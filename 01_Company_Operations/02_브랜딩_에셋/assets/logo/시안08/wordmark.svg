@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="260" height="60">
+  <style>
+    .wm8my { font-family: 'Inter', system-ui, sans-serif; font-weight: 300; font-size: 46px; letter-spacing: -1px; }
+    .wm8cr { font-family: 'Inter', system-ui, sans-serif; font-weight: 900; font-size: 46px; letter-spacing: -1px; }
+  </style>
+  <text x="0" y="46">
+    <tspan class="wm8my" fill="#111827">My</tspan><tspan class="wm8cr" fill="#2563EB">Crew</tspan>
+  </text>
+</svg>

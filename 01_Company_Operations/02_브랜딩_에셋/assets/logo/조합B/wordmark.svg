@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="280" height="64">
+  <defs>
+    <linearGradient id="wmBg" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .wmB-my { font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 46px; letter-spacing: -2px; font-style: italic; }
+    .wmB-cr { font-family: 'Inter', system-ui, sans-serif; font-weight: 900; font-size: 46px; letter-spacing: -1.5px; font-style: italic; }
+  </style>
+  <text x="0" y="48">
+    <tspan class="wmB-my" fill="#111827">My</tspan><tspan class="wmB-cr" fill="url(#wmBg)">Crew</tspan>
+  </text>
+  <!-- Subtle hexagonal accent dot -->
+  <polygon points="240,10 245,7 250,10 250,16 245,19 240,16" fill="#3B82F6" opacity="0.5"/>
+</svg>

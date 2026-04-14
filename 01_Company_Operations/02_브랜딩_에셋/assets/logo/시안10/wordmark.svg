@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 64" width="280" height="64">
+  <style>
+    .wm10my { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-weight: 700; font-size: 42px; letter-spacing: -0.5px; }
+    .wm10cr { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-weight: 700; font-size: 42px; letter-spacing: -0.5px; }
+  </style>
+  <text x="2" y="44">
+    <tspan class="wm10my" fill="#111827">My</tspan><tspan class="wm10cr" fill="#2563EB">Crew</tspan>
+  </text>
+  <!-- Accent underline under Crew -->
+  <rect x="80" y="52" width="120" height="3" rx="1.5" fill="#2563EB"/>
+</svg>

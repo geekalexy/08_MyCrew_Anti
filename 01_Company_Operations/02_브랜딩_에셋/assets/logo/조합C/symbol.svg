@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sgC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- No background rectangle — hexagons only -->
+  <!-- Central hexagon (larger, filled) -->
+  <polygon points="60,22 84,36 84,64 60,78 36,64 36,36" fill="url(#sgC)" opacity="0.12" stroke="url(#sgC)" stroke-width="2.5"/>
+  <!-- Top-left hex -->
+  <polygon points="32,20 44,13 56,20 56,34 44,41 32,34" fill="none" stroke="url(#sgC)" stroke-width="2" opacity="0.6"/>
+  <!-- Top-right hex -->
+  <polygon points="64,20 76,13 88,20 88,34 76,41 64,34" fill="none" stroke="url(#sgC)" stroke-width="2" opacity="0.6"/>
+  <!-- Bottom hex -->
+  <polygon points="48,66 60,59 72,66 72,80 60,87 48,80" fill="none" stroke="url(#sgC)" stroke-width="2" opacity="0.6"/>
+  <!-- Bottom-left hex (extra for balance) -->
+  <polygon points="20,48 32,41 44,48 44,62 32,69 20,62" fill="none" stroke="url(#sgC)" stroke-width="1.5" opacity="0.35"/>
+  <!-- Bottom-right hex (extra for balance) -->
+  <polygon points="76,48 88,41 100,48 100,62 88,69 76,62" fill="none" stroke="url(#sgC)" stroke-width="1.5" opacity="0.35"/>
+  <!-- AI core dot in center -->
+  <circle cx="60" cy="50" r="7" fill="url(#sgC)"/>
+  <!-- Pulse ring -->
+  <circle cx="60" cy="50" r="14" fill="none" stroke="url(#sgC)" stroke-width="1.5" opacity="0.3"/>
+</svg>

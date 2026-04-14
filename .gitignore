@@ -1,0 +1,32 @@
+# 🔐 Security & Secrets
+.env
+.env.*
+!.env.example
+
+# 🗄️ Database (No History Leak)
+*.sqlite
+*.sqlite3
+database.sqlite
+database.sqlite-*
+
+# 📦 Node Modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🖥️ OS & IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# 🏗️ Build & Logs
+dist/
+build/
+logs/
+*.log
+
+# 🛸 AI Engine Specific
+.gemini/
+.claude/

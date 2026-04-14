@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 120" width="380" height="120">
+  <defs>
+    <linearGradient id="sgDc" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .wmD { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 48px; letter-spacing: -2px; font-style: italic; }
+  </style>
+  <!-- Hexagon symbol (no background, exact 시안03 layout) -->
+  <polygon points="60,30 78,42 78,66 60,78 42,66 42,42" fill="url(#sgDc)" opacity="0.12" stroke="url(#sgDc)" stroke-width="2.5"/>
+  <polygon points="38,28 48,22 58,28 58,40 48,46 38,40" fill="none" stroke="url(#sgDc)" stroke-width="2" opacity="0.7"/>
+  <polygon points="62,28 72,22 82,28 82,40 72,46 62,40" fill="none" stroke="url(#sgDc)" stroke-width="2" opacity="0.7"/>
+  <polygon points="50,68 60,62 70,68 70,80 60,86 50,80" fill="none" stroke="url(#sgDc)" stroke-width="2" opacity="0.7"/>
+  <circle cx="60" cy="54" r="6" fill="url(#sgDc)"/>
+  <circle cx="60" cy="54" r="12" fill="none" stroke="url(#sgDc)" stroke-width="1.5" opacity="0.4"/>
+  <!-- Wordmark (italic) -->
+  <text x="124" y="76">
+    <tspan class="wmD" fill="#111827">My</tspan><tspan class="wmD" fill="#2563EB">Crew</tspan>
+  </text>
+</svg>

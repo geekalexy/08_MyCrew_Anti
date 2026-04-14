@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" width="420" height="120">
+  <defs>
+    <linearGradient id="sg4c" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .wm-my { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 48px; letter-spacing: -1.5px; }
+    .wm-crew { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 48px; letter-spacing: -1.5px; }
+  </style>
+  <!-- Symbol -->
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg4c)"/>
+  <rect x="24" y="30" width="36" height="28" rx="8" fill="#fff"/>
+  <polygon points="36,58 42,58 34,68" fill="#fff"/>
+  <circle cx="34" cy="44" r="2.5" fill="#2563EB"/>
+  <circle cx="42" cy="44" r="2.5" fill="#2563EB"/>
+  <circle cx="50" cy="44" r="2.5" fill="#2563EB"/>
+  <rect x="56" y="50" width="40" height="28" rx="8" fill="rgba(255,255,255,0.85)"/>
+  <polygon points="80,78 86,78 90,88" fill="rgba(255,255,255,0.85)"/>
+  <path d="M76 60 L78 64 L82 64 L79 67 L80 71 L76 68 L72 71 L73 67 L70 64 L74 64 Z" fill="#2563EB" transform="scale(0.9) translate(8, 6)"/>
+  <circle cx="56" cy="52" r="2" fill="#fff" opacity="0.7"/>
+  <!-- Wordmark -->
+  <text x="136" y="76" class="wm-my" fill="#111827">My</text>
+  <text x="220" y="76" class="wm-crew" fill="#2563EB">Crew</text>
+</svg>

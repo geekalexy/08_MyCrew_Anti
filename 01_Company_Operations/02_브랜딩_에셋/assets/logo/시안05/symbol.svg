@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sg5" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square base -->
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg5)"/>
+  <!-- Three flowing wave lines representing crew members -->
+  <!-- Wave 1 (top) -->
+  <path d="M26 42 Q40 30 52 42 Q64 54 78 42 Q86 36 94 42" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <!-- Wave 2 (middle - primary) -->
+  <path d="M26 58 Q40 44 52 58 Q64 72 78 58 Q86 50 94 58" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <!-- Wave 3 (bottom) -->
+  <path d="M26 74 Q40 62 52 74 Q64 86 78 74 Q86 68 94 74" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+  <!-- Leading dots on each wave -->
+  <circle cx="94" cy="42" r="3" fill="#fff" opacity="0.7"/>
+  <circle cx="94" cy="58" r="4" fill="#fff"/>
+  <circle cx="94" cy="74" r="3" fill="#fff" opacity="0.7"/>
+</svg>

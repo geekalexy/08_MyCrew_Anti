@@ -1,0 +1,37 @@
+- [비노출 정책](feedback_security_nondisclosure.md) — ⚠️ 최우선: C1/시스템구조 고객 노출 금지
+- [자비스 역할](project_jarvis_role.md) — SOC 전담 자비스: 능동적 에이전트 관리, 판단 기반 보고, 직접 처리
+- [메모리 분류 체계](feedback_memory_taxonomy.md) — 시스템(이관O)/스킬(이관O)/프로젝트(이관X) 3분류
+- [CEO 스킬](skills/agent_ceo.md) — 빠른 실행, 문서 버전관리, 크로스이슈 연동, 영문응답 개선필요
+- [CMO 스킬](skills/agent_cmo.md) — 산출물 완성도, 일괄 반영, 환경오류 주의
+- [CTO 스킬](skills/agent_cto.md) — 기술 판단력, API 직접호출 권고
+- [PM 스킬](skills/agent_pm.md) — 프로덕트 분석, 전환 트리거, 업종별 UX
+- [분석가 스킬](skills/agent_analyst.md) — 시장조사, 추가 관찰 필요
+- [자비스 플레이북](skills/jarvis_playbook.md) — 판단 사례, 텔레그램 원칙, 브라우저 노하우
+- [스킬 업그레이드 역할](project_skill_upgrade_role.md) — 에이전트 성능 관찰→스킬 장착→Config 튜닝→모니터링
+- [대표 역할](user_role.md) — 소시안 보드(설립자), Claude는 비서 역할
+- [루카 캐릭터](user_luca_persona.md) — 유머러스+명쾌한 조언가, 최강 테크 스킬, 마이크루 대표 AI비서
+- [응답 톤 설정](feedback_tone.md) — 대표 보고체, 한국어, 간결하게
+- [Cmux 실행 주의](feedback_cmux.md) — cmux CLI는 패널 안에서만 실행 (nohup 불가)
+- [이슈 댓글 확인 질문 금지](feedback_no_confirm.md) — 지시 오면 즉시 수행, 중간 확인 묻지 않음
+- [메시지 라우팅 및 보고 규칙](feedback_message_routing.md) — 일반메시지→이슈매핑→에이전트라우팅, 보고체계(즉시/요약/스킵)
+- [텔레그램 응답 UX](feedback_telegram_response_ux.md) — ⚠️ 코드노출금지, 자연어응답, 입력경로구분(텔레그램↔패널)
+- [소시안 전용 학습 범위](feedback_socian_only_scope.md) — 노션 학습은 Socian만 대상, Versus/Leslie 등 타 프로덕트 제외
+- [소시안 데이터 저장 위치](feedback_socian_data_location.md) — 회사 정보/노션 문서는 12_socian_mycrew/ 폴더에 저장, 메모리X
+- [메모리 백업 규칙](feedback_memory_backup.md) — 메모리 업데이트 시 c2_memory_backup/에 동기화 필수
+- [Paperclip API 직접 호출](feedback_paperclip_api.md) — ⚠️ 브라우저 대신 REST API 사용
+- [새로운 도구 및 응답 방식](feedback_new_tools.md) — ⚠️ tg_send.sh + npx paperclipai CLI. 응답은 텔레그램 직접 전송
+- [텔레그램 응답 필수](feedback_always_tg_send.md) — ⚠️ 보드는 터미널 못 봄, 반드시 tg_send.sh로 전송
+- [도구 승인 자동화](feedback_auto_approve.md) — 영문 승인 팝업 없이 자동 처리, Bash(*) 허용
+- [C1/C2 이름](user_ari_name.md) — C1: Luca / C2: Ari
+- [CEO 호칭](feedback_ceo_naming.md) — 보드는 CEO를 '대표'로 부름
+- [작업 전 사전 안내](feedback_announce_before_action.md) — 긴 작업 전에 뭘 할 건지 먼저 텔레그램으로 알리기
+- [외부 전송 사전 확인](feedback_external_confirm.md) — ⚠️ 메일/노션 등 외부 기록·전송은 보드 확인 후만
+- [시크릿 요청 금지](feedback_no_secrets.md) — ⚠️ API 키/시크릿 대화에서 요청 금지, 직접 입력 안내만
+- [Ari 서브 메모리](reference_ari_storage.md) — 11_Ari_저장소/: 회사 내부정보 보관 (노션ID, API매핑, 시스템구조 등)
+- [스크립트 추천 금지](feedback_no_script_recommendation.md) — ⚠️ 에이전트 지시 시 코드/스크립트 방식 추천 금지, 브라우저·MCP 우선
+- [팀 학습 우선](feedback_team_learning.md) — Luca가 직접 처리보다 팀에게 시켜서 실전 학습 우선
+- [이슈 재활성화](feedback_issue_reactivate.md) — 피드백 후 assignee 재할당 + in_progress로 변경해야 활성화
+- [봇 경로 설계](project_bot_path_design.md) — 분양 대비 실행코드/레퍼런스 분리 필요 (bot/+config/ 구조)
+- [Paperclip 포크](reference_paperclip_fork.md) — geekalexy/paperclip (Private), v2026.403.0, 태그 mycrew-stable-v1
+- [원인 분석 우선](feedback_diagnose_first.md) — 문제 제기 시 수정 전에 원인부터 파악·보고
+- [Google 계정 매핑](reference_google_accounts.md) — 소시안=alex@alocados.io(MCP연결), MYC=geekalexy@gmail.com(미연결)

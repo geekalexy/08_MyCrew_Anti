@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 60" width="260" height="60">
+  <style>
+    .wmC { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 46px; letter-spacing: -2px; font-style: italic; }
+  </style>
+  <text x="0" y="48">
+    <tspan class="wmC" fill="#111827">My</tspan><tspan class="wmC" fill="#2563EB">Crew</tspan>
+  </text>
+</svg>

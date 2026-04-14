@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mycrew - AI팀 세팅 신청 폼 디자인 시안 v2</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* === 사이트 디자인 시스템 (기존 동일) === */
+        :root, [data-theme="light"] {
+            color-scheme: light;
+            --bg-primary: #F8F9FA;
+            --bg-secondary: #FFFFFF;
+            --bg-hover: #F0F1F3;
+            --border: rgba(0,0,0,0.06);
+            --border-hover: rgba(59,130,246,0.25);
+            --text-white: #111827;
+            --text-normal: #374151;
+            --text-muted: #6B7280;
+            --text-faint: #9CA3AF;
+            --accent: #2563EB;
+            --accent-hover: #1D4ED8;
+            --accent-glow: rgba(37,99,235,0.08);
+            --nav-bg: rgba(248, 249, 250, 0.85);
+        }
+        [data-theme="dark"] {
+            color-scheme: dark;
+            --bg-primary: #0F0F0F;
+            --bg-secondary: #1A1A1D;
+            --bg-hover: #262626;
+            --border: rgba(255,255,255,0.06);
+            --border-hover: rgba(59,130,246,0.3);
+            --text-white: #FFFFFF;
+            --text-normal: #E5E5E5;
+            --text-muted: #A1A1AA;
+            --text-faint: #71717A;
+            --accent: #3B82F6;
+            --accent-hover: #60A5FA;
+            --accent-glow: rgba(59,130,246,0.12);
+            --nav-bg: rgba(15, 15, 15, 0.85);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            color: var(--text-normal);
+            line-height: 1.6;
+            background: var(--bg-primary);
+            font-size: 16px;
+        }
+        .container {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* === 시안 네비게이션 === */
+        .design-nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--nav-bg);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .design-nav .label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .design-nav .theme-btn {
+            margin-left: auto;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        /* === 멀티스텝 위자드 폼 === */
+        .apply-form {
+            padding: 96px 0;
+        }
+        .apply-form h2 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-white);
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+            text-align: center;
+        }
+        .apply-form h2 .accent { color: var(--accent); }
+        .apply-form .form-sub {
+            color: var(--text-muted);
+            margin-bottom: 48px;
+            font-size: 1.125rem;
+            line-height: 1.7;
+            text-align: center;
+        }
+
+        /* 프로그레스 인디케이터 */
+        .progress-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            margin-bottom: 40px;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .progress-num {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            border: 2px solid var(--border);
+            color: var(--text-faint);
+            background: var(--bg-secondary);
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+        .progress-step.active .progress-num {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+        .progress-step.done .progress-num {
+            border-color: #22C55E;
+            background: rgba(34,197,94,0.1);
+            color: #22C55E;
+        }
+        .progress-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-faint);
+            white-space: nowrap;
+        }
+        .progress-step.active .progress-label {
+            color: var(--accent);
+        }
+        .progress-step.done .progress-label {
+            color: var(--text-muted);
+        }
+        .progress-line {
+            width: 40px;
+            height: 2px;
+            background: var(--border);
+            margin: 0 6px;
+            flex-shrink: 0;
+        }
+        .progress-line.done {
+            background: #22C55E;
+        }
+
+        /* 위자드 카드 */
+        .wizard-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            max-width: 640px;
+            margin: 0 auto;
+        }
+        .wizard-header {
+            padding: 32px 40px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .wizard-step-tag {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .wizard-header h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text-white);
+            margin-bottom: 4px;
+        }
+        .wizard-header p {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .wizard-body {
+            padding: 32px 40px;
+        }
+        .wizard-footer {
+            padding: 0 40px 32px;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        /* 폼 요소 */
+        .form-group {
+            margin-bottom: 24px;
+        }
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-white);
+            margin-bottom: 8px;
+        }
+        .form-label .req {
+            color: #EF4444;
+            margin-left: 2px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-normal);
+            font-family: inherit;
+            font-size: 15px;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        .form-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .form-input::placeholder {
+            color: var(--text-faint);
+        }
+
+        /* 라디오 옵션 */
+        .radio-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .radio-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            color: var(--text-normal);
+            background: var(--bg-primary);
+        }
+        .radio-pill:hover {
+            border-color: var(--border-hover);
+            background: var(--accent-glow);
+        }
+        .radio-pill.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .radio-pill input { display: none; }
+
+        /* 체크박스 그리드 */
+        .task-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .task-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-primary);
+        }
+        .task-card:hover {
+            border-color: var(--border-hover);
+            background: var(--accent-glow);
+        }
+        .task-card.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .task-card input { display: none; }
+        .task-card .task-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-normal);
+            flex: 1;
+        }
+        .task-card.selected .task-label {
+            color: var(--accent);
+            font-weight: 600;
+        }
+        .task-card .check-box {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: transparent;
+            flex-shrink: 0;
+        }
+        .task-card.selected .check-box {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #fff;
+        }
+
+        /* 캐릭터 선택 카드 */
+        .char-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .char-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-primary);
+        }
+        .char-row:hover {
+            border-color: var(--border-hover);
+        }
+        .char-row.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .char-row input { display: none; }
+        .char-row .char-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            overflow: hidden;
+            image-rendering: pixelated;
+            flex-shrink: 0;
+            background: var(--bg-secondary);
+        }
+        .char-row .char-avatar img {
+            width: 100%;
+            height: 100%;
+        }
+        .char-row .char-info { flex: 1; }
+        .char-row .char-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-white);
+        }
+        .char-row .char-badge {
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: 700;
+            margin-left: 6px;
+        }
+        .char-row .char-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .char-row .radio-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .char-row.selected .radio-dot {
+            border-color: var(--accent);
+        }
+        .char-row.selected .radio-dot::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* 버튼 */
+        .btn-prev {
+            padding: 12px 28px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .btn-prev:hover {
+            border-color: var(--border-hover);
+            color: var(--text-normal);
+        }
+        .btn-next {
+            padding: 12px 28px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        .btn-next:hover { background: var(--accent-hover); }
+        .btn-submit {
+            padding: 12px 28px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        .btn-submit:hover { background: var(--accent-hover); }
+
+        /* 자격 미달 종료 화면 */
+        .disqualify-box {
+            text-align: center;
+            padding: 40px 24px;
+        }
+        .disqualify-box .dq-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(234,179,8,0.1);
+            border: 2px solid #EAB308;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 22px;
+            color: #EAB308;
+        }
+        .disqualify-box h4 {
+            font-size: 1.125rem;
+            color: var(--text-white);
+            margin-bottom: 8px;
+        }
+        .disqualify-box p {
+            color: var(--text-muted);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        .disqualify-box .email-input-row {
+            display: flex;
+            gap: 8px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .disqualify-box .email-input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-normal);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+        }
+        .disqualify-box .email-input-row input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .disqualify-box .email-input-row button {
+            padding: 10px 20px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        /* 성공 화면 */
+        .success-box {
+            text-align: center;
+            padding: 48px 24px;
+        }
+        .success-box .ok-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(34,197,94,0.1);
+            border: 2px solid #22C55E;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 28px;
+            color: #22C55E;
+        }
+        .success-box h3 {
+            font-size: 1.5rem;
+            color: var(--text-white);
+            margin-bottom: 12px;
+        }
+        .success-box p {
+            color: var(--text-muted);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        /* 그리드 */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* 숨김 */
+        .step-panel { display: none; }
+        .step-panel.visible { display: block; }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .task-grid { grid-template-columns: 1fr; }
+            .progress-label { display: none; }
+            .progress-line { width: 24px; }
+        }
+        @media (max-width: 640px) {
+            .wizard-header { padding: 24px; }
+            .wizard-body { padding: 24px; }
+            .wizard-footer { padding: 0 24px 24px; }
+            .form-grid { grid-template-columns: 1fr; }
+            .wizard-card { border-radius: 12px; }
+        }
+
+        /* 구분선 */
+        .design-sep {
+            max-width: 640px;
+            margin: 48px auto;
+            border: none;
+            height: 1px;
+            background: var(--border);
+        }
+        .design-label {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .design-label .tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            background: var(--accent-glow);
+            padding: 3px 10px;
+            border-radius: 12px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .design-label p {
+            font-size: 13px;
+            color: var(--text-faint);
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 시안 네비게이션 -->
+    <div class="design-nav">
+        <span class="label">v2 - 멀티스텝 위자드</span>
+        <button class="theme-btn" onclick="toggleTheme()">
+            <span class="icon-sun">&#9728;</span>
+            <span class="icon-moon" style="display:none;">&#9790;</span>
+        </button>
+    </div>
+
+    <div class="apply-form">
+        <div class="container">
+            <h2><span class="txt-ko">AI팀 세팅 <span class="accent">신청</span></span><span class="txt-en" style="display:none;">AI Team Setup <span class="accent">Application</span></span></h2>
+            <p class="form-sub"><span class="txt-ko">간단한 질문에 답변해주시면 맞춤형 AI 팀을 세팅해드립니다.</span><span class="txt-en" style="display:none;">Answer a few questions and we'll set up a custom AI team for you.</span></p>
+
+            <!-- ============================
+                 스텝 1: 자격 확인 (2문항)
+            ============================ -->
+            <div class="design-label">
+                <span class="tag">STEP 1</span>
+                <p>자격 확인 - 조건 미충족 시 종료 플로우 포함</p>
+            </div>
+
+            <!-- 프로그레스 -->
+            <div class="progress-bar">
+                <div class="progress-step active">
+                    <div class="progress-num">1</div>
+                    <span class="progress-label"><span class="txt-ko">자격 확인</span><span class="txt-en" style="display:none;">Eligibility</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">2</div>
+                    <span class="progress-label"><span class="txt-ko">기본 정보</span><span class="txt-en" style="display:none;">Info</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">3</div>
+                    <span class="progress-label"><span class="txt-ko">업무</span><span class="txt-en" style="display:none;">Tasks</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">4</div>
+                    <span class="progress-label"><span class="txt-ko">AI 비서</span><span class="txt-en" style="display:none;">Character</span></span>
+                </div>
+            </div>
+
+            <!-- 스텝 1 카드 -->
+            <div class="wizard-card">
+                <div class="wizard-header">
+                    <div class="wizard-step-tag"><span class="txt-ko">1/4 단계</span><span class="txt-en" style="display:none;">STEP 1 OF 4</span></div>
+                    <h3><span class="txt-ko"><span style="color:var(--accent);">자격</span> 확인</span><span class="txt-en" style="display:none;"><span style="color:var(--accent);">Eligibility</span> Check</span></h3>
+                    <p><span class="txt-ko">서비스 이용 조건을 확인합니다.</span><span class="txt-en" style="display:none;">Let's check if you meet the requirements.</span></p>
+                </div>
+                <div class="wizard-body">
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">Mac을 사용하고 계신가요?</span><span class="txt-en" style="display:none;">Are you using a Mac?</span> <span class="req">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-pill selected"><input type="radio" name="useMac" value="Yes" checked>Yes</label>
+                            <label class="radio-pill"><input type="radio" name="useMac" value="No">No</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">Claude 유료 플랜을 구독 중이신가요?</span><span class="txt-en" style="display:none;">Do you have a paid Claude plan?</span> <span class="req">*</span></label>
+                        <div class="radio-group">
+                            <label class="radio-pill"><input type="radio" name="claudePlan" value="Pro">Pro ($20)</label>
+                            <label class="radio-pill selected"><input type="radio" name="claudePlan" value="Max" checked>Max ($100)</label>
+                            <label class="radio-pill"><input type="radio" name="claudePlan" value="Team">Team</label>
+                            <label class="radio-pill"><input type="radio" name="claudePlan" value="free"><span class="txt-ko">무료 / 없음</span><span class="txt-en" style="display:none;">Free / None</span></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="wizard-footer">
+                    <div></div>
+                    <button class="btn-next"><span class="txt-ko">다음</span><span class="txt-en" style="display:none;">Next</span></button>
+                </div>
+            </div>
+
+            <!-- 자격 미달: Mac 없음 -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">STEP 1 - Mac No</span>
+                <p>Mac 미사용 시 종료 화면</p>
+            </div>
+            <div class="wizard-card">
+                <div class="wizard-body">
+                    <div class="disqualify-box">
+                        <div class="dq-icon">!</div>
+                        <h4><span class="txt-ko">현재 Mac 전용 서비스입니다</span><span class="txt-en" style="display:none;">Mac only service</span></h4>
+                        <p><span class="txt-ko">mycrew는 현재 macOS 환경에서만 이용 가능합니다.<br>Windows/Linux 지원이 시작되면 알려드리겠습니다.</span><span class="txt-en" style="display:none;">mycrew currently requires macOS.<br>We'll notify you when Windows/Linux support launches.</span></p>
+                        <div class="email-input-row">
+                            <input type="email" placeholder="your@email.com">
+                            <button><span class="txt-ko">알림 받기</span><span class="txt-en" style="display:none;">Notify me</span></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 자격 미달: 무료 플랜 -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">STEP 1 - Free Plan</span>
+                <p>Claude 무료 사용 시 종료 화면</p>
+            </div>
+            <div class="wizard-card">
+                <div class="wizard-body">
+                    <div class="disqualify-box">
+                        <div class="dq-icon">!</div>
+                        <h4><span class="txt-ko">유료 플랜 구독이 필요합니다</span><span class="txt-en" style="display:none;">Paid plan required</span></h4>
+                        <p><span class="txt-ko">mycrew는 Claude Pro, Max, 또는 Team 플랜이 필요합니다.<br>구독 후 다시 신청해주세요.</span><span class="txt-en" style="display:none;">mycrew requires Claude Pro, Max, or Team plan.<br>Please subscribe and apply again.</span></p>
+                        <a href="https://claude.ai/settings/billing" style="display:inline-block; padding:10px 24px; background:var(--accent); color:#fff; border-radius:8px; font-size:14px; font-weight:600; text-decoration:none;"><span class="txt-ko">Claude 플랜 확인</span><span class="txt-en" style="display:none;">Check Claude Plans</span></a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================
+                 스텝 2: 환경 + 기본 정보 (3문항)
+            ============================ -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">STEP 2</span>
+                <p>환경 + 기본 정보</p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">자격 확인</span><span class="txt-en" style="display:none;">Eligibility</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step active">
+                    <div class="progress-num">2</div>
+                    <span class="progress-label"><span class="txt-ko">기본 정보</span><span class="txt-en" style="display:none;">Info</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">3</div>
+                    <span class="progress-label"><span class="txt-ko">업무</span><span class="txt-en" style="display:none;">Tasks</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">4</div>
+                    <span class="progress-label"><span class="txt-ko">AI 비서</span><span class="txt-en" style="display:none;">Character</span></span>
+                </div>
+            </div>
+
+            <div class="wizard-card">
+                <div class="wizard-header">
+                    <div class="wizard-step-tag"><span class="txt-ko">2/4 단계</span><span class="txt-en" style="display:none;">STEP 2 OF 4</span></div>
+                    <h3><span class="txt-ko"><span style="color:var(--accent);">기본</span> 정보</span><span class="txt-en" style="display:none;"><span style="color:var(--accent);">Basic</span> Info</span></h3>
+                    <p><span class="txt-ko">환경과 연락처 정보를 알려주세요.</span><span class="txt-en" style="display:none;">Tell us about your setup and contact info.</span></p>
+                </div>
+                <div class="wizard-body">
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">macOS 버전</span><span class="txt-en" style="display:none;">macOS Version</span></label>
+                        <input type="text" class="form-input" placeholder="예: Sequoia 15.4" value="Sequoia 15.4" style="color: var(--text-normal);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">텔레그램 ID</span><span class="txt-en" style="display:none;">Telegram ID</span></label>
+                        <input type="text" class="form-input" placeholder="@username" value="@mycrew_user" style="color: var(--text-normal);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">회사(브랜드) 이름</span><span class="txt-en" style="display:none;">Company / Brand Name</span></label>
+                        <input type="text" class="form-input" placeholder="" value="" style="color: var(--text-normal);">
+                    </div>
+                </div>
+                <div class="wizard-footer">
+                    <button class="btn-prev"><span class="txt-ko">이전</span><span class="txt-en" style="display:none;">Back</span></button>
+                    <button class="btn-next"><span class="txt-ko">다음</span><span class="txt-en" style="display:none;">Next</span></button>
+                </div>
+            </div>
+
+            <!-- ============================
+                 스텝 3: 업무 정보 (4문항)
+            ============================ -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">STEP 3</span>
+                <p>업무 정보</p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">자격 확인</span><span class="txt-en" style="display:none;">Eligibility</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">기본 정보</span><span class="txt-en" style="display:none;">Info</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step active">
+                    <div class="progress-num">3</div>
+                    <span class="progress-label"><span class="txt-ko">업무</span><span class="txt-en" style="display:none;">Tasks</span></span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step">
+                    <div class="progress-num">4</div>
+                    <span class="progress-label"><span class="txt-ko">AI 비서</span><span class="txt-en" style="display:none;">Character</span></span>
+                </div>
+            </div>
+
+            <div class="wizard-card">
+                <div class="wizard-header">
+                    <div class="wizard-step-tag"><span class="txt-ko">3/4 단계</span><span class="txt-en" style="display:none;">STEP 3 OF 4</span></div>
+                    <h3><span class="txt-ko"><span style="color:var(--accent);">업무</span> 정보</span><span class="txt-en" style="display:none;"><span style="color:var(--accent);">Task</span> Info</span></h3>
+                    <p><span class="txt-ko">사업 내용과 맡기고 싶은 업무를 알려주세요.</span><span class="txt-en" style="display:none;">Tell us about your business and what tasks you want AI to handle.</span></p>
+                </div>
+                <div class="wizard-body">
+                    <div class="form-grid" style="margin-bottom: 24px;">
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label"><span class="txt-ko">업종</span><span class="txt-en" style="display:none;">Industry</span></label>
+                            <input type="text" class="form-input" value="AI SaaS" style="color: var(--text-normal);">
+                        </div>
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label"><span class="txt-ko">주요 제품/서비스</span><span class="txt-en" style="display:none;">Main Product/Service</span></label>
+                            <input type="text" class="form-input" value="" style="color: var(--text-normal);">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">타겟 고객</span><span class="txt-en" style="display:none;">Target Customer</span></label>
+                        <input type="text" class="form-input" value="" style="color: var(--text-normal);">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label"><span class="txt-ko">맡기고 싶은 업무 (복수 선택)</span><span class="txt-en" style="display:none;">Tasks you want AI to handle (multiple)</span></label>
+                        <div class="task-grid">
+                            <label class="task-card selected">
+                                <input type="checkbox" checked>
+                                <span class="task-label"><span class="txt-ko">콘텐츠 기획/제작</span><span class="txt-en" style="display:none;">Content</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card selected">
+                                <input type="checkbox" checked>
+                                <span class="task-label"><span class="txt-ko">마케팅/광고 운영</span><span class="txt-en" style="display:none;">Marketing/Ads</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">시장조사/경쟁사 분석</span><span class="txt-en" style="display:none;">Research</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">고객 응대/CS</span><span class="txt-en" style="display:none;">CS</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">기획/전략 수립</span><span class="txt-en" style="display:none;">Strategy</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">디자인</span><span class="txt-en" style="display:none;">Design</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">데이터 분석/보고서</span><span class="txt-en" style="display:none;">Analytics</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                            <label class="task-card">
+                                <input type="checkbox">
+                                <span class="task-label"><span class="txt-ko">기타</span><span class="txt-en" style="display:none;">Other</span></span>
+                                <div class="check-box">&#10003;</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="wizard-footer">
+                    <button class="btn-prev"><span class="txt-ko">이전</span><span class="txt-en" style="display:none;">Back</span></button>
+                    <button class="btn-next"><span class="txt-ko">다음</span><span class="txt-en" style="display:none;">Next</span></button>
+                </div>
+            </div>
+
+            <!-- ============================
+                 스텝 4: AI 비서 선택 (1문항)
+            ============================ -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">STEP 4</span>
+                <p>AI 비서 캐릭터 선택 + 신청 완료</p>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">자격 확인</span><span class="txt-en" style="display:none;">Eligibility</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">기본 정보</span><span class="txt-en" style="display:none;">Info</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step done">
+                    <div class="progress-num">&#10003;</div>
+                    <span class="progress-label"><span class="txt-ko">업무</span><span class="txt-en" style="display:none;">Tasks</span></span>
+                </div>
+                <div class="progress-line done"></div>
+                <div class="progress-step active">
+                    <div class="progress-num">4</div>
+                    <span class="progress-label"><span class="txt-ko">AI 비서</span><span class="txt-en" style="display:none;">Character</span></span>
+                </div>
+            </div>
+
+            <div class="wizard-card">
+                <div class="wizard-header">
+                    <div class="wizard-step-tag"><span class="txt-ko">4/4 단계</span><span class="txt-en" style="display:none;">STEP 4 OF 4</span></div>
+                    <h3><span class="txt-ko">AI 비서 <span style="color:var(--accent);">캐릭터</span></span><span class="txt-en" style="display:none;">AI Secretary <span style="color:var(--accent);">Character</span></span></h3>
+                    <p><span class="txt-ko">텔레그램으로 소통할 AI 비서 캐릭터를 선택하세요.</span><span class="txt-en" style="display:none;">Choose your AI secretary character for Telegram.</span></p>
+                </div>
+                <div class="wizard-body">
+                    <div class="char-list">
+                        <label class="char-row selected">
+                            <input type="radio" name="character" value="Ari" checked>
+                            <div class="char-avatar">
+                                <img src="assets/characters/final_svg/ari.svg" alt="Ari">
+                            </div>
+                            <div class="char-info">
+                                <div class="char-name">Ari <span class="char-badge"><span class="txt-ko">기본</span><span class="txt-en" style="display:none;">Default</span></span></div>
+                                <div class="char-desc"><span class="txt-ko">밝고 영민한 비서 - 빠른 판단과 친근한 소통</span><span class="txt-en" style="display:none;">Bright & smart - quick decisions, friendly communication</span></div>
+                            </div>
+                            <div class="radio-dot"></div>
+                        </label>
+                        <label class="char-row">
+                            <input type="radio" name="character" value="Ollie">
+                            <div class="char-avatar">
+                                <img src="assets/characters/final_svg/ollie.svg" alt="Ollie">
+                            </div>
+                            <div class="char-info">
+                                <div class="char-name">Ollie</div>
+                                <div class="char-desc"><span class="txt-ko">지혜로운 관리자 - 꼼꼼한 업무 관리와 조언</span><span class="txt-en" style="display:none;">Wise manager - meticulous task management and advice</span></div>
+                            </div>
+                            <div class="radio-dot"></div>
+                        </label>
+                        <label class="char-row">
+                            <input type="radio" name="character" value="Pico">
+                            <div class="char-avatar">
+                                <img src="assets/characters/final_svg/pico.svg" alt="Pico">
+                            </div>
+                            <div class="char-info">
+                                <div class="char-name">Pico</div>
+                                <div class="char-desc"><span class="txt-ko">작지만 강한 도우미 - 빠르고 정확한 실행력</span><span class="txt-en" style="display:none;">Small but mighty - fast and precise execution</span></div>
+                            </div>
+                            <div class="radio-dot"></div>
+                        </label>
+                        <label class="char-row">
+                            <input type="radio" name="character" value="Lumi">
+                            <div class="char-avatar">
+                                <img src="assets/characters/final_svg/lumi.svg" alt="Lumi">
+                            </div>
+                            <div class="char-info">
+                                <div class="char-name">Lumi</div>
+                                <div class="char-desc"><span class="txt-ko">따뜻한 길잡이 - 부드럽고 배려 깊은 안내</span><span class="txt-en" style="display:none;">Warm guide - gentle and caring navigation</span></div>
+                            </div>
+                            <div class="radio-dot"></div>
+                        </label>
+                        <label class="char-row">
+                            <input type="radio" name="character" value="Nova">
+                            <div class="char-avatar">
+                                <img src="assets/characters/final_svg/nova.svg" alt="Nova">
+                            </div>
+                            <div class="char-info">
+                                <div class="char-name">Nova</div>
+                                <div class="char-desc"><span class="txt-ko">에너지 넘치는 리더 - 적극적이고 추진력 있는 소통</span><span class="txt-en" style="display:none;">Energetic leader - proactive and driven communication</span></div>
+                            </div>
+                            <div class="radio-dot"></div>
+                        </label>
+                    </div>
+                </div>
+                <div class="wizard-footer">
+                    <button class="btn-prev"><span class="txt-ko">이전</span><span class="txt-en" style="display:none;">Back</span></button>
+                    <button class="btn-submit"><span class="txt-ko">신청하기</span><span class="txt-en" style="display:none;">Submit</span></button>
+                </div>
+            </div>
+
+            <!-- ============================
+                 성공 화면
+            ============================ -->
+            <hr class="design-sep">
+            <div class="design-label">
+                <span class="tag">완료</span>
+                <p>신청 완료 화면</p>
+            </div>
+
+            <div class="wizard-card">
+                <div class="success-box">
+                    <div class="ok-icon">&#10003;</div>
+                    <h3><span class="txt-ko">신청이 완료되었습니다</span><span class="txt-en" style="display:none;">Application submitted</span></h3>
+                    <p><span class="txt-ko">맞춤형 AI 팀 구성안을 준비하여 텔레그램으로 연락드리겠습니다.<br>감사합니다.</span><span class="txt-en" style="display:none;">We'll prepare a custom AI team plan and contact you via Telegram.<br>Thank you.</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="height: 80px;"></div>
+
+    <script>
+    function toggleTheme() {
+        var html = document.documentElement;
+        var current = html.getAttribute('data-theme') || 'light';
+        var next = current === 'light' ? 'dark' : 'light';
+        html.setAttribute('data-theme', next);
+        var sun = document.querySelector('.icon-sun');
+        var moon = document.querySelector('.icon-moon');
+        if (sun && moon) {
+            sun.style.display = next === 'light' ? 'inline' : 'none';
+            moon.style.display = next === 'dark' ? 'inline' : 'none';
+        }
+        // i18n toggle
+        document.querySelectorAll('.txt-ko').forEach(function(el) {
+            el.style.display = next === 'light' ? '' : 'none';
+        });
+        document.querySelectorAll('.txt-en').forEach(function(el) {
+            el.style.display = next === 'dark' ? '' : 'none';
+        });
+    }
+
+    // Radio pill interaction
+    document.querySelectorAll('.radio-pill').forEach(function(opt) {
+        opt.addEventListener('click', function() {
+            var group = this.closest('.radio-group');
+            if (group) {
+                group.querySelectorAll('.radio-pill').forEach(function(o) { o.classList.remove('selected'); });
+                this.classList.add('selected');
+            }
+        });
+    });
+
+    // Task card interaction
+    document.querySelectorAll('.task-card').forEach(function(opt) {
+        opt.addEventListener('click', function() {
+            this.classList.toggle('selected');
+        });
+    });
+
+    // Character row interaction
+    document.querySelectorAll('.char-row').forEach(function(opt) {
+        opt.addEventListener('click', function() {
+            this.closest('.char-list').querySelectorAll('.char-row').forEach(function(o) { o.classList.remove('selected'); });
+            this.classList.add('selected');
+        });
+    });
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="256" height="256" shape-rendering="crispEdges">
+  <style>
+    rect { width: 1px; height: 1px; }
+  </style>
+  <!-- Background -->
+  <rect x="0" y="0" width="16" height="16" fill="#E0E7FF"/>
+
+  <!-- Antenna -->
+  <rect x="7" y="0" fill="#818CF8"/><rect x="8" y="0" fill="#818CF8"/>
+  <rect x="6" y="0" fill="#A5B4FC"/><rect x="9" y="0" fill="#A5B4FC"/>
+
+  <!-- Head (angular, robot-like) -->
+  <rect x="4" y="1" fill="#312E81"/><rect x="5" y="1" fill="#312E81"/><rect x="6" y="1" fill="#312E81"/><rect x="7" y="1" fill="#312E81"/><rect x="8" y="1" fill="#312E81"/><rect x="9" y="1" fill="#312E81"/><rect x="10" y="1" fill="#312E81"/><rect x="11" y="1" fill="#312E81"/>
+  <rect x="4" y="2" fill="#312E81"/><rect x="5" y="2" fill="#312E81"/><rect x="6" y="2" fill="#312E81"/><rect x="7" y="2" fill="#312E81"/><rect x="8" y="2" fill="#312E81"/><rect x="9" y="2" fill="#312E81"/><rect x="10" y="2" fill="#312E81"/><rect x="11" y="2" fill="#312E81"/>
+  <rect x="4" y="3" fill="#312E81"/><rect x="5" y="3" fill="#312E81"/><rect x="6" y="3" fill="#312E81"/><rect x="7" y="3" fill="#312E81"/><rect x="8" y="3" fill="#312E81"/><rect x="9" y="3" fill="#312E81"/><rect x="10" y="3" fill="#312E81"/><rect x="11" y="3" fill="#312E81"/>
+  <rect x="4" y="4" fill="#312E81"/><rect x="5" y="4" fill="#312E81"/><rect x="6" y="4" fill="#312E81"/><rect x="7" y="4" fill="#312E81"/><rect x="8" y="4" fill="#312E81"/><rect x="9" y="4" fill="#312E81"/><rect x="10" y="4" fill="#312E81"/><rect x="11" y="4" fill="#312E81"/>
+
+  <!-- Visor / screen eyes -->
+  <rect x="5" y="2" fill="#818CF8"/><rect x="6" y="2" fill="#818CF8"/><rect x="7" y="2" fill="#818CF8"/><rect x="8" y="2" fill="#818CF8"/><rect x="9" y="2" fill="#818CF8"/><rect x="10" y="2" fill="#818CF8"/>
+  <rect x="5" y="3" fill="#818CF8"/><rect x="6" y="3" fill="#818CF8"/><rect x="7" y="3" fill="#818CF8"/><rect x="8" y="3" fill="#818CF8"/><rect x="9" y="3" fill="#818CF8"/><rect x="10" y="3" fill="#818CF8"/>
+  <!-- Digital eyes (bright squares) -->
+  <rect x="5" y="2" fill="#FFFFFF"/><rect x="6" y="2" fill="#FFFFFF"/>
+  <rect x="9" y="2" fill="#FFFFFF"/><rect x="10" y="2" fill="#FFFFFF"/>
+  <rect x="5" y="3" fill="#FFFFFF"/><rect x="6" y="3" fill="#FFFFFF"/>
+  <rect x="9" y="3" fill="#FFFFFF"/><rect x="10" y="3" fill="#FFFFFF"/>
+  <!-- Pupils -->
+  <rect x="6" y="3" fill="#312E81"/><rect x="9" y="3" fill="#312E81"/>
+
+  <!-- LED mouth -->
+  <rect x="6" y="4" fill="#A5B4FC"/><rect x="7" y="4" fill="#A5B4FC"/><rect x="8" y="4" fill="#A5B4FC"/><rect x="9" y="4" fill="#A5B4FC"/>
+
+  <!-- Neck -->
+  <rect x="7" y="5" fill="#4338CA"/><rect x="8" y="5" fill="#4338CA"/>
+
+  <!-- Body (indigo uniform) -->
+  <rect x="3" y="6" fill="#4338CA"/><rect x="4" y="6" fill="#4338CA"/><rect x="5" y="6" fill="#4338CA"/><rect x="6" y="6" fill="#4338CA"/><rect x="7" y="6" fill="#4338CA"/><rect x="8" y="6" fill="#4338CA"/><rect x="9" y="6" fill="#4338CA"/><rect x="10" y="6" fill="#4338CA"/><rect x="11" y="6" fill="#4338CA"/><rect x="12" y="6" fill="#4338CA"/>
+  <rect x="3" y="7" fill="#4338CA"/><rect x="4" y="7" fill="#4338CA"/><rect x="5" y="7" fill="#4338CA"/><rect x="6" y="7" fill="#4338CA"/><rect x="7" y="7" fill="#4338CA"/><rect x="8" y="7" fill="#4338CA"/><rect x="9" y="7" fill="#4338CA"/><rect x="10" y="7" fill="#4338CA"/><rect x="11" y="7" fill="#4338CA"/><rect x="12" y="7" fill="#4338CA"/>
+  <rect x="3" y="8" fill="#4338CA"/><rect x="4" y="8" fill="#4338CA"/><rect x="5" y="8" fill="#4338CA"/><rect x="6" y="8" fill="#4338CA"/><rect x="7" y="8" fill="#4338CA"/><rect x="8" y="8" fill="#4338CA"/><rect x="9" y="8" fill="#4338CA"/><rect x="10" y="8" fill="#4338CA"/><rect x="11" y="8" fill="#4338CA"/><rect x="12" y="8" fill="#4338CA"/>
+  <rect x="4" y="9" fill="#4338CA"/><rect x="5" y="9" fill="#4338CA"/><rect x="6" y="9" fill="#4338CA"/><rect x="7" y="9" fill="#4338CA"/><rect x="8" y="9" fill="#4338CA"/><rect x="9" y="9" fill="#4338CA"/><rect x="10" y="9" fill="#4338CA"/><rect x="11" y="9" fill="#4338CA"/>
+
+  <!-- Chest panel -->
+  <rect x="6" y="7" fill="#818CF8"/><rect x="7" y="7" fill="#818CF8"/><rect x="8" y="7" fill="#818CF8"/><rect x="9" y="7" fill="#818CF8"/>
+  <rect x="6" y="8" fill="#A5B4FC"/><rect x="7" y="8" fill="#818CF8"/><rect x="8" y="8" fill="#A5B4FC"/><rect x="9" y="8" fill="#818CF8"/>
+
+  <!-- Arms (mechanical) -->
+  <rect x="2" y="6" fill="#312E81"/><rect x="2" y="7" fill="#312E81"/><rect x="2" y="8" fill="#818CF8"/>
+  <rect x="13" y="6" fill="#312E81"/><rect x="13" y="7" fill="#312E81"/><rect x="13" y="8" fill="#818CF8"/>
+
+  <!-- Legs -->
+  <rect x="5" y="10" fill="#312E81"/><rect x="6" y="10" fill="#312E81"/>
+  <rect x="9" y="10" fill="#312E81"/><rect x="10" y="10" fill="#312E81"/>
+  <rect x="5" y="11" fill="#312E81"/><rect x="6" y="11" fill="#312E81"/>
+  <rect x="9" y="11" fill="#312E81"/><rect x="10" y="11" fill="#312E81"/>
+
+  <!-- Shoes -->
+  <rect x="4" y="12" fill="#1E1B4B"/><rect x="5" y="12" fill="#1E1B4B"/><rect x="6" y="12" fill="#1E1B4B"/>
+  <rect x="9" y="12" fill="#1E1B4B"/><rect x="10" y="12" fill="#1E1B4B"/><rect x="11" y="12" fill="#1E1B4B"/>
+
+  <!-- Label -->
+  <text x="8" y="15.5" text-anchor="middle" fill="#4338CA" font-family="monospace" font-size="1.2" font-weight="bold">Luca</text>
+</svg>

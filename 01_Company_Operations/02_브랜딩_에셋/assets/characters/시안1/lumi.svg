@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="lumi-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF7ED"/>
+      <stop offset="100%" stop-color="#FFFBF5"/>
+    </linearGradient>
+    <linearGradient id="lumi-body" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#FBBF24"/>
+    </linearGradient>
+    <filter id="lumi-glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <circle cx="100" cy="100" r="96" fill="url(#lumi-bg)" stroke="#FDE68A" stroke-width="2"/>
+  <!-- Glow rays -->
+  <g opacity="0.3" stroke="#F59E0B" stroke-width="2" stroke-linecap="round">
+    <line x1="100" y1="20" x2="100" y2="32"/>
+    <line x1="140" y1="30" x2="134" y2="40"/>
+    <line x1="60" y1="30" x2="66" y2="40"/>
+    <line x1="152" y1="58" x2="142" y2="62"/>
+    <line x1="48" y1="58" x2="58" y2="62"/>
+  </g>
+  <!-- Head (orb of light) -->
+  <circle cx="100" cy="76" r="36" fill="url(#lumi-body)" filter="url(#lumi-glow)"/>
+  <!-- Inner glow -->
+  <circle cx="100" cy="72" r="22" fill="#FDE68A" opacity="0.5"/>
+  <!-- Eyes (warm) -->
+  <ellipse cx="88" cy="74" rx="5" ry="5.5" fill="#fff"/>
+  <ellipse cx="112" cy="74" rx="5" ry="5.5" fill="#fff"/>
+  <circle cx="89" cy="73" r="2.5" fill="#92400E"/>
+  <circle cx="113" cy="73" r="2.5" fill="#92400E"/>
+  <!-- Warm smile -->
+  <path d="M90 86 Q100 94 110 86" fill="none" stroke="#92400E" stroke-width="2" stroke-linecap="round"/>
+  <!-- Body (soft, warm) -->
+  <path d="M66 124 Q66 108 82 108 Q100 104 118 108 Q134 108 134 124 L134 168 Q134 176 126 176 L74 176 Q66 176 66 168 Z" fill="url(#lumi-body)"/>
+  <!-- Chest light -->
+  <circle cx="100" cy="138" r="12" fill="#FDE68A" opacity="0.6"/>
+  <circle cx="100" cy="138" r="6" fill="#fff" opacity="0.5"/>
+  <!-- Label -->
+  <text x="100" y="196" text-anchor="middle" fill="#D97706" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="600">Lumi</text>
+</svg>

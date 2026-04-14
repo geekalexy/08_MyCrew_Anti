@@ -1,0 +1,139 @@
+/* src/styles/colors.css — MyCrew × Stitch "Luminescent Terminal" 듀얼 테마 */
+
+/* ── DARK MODE (기본, Stitch 인디고 팔레트) ────────────────────────────── */
+:root,
+[data-theme="dark"] {
+  /* ── Surface (Stitch 정확 색상 조정된 버전) ── */
+  --bg-base:              #090a0d;        /* body: 가장 어두운 레이어 (sidebar bg) */
+  --bg-surface:           #14151e;        /* center board bg — sidebar보다 놀라울 정도 밝음 */
+  --bg-surface-2:         #1e2030;        /* kanban 쳤럼 카드 bg */
+  --bg-surface-3:         #272940;        /* surface-container-high */
+  --bg-surface-highest:   #323459;        /* surface-container-highest */
+  --bg-overlay:           rgba(9,10,13,0.82);
+
+  /* ── Border ── */
+  --border:               rgba(72,71,74,0.25);
+  --border-active:        #b4c5ff;         /* primary(인디고) */
+
+  /* ── Brand / Primary (Stitch Indigo) ── */
+  --brand:                #b4c5ff;         /* primary */
+  --brand-hover:          #678bf7;         /* primary-container */
+  --brand-glow:           rgba(180,197,255,0.20);
+  --brand-dim:            #2668ff;         /* primary-dim */
+
+  /* ── Text ── */
+  --text-primary:         #e2e1eb;         /* on-surface */
+  --text-secondary:       #c4c6d5;         /* on-surface-variant */
+  --text-muted:           #8e909e;         /* outline */
+
+  /* ── Status ── */
+  --status-active:        #ffb963;         /* tertiary (amber) */
+  --status-idle:          #434653;         /* outline-variant */
+  --status-active-glow:   rgba(255,185,99,0.30);
+
+  /* ── Kanban 열(column) 강조색 ── */
+  --col-todo:             rgba(180,197,255,0.06);
+  --col-progress:         rgba(255,185,99,0.06);
+  --col-done:             rgba(74,222,128,0.06);
+  --col-todo-accent:      #b4c5ff;
+  --col-progress-accent:  #ffb963;
+  --col-done-accent:      #4ade80;
+
+  /* ── 로그 레벨 색상 ── */
+  --log-info:             #b9c5f4;         /* secondary */
+  --log-success:          #4ade80;
+  --log-warn:             #ffb963;
+  --log-error:            #ffb4ab;         /* error */
+
+  /* ── 위험 등급 ── */
+  --risk-safe:            #4ade80;
+  --risk-critical:        #ffb4ab;
+
+  /* ── Z-Index 레이어 시스템 (Phase 17-4) ── */
+  --z-base:         1;
+  --z-floating:     10;
+  --z-drawer-local: 50;    /* AgentDetailView 내부 Local Drawer */
+  --z-modal:        800;   /* SkillDetailModal */
+  --z-overlay:      900;   /* 전역 모달 오버레이 */
+  --z-top:          1000;  /* 최상위 팝업 */
+
+  /* ── 레거시 호환 변수 ── */
+  --color-bg-base:        var(--bg-base);
+  --color-bg-surface:     var(--bg-surface);
+  --color-bg-surface-2:   var(--bg-surface-2);
+  --color-bg-overlay:     var(--bg-overlay);
+  --color-border:         var(--border);
+  --color-border-active:  var(--border-active);
+  --color-brand:          var(--brand);
+  --color-brand-dark:     var(--brand-hover);
+  --color-brand-glow:     var(--brand-glow);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-muted);
+  --color-active:         var(--status-active);
+  --color-idle:           var(--status-idle);
+  --color-log-info:       var(--log-info);
+  --color-log-success:    var(--log-success);
+  --color-log-warn:       var(--log-warn);
+  --color-log-error:      var(--log-error);
+}
+
+/* ── LIGHT MODE ──────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:              #f2f4f7;
+  --bg-surface:           #ffffff;
+  --bg-surface-2:         #f8fafc;
+  --bg-surface-3:         #f1f3f7;
+  --bg-surface-highest:   #e8eaf0;
+  --bg-overlay:           rgba(242,244,247,0.92);
+
+  --border:               #e2e8f0;
+  --border-active:        #6366f1;
+
+  --brand:                #6366f1;
+  --brand-hover:          #4f46e5;
+  --brand-glow:           rgba(99,102,241,0.15);
+  --brand-dim:            #818cf8;
+
+  --text-primary:         #101828;
+  --text-secondary:       #475569;
+  --text-muted:           #94a3b8;
+
+  --status-active:        #0891b2;
+  --status-idle:          #cbd5e1;
+  --status-active-glow:   rgba(8,145,178,0.20);
+
+  --col-todo:             rgba(99,102,241,0.05);
+  --col-progress:         rgba(234,179,8,0.06);
+  --col-done:             rgba(34,197,94,0.06);
+  --col-todo-accent:      #6366f1;
+  --col-progress-accent:  #ca8a04;
+  --col-done-accent:      #16a34a;
+
+  --log-info:             #3b82f6;
+  --log-success:          #16a34a;
+  --log-warn:             #ea580c;
+  --log-error:            #dc2626;
+
+  --risk-safe:            #16a34a;
+  --risk-critical:        #dc2626;
+
+  --color-bg-base:        var(--bg-base);
+  --color-bg-surface:     var(--bg-surface);
+  --color-bg-surface-2:   var(--bg-surface-2);
+  --color-bg-overlay:     var(--bg-overlay);
+  --color-border:         var(--border);
+  --color-border-active:  var(--border-active);
+  --color-brand:          var(--brand);
+  --color-brand-dark:     var(--brand-hover);
+  --color-brand-glow:     var(--brand-glow);
+  --color-text-primary:   var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-muted);
+  --color-active:         var(--status-active);
+  --color-idle:           var(--status-idle);
+  --color-log-info:       var(--log-info);
+  --color-log-success:    var(--log-success);
+  --color-log-warn:       var(--log-warn);
+  --color-log-error:      var(--log-error);
+}

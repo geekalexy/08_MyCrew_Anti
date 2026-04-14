@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="nova-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#EDE9FE"/>
+      <stop offset="100%" stop-color="#F5F3FF"/>
+    </linearGradient>
+    <linearGradient id="nova-body" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <circle cx="100" cy="100" r="96" fill="url(#nova-bg)" stroke="#DDD6FE" stroke-width="2"/>
+  <!-- Star sparkles -->
+  <g fill="#A78BFA" opacity="0.4">
+    <polygon points="50,40 52,46 58,46 53,50 55,56 50,52 45,56 47,50 42,46 48,46"/>
+    <polygon points="148,35 150,40 155,40 151,43 153,48 148,45 143,48 145,43 140,40 146,40"/>
+    <polygon points="36,80 37,83 40,83 38,85 39,88 36,86 33,88 34,85 32,83 35,83"/>
+  </g>
+  <!-- Head (star-crowned) -->
+  <circle cx="100" cy="80" r="36" fill="url(#nova-body)"/>
+  <!-- Crown star -->
+  <polygon points="100,36 104,48 116,48 106,54 110,66 100,58 90,66 94,54 84,48 96,48" fill="#FBBF24"/>
+  <!-- Face -->
+  <ellipse cx="88" cy="78" rx="5" ry="6" fill="#fff"/>
+  <ellipse cx="112" cy="78" rx="5" ry="6" fill="#fff"/>
+  <circle cx="89" cy="77" r="2.5" fill="#4C1D95"/>
+  <circle cx="113" cy="77" r="2.5" fill="#4C1D95"/>
+  <!-- Confident smile -->
+  <path d="M88 92 Q100 100 112 92" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Body -->
+  <path d="M62 128 Q62 112 80 108 Q100 104 120 108 Q138 112 138 128 L138 170 Q138 178 130 178 L70 178 Q62 178 62 170 Z" fill="url(#nova-body)"/>
+  <!-- Star badge -->
+  <polygon points="100,130 103,138 112,138 105,143 108,152 100,146 92,152 95,143 88,138 97,138" fill="#FBBF24" opacity="0.6"/>
+  <!-- Label -->
+  <text x="100" y="196" text-anchor="middle" fill="#7C3AED" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="600">Nova</text>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 60" width="320" height="60">
+  <style>
+    .wm9my { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 38px; letter-spacing: 6px; text-transform: uppercase; }
+    .wm9cr { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 38px; letter-spacing: 6px; text-transform: uppercase; }
+  </style>
+  <text x="0" y="44">
+    <tspan class="wm9my" fill="#111827">MY</tspan><tspan class="wm9cr" fill="#2563EB">CREW</tspan>
+  </text>
+</svg>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="ollie-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="100%" stop-color="#FFFBEB"/>
+    </linearGradient>
+    <linearGradient id="ollie-body" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D97706"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <circle cx="100" cy="100" r="96" fill="url(#ollie-bg)" stroke="#FDE68A" stroke-width="2"/>
+  <!-- Owl body (round) -->
+  <ellipse cx="100" cy="110" rx="48" ry="56" fill="url(#ollie-body)"/>
+  <!-- Belly -->
+  <ellipse cx="100" cy="120" rx="30" ry="36" fill="#FEF3C7"/>
+  <!-- Large owl eyes -->
+  <circle cx="82" cy="90" r="16" fill="#fff" stroke="#92400E" stroke-width="1.5"/>
+  <circle cx="118" cy="90" r="16" fill="#fff" stroke="#92400E" stroke-width="1.5"/>
+  <circle cx="84" cy="88" r="7" fill="#92400E"/>
+  <circle cx="120" cy="88" r="7" fill="#92400E"/>
+  <circle cx="86" cy="86" r="2.5" fill="#fff"/>
+  <circle cx="122" cy="86" r="2.5" fill="#fff"/>
+  <!-- Beak -->
+  <polygon points="100,98 95,106 105,106" fill="#D97706"/>
+  <!-- Ear tufts -->
+  <polygon points="68,62 74,78 62,76" fill="#D97706"/>
+  <polygon points="132,62 126,78 138,76" fill="#D97706"/>
+  <!-- Feet -->
+  <ellipse cx="85" cy="168" rx="12" ry="5" fill="#D97706"/>
+  <ellipse cx="115" cy="168" rx="12" ry="5" fill="#D97706"/>
+  <!-- Label -->
+  <text x="100" y="196" text-anchor="middle" fill="#D97706" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="600">Ollie</text>
+</svg>

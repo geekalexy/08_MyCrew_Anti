@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 120" width="460" height="120">
+  <defs>
+    <linearGradient id="sg9c" x1="0%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .wm9my { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 40px; letter-spacing: 6px; text-transform: uppercase; }
+    .wm9cr { font-family: 'Inter', system-ui, sans-serif; font-weight: 800; font-size: 40px; letter-spacing: 6px; text-transform: uppercase; }
+  </style>
+  <!-- Symbol -->
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg9c)"/>
+  <path d="M68 24 L44 62 L56 62 L48 96 L82 54 L66 54 L76 24Z" fill="#fff"/>
+  <path d="M68 24 L44 62 L56 62 L48 96 L82 54 L66 54 L76 24Z" fill="#fff" opacity="0.3" transform="scale(1.08) translate(-4.8, -4.8)"/>
+  <circle cx="36" cy="40" r="2" fill="#fff" opacity="0.5"/>
+  <circle cx="88" cy="76" r="2" fill="#fff" opacity="0.5"/>
+  <circle cx="40" cy="82" r="1.5" fill="#fff" opacity="0.4"/>
+  <!-- Wordmark (all caps, wide tracking) -->
+  <text x="136" y="74">
+    <tspan class="wm9my" fill="#111827">MY</tspan><tspan class="wm9cr" fill="#2563EB">CREW</tspan>
+  </text>
+</svg>

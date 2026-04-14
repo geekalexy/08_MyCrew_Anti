@@ -1,0 +1,11 @@
+[
+  { "id": "ari", "nameKo": "아리", "role": "비서실장" },
+  { "id": "luca", "nameKo": "루카", "role": "풀스택 엔지니어" },
+  { "id": "sonnet", "nameKo": "소넷", "role": "AI 디벨로퍼" },
+  { "id": "opus", "nameKo": "오퍼스", "role": "시스템 아키텍트" },
+  { "id": "devteam", "nameKo": "개발팀", "role": "개발 조직" },
+  { "id": "nova", "nameKo": "노바", "role": "브랜드 마케터" },
+  { "id": "ollie", "nameKo": "올리", "role": "그로스 데이터 분석가" },
+  { "id": "pico", "nameKo": "피코", "role": "콘텐츠 카피라이터" },
+  { "id": "lumi", "nameKo": "루미", "role": "비주얼 아트 디렉터" }
+]

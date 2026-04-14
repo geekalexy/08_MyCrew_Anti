@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="brand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square base -->
+  <rect x="8" y="8" width="104" height="104" rx="28" fill="url(#brand-grad)"/>
+  <!-- Three connected nodes representing "crew" -->
+  <circle cx="38" cy="52" r="10" fill="none" stroke="#fff" stroke-width="3"/>
+  <circle cx="82" cy="52" r="10" fill="none" stroke="#fff" stroke-width="3"/>
+  <circle cx="60" cy="78" r="10" fill="none" stroke="#fff" stroke-width="3"/>
+  <!-- Connection lines -->
+  <line x1="46" y1="58" x2="52" y2="72" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="74" y1="58" x2="68" y2="72" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="48" y1="52" x2="72" y2="52" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Center dot (AI core) -->
+  <circle cx="60" cy="58" r="4" fill="#fff"/>
+</svg>

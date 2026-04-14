@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="ari-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#DBEAFE"/>
+      <stop offset="100%" stop-color="#EFF6FF"/>
+    </linearGradient>
+    <linearGradient id="ari-accent" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="96" fill="url(#ari-bg)" stroke="#BFDBFE" stroke-width="2"/>
+  <!-- Head -->
+  <circle cx="100" cy="82" r="38" fill="url(#ari-accent)"/>
+  <!-- Face highlight -->
+  <ellipse cx="100" cy="78" rx="30" ry="28" fill="#3B82F6" opacity="0.6"/>
+  <!-- Eyes -->
+  <ellipse cx="87" cy="78" rx="5" ry="6" fill="#fff"/>
+  <ellipse cx="113" cy="78" rx="5" ry="6" fill="#fff"/>
+  <circle cx="88" cy="77" r="2.5" fill="#1E3A5F"/>
+  <circle cx="114" cy="77" r="2.5" fill="#1E3A5F"/>
+  <!-- Smile -->
+  <path d="M90 90 Q100 98 110 90" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Antenna / AI spark -->
+  <line x1="100" y1="44" x2="100" y2="32" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="100" cy="28" r="4" fill="#FBBF24"/>
+  <!-- Body -->
+  <path d="M62 130 Q62 112 80 108 Q100 104 120 108 Q138 112 138 130 L138 170 Q138 178 130 178 L70 178 Q62 178 62 170 Z" fill="url(#ari-accent)"/>
+  <!-- Chest badge -->
+  <circle cx="100" cy="140" r="10" fill="#fff" opacity="0.25"/>
+  <text x="100" y="144" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-size="11" font-weight="700">A</text>
+  <!-- Label -->
+  <text x="100" y="196" text-anchor="middle" fill="#2563EB" font-family="Inter,system-ui,sans-serif" font-size="13" font-weight="600">Ari</text>
+</svg>

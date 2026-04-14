@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sg6" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg6)"/>
+  <!-- Rocket body -->
+  <path d="M60 26 Q60 26 72 50 L72 72 Q66 80 60 82 Q54 80 48 72 L48 50 Q60 26 60 26Z" fill="#fff" opacity="0.95"/>
+  <!-- Rocket nose cone -->
+  <path d="M60 26 Q54 38 48 50 L72 50 Q66 38 60 26Z" fill="#fff"/>
+  <!-- Window -->
+  <circle cx="60" cy="56" r="6" fill="#2563EB"/>
+  <circle cx="60" cy="56" r="3.5" fill="#3B82F6"/>
+  <!-- Fins -->
+  <path d="M48 64 L36 78 L48 72Z" fill="#fff" opacity="0.8"/>
+  <path d="M72 64 L84 78 L72 72Z" fill="#fff" opacity="0.8"/>
+  <!-- Exhaust flames -->
+  <path d="M54 82 L60 96 L66 82" fill="#fff" opacity="0.5"/>
+  <path d="M56 82 L60 90 L64 82" fill="#fff" opacity="0.7"/>
+</svg>

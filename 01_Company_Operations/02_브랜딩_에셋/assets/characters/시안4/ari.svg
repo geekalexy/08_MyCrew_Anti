@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="256" height="256" shape-rendering="crispEdges">
+  <style>
+    rect { width: 1px; height: 1px; }
+  </style>
+  <!-- Background -->
+  <rect x="0" y="0" width="16" height="16" fill="#DBEAFE"/>
+
+  <!-- 시안4: 중성 + 약간 여성스러운 — 어깨선 머리 + 헤어핀 포인트 -->
+
+  <!-- Hair (shoulder-length, swept to one side) -->
+  <rect x="5" y="0" fill="#1E40AF"/><rect x="6" y="0" fill="#1E40AF"/><rect x="7" y="0" fill="#1E40AF"/><rect x="8" y="0" fill="#1E40AF"/><rect x="9" y="0" fill="#1E40AF"/><rect x="10" y="0" fill="#1E40AF"/>
+  <rect x="4" y="1" fill="#1E40AF"/><rect x="5" y="1" fill="#1E40AF"/><rect x="6" y="1" fill="#1E40AF"/><rect x="7" y="1" fill="#1E40AF"/><rect x="8" y="1" fill="#1E40AF"/><rect x="9" y="1" fill="#1E40AF"/><rect x="10" y="1" fill="#1E40AF"/><rect x="11" y="1" fill="#1E40AF"/>
+  <!-- Side hair (asymmetric — left shorter, right shoulder length) -->
+  <rect x="3" y="2" fill="#1E40AF"/><rect x="4" y="2" fill="#1E40AF"/><rect x="11" y="2" fill="#1E40AF"/><rect x="12" y="2" fill="#1E40AF"/>
+  <rect x="3" y="3" fill="#1E40AF"/><rect x="12" y="3" fill="#1E40AF"/>
+  <!-- Right side flows to shoulder -->
+  <rect x="12" y="4" fill="#1E40AF"/><rect x="12" y="5" fill="#1E40AF"/><rect x="12" y="6" fill="#1E40AF"/><rect x="12" y="7" fill="#1E40AF"/>
+
+  <!-- Small hair pin (subtle feminine touch — light blue) -->
+  <rect x="4" y="2" fill="#93C5FD"/><rect x="4" y="3" fill="#93C5FD"/>
+
+  <!-- Antenna spark -->
+  <rect x="7" y="0" fill="#FBBF24"/><rect x="8" y="0" fill="#FBBF24"/>
+
+  <!-- Face (warm skin) -->
+  <rect x="5" y="2" fill="#FDE68A"/><rect x="6" y="2" fill="#FDE68A"/><rect x="7" y="2" fill="#FDE68A"/><rect x="8" y="2" fill="#FDE68A"/><rect x="9" y="2" fill="#FDE68A"/><rect x="10" y="2" fill="#FDE68A"/>
+  <rect x="4" y="3" fill="#FDE68A"/><rect x="5" y="3" fill="#FDE68A"/><rect x="6" y="3" fill="#FDE68A"/><rect x="7" y="3" fill="#FDE68A"/><rect x="8" y="3" fill="#FDE68A"/><rect x="9" y="3" fill="#FDE68A"/><rect x="10" y="3" fill="#FDE68A"/><rect x="11" y="3" fill="#FDE68A"/>
+  <rect x="4" y="4" fill="#FDE68A"/><rect x="5" y="4" fill="#FDE68A"/><rect x="6" y="4" fill="#FDE68A"/><rect x="7" y="4" fill="#FDE68A"/><rect x="8" y="4" fill="#FDE68A"/><rect x="9" y="4" fill="#FDE68A"/><rect x="10" y="4" fill="#FDE68A"/><rect x="11" y="4" fill="#FDE68A"/>
+  <rect x="4" y="5" fill="#FDE68A"/><rect x="5" y="5" fill="#FDE68A"/><rect x="6" y="5" fill="#FDE68A"/><rect x="7" y="5" fill="#FDE68A"/><rect x="8" y="5" fill="#FDE68A"/><rect x="9" y="5" fill="#FDE68A"/><rect x="10" y="5" fill="#FDE68A"/><rect x="11" y="5" fill="#FDE68A"/>
+
+  <!-- Eyes (round, friendly — with subtle lash on top) -->
+  <rect x="5" y="3" fill="#1E3A5F"/><rect x="6" y="3" fill="#1E3A5F"/>
+  <rect x="9" y="3" fill="#1E3A5F"/><rect x="10" y="3" fill="#1E3A5F"/>
+  <rect x="5" y="4" fill="#2563EB"/><rect x="6" y="4" fill="#2563EB"/>
+  <rect x="9" y="4" fill="#2563EB"/><rect x="10" y="4" fill="#2563EB"/>
+  <!-- Eye highlight -->
+  <rect x="5" y="3" fill="#93C5FD"/><rect x="9" y="3" fill="#93C5FD"/>
+
+  <!-- Gentle smile (small, warm) -->
+  <rect x="7" y="5" fill="#D97706"/><rect x="8" y="5" fill="#D97706"/>
+
+  <!-- Neck -->
+  <rect x="7" y="6" fill="#FDE68A"/><rect x="8" y="6" fill="#FDE68A"/>
+
+  <!-- Body (blue jacket over lighter inner) -->
+  <rect x="6" y="6" fill="#DBEAFE"/><rect x="9" y="6" fill="#DBEAFE"/>
+  <rect x="4" y="7" fill="#2563EB"/><rect x="5" y="7" fill="#2563EB"/><rect x="6" y="7" fill="#DBEAFE"/><rect x="7" y="7" fill="#DBEAFE"/><rect x="8" y="7" fill="#DBEAFE"/><rect x="9" y="7" fill="#DBEAFE"/><rect x="10" y="7" fill="#2563EB"/><rect x="11" y="7" fill="#2563EB"/>
+  <rect x="3" y="8" fill="#2563EB"/><rect x="4" y="8" fill="#2563EB"/><rect x="5" y="8" fill="#2563EB"/><rect x="6" y="8" fill="#DBEAFE"/><rect x="7" y="8" fill="#DBEAFE"/><rect x="8" y="8" fill="#DBEAFE"/><rect x="9" y="8" fill="#DBEAFE"/><rect x="10" y="8" fill="#2563EB"/><rect x="11" y="8" fill="#2563EB"/><rect x="12" y="8" fill="#2563EB"/>
+  <rect x="4" y="9" fill="#2563EB"/><rect x="5" y="9" fill="#2563EB"/><rect x="6" y="9" fill="#2563EB"/><rect x="7" y="9" fill="#2563EB"/><rect x="8" y="9" fill="#2563EB"/><rect x="9" y="9" fill="#2563EB"/><rect x="10" y="9" fill="#2563EB"/><rect x="11" y="9" fill="#2563EB"/>
+
+  <!-- Star badge -->
+  <rect x="7" y="7" fill="#FBBF24"/><rect x="8" y="7" fill="#FBBF24"/>
+
+  <!-- Arms -->
+  <rect x="2" y="8" fill="#FDE68A"/><rect x="2" y="9" fill="#FDE68A"/>
+  <rect x="13" y="8" fill="#FDE68A"/><rect x="13" y="9" fill="#FDE68A"/>
+
+  <!-- Pants (slim, slightly tapered) -->
+  <rect x="5" y="10" fill="#1E40AF"/><rect x="6" y="10" fill="#1E40AF"/><rect x="7" y="10" fill="#1E40AF"/>
+  <rect x="8" y="10" fill="#1E40AF"/><rect x="9" y="10" fill="#1E40AF"/><rect x="10" y="10" fill="#1E40AF"/>
+  <rect x="6" y="11" fill="#1E40AF"/><rect x="7" y="11" fill="#1E40AF"/>
+  <rect x="8" y="11" fill="#1E40AF"/><rect x="9" y="11" fill="#1E40AF"/>
+
+  <!-- Shoes (blue sneakers) -->
+  <rect x="5" y="12" fill="#1D4ED8"/><rect x="6" y="12" fill="#1D4ED8"/><rect x="7" y="12" fill="#1D4ED8"/>
+  <rect x="8" y="12" fill="#1D4ED8"/><rect x="9" y="12" fill="#1D4ED8"/><rect x="10" y="12" fill="#1D4ED8"/>
+
+  <!-- Label -->
+  <text x="8" y="15.5" text-anchor="middle" fill="#2563EB" font-family="monospace" font-size="1.2" font-weight="bold">Ari</text>
+</svg>

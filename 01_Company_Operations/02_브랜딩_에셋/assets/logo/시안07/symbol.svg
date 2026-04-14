@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sg7" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg7)"/>
+  <!-- 4 puzzle pieces forming a square -->
+  <!-- Top-left piece -->
+  <path d="M36 36 L54 36 Q54 30 58 30 Q62 30 62 36 L80 36 L80 54 Q74 54 74 58 Q74 62 80 62 L80 80 L62 80 Q62 74 58 74 Q54 74 54 80 L36 80 L36 62 Q42 62 42 58 Q42 54 36 54 Z" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Dividing lines -->
+  <line x1="58" y1="36" x2="58" y2="80" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>
+  <line x1="36" y1="58" x2="80" y2="58" stroke="#fff" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.5"/>
+  <!-- AI sparkle in center -->
+  <circle cx="58" cy="58" r="5" fill="#fff"/>
+  <circle cx="58" cy="58" r="2.5" fill="#3B82F6"/>
+</svg>

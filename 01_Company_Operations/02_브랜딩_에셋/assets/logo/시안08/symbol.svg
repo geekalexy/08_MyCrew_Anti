@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="sg8" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="104" height="104" rx="26" fill="url(#sg8)"/>
+  <!-- Central core -->
+  <circle cx="60" cy="60" r="10" fill="#fff"/>
+  <!-- Orbit ring 1 (tilted) -->
+  <ellipse cx="60" cy="60" rx="30" ry="14" fill="none" stroke="#fff" stroke-width="2.5" transform="rotate(-30 60 60)" opacity="0.9"/>
+  <!-- Orbit ring 2 (tilted opposite) -->
+  <ellipse cx="60" cy="60" rx="30" ry="14" fill="none" stroke="#fff" stroke-width="2.5" transform="rotate(30 60 60)" opacity="0.9"/>
+  <!-- Orbit ring 3 (horizontal) -->
+  <ellipse cx="60" cy="60" rx="30" ry="14" fill="none" stroke="#fff" stroke-width="2" transform="rotate(90 60 60)" opacity="0.6"/>
+  <!-- Satellite dots on orbits -->
+  <circle cx="36" cy="44" r="3.5" fill="#fff"/>
+  <circle cx="84" cy="44" r="3.5" fill="#fff"/>
+  <circle cx="60" cy="30" r="3.5" fill="#fff"/>
+</svg>

@@ -1,0 +1,74 @@
+// src/store/kanbanStore.js — Task 전용 (Phase 11 액션 추가)
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+const COLUMNS = ['todo', 'in_progress', 'review', 'done'];
+const preMovSnapshot = new Map();
+
+export const useKanbanStore = create(
+  persist(
+    (set, get) => ({
+      tasks: {},      // { taskId: { id, title, content, column, agentId, priority, riskLevel, projectId, status, latestComment } }
+      columns: COLUMNS,
+
+      addTask: (task) =>
+        set((s) => ({ tasks: { ...s.tasks, [String(task.id)]: task } })),
+
+      // Phase 11: Soft Delete 후 UI에서 제거
+      removeTask: (taskId) =>
+        set((s) => {
+          const next = { ...s.tasks };
+          delete next[String(taskId)];
+          return { tasks: next };
+        }),
+
+      // Phase 11: 태스크 상태 단독 업데이트 (PAUSED 등)
+      updateTaskStatus: (taskId, status) =>
+        set((s) => ({
+          tasks: { ...s.tasks, [String(taskId)]: { ...s.tasks[String(taskId)], status } },
+        })),
+
+      // Phase 11: 소켓 댓글 이벤트로 카드 미리보기 갱신
+      updateTaskLatestComment: (taskId, comment) =>
+        set((s) => ({
+          tasks: { ...s.tasks, [String(taskId)]: { ...s.tasks[String(taskId)], latestComment: comment } },
+        })),
+
+      // Phase 12 v2.0: 핑퐁 규칙 — 담당자 복귀 등 부분 필드 업데이트
+      patchTask: (taskId, fields) =>
+        set((s) => ({
+          tasks: { ...s.tasks, [String(taskId)]: { ...s.tasks[String(taskId)], ...fields } },
+        })),
+
+      moveTask: (taskId, toColumn) => {
+        const sid = String(taskId);
+        const snapshot = get().tasks[sid];
+        if (snapshot) preMovSnapshot.set(sid, snapshot);
+        set((s) => ({
+          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn } },
+        }));
+        return snapshot;
+      },
+
+      rollbackTask: (taskId) => {
+        const sid = String(taskId);
+        const snapshot = preMovSnapshot.get(sid);
+        if (snapshot) {
+          set((s) => ({ tasks: { ...s.tasks, [sid]: snapshot } }));
+          preMovSnapshot.delete(sid);
+        }
+      },
+
+      confirmTaskMove: (taskId, toColumn) => {
+        const sid = String(taskId);
+        preMovSnapshot.delete(sid);
+        set((s) => ({
+          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn } },
+        }));
+      },
+    }),
+    {
+      name: 'mycrew-kanban',
+    }
+  )
+);

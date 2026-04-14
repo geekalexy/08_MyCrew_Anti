@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="256" height="256" shape-rendering="crispEdges">
+  <style>
+    rect { width: 1px; height: 1px; }
+  </style>
+  <!-- Background -->
+  <rect x="0" y="0" width="16" height="16" fill="#FFF7ED"/>
+
+  <!-- Light rays -->
+  <rect x="7" y="0" fill="#FDE68A"/><rect x="8" y="0" fill="#FDE68A"/>
+  <rect x="3" y="1" fill="#FDE68A"/><rect x="12" y="1" fill="#FDE68A"/>
+  <rect x="2" y="3" fill="#FDE68A"/><rect x="13" y="3" fill="#FDE68A"/>
+
+  <!-- Head (glowing orb) -->
+  <rect x="5" y="1" fill="#FBBF24"/><rect x="6" y="1" fill="#FBBF24"/><rect x="7" y="1" fill="#FBBF24"/><rect x="8" y="1" fill="#FBBF24"/><rect x="9" y="1" fill="#FBBF24"/><rect x="10" y="1" fill="#FBBF24"/>
+  <rect x="4" y="2" fill="#FBBF24"/><rect x="5" y="2" fill="#FDE68A"/><rect x="6" y="2" fill="#FDE68A"/><rect x="7" y="2" fill="#FDE68A"/><rect x="8" y="2" fill="#FDE68A"/><rect x="9" y="2" fill="#FDE68A"/><rect x="10" y="2" fill="#FDE68A"/><rect x="11" y="2" fill="#FBBF24"/>
+  <rect x="4" y="3" fill="#FBBF24"/><rect x="5" y="3" fill="#FDE68A"/><rect x="6" y="3" fill="#FDE68A"/><rect x="7" y="3" fill="#FDE68A"/><rect x="8" y="3" fill="#FDE68A"/><rect x="9" y="3" fill="#FDE68A"/><rect x="10" y="3" fill="#FDE68A"/><rect x="11" y="3" fill="#FBBF24"/>
+  <rect x="4" y="4" fill="#FBBF24"/><rect x="5" y="4" fill="#FDE68A"/><rect x="6" y="4" fill="#FDE68A"/><rect x="7" y="4" fill="#FDE68A"/><rect x="8" y="4" fill="#FDE68A"/><rect x="9" y="4" fill="#FDE68A"/><rect x="10" y="4" fill="#FDE68A"/><rect x="11" y="4" fill="#FBBF24"/>
+  <rect x="5" y="5" fill="#FBBF24"/><rect x="6" y="5" fill="#FBBF24"/><rect x="7" y="5" fill="#FBBF24"/><rect x="8" y="5" fill="#FBBF24"/><rect x="9" y="5" fill="#FBBF24"/><rect x="10" y="5" fill="#FBBF24"/>
+
+  <!-- Eyes (warm brown) -->
+  <rect x="5" y="3" fill="#FFFFFF"/><rect x="6" y="3" fill="#FFFFFF"/>
+  <rect x="9" y="3" fill="#FFFFFF"/><rect x="10" y="3" fill="#FFFFFF"/>
+  <rect x="6" y="3" fill="#92400E"/><rect x="9" y="3" fill="#92400E"/>
+
+  <!-- Warm smile -->
+  <rect x="6" y="4" fill="#D97706"/><rect x="7" y="4" fill="#D97706"/><rect x="8" y="4" fill="#D97706"/><rect x="9" y="4" fill="#D97706"/>
+
+  <!-- Body (golden) -->
+  <rect x="4" y="6" fill="#F59E0B"/><rect x="5" y="6" fill="#F59E0B"/><rect x="6" y="6" fill="#F59E0B"/><rect x="7" y="6" fill="#F59E0B"/><rect x="8" y="6" fill="#F59E0B"/><rect x="9" y="6" fill="#F59E0B"/><rect x="10" y="6" fill="#F59E0B"/><rect x="11" y="6" fill="#F59E0B"/>
+  <rect x="3" y="7" fill="#F59E0B"/><rect x="4" y="7" fill="#F59E0B"/><rect x="5" y="7" fill="#F59E0B"/><rect x="6" y="7" fill="#F59E0B"/><rect x="7" y="7" fill="#F59E0B"/><rect x="8" y="7" fill="#F59E0B"/><rect x="9" y="7" fill="#F59E0B"/><rect x="10" y="7" fill="#F59E0B"/><rect x="11" y="7" fill="#F59E0B"/><rect x="12" y="7" fill="#F59E0B"/>
+  <rect x="3" y="8" fill="#F59E0B"/><rect x="4" y="8" fill="#F59E0B"/><rect x="5" y="8" fill="#F59E0B"/><rect x="6" y="8" fill="#F59E0B"/><rect x="7" y="8" fill="#F59E0B"/><rect x="8" y="8" fill="#F59E0B"/><rect x="9" y="8" fill="#F59E0B"/><rect x="10" y="8" fill="#F59E0B"/><rect x="11" y="8" fill="#F59E0B"/><rect x="12" y="8" fill="#F59E0B"/>
+  <rect x="4" y="9" fill="#F59E0B"/><rect x="5" y="9" fill="#F59E0B"/><rect x="6" y="9" fill="#F59E0B"/><rect x="7" y="9" fill="#F59E0B"/><rect x="8" y="9" fill="#F59E0B"/><rect x="9" y="9" fill="#F59E0B"/><rect x="10" y="9" fill="#F59E0B"/><rect x="11" y="9" fill="#F59E0B"/>
+
+  <!-- Chest glow -->
+  <rect x="7" y="7" fill="#FDE68A"/><rect x="8" y="7" fill="#FDE68A"/>
+  <rect x="7" y="8" fill="#FFFFFF"/><rect x="8" y="8" fill="#FFFFFF"/>
+
+  <!-- Arms -->
+  <rect x="2" y="7" fill="#FDE68A"/><rect x="2" y="8" fill="#FDE68A"/>
+  <rect x="13" y="7" fill="#FDE68A"/><rect x="13" y="8" fill="#FDE68A"/>
+
+  <!-- Legs -->
+  <rect x="5" y="10" fill="#D97706"/><rect x="6" y="10" fill="#D97706"/>
+  <rect x="9" y="10" fill="#D97706"/><rect x="10" y="10" fill="#D97706"/>
+  <rect x="5" y="11" fill="#D97706"/><rect x="6" y="11" fill="#D97706"/>
+  <rect x="9" y="11" fill="#D97706"/><rect x="10" y="11" fill="#D97706"/>
+
+  <!-- Shoes -->
+  <rect x="4" y="12" fill="#92400E"/><rect x="5" y="12" fill="#92400E"/><rect x="6" y="12" fill="#92400E"/>
+  <rect x="9" y="12" fill="#92400E"/><rect x="10" y="12" fill="#92400E"/><rect x="11" y="12" fill="#92400E"/>
+
+  <!-- Label -->
+  <text x="8" y="15.5" text-anchor="middle" fill="#D97706" font-family="monospace" font-size="1.2" font-weight="bold">Lumi</text>
+</svg>

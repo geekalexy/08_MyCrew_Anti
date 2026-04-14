@@ -1,0 +1,65 @@
+/* src/styles/animations.css — 에이전트 상태 애니메이션 */
+
+/* ── 통통 튀는 Bounce (활성 에이전트) ───────────────── */
+@keyframes agent-bounce {
+  0%, 100% { transform: translateY(0);    }
+  50%       { transform: translateY(-6px); }
+}
+
+/* ── Aura Pulse 링 (외곽 글로우) ────────────────────── */
+@keyframes aura-pulse {
+  0%   { box-shadow: 0 0 0   4px var(--color-active-glow); opacity: 1; }
+  70%  { box-shadow: 0 0 0  12px transparent;               opacity: 0.4; }
+  100% { box-shadow: 0 0 0   4px var(--color-active-glow); opacity: 1; }
+}
+
+/* ── 카드 드래그 중 유령 효과 ──────────────────────── */
+@keyframes drag-float {
+  0%, 100% { transform: rotate(-1deg) scale(1.03); }
+  50%       { transform: rotate(1deg)  scale(1.03); }
+}
+
+/* ── 페이드 인 슬라이드 (로그 항목) ─────────────────── */
+@keyframes log-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── 응용 클래스 ─────────────────────────────────────── */
+.agent-avatar--active .agent-avatar__img {
+  animation: agent-bounce 1.4s ease-in-out infinite;
+}
+
+.agent-avatar--active {
+  animation: aura-pulse 2s ease-in-out infinite;
+}
+
+.task-card--dragging {
+  animation: drag-float 0.6s ease-in-out infinite;
+  opacity: 0.85;
+  cursor: grabbing;
+}
+
+.terminal-log__entry {
+  animation: log-slide-in 0.2s ease-out;
+}
+
+/* ── 브랜드 그라디언트 shimmer (헤더 타이틀) ────────── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.app__title {
+  background: linear-gradient(
+    90deg,
+    var(--color-brand),
+    var(--color-active),
+    var(--color-brand)
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}

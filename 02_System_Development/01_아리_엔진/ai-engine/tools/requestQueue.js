@@ -1,5 +1,8 @@
 class RequestQueue {
-  constructor(maxRPM = 14) { // 15 RPM 한계에서 1 여유
+  // Gemini Flash 무료 티어: 10 RPM 제한
+  // 9 RPM = 10에서 10% 여유 확보 → 429 에러 완전 원천 차단
+  // Image Lab 1사이클 = 최소 2회 호출(분석+생성) → 실질 최대 4 사이클/분 허용
+  constructor(maxRPM = 9) {
     this.queue = [];
     this.timestamps = [];
     this.maxRPM = maxRPM;

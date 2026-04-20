@@ -2,11 +2,9 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import geminiAdapter from '../ai-engine/adapters/geminiAdapter.js';
-import { exec } from 'child_process';
-import util from 'util';
+import filePollingAdapter from '../ai-engine/adapters/FilePollingAdapter.js';
+import dbManager from '../database.js';
 
-const execPromise = util.promisify(exec);
 const router = express.Router();
 
 // ── 디렉토리 셋업 ───────────────────────────────────────────
@@ -40,12 +38,8 @@ async function renderRemotionVideo(jsonProps) {
 
 // ── 라우트 핸들러 ───────────────────────────────────────────
 
-/** [POST] /generate: 프롬프트를 받아 Gemini로 Props를 짜고 Remotion MP4 렌더링 */
-router.post('/generate', async (req, res) => {
-    // 504 Timeout 방어: 서버 처리 시간 3분 (180초) 강제 연장
-    req.setTimeout(180000); 
-    res.setTimeout(180000);
-
+/** [POST] /task/request: 프롬프트를 받아 백그라운드 렌더링 큐에 등록 (비동기) */
+router.post('/task/request', async (req, res) => {
     try {
         const { prompt, templateId = "socian-reels" } = req.body;
         if (!prompt) return res.status(400).json({ error: '프롬프트가 필요합니다.' });
@@ -59,94 +53,33 @@ Use standard Marketing Frameworks (Hook -> Solution -> Value -> CTA).
 
 YOUR CRITICAL JOB IS ART DIRECTION: You must decide the visual layout and assets for EACH scene!
 Available layoutTypes: "centered" (classic bold text), "chat-bubble" (simulates Instagram DM), "notification" (iOS banner style).
-Available assetTypes: "emoji" (pass an emoji character), "imageUrl" (pass a valid URL).
+Available assetTypes: "emoji" (pass an emoji character), "imageUrl" (pass a valid URL).`;
 
-Example expected keys for a Reels Template:
-{
-  "durationInSeconds": 15,
-  "fps": 30,
-  "theme": {
-    "primaryColor": "#1E90FF",
-    "secondaryColor": "#FAFAFA",
-    "bgGradient": ["#0F172A", "#1E1B4B"]
-  },
-  "scenes": [
-    {
-      "type": "hook",
-      "durationFrames": 90,
-      "layoutType": "notification",
-      "assetType": "emoji",
-      "assetContent": "✉️",
-      "textLines": ["댓글 문의,", "매출로 연결하는 방법"],
-      "animationType": "bounceIn"
-    },
-    {
-      "type": "solution",
-      "durationFrames": 120,
-      "layoutType": "chat-bubble",
-      "assetType": "emoji",
-      "assetContent": "💬",
-      "textLines": ["제품링크/문의,", "DM 자동화로 해결!"],
-      "animationType": "slideLeft"
-    },
-    {
-      "type": "value",
-      "durationFrames": 120,
-      "layoutType": "centered",
-      "assetType": "emoji",
-      "assetContent": "💳",
-      "textLines": ["업계 최저가,", "단 2,900원"],
-      "animationType": "zoomIn",
-      "highlightColor": "#FBBF24"
-    },
-    {
-      "type": "cta",
-      "durationFrames": 120,
-      "layoutType": "centered",
-      "assetType": "emoji",
-      "assetContent": "🎁",
-      "textLines": ["\\"최고\\" 댓글 달고,", "시크릿 쿠폰 받기"],
-      "animationType": "pulse",
-      "interactionElement": "comment_icon"
-    }
-  ]
-}`;
-        // 타겟 모델 설정 (gemini-2.0-pro 로 상향)
-        const targetModel = 'gemini-2.0-pro-exp-0205'; // 안정판을 가리키도록 설정, 실패시 geminiAdapter가 flash로 폴백 (PRD 참조)
+        // 고유 태스크 ID 발급
+        const taskId = `vid_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
         
-        let aiResult;
-        try {
-            aiResult = await geminiAdapter.generateResponse(prompt, systemPrompt, 'gemini-2.5-pro'); // Google GenAI Model alias 대응
-        } catch (err) {
-            // Flash 폴백 시뮬레이션
-            console.warn('[VideoLab] Main model quota exceeded or failed. Falling back to Flash...');
-            aiResult = await geminiAdapter.generateResponse(prompt, systemPrompt, 'gemini-2.5-flash');
-        }
+        // 데이터베이스에 레코드 기록 (옵션)
+        // await dbManager.createTask(...);
 
-        // 마크다운 찌꺼기 제거 (Sanitizer)
-        let rawText = aiResult.text || '';
-        rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-        
-        let jsonProps;
-        try {
-            jsonProps = JSON.parse(rawText);
-        } catch (parseErr) {
-            console.error("[VideoLab] JSON Parsing Error on text:", rawText);
-            throw new Error("AI가 생성한 JSON 형식이 올바르지 않습니다.");
-        }
+        // File Polling Adapter로 비동기 큐에 위임 (geminiAdapter 직접 호출 제거)
+        const result = await filePollingAdapter.execute({
+            taskId,
+            agentId: 'lily',
+            category: 'MEDIA',
+            content: prompt,
+            systemPrompt: systemPrompt + `\nTemplate: ${templateId}`,
+            modelToUse: 'gemini-2.5-pro' // 고성능 어댑터에게 위임
+        });
 
-        // Remotion 엔진 렌더링
-        const videoUrl = await renderRemotionVideo(jsonProps);
-
-        res.json({
-            status: 'success',
-            videoUrl: videoUrl,
-            generatedProps: jsonProps,
-            inferenceTimeMs: 0 // TODO: Add real measurement if needed
+        // 클라이언트에게 즉시 202 Accepted 및 임시 ID 반환
+        res.status(202).json({
+            status: 'queued',
+            taskId: taskId,
+            message: result.message
         });
 
     } catch (err) {
-        console.error('[VideoLab] Generate Error:', err);
+        console.error('[VideoLab] Queue Request Error:', err);
         res.status(500).json({ error: err.message });
     }
 });

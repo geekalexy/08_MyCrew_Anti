@@ -1,4 +1,4 @@
-// src/components/Sidebar/Sidebar.jsx — v7 (에이전트명 편집 → 에이전트 상세 페이지로 이전)
+// src/components/Sidebar/Sidebar.jsx — v7
 import { useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useAgentStore } from '../../store/agentStore';

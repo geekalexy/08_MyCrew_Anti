@@ -35,13 +35,27 @@ export async function generateImage(prompt, style = '') {
       base64Data = response.generatedImages[0].image.imageBytes;
     } catch (apiError) {
       console.warn(`[LUMI Skill] 구글 Imagen API 호출 실패 (권한/지역 제한 등), Fallback (NanoBanana B-플랜)으로 우회합니다. 에러: ${apiError.message}`);
-      // 2차 시도 (Fallback): Pollinations 퍼블릭 API를 활용하여 POC 시각화 보장
-      const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&nologo=true`;
-      
+      // 2차 시도 (Fallback): Pollinations API — 현재 Spore 티어 (0.01 pollen/hour)
+      // ⚠️ Seed(7+ dev points) 달성 후 model=flux 로 변경할 것
+      // flux-schnell: pollen 소비 최소 모델, Spore 티어에서 최적
+      const fallbackUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&nologo=true&model=flux-schnell`;
+
+      // POLLINATIONS_API_KEY가 있으면 Seed 티어(안정적), 없으면 Anonymous(제한적)
+      const pollinationsKey = process.env.POLLINATIONS_API_KEY;
+      const pollinationsHeaders = pollinationsKey
+        ? { 'Authorization': `Bearer ${pollinationsKey}` }
+        : {};
+
+      if (pollinationsKey) {
+        console.log('[LUMI Skill] Pollinations Seed 계정으로 인증 호출 중...');
+      } else {
+        console.warn('[LUMI Skill] POLLINATIONS_API_KEY 없음 → 익명 호출 (제한적)');
+      }
+
       const fetch = (await import('node-fetch')).default || globalThis.fetch;
-      const fbResponse = await fetch(fallbackUrl);
-      if (!fbResponse.ok) throw new Error('Fallback 이미지 생성에도 실패했습니다.');
-      
+      const fbResponse = await fetch(fallbackUrl, { headers: pollinationsHeaders });
+      if (!fbResponse.ok) throw new Error(`Fallback 이미지 생성 실패 (HTTP ${fbResponse.status})`);
+
       const arrayBuffer = await fbResponse.arrayBuffer();
       base64Data = Buffer.from(arrayBuffer).toString('base64');
     }

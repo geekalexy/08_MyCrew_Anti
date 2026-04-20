@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import keyProvider from '../tools/keyProvider.js';
+import { MODEL } from '../modelRegistry.js';
 
 class AnthropicAdapter {
     constructor() {
@@ -17,7 +18,7 @@ class AnthropicAdapter {
         }
     }
 
-    async generateResponse(systemPrompt, userPrompt, model = "claude-4-6-sonnet") {
+    async generateResponse(systemPrompt, userPrompt, model = MODEL.SONNET) {
         try {
             await this._ensureClient();
             if (!this.client) throw new Error("ANTHROPIC_API_KEY를 찾을 수 없습니다.");

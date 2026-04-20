@@ -1,4 +1,5 @@
 import geminiAdapter from './adapters/geminiAdapter.js';
+import { MODEL } from './modelRegistry.js';
 
 // taskId 단위로 마지막 보고 날짜를 캐싱 (API 콜 폭주 방지 방어벽 - Prime C2 대응)
 const lastReportCache = new Map();
@@ -40,7 +41,7 @@ class StatusReporter {
 이 지시를 에이전트가 막 수신하고 실행 중이라는 사실을 1~2줄 이내로 매우 짧게 요약해 주세요. 친근하면서 든든한 톤.`;
 
       // API 호출 비용 절약을 위해 가벼운 Flash 모델 고정 사용
-      const result = await geminiAdapter.generateResponse(prompt, '당신은 대표님에게 로봇의 활동을 짧게 보고하는 비서실장입니다.', 'gemini-3-flash');
+      const result = await geminiAdapter.generateResponse(prompt, '당신은 대표님에게 로봇의 활동을 짧게 보고하는 비서실장입니다.', MODEL.FLASH);
       
       this.botRef.sendMessage(this.chatId, `🤖 ${result.text}`);
     } catch (err) {

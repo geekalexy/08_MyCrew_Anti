@@ -44,3 +44,12 @@
 4. CTA: 링크 클릭하고 코디 좌표 바로 확인하기
 - **Feedback**: 없음
 - **Props Snapshot**: {"durationInSeconds":15,"fps":30,"theme":{"primaryColor":"#F8A4B8","secondaryColor":"#FAFAFA","bgGradient":["#FFDAB9","#F8A4B8"]},"scenes":[{"type":"hook","durationFrames":90,"layoutType":"notification","assetType":"emoji","assetContent":"🔥","textLines":["지금 안 입으면 품절각!","여리여리 오프숄더"],"animationType":"bounceIn"},{"type":"solution","durationFrames":120,"layoutType":"chat-bubble","assetType":"emoji","assetContent":"✨","textLines":["어깨라인 완벽 커버,","슬림핏 자동 연출"],"animationType":"slideLeft"},{"type":"value","durationFrames":120,"layoutType":"centered","assetType":"emoji","assetContent":"🛍️","textLines":["1+1 특별 할인","오늘 출발 무료배송"],"animationType":"zoomIn","highlightColor":"#FFD700"},{"type":"cta","durationFrames":120,"layoutType":"centered","assetType":"emoji","assetContent":"🔗","textLines":["링크 클릭하고","코디 좌표 바로 확인하기"],"animationType":"pulse","interactionElement":"link_icon"}]}
+
+### [2026-04-20] 🏆 Winner Pattern (Score: 4)
+- **Prompt**: 다음 문구를 사용해서 인스타그램 DM 자동화 솔루션을 파는 숏폼 릴스를 만들어줘.
+1. 훅: "댓글 문의, 매출로 연결하는 방법"
+2. 솔루션: "제품링크/문의, DM 자동화로 해결하세요."
+3. 소구점: 업계최저가, 2900원
+4. CTA: "최고" 댓글 달고, 시크릿 무료 쿠폰 받기
+- **Feedback**: 없음
+- **Props Snapshot**: {"durationInSeconds":15,"fps":30,"theme":{"primaryColor":"#6A5ACD","secondaryColor":"#F0F0F0","bgGradient":["#1A202C","#2D3748"]},"scenes":[{"type":"hook","durationFrames":90,"layoutType":"notification","assetType":"emoji","assetContent":"✉️","textLines":["댓글 문의,","매출로 연결하는 방법"],"animationType":"bounceIn"},{"type":"solution","durationFrames":120,"layoutType":"chat-bubble","assetType":"emoji","assetContent":"💬","textLines":["제품링크/문의,","DM 자동화로 해결하세요."],"animationType":"slideLeft"},{"type":"value","durationFrames":120,"layoutType":"centered","assetType":"emoji","assetContent":"💳","textLines":["업계 최저가,","단 2,900원"],"animationType":"zoomIn","highlightColor":"#FBBF24"},{"type":"cta","durationFrames":120,"layoutType":"centered","assetType":"emoji","assetContent":"🎁","textLines":["\"최고\" 댓글 달고,","시크릿 무료 쿠폰 받기"],"animationType":"pulse","interactionElement":"comment_icon"}]}

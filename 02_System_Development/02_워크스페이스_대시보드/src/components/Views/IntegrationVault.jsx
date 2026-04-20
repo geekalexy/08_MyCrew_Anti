@@ -1,11 +1,49 @@
 // src/components/Views/IntegrationVault.jsx
-// Phase 21 — Task 1: Integration Vault (Redesign — Flat List Style, Spacious)
+// Phase 22 Sprint 1 — AI 어댑터 섹션 추가 (Imagen 3, Antigravity CLI, Claude Code)
 import { useState } from 'react';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 /* ── 통합 목록 ───────────────────────────────────────────── */
 const INTEGRATIONS = [
+  // ── AI 어댑터 (Phase 22) ─────────────────────────────────
+  {
+    id: 'imagen3',
+    label: 'Imagen 3',
+    description: '구글 최신 이미지 생성 모델. 소시안 브랜드 이미지 및 고품질 일러스트 생성에 활용됩니다.',
+    secretKey: 'GEMINI_API_KEY',
+    placeholder: 'AIzaSy...',
+    inputType: 'password',
+    docUrl: 'https://cloud.google.com/vertex-ai/docs/generative-ai/image/overview',
+    category: 'AI 어댑터',
+    badge: 'Phase 1',
+    badgeColor: '#7C6EF8',
+  },
+  {
+    id: 'antigravity',
+    label: 'Antigravity CLI',
+    description: 'Gemini Ultra 구독 기반 자율 실행 에이전트. File Polling 방식으로 복잡한 태스크를 비동기 처리합니다.',
+    secretKey: 'ANTIGRAVITY_CLI_PATH',
+    placeholder: '/usr/local/bin/antigravity',
+    inputType: 'text',
+    docUrl: '#',
+    category: 'AI 어댑터',
+    badge: 'Phase 1',
+    badgeColor: '#7C6EF8',
+  },
+  {
+    id: 'claude_code',
+    label: 'Claude Code',
+    description: '자율 코딩 에이전트. Ari 엔진으로부터 태스크를 위임받아 파일 수정·테스트·커밋까지 자동으로 수행합니다.',
+    secretKey: 'ANTHROPIC_API_KEY',
+    placeholder: 'sk-ant-...',
+    inputType: 'password',
+    docUrl: 'https://docs.anthropic.com/claude-code',
+    category: 'AI 어댑터',
+    badge: 'Phase 2',
+    badgeColor: '#4ECDC4',
+  },
+  // ── 외부 서비스 연동 ─────────────────────────────────────
   {
     id: 'google_drive',
     label: 'Google Drive',
@@ -68,6 +106,19 @@ const INTEGRATIONS = [
   },
 ];
 
+/* ── Phase 배지 ──────────────────────────────────────────── */
+function PhaseBadge({ badge, badgeColor }) {
+  if (!badge) return null;
+  return (
+    <span style={{
+      fontSize: '0.6rem', fontWeight: 700, padding: '1px 6px',
+      borderRadius: '4px', background: `${badgeColor}22`,
+      color: badgeColor, border: `1px solid ${badgeColor}44`,
+      fontFamily: 'Space Grotesk, sans-serif',
+    }}>{badge}</span>
+  );
+}
+
 /* ── 설정 모달 ───────────────────────────────────────────── */
 function ConfigureModal({ integration, onInstall, onCancel }) {
   const [value, setValue] = useState('');
@@ -111,11 +162,17 @@ function ConfigureModal({ integration, onInstall, onCancel }) {
               </a>
             )}
           </div>
-          <p className="iv2-modal__field-hint">{integration.placeholder.startsWith('http') ? `URL 형식으로 입력해 주세요.` : `API 키를 입력해 주세요. (예: ${integration.placeholder})`}</p>
+          <p className="iv2-modal__field-hint">
+            {integration.placeholder.startsWith('http')
+              ? 'URL 형식으로 입력해 주세요.'
+              : integration.placeholder.startsWith('/')
+              ? '실행 파일 경로를 입력해 주세요.'
+              : `API 키를 입력해 주세요. (예: ${integration.placeholder})`}
+          </p>
           <div className="iv2-modal__input-wrap">
             <input
               className={`iv2-modal__input ${testResult === 'ok' ? 'iv2-modal__input--ok' : testResult === 'fail' ? 'iv2-modal__input--fail' : ''}`}
-              type={visible || integration.inputType === 'url' ? 'text' : 'password'}
+              type={visible || integration.inputType !== 'password' ? 'text' : 'password'}
               placeholder={integration.placeholder}
               value={value}
               onChange={(e) => { setValue(e.target.value); setTestResult(null); }}
@@ -159,8 +216,8 @@ function ConfigureModal({ integration, onInstall, onCancel }) {
 
 /* ── 메인 컴포넌트 ───────────────────────────────────────── */
 export default function IntegrationVault() {
-  const [configured, setConfigured] = useState([]); // 설치된 항목 id 목록
-  const [configuring, setConfiguring] = useState(null); // 현재 설정 중인 integration
+  const [configured, setConfigured] = useState([]);
+  const [configuring, setConfiguring] = useState(null);
   const [search, setSearch] = useState('');
 
   const available = INTEGRATIONS.filter(
@@ -169,6 +226,18 @@ export default function IntegrationVault() {
      i.description.toLowerCase().includes(search.toLowerCase()))
   );
   const installedItems = INTEGRATIONS.filter((i) => configured.includes(i.id));
+
+  // 카테고리별 그룹핑 (AI 어댑터 항상 맨 위)
+  const groupedAvailable = available.reduce((acc, item) => {
+    const cat = item.category || 'General';
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
+    return acc;
+  }, {});
+  const categoryOrder = [
+    'AI 어댑터',
+    ...Object.keys(groupedAvailable).filter(c => c !== 'AI 어댑터'),
+  ];
 
   const handleInstall = async (integration, value) => {
     try {
@@ -208,6 +277,7 @@ export default function IntegrationVault() {
                   <span className="iv2-row__name">
                     {item.label}
                     <span className="iv2-row__connected">● 연결됨</span>
+                    <PhaseBadge badge={item.badge} badgeColor={item.badgeColor} />
                   </span>
                   <span className="iv2-row__desc">{item.description}</span>
                 </div>
@@ -220,7 +290,7 @@ export default function IntegrationVault() {
         </div>
       </div>
 
-      {/* ── 추가 가능한 연동 ─────────────────────────────── */}
+      {/* ── 추가 가능한 연동 (카테고리 그룹핑) ──────────── */}
       <div className="iv2-section">
         <div className="iv2-section__header">
           <span className="iv2-section__label">ADD INTEGRATIONS</span>
@@ -236,31 +306,62 @@ export default function IntegrationVault() {
             />
           </div>
         </div>
-        <div className="iv2-list">
-          {available.length === 0 && (
-            <div className="iv2-empty"><p>검색 결과가 없습니다.</p></div>
-          )}
-          {available.map((item) => (
-            <div key={item.id} className="iv2-row">
-              <div className="iv2-row__info">
-                <span className="iv2-row__name">
-                  {item.label}
-                  {item.docUrl !== '#' && (
-                    <a href={item.docUrl} target="_blank" rel="noreferrer" className="iv2-row__link" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                      </svg>
-                    </a>
-                  )}
+
+        {available.length === 0 && (
+          <div className="iv2-list"><div className="iv2-empty"><p>검색 결과가 없습니다.</p></div></div>
+        )}
+
+        {categoryOrder.filter(cat => groupedAvailable[cat]?.length > 0).map(cat => (
+          <div key={cat} style={{ marginBottom: '1.4rem' }}>
+            {/* 카테고리 헤더 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              marginBottom: '0.5rem', padding: '0 0.1rem',
+            }}>
+              {cat === 'AI 어댑터' && (
+                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem', color: '#7C6EF8' }}>
+                  electrical_services
                 </span>
-                <span className="iv2-row__desc">{item.description}</span>
-              </div>
-              <button className="iv2-btn iv2-btn--add" onClick={() => setConfiguring(item)}>
-                + Add
-              </button>
+              )}
+              <span style={{
+                fontSize: '0.64rem', fontWeight: 700, letterSpacing: '0.1em',
+                color: cat === 'AI 어댑터' ? '#7C6EF8' : 'var(--text-muted)',
+                textTransform: 'uppercase',
+              }}>{cat}</span>
+              {cat === 'AI 어댑터' && (
+                <span style={{
+                  fontSize: '0.6rem', color: 'var(--text-muted)',
+                  padding: '1px 7px', background: 'rgba(124,110,248,0.08)',
+                  border: '1px solid rgba(124,110,248,0.15)', borderRadius: '10px',
+                }}>Phase 22</span>
+              )}
             </div>
-          ))}
-        </div>
+
+            <div className="iv2-list">
+              {groupedAvailable[cat].map((item) => (
+                <div key={item.id} className="iv2-row">
+                  <div className="iv2-row__info">
+                    <span className="iv2-row__name">
+                      {item.label}
+                      <PhaseBadge badge={item.badge} badgeColor={item.badgeColor} />
+                      {item.docUrl !== '#' && (
+                        <a href={item.docUrl} target="_blank" rel="noreferrer" className="iv2-row__link" tabIndex={-1} onClick={(e) => e.stopPropagation()}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                          </svg>
+                        </a>
+                      )}
+                    </span>
+                    <span className="iv2-row__desc">{item.description}</span>
+                  </div>
+                  <button className="iv2-btn iv2-btn--add" onClick={() => setConfiguring(item)}>
+                    + Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ── 설정 모달 ────────────────────────────────────── */}

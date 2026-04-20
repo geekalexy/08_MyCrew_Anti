@@ -1,11 +1,27 @@
-// src/components/Log/LogDrawer.jsx — Phase 11 Premium v3
+// src/components/Log/LogDrawer.jsx — Phase 22 Sprint 1: Ari Socket 스트리밍
 import { useLogStore } from '../../store/logStore';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useSocket } from '../../hooks/useSocket';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { io } from 'socket.io-client';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+
+// ── Ari 전용 Socket 싱글턴 (/ari 네임스페이스) ───────────────────────────────
+// HTTP REST /api/chat 완전 대체 (Phase 22 Sprint 1)
+let ariSocketInstance = null;
+function getAriSocket() {
+  if (!ariSocketInstance) {
+    ariSocketInstance = io(`${SERVER_URL}/ari`, {
+      withCredentials: true,
+      reconnectionAttempts: 5,
+    });
+    ariSocketInstance.on('connect', () => console.log('[AriSocket] ✅ /ari 네임스페이스 연결됨'));
+    ariSocketInstance.on('connect_error', (e) => console.warn('[AriSocket] 연결 실패:', e.message));
+  }
+  return ariSocketInstance;
+}
 
 // 입력창 우측 버튼 상태 머신
 // 'idle'   → 카드 미선택: dimmed send 버튼
@@ -27,6 +43,10 @@ export default function LogDrawer() {
   const [inputText, setInputText]     = useState('');
   const [btnMode, setBtnMode]         = useState('idle'); // idle | stop | send | sending
   const [isDragOver, setIsDragOver]   = useState(false);  // 드래그&드롭 오버레이
+
+  // ── Phase 22: Ari 스트리밍 상태 ──────────────────────────────────────────
+  const [streamingText, setStreamingText] = useState('');   // 누적 청크
+  const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
 
   const bottomRef   = useRef(null);
   const textareaRef = useRef(null);
@@ -53,10 +73,10 @@ export default function LogDrawer() {
     }
   }, [currentView, setActiveLogTab]);
 
-  // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 태스크 ID 없는 로그 + 에이전트 응답 로그
+  // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
     ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : [])
-    : logs.filter((log) => !log.taskId || log.agentId); // taskId 없는 로그 + 에이전트 응답 모두 표시
+    : logs.filter((log) => !log.taskId); // taskId가 있는 타임라인 전용 로그는 채팅방에서 격리
 
   // 타임라인용 필터 (하위 호환성 및 스크롤 감지용)
   const filteredLogs = focusedTaskId
@@ -117,6 +137,38 @@ export default function LogDrawer() {
       .catch(console.error);
   }, [focusedTask]);
 
+  // ── Phase 22: Ari Socket 스트리밍 이벤트 구독 ──────────────────────────
+  useEffect(() => {
+    const ariSocket = getAriSocket();
+
+    const onChunk = ({ text }) => {
+      setStreamingText(prev => prev + text);
+    };
+
+    const onDone = ({ fullText, error } = {}) => {
+      setIsStreaming(false);
+      setStreamingText('');
+      setBtnMode('send');
+      // 완료된 응답은 로그 스토어에 추가 (서버 broadcastLog에서도 오지만 즉각 반영)
+      if (fullText && !error) {
+        useLogStore.getState().appendLog({
+          level: 'info',
+          message: fullText,
+          agentId: 'ari',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    };
+
+    ariSocket.on('ari:stream_chunk', onChunk);
+    ariSocket.on('ari:stream_done', onDone);
+
+    return () => {
+      ariSocket.off('ari:stream_chunk', onChunk);
+      ariSocket.off('ari:stream_done', onDone);
+    };
+  }, []);
+
   const handleSend = useCallback(() => {
     if (!inputText.trim() || btnMode === 'sending') return;
     setBtnMode('sending');
@@ -134,15 +186,34 @@ export default function LogDrawer() {
     } else {
       // 2. 글로벌/채팅/타임라인(카드미선택) 처리
       if (activeLogTab === 'interaction') {
-        const mentionMatch = trimmedText.match(/^@([a-zA-Z가-힣]+)\s+(.*)/);
-        const agentName = mentionMatch ? mentionMatch[1] : 'ari';
-        const finalContent = mentionMatch ? mentionMatch[2] : trimmedText;
+        // ── [Phase 22 Sprint 1] fetch → Socket 스트리밍 교체 ──────────────
+        // HTTP REST /api/chat (블로킹, 10초 대기) 완전 폐기
+        // 멘션(@) 파싱 제거: 이제 채팅은 오직 Ari와의 1:1로만 이루어집니다.
+        const finalContent = trimmedText;
 
-        fetchPromise = fetch(`${SERVER_URL}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ agent: agentName, content: finalContent, author: '대표님' }),
+        // 서버의 broadcastLog가 소켓(log:append)으로 글로벌 갱신해주므로
+        // 클라이언트 로컬에서 중복으로 appendLog를 쏘지 않도록 제거. (버그 픽스)
+
+        // Ari Socket으로 메시지 발송 → 스트리밍 응답 수신
+        setIsStreaming(true);
+        setStreamingText('');
+        getAriSocket().emit('ari:message', {
+          content: finalContent,
+          channel: 'dashboard',
+          author: '대표님',
         });
+
+        // 입력창 즉시 초기화 및 포커스 유지
+        setInputText('');
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          // 전송 후에도 계속해서 바로 타이핑할 수 있도록 포커스 강제 유지
+          setTimeout(() => {
+            if (textareaRef.current) textareaRef.current.focus();
+          }, 0);
+        }
+        // btnMode는 ari:stream_done에서 'send'로 복귀
+        return;
       } else if (activeLogTab === 'time') {
         // [Phase 14] Timeline 탭: #번호 소환 및 전환 기능
         const summonMatch = trimmedText.match(/^#(\d+)\s*(.*)/);
@@ -182,7 +253,12 @@ export default function LogDrawer() {
     fetchPromise
       .then(() => {
         setInputText('');
-        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          setTimeout(() => {
+            if (textareaRef.current) textareaRef.current.focus();
+          }, 0);
+        }
       })
       .catch(console.error)
       .finally(() => setBtnMode(activeLogTab === 'time' ? (focusedTask ? 'stop' : 'idle') : 'send'));
@@ -192,23 +268,7 @@ export default function LogDrawer() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
 
-  // 동적 멘션 키워드 로드 (Phase 19)
-  const [validKeywords, setValidKeywords] = useState([]);
-  useEffect(() => {
-    fetch(`${SERVER_URL}/api/agents`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === 'ok' && data.agents) {
-          const keys = [];
-          data.agents.forEach(a => {
-            keys.push(a.id.toLowerCase());
-            if (a.nameKo) keys.push(a.nameKo);
-          });
-          setValidKeywords(keys);
-        }
-      })
-      .catch(err => console.error('[Agents] Failed to load agents:', err));
-  }, []);
+  // 동적 멘션 키워드 로드 (Phase 22: 아리 1:1 독대 체제로 인해 멘션 기능 제거)
 
   if (!isLogPanelOpen) return null;
 
@@ -503,6 +563,38 @@ export default function LogDrawer() {
                     </div>
                   );
                 })}
+
+                {/* ── Phase 22: Ari 스트리밍 타이핑 버블 ──────────────── */}
+                {isStreaming && activeLogTab === 'interaction' && (
+                  <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+                    marginTop: '0.9rem', animation: 'fadeIn 0.15s',
+                  }}>
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                      background: 'rgba(124,110,248,0.1)', border: '1.5px solid rgba(124,110,248,0.4)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '0.6rem', fontWeight: 700, color: '#7C6EF8', marginTop: '0.1rem',
+                    }}>A</div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
+                        ari <span style={{ opacity: 0.5 }}>· 방금</span>
+                      </p>
+                      <p style={{
+                        fontSize: '1rem', lineHeight: 1.6, color: 'var(--text-secondary)',
+                        wordBreak: 'break-word', margin: 0,
+                      }}>
+                        {streamingText}
+                        {/* 타이핑 커서 */}
+                        <span style={{
+                          display: 'inline-block', width: '2px', height: '1em',
+                          background: '#7C6EF8', marginLeft: '2px', verticalAlign: 'text-bottom',
+                          animation: 'blink 0.8s step-end infinite',
+                        }} />
+                      </p>
+                    </div>
+                  </div>
+                )}
                 </>
               )}
               <div ref={bottomRef} />
@@ -538,17 +630,8 @@ export default function LogDrawer() {
                 }}
               >
                 {activeLogTab === 'interaction' ? (
-                  // [Chatting 탭] @멘션 하이라이트
-                  inputText.split(/(@[a-zA-Z가-힣0-9_]+)/g).map((part, i) => {
-                    if (part.startsWith('@')) {
-                      const name = part.slice(1).toLowerCase();
-                      const isValid = validKeywords.some(k => k.startsWith(name) || name.startsWith(k));
-                      if (isValid) {
-                        return <span key={i} style={{ color: 'var(--brand)', fontWeight: 500 }}>{part}</span>;
-                      }
-                    }
-                    return part;
-                  })
+                  // [Chatting 탭] 멘션 기능 제거됨 (전역 텍스트 처리)
+                  inputText
                 ) : (
                   // [Timeline 탭] #번호 하이라이트
                   inputText.split(/(#\d+)/g).map((part, i) => {
@@ -612,26 +695,6 @@ export default function LogDrawer() {
                   <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>attach_file</span>
                 </button>
 
-                {/* @ 멘션 버튼 (채팅 탭 전용) */}
-                {activeLogTab === 'interaction' && (
-                  <button
-                    onClick={() => {
-                      if (!inputText.startsWith('@')) {
-                        setInputText('@' + inputText);
-                        textareaRef.current?.focus();
-                      }
-                    }}
-                    title="크루 멘션 (@)"
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--text-secondary)', fontWeight: 500, fontSize: '1.1rem',
-                      fontFamily: 'Space Grotesk, sans-serif'
-                    }}
-                  >
-                    @
-                  </button>
-                )}
               </div>
 
               {/* 우측: 상태 머신 버튼 */}

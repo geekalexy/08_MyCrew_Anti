@@ -1,10 +1,12 @@
+// imageLabRouter.js — Phase 22 Phase 0 클린업
+// geminiAdapter 직접 의존성 제거 → imageAnalysisService 서비스 레이어 사용
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import dbManager from '../database.js';
-import geminiAdapter from '../ai-engine/adapters/geminiAdapter.js';
+import { analyzeImageForPrompt } from '../ai-engine/services/imageAnalysisService.js';
 import { generateImage } from '../skill-library/05_design/nanoBananaGenerator.js';
 import { clearSkillCache } from '../ai-engine/executor.js';
 
@@ -61,7 +63,7 @@ CRITICAL: If the image has no character, treat the brand colors and style as the
 Always extract real HEX colors from the image for colorPalette.
 Return ONLY valid JSON, no explanation.`;
 
-    const result = await geminiAdapter.analyzeImage(imagePath, systemPrompt);
+    const result = await analyzeImageForPrompt(imagePath, systemPrompt);
 
     // Gemini가 ```json ... ``` 코드블록으로 감싸는 경우 방어 처리
     const rawText = result.text?.trim() || '';
@@ -229,7 +231,44 @@ router.post('/learn', async (req, res) => {
 
 
 
+// ── 소시안 이미지 풀 경로 ──────────────────────────────────────────────────
+const SOCIAN_POOL_DIR = path.resolve(
+  process.cwd(),
+  '../../06_소시안자료/소시안 이미지'
+);
 
+/** [GET] /api/imagelab/reference-pool - 소시안 이미지 풀 목록 반환 */
+router.get('/reference-pool', (req, res) => {
+  try {
+    if (!fs.existsSync(SOCIAN_POOL_DIR)) {
+      return res.status(404).json({ error: '이미지 풀 폴더를 찾을 수 없습니다.', path: SOCIAN_POOL_DIR });
+    }
+    const files = fs.readdirSync(SOCIAN_POOL_DIR)
+      .filter(f => /\.(png|jpe?g|webp)$/i.test(f))
+      .map(f => ({ name: f, url: `/api/imagelab/reference-pool/${encodeURIComponent(f)}` }));
+    res.json({ status: 'ok', total: files.length, files });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** [GET] /api/imagelab/reference-pool/:filename - 개별 이미지 파일 서빙 */
+router.get('/reference-pool/:filename', (req, res) => {
+  try {
+    const filename = decodeURIComponent(req.params.filename);
+    const filePath = path.join(SOCIAN_POOL_DIR, filename);
+    // 경로 탈출 방어
+    if (!filePath.startsWith(SOCIAN_POOL_DIR)) {
+      return res.status(403).json({ error: '접근 거부' });
+    }
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: '파일 없음' });
+    }
+    res.sendFile(filePath);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** [GET] /api/imagelab/assets - 자산 라이브러리 목록 조회 */
 router.get('/assets', async (req, res) => {
@@ -250,4 +289,18 @@ router.get('/assets', async (req, res) => {
   }
 });
 
+/** [GET] /api/imagelab/winners/count - Winner 누적 수 조회 (페이지 마운트 시 상태 복구용) */
+router.get('/winners/count', (req, res) => {
+  try {
+    const WINNERS_DIR = path.resolve(process.cwd(), 'outputs/winners');
+    const count = fs.existsSync(WINNERS_DIR)
+      ? fs.readdirSync(WINNERS_DIR).filter(f => f.endsWith('.png')).length
+      : 0;
+    res.json({ status: 'ok', count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
+

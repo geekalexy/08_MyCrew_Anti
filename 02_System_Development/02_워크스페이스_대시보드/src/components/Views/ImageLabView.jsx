@@ -188,7 +188,28 @@ function AnalyzingOverlay() {
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────────────
 export default function ImageLabView() {
   const { setLogPanelOpen, setCurrentView } = useUiStore();
-  useEffect(() => { setLogPanelOpen(false); }, []);
+
+  // ─ 소시안 이미지 풀 (Full Auto Loop용)
+  const [refPool,       setRefPool]       = useState([]);   // { name, url }[]
+  const [poolIndex,     setPoolIndex]     = useState(0);
+  const [fullAutoMode,  setFullAutoMode]  = useState(false); // 완전 자동 루프 ON/OFF
+  const [autoPhase,     setAutoPhase]     = useState('idle'); // 'idle'|'analyzing'|'generating'|'waiting'
+  const [cooldownSec,   setCooldownSec]   = useState(0);    // 루프 주기 전 쿼다운 (Rate Limit 방어)
+
+  useEffect(() => {
+    setLogPanelOpen(false);
+    // ── 마운트 시 누적 Winner 수 복구 (휘발 방지) ─────────────────
+    fetch(`${SERVER_URL}/api/imagelab/winners/count`)
+      .then(r => r.json())
+      .then(d => { if (d.count > 0) setWinnerCount(d.count); })
+      .catch(() => {});
+    // ── 소시안 이미지 풀 로드 ────────────────────────────────────
+    fetch(`${SERVER_URL}/api/imagelab/reference-pool`)
+      .then(r => r.json())
+      .then(d => { if (d.files?.length) setRefPool(d.files); })
+      .catch(() => {});
+  }, []);
+
 
   // ─ 레퍼런스
   const [refFile,    setRefFile]    = useState(null);
@@ -226,8 +247,10 @@ export default function ImageLabView() {
   // ─ 결과
   const [learnResult, setLearnResult] = useState(null);
   const [errorMsg,    setErrorMsg]    = useState('');
-  const [isWinnerMsg, setIsWinnerMsg] = useState(false); // 탑바 메시지 타입
-  const [winnerCount, setWinnerCount] = useState(0);     // 누적 Winner 수
+  const [isWinnerMsg, setIsWinnerMsg] = useState(false);
+  const [winnerCount, setWinnerCount] = useState(0);     // 4점이상 우수 패턴 수
+  const [totalLearnCount, setTotalLearnCount] = useState(0); // 전체 학습 횟수
+  const [runningAvgScore, setRunningAvgScore] = useState(0); // 누적 평균 품질점수 (5점 만점)
   const [activeTab,   setActiveTab]   = useState('ref');
 
   const avgScore = (() => {
@@ -239,10 +262,10 @@ export default function ImageLabView() {
 
   // ── 자동 학습: AUTO 모드 + 별점 변경 → 2초 디바운스 후 자동 실행 ──────────
   useEffect(() => {
-    if (!autoLearnMode) return;                         // MANUAL 모드면 스킵
+    if (!autoLearnMode) return;
     if (!generatedUrl || learnResult === 'ok' || isLearning) return;
-    const hasAnyScore = Object.values(scores).some(v => v > 0);
-    if (!hasAnyScore) return;
+    const isFullyScored = Object.values(scores).every(v => v > 0);
+    if (!isFullyScored) return;
 
     setIsAutoLearning(true);
     const timer = setTimeout(() => {
@@ -255,7 +278,80 @@ export default function ImageLabView() {
       setIsAutoLearning(false);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scores, generatedUrl, autoLearnMode]);
+  }, [scores, generatedUrl, autoLearnMode, learnResult]);
+
+  // ── Full Auto Loop ①: 학습 완료 → 쿼다운 후 다음 이미지 로드 ─────────────────
+  useEffect(() => {
+    if (!fullAutoMode || learnResult !== 'ok') return;
+    if (refPool.length === 0) return;
+
+    // 쿼다운 45초: Gemini Flash 무료티어 RPM 한도 방어
+    const COOLDOWN = 45;
+    setCooldownSec(COOLDOWN);
+    setAutoPhase('cooldown');
+
+    const interval = setInterval(() => {
+      setCooldownSec(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // 쿼다운 종료 → 다음 이미지 로드
+          const nextIdx = (poolIndex + 1) % refPool.length;
+          setPoolIndex(nextIdx);
+          setAutoPhase('analyzing');
+          const nextImg = refPool[nextIdx];
+          fetch(`${SERVER_URL}${nextImg.url}`)
+            .then(r => r.blob())
+            .then(blob => {
+              const file = new File([blob], nextImg.name, { type: blob.type || 'image/png' });
+              setRefFile(file);
+              setRefPreview(URL.createObjectURL(blob));
+              setAnalysis(null); setPrompt(''); setHistory([]); setHistoryIndex(-1);
+              setScores({ fidelity:0, style:0, color:0, ratio:0, brand:0 });
+              setMemo(''); setLearnResult(null); setActiveTab('ref');
+              setErrorMsg('');
+            })
+            .catch(err => {
+              setErrorMsg(`자동 루프 이미지 로드 오류: ${err.message}`);
+              setAutoPhase('idle');
+            });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnResult, fullAutoMode]);
+
+  // ── Full Auto Loop ②: 분석 단계 → 자동 분석 실행 ───────────────────────────
+  useEffect(() => {
+    if (!fullAutoMode || autoPhase !== 'analyzing') return;
+    if (!refFile || isAnalyzing) return;
+    // refFile이 세팅된 직후 자동 분석 킥오프 (약간의 딜레이로 상태 안정화)
+    const t = setTimeout(() => { handleAnalyze(); }, 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refFile, autoPhase, fullAutoMode]);
+
+  // ── Full Auto Loop ③: 분석 완료 → 자동 생성 ───────────────────────────────
+  useEffect(() => {
+    if (!fullAutoMode || autoPhase !== 'analyzing') return;
+    if (!analysis || !prompt.trim() || isAnalyzing || isGenerating) return;
+    setAutoPhase('generating');
+    const t = setTimeout(() => { handleGenerate(); }, 300);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis, fullAutoMode, autoPhase]);
+
+  // ── Full Auto Loop ④: 생성 완료 → 평가 대기 상태 ─────────────────────────
+  useEffect(() => {
+    if (!fullAutoMode) return;
+    if (autoPhase === 'generating' && !isGenerating && generatedUrl) {
+      setAutoPhase('waiting'); // 이제 사용자 별점 입력 대기
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGenerating, generatedUrl, fullAutoMode]);
 
   // ── 파일 선택 ─────────────────────────────────────────────────────────────
   const handleFileSelect = useCallback((file) => {
@@ -324,7 +420,12 @@ export default function ImageLabView() {
 
   const handleGenerate = async (editHint = '') => {
     if (!prompt.trim()) return;
-    setIsGenerating(true); setErrorMsg('');
+    setIsGenerating(true);
+    setErrorMsg('');
+    // ── 새 이미지 생성 시 평가 상태 완전 리셋 ───────────────────────────
+    setLearnResult(null);
+    setScores({ fidelity:0, style:0, color:0, ratio:0, brand:0 });
+    setMemo('');
     try {
       const finalPrompt = buildFinalPrompt(prompt, editHint);
       const res = await fetch(`${SERVER_URL}/api/imagelab/generate`, {
@@ -348,6 +449,7 @@ export default function ImageLabView() {
       setIsGenerating(false);
     }
   };
+
 
   // ── Step 3: 학습 ─────────────────────────────────────────────────────────
   const handleLearn = async () => {
@@ -373,12 +475,20 @@ export default function ImageLabView() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '저장 실패');
       setLearnResult('ok');
+
+      // ── 누적 통계 업데이트 ───────────────────────────────────────────
+      const newTotal = totalLearnCount + 1;
+      setTotalLearnCount(newTotal);
+      // 누적 평균 점수: (이전평균 * 이전횟수 + 현재점수) / 새횟수
+      const newRunningAvg = ((runningAvgScore * totalLearnCount) + parseFloat(avgScore)) / newTotal;
+      setRunningAvgScore(parseFloat(newRunningAvg.toFixed(2)));
+
       // 🏆 Winner 저장 피드백
       if (data.winnerSaved) {
         const cnt = data.winnerCount;
         setWinnerCount(cnt);
         setIsWinnerMsg(true);
-        setErrorMsg(`🏆 Winner #${cnt} 저장! (${cnt}/50 수집 완료${cnt >= 50 ? ' → FLUX LoRA 훈련 준비 완료!' : ''})`);
+        setErrorMsg(`🏆 Winner #${cnt} 저장! 누적 평균 ${newRunningAvg.toFixed(1)}점`);
         setTimeout(() => { setErrorMsg(''); setIsWinnerMsg(false); }, 4000);
       }
     } catch (err) {
@@ -453,19 +563,57 @@ export default function ImageLabView() {
 
 
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {/* 🏆 FLUX LoRA 수집 현황 */}
-          {winnerCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '3px 10px', borderRadius: '20px', background: 'rgba(255,215,0,0.07)', border: '1px solid rgba(255,215,0,0.2)' }}>
-              <span style={{ fontSize: '0.7rem' }}>🏆</span>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#ffd700', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }}>
-                  {winnerCount}/50 LoRA
-                </span>
-                <div style={{ width: '60px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(100, (winnerCount / 50) * 100)}%`, background: winnerCount >= 50 ? '#4ade80' : 'linear-gradient(90deg, #ffd700, #ffaa00)', borderRadius: '2px', transition: 'width 0.4s' }} />
+
+          {/* ⏱️ 쿨다운 카운터 (Rate Limit 대기 중) */}
+          {fullAutoMode && autoPhase === 'cooldown' && cooldownSec > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '3px 10px', borderRadius: '20px',
+              background: 'rgba(251,146,60,0.08)',
+              border: '1px solid rgba(251,146,60,0.25)',
+              fontSize: '0.65rem', color: '#fb923c',
+              fontFamily: 'Space Grotesk', fontWeight: 700,
+            }}>
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏱</span>
+              API 쿨다운 {cooldownSec}초 후 재개
+            </div>
+          )}
+
+          {/* 📊 학습 품질 트래커: 첫 학습부터 항상 표시 */}
+          {totalLearnCount > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '4px 12px', borderRadius: '20px',
+              background: 'rgba(255,215,0,0.06)',
+              border: '1px solid rgba(255,215,0,0.18)',
+            }}>
+              <span style={{ fontSize: '0.75rem' }}>🏆</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                {/* 4점이상 / 총학습횟수 */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#ffd700', fontFamily: 'Space Grotesk', whiteSpace: 'nowrap' }}>
+                    우수 {winnerCount}/{totalLearnCount}회
+                  </span>
+                  <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)', fontFamily: 'Space Grotesk' }}>
+                    품질 {runningAvgScore.toFixed(1)}/5
+                  </span>
+                </div>
+                {/* 프로그래스 바: 누적 평균 품질 점수 / 5.0 */}
+                <div style={{ width: '80px', height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(100, (runningAvgScore / 5) * 100)}%`,
+                    background: runningAvgScore >= 4 ? '#4ade80'
+                              : runningAvgScore >= 3 ? 'linear-gradient(90deg, #ffd700, #ffaa00)'
+                              : 'linear-gradient(90deg, #ff6b6b, #ffd700)',
+                    borderRadius: '2px',
+                    transition: 'width 0.5s ease, background 0.3s',
+                  }} />
                 </div>
               </div>
-              {winnerCount >= 50 && <span style={{ fontSize: '0.65rem', color: '#4ade80', fontWeight: 700 }}>훈련 준비!</span>}
+              {runningAvgScore >= 4 && (
+                <span style={{ fontSize: '0.62rem', color: '#4ade80', fontWeight: 700, whiteSpace: 'nowrap' }}>↑ 안정권</span>
+              )}
             </div>
           )}
           {/* 히스토리 탐색 */}
@@ -504,10 +652,75 @@ export default function ImageLabView() {
             <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '0.55rem', fontFamily: 'Space Grotesk' }}>
               레퍼런스 이미지
             </div>
-            <div id="imagelab-dropzone" onDrop={handleDrop}
+            {/* 🔁 Full Auto Loop 토글 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.09em', textTransform: 'uppercase', fontFamily: 'Space Grotesk' }}>
+                Full Auto Loop
+              </span>
+              <button
+                onClick={() => {
+                  const next = !fullAutoMode;
+                  setFullAutoMode(next);
+                  if (next && refPool.length > 0 && !refFile) {
+                    // 최초 시작: 풀에서 첫 이미지 자동 로드
+                    const img = refPool[poolIndex];
+                    fetch(`${SERVER_URL}${img.url}`)
+                      .then(r => r.blob())
+                      .then(blob => {
+                        const file = new File([blob], img.name, { type: blob.type || 'image/png' });
+                        setRefFile(file);
+                        setRefPreview(URL.createObjectURL(blob));
+                        setAnalysis(null); setPrompt(''); setHistory([]); setHistoryIndex(-1);
+                        setScores({ fidelity:0, style:0, color:0, ratio:0, brand:0 });
+                        setMemo(''); setLearnResult(null); setActiveTab('ref');
+                        setAutoPhase('analyzing');
+                      }).catch(() => {});
+                  }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '3px 8px', borderRadius: '20px',
+                  border: `1px solid ${fullAutoMode ? 'rgba(249,206,52,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                  background: fullAutoMode ? 'rgba(249,206,52,0.1)' : 'rgba(255,255,255,0.04)',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  fontSize: '0.62rem', fontWeight: 700,
+                  color: fullAutoMode ? '#F9CE34' : 'var(--text-muted)',
+                }}
+              >
+                <div style={{
+                  width: '22px', height: '12px', borderRadius: '6px',
+                  background: fullAutoMode ? 'rgba(249,206,52,0.4)' : 'rgba(255,255,255,0.1)',
+                  position: 'relative', transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: '2px',
+                    left: fullAutoMode ? '12px' : '2px',
+                    width: '8px', height: '8px', borderRadius: '50%',
+                    background: fullAutoMode ? '#F9CE34' : '#666',
+                    transition: 'left 0.18s',
+                  }} />
+                </div>
+                {fullAutoMode ? '🔁 ON' : 'OFF'}
+              </button>
+            </div>
+            {fullAutoMode && (
+              <div style={{
+                padding: '5px 8px', borderRadius: '7px', marginBottom: '0.5rem',
+                background: 'rgba(249,206,52,0.06)', border: '1px solid rgba(249,206,52,0.2)',
+                fontSize: '0.63rem', color: '#fde68a', lineHeight: 1.6,
+              }}>
+                {autoPhase === 'idle'      && `🟡 대기 중 · 풀 ${refPool.length}장`}
+                {autoPhase === 'cooldown'  && `⏱ API 쿨다운 ${cooldownSec}초 대기 중...`}
+                {autoPhase === 'analyzing' && `🔵 이미지 분석 중... (${poolIndex + 1}/${refPool.length})`}
+                {autoPhase === 'generating' && `🟣 이미지 생성 중...`}
+                {autoPhase === 'waiting'   && `⭐ 별점 평가 후 자동 다음 루프`}
+              </div>
+            )}
+
+          <div id="imagelab-dropzone" onDrop={handleDrop}
               onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => !fullAutoMode && fileInputRef.current?.click()}
               style={{
                 border: `2px dashed ${isDragging ? 'var(--brand)' : refPreview ? 'rgba(180,197,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: '10px', cursor: 'pointer',

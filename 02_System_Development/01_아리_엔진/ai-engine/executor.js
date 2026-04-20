@@ -3,6 +3,7 @@ import path from 'path';
 import router from './router.js';
 import geminiAdapter from './adapters/geminiAdapter.js';
 import antigravityAdapter from './adapters/antigravityAdapter.js';
+import filePollingAdapter from './adapters/FilePollingAdapter.js';
 import modelSelector from './modelSelector.js';
 import dbManager from '../database.js';
 import systemShieldSkill from './skills/systemShieldSkill.js';
@@ -12,6 +13,7 @@ import { generateImage } from '../skill-library/05_design/nanoBananaGenerator.js
 import { generateVideo } from '../skill-library/05_design/remotionRenderer.js';
 import ruleHarvester from './tools/ruleHarvester.js';
 import workflowOrchestrator from './tools/workflowOrchestrator.js';
+import contextInjector from './tools/contextInjector.js';
 
 
 
@@ -182,25 +184,7 @@ function isApprovalIntent(text) {
   return APPROVAL_PATTERNS.some((pattern) => pattern.test(trimmed));
 }
 
-// ─── [Week 1: SOUL 흡수] ───────────────────────────────────────────────
-function loadSoulContext() {
-  const files = ['MYCREW.md', 'IDENTITY.md'];
-  const parts = [];
-  for (const f of files) {
-    try {
-      // 1) Root 검색을 위해 상위 이동 적용 (아리 엔진 cwd가 하위 경로이므로)
-      let p = path.resolve(process.cwd(), '../../', f);
-      if (!fs.existsSync(p)) p = path.resolve(process.cwd(), f);
-      
-      if (fs.existsSync(p)) {
-        parts.push(fs.readFileSync(p, 'utf-8').slice(0, 2000));
-      }
-    } catch (e) {
-      // Ignore
-    }
-  }
-  return parts.join('\n---\n');
-}
+// ─── [Week 1: SOUL 흡수] 제거됨: ContextInjector로 이관 ─────────────────
 
 class Executor {
   constructor() {
@@ -385,24 +369,39 @@ class Executor {
       systemPrompt = skill.getSystemPrompt(); // 기존 Fallback 보장
     }
 
-    // [Week 1: SOUL 흡수] 시스템 프롬프트 최상단에 영구 기억(SOUL) 강제 주입
-    const soulContext = loadSoulContext();
-    
-    // [Living Playbook] 유저가 수시로 업데이트한 팀 그라운드룰 주입
+    // [Phase 22] 🧠 Context Injector를 통한 완벽한 문맥 캡슐화
     const livingRules = ruleHarvester.getAppliedRules();
-    const groundRulesContext = livingRules.trim() !== '' 
-      ? `\n\n[LIVING TEAM GROUND RULES - MUST FOLLOW]\n${livingRules}` 
-      : '';
-
-    const finalSystemPrompt = soulContext.trim() !== '' 
-      ? `[GLOBAL ENTITY/SOUL CONTEXT]\n${soulContext}${groundRulesContext}\n\n[TASK INSTRUCTIONS]\n${systemPrompt}`
-      : `${groundRulesContext}\n\n[TASK INSTRUCTIONS]\n${systemPrompt}`;
+    const finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
     try {
       console.log(`[Executor] 투입 모델: ${modelToUse}, 카테고리: ${evaluation.category}`);
-      this._log('info', `> [${evaluation.category}] 카테고리에 해당하는 도구 모듈과 컨텍스트 로드를 완료했습니다.\n> 에이전트의 논리 회로를 가동하여 [${modelToUse}] 엔진을 통해 랜더링 및 생성을 시작합니다...`, agentId, taskId);
+      this._log('info', `> [${evaluation.category}] 카테고리에 해당하는 도구 모듈과 컨텍스트 로드를 완료했습니다.\n> 에이전트의 논리 회로를 가동하여 [${modelToUse}] 엔진을 통해 렌더링 및 생성을 시작합니다...`, agentId, taskId);
 
-      // 5. 어댑터를 통해 실행 시도 (1차: 고성능 모델)
+      // 5. [Phase 22] 비동기 어댑터 라우팅 (비서 대화 외의 무거운 작업은 File Polling 위임)
+      const ASYNC_CATEGORIES = ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'MEDIA', 'ANALYSIS'];
+      if (ASYNC_CATEGORIES.includes(evaluation.category) && taskId) {
+        this._log('info', `> [비동기 위임] 이 작업은 시간이 소요되므로 고성능 백그라운드 어댑터에게 위임합니다.`, agentId, taskId);
+        
+        const taskContext = {
+          taskId,
+          agentId,
+          category: evaluation.category,
+          content: actualContent,
+          systemPrompt: finalSystemPrompt,
+          modelToUse
+        };
+        
+        const queueResult = await filePollingAdapter.execute(taskContext);
+        
+        return {
+          text: queueResult.message,
+          model: 'AsyncAdapter',
+          category: evaluation.category,
+          score: 1.0
+        };
+      }
+
+      // 6. 비서 레이어 또는 동기 처리 대상 (QUICK_CHAT, KNOWLEDGE 등)
       let result;
       try {
         if (modelToUse.startsWith('anti-bridge-')) {

@@ -42,11 +42,11 @@ class ModelSelector {
 9. WORKFLOW: 멀티에이전트 협업 실행(초안 발제/어택/병합/발산 등), 팀장/팀원 간 워크플로우 제어.
 
 [모델 배정 원칙 (v4.7 울트라 구독 기준)]
-- QUICK_CHAT, MARKETING, CONTENT, DESIGN: 'gemini-3-flash' (최신 초고속 모델)
-- KNOWLEDGE, ANALYSIS, DEEP_WORK, WORKFLOW: 'gemini-3.1-pro' (최신 고성능 추론 모델)
-- 오직 JSON 형식으로만 응답하세요.
+- QUICK_CHAT, MARKETING, CONTENT, DESIGN: 'gemini-2.5-flash' (최신 초고속/경량 모델)
+- KNOWLEDGE, ANALYSIS, DEEP_WORK, WORKFLOW: 'gemini-2.5-pro' (최신 고성능 추론 모델)
 
-결과 예시: { "recommended_model": "gemini-3.1-pro", "score": 10, "reason": "심층 분석 및 복잡한 추론이 필요하므로 최신 프로 티어 모델 배정", "category": "DEEP_WORK" }`;
+당신의 분석 결과를 오직 다음 JSON 형식으로만 응답하시오. 다른 말은 절대 금지:
+결과 예시: { "recommended_model": "gemini-2.5-pro", "score": 10, "reason": "심층 분석 및 복잡한 추론이 필요하므로 고성능 프로 티어 모델 배정", "category": "DEEP_WORK" }`;
 
             const userPrompt = `다음 요청의 의도를 분석하고 최적의 모드를 추천하세요: "${taskContent}"`;
             

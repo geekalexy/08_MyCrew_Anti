@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useUiStore } from '../../store/uiStore';
 import IntegrationVault from './IntegrationVault';
+import AdapterStatusPanel from '../Sidebar/AdapterStatusPanel';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -169,7 +170,9 @@ export default function SettingsView() {
 
       {/* Integrations 탭 */}
       {settingsTab === 'integrations' && (
-        <div style={{ marginTop: '1.5rem', animation: 'fadeIn 0.25s' }}>
+        <div style={{ marginTop: '1.5rem', animation: 'fadeIn 0.25s', display: 'flex', flexDirection: 'column', gap: '0' }}>
+          {/* Phase 22: AI 어댑터 실시간 상태 패널 (IntegrationVault 상단 고정) */}
+          <AdapterStatusPanel />
           <IntegrationVault />
         </div>
       )}

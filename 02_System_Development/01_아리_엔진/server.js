@@ -3,10 +3,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import cors from 'cors';
+import http from 'http';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import TelegramBot from 'node-telegram-bot-api';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 
 const execFilePromise = promisify(execFile);
@@ -23,6 +24,8 @@ import { launchOmoTask } from './ai-engine/omoLauncher.js';
 import obsidianAdapter from './ai-engine/adapters/obsidianAdapter.js';
 import statusReporter from './ai-engine/statusReporter.js';
 import { processOnboardingUrl } from './ai-engine/tools/onboardingPipeline.js';
+import { initAdapterWatcher } from './ai-engine/AdapterWatcher.js';
+import { MODEL } from './ai-engine/modelRegistry.js';
 import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
 import b4System from './ai-engine/tools/b4System.js';
 import imageLabRouter from './routes/imageLabRouter.js';
@@ -244,6 +247,163 @@ export function broadcastLog(level, message, agentId = 'system', taskId = null, 
 // 순환 참조 해결을 위한 Dependency Injection
 // executor 구동 전 로깅 함수를 주입합니다.
 executor.setBroadcastLog(broadcastLog);
+
+// [Phase 1] 파일 폴링 어댑터 감시 데몬 실행 개시
+initAdapterWatcher(io, dbManager, broadcastLog);
+
+// ─── [Phase 22 Sprint 1] Ari 비서 전용 Socket 네임스페이스 ─────────────────
+// HTTP REST /api/chat 완전 대체 — 실시간 스트리밍 응답 지원
+const ariNs = io.of('/ari');
+ariNs.on('connection', (socket) => {
+  console.log(`[Socket/ari] ✅ Ari 비서 세션 연결됨: ${socket.id}`);
+
+  socket.on('ari:message', async (data) => {
+    const { content, channel = 'dashboard', author = '대표님' } = data || {};
+    if (!content?.trim()) return;
+
+    console.log(`[Socket/ari] 메시지 수신 (${channel}): ${content}`);
+    broadcastLog('info', content, author, null, 'WEB_CHAT');
+
+    try {
+      // [Phase 22] 실제 AI 실행 (executor → Ari 비서 레이어)
+      const evaluation = await modelSelector.selectModel(content);
+
+      // --- [Phase 22] Ari 비서는 무거운 비동기 태스크를 직접 처리하지 않고 칸반 태스크로 자동 파생시킴 ---
+      const ASYNC_CATEGORIES = ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'MEDIA', 'ANALYSIS', 'WORKFLOW'];
+      if (ASYNC_CATEGORIES.includes(evaluation.category)) {
+        const categoryAgents = {
+          'MARKETING': 'luma',
+          'CONTENT': 'lily',
+          'DESIGN': 'pico',
+          'ANALYSIS': 'aria',
+          'MEDIA': 'nova',
+          'WORKFLOW': 'luca',
+          'DEEP_WORK': 'luca'
+        };
+        const targetAgent = categoryAgents[evaluation.category] || 'ari';
+        
+        // 1. 태스크 생성 (평가된 추천 모델 스펙 그대로 삽입)
+        const taskId = await dbManager.createTask(content, author, evaluation.recommended_model || 'gemini-2.5-flash', targetAgent);
+        
+        // 2. 프론트엔드에 칸반 생성 이벤트 발송
+        io.emit('task:created', {
+          taskId: String(taskId),
+          title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
+          content,
+          column: 'in_progress', // 실행 상태로 바로 생성
+          agentId: targetAgent,
+          priority: 'medium',
+        });
+        await dbManager.updateTaskStatus(taskId, 'in_progress');
+
+        // 2.5 실제 백그라운드 어댑터에 큐잉 (File Polling)
+        const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
+        await filePollingAdapter.execute({
+          taskId,
+          agentId: targetAgent,
+          category: evaluation.category,
+          content: content,
+          systemPrompt: "이 작업은 전문가 크루로서 대표님의 지시를 성실히 이행하는 태스크입니다.", 
+          modelToUse: evaluation.recommended_model || 'gemini-2.5-flash'
+        });
+
+        // 3. Ari 응답 스트리밍 (자연스러운 체팅 톤)
+        const replyMsg = `네 알겠어요. 이 일은 담당 크루(${targetAgent})에게 전달해서 진행시키겠습니다. 완료되면 리뷰 요청드릴게요! 😊 (작업번호: #${taskId})`;
+        const words = replyMsg.split(' ');
+        for (let i = 0; i < words.length; i++) {
+          const isLast = i === words.length - 1;
+          socket.emit('ari:stream_chunk', { text: words[i] + (isLast ? '' : ' ') });
+          await new Promise(r => setTimeout(r, 20));
+        }
+        socket.emit('ari:stream_done', { fullText: replyMsg, model: 'Ari (Router)' });
+        return; // 즉각 반환 (executor 직접 돌입 금지)
+      }
+      
+      // --- [Phase 22] 독립 구동되는 Ari Daemon (포트 5050)으로 포워딩 ---
+      // 일상 대화, 지식 등은 5050 포트(독립 자아 세션)로 프록시하여 스트리밍 중계
+      const postData = JSON.stringify({ content, author });
+      const reqDaemon = http.request({
+        hostname: 'localhost',
+        port: 5050,
+        path: '/api/compute',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      }, (resDaemon) => {
+        if (resDaemon.statusCode !== 200) {
+          console.warn(`[Socket/ari] 데몬 비정상 응답 상태코드: ${resDaemon.statusCode}`);
+          reqDaemon.emit('error', new Error(`Status ${resDaemon.statusCode}`));
+          return;
+        }
+
+        let fullText = '';
+        let buffer = '';
+        
+        resDaemon.on('data', (chunk) => {
+          buffer += chunk.toString();
+          
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            
+            if (line.startsWith('event: error')) {
+              console.error('[Socket/ari] 데몬 내부 스트리밍 에러 이벤트 수신');
+              // 스트리밍이 여기서 죽으므로 적절히 텍스트 주입
+              fullText += '\n\n💡 죄송합니다. 내부 엔진과 통신 중 에러가 발생했습니다.';
+              socket.emit('ari:stream_chunk', { text: '\n\n💡 죄송합니다. 내부 엔진과 통신 중 에러가 발생했습니다.' });
+              continue;
+            }
+            
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              if (dataStr === '{}') continue;
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.text) {
+                  fullText += parsed.text;
+                  socket.emit('ari:stream_chunk', { text: parsed.text });
+                }
+              } catch(e) {
+                console.error('[Socket/ari] JSON 파싱 오류 (청크 잘림 무시):', e.message);
+              }
+            }
+          }
+        });
+        
+        resDaemon.on('end', () => {
+          socket.emit('ari:stream_done', { fullText, model: 'Ari Daemon (Flash)' });
+        });
+      });
+
+      reqDaemon.on('error', async (err) => {
+        console.warn('[Socket/ari] 독립 Daemon(5050) 통신 실패. 로컬 엔진으로 폴백합니다.', err.message);
+        const result = await executor.run(content, evaluation, 'ari');
+        const words = (result.text || '').split(' ');
+        for (let i = 0; i < words.length; i++) {
+          const isLast = i === words.length - 1;
+          socket.emit('ari:stream_chunk', { text: words[i] + (isLast ? '' : ' ') });
+          await new Promise(r => setTimeout(r, 20)); // 단어 단위 딜레이
+        }
+        socket.emit('ari:stream_done', { fullText: result.text, model: result.model });
+      });
+
+      reqDaemon.write(postData);
+      reqDaemon.end();
+
+    } catch (err) {
+      console.error('[Socket/ari] AI 실행 오류:', err.message);
+      socket.emit('ari:stream_chunk', { text: '죄송해요, 잠시 문제가 생겼어요. 다시 시도해 주세요. 😵' });
+      socket.emit('ari:stream_done', { error: err.message });
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket/ari] Ari 세션 해제: ${socket.id}`);
+  });
+});
 
 // ─── Telegram Bot ────────────────────────────────────────────────────────────
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -601,7 +761,7 @@ app.post('/api/tasks/mention', async (req, res) => {
     const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
     
     // [W1 Fix] model은 기본값 유지, assignedAgent 파라미터로 에이전트 분리
-    const taskId = await dbManager.createTask(content, author, 'gemini-3-flash-preview', targetAgent);
+    const taskId = await dbManager.createTask(content, author, MODEL.FLASH, targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
     await dbManager.updateTaskStatus(taskId, 'in_progress');
@@ -1085,6 +1245,49 @@ app.post('/api/secrets', async (req, res) => {
   }
 });
 
+// ─── 어댑터 상태 API (Phase 22 Sprint 1) ─────────────────────────────────────
+app.get('/api/adapters/status', async (req, res) => {
+  try {
+    const { readdir: fsReaddir } = await import('fs/promises');
+    const { existsSync } = await import('fs');
+    const PENDING_DIR = path.resolve(process.cwd(), '.agents/tasks/pending');
+
+    // pending 큐 깊이
+    let queueDepth = 0;
+    if (existsSync(PENDING_DIR)) {
+      const files = await fsReaddir(PENDING_DIR).catch(() => []);
+      queueDepth = files.filter(f => f.endsWith('.json')).length;
+    }
+
+    // API 키 존재 여부로 어댑터 가용성 판단
+    const geminiKey     = process.env.GEMINI_API_KEY     || '';
+    const anthropicKey  = process.env.ANTHROPIC_API_KEY  || '';
+
+    res.json({
+      status: 'ok',
+      adapters: {
+        antigravity: {
+          status:     queueDepth > 0 ? 'active' : (geminiKey ? 'idle' : 'error'),
+          queueDepth,
+          configured: !!geminiKey,
+        },
+        imagen3: {
+          status:     geminiKey ? 'idle' : 'error',
+          queueDepth: 0,
+          configured: !!geminiKey,
+        },
+        claude_code: {
+          status:     anthropicKey ? 'idle' : 'disabled',
+          queueDepth: 0,
+          configured: !!anthropicKey,
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 app.post('/api/onboarding/activate-team', async (req, res) => {
   try {
     const { teamType } = req.body;
@@ -1418,6 +1621,47 @@ httpServer.listen(PORT, () => {
   setTimeout(runWatchdog, 5 * 60 * 1000);
   console.log('🐶 Heartbeat Watchdog 2.0 armed (첫 실행: 5분 후)');
 
+  // ─── [Phase 22] Ari Daemon 자동 구동 ────────────────────────────────────────
+  // ariDaemon.js는 아리의 독립 두뇌(Port 5050). 서버와 함께 자동 시작/모니터링.
+  const DAEMON_PATH = path.resolve(process.cwd(), 'ai-engine/ariDaemon.js');
+  let daemonProcess = null;
+  let daemonRestartCount = 0;
+  const MAX_DAEMON_RESTARTS = 5;
+
+  function startAriDaemon() {
+    if (daemonRestartCount >= MAX_DAEMON_RESTARTS) {
+      console.error(`[AriDaemon] 🚨 최대 재시작 횟수(${MAX_DAEMON_RESTARTS}회) 도달. 자동 재시작 중단.`);
+      return;
+    }
+    console.log(`[AriDaemon] 🚀 독립 두뇌 프로세스 기동 시도... (Port 5050)`);
+    daemonProcess = spawn('node', [DAEMON_PATH], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    });
+    daemonProcess.stdout.on('data', (d) => process.stdout.write(`[AriDaemon] ${d}`));
+    daemonProcess.stderr.on('data', (d) => process.stderr.write(`[AriDaemon:ERR] ${d}`));
+    daemonProcess.on('exit', (code, signal) => {
+      if (code !== 0 && signal !== 'SIGTERM') {
+        daemonRestartCount++;
+        const delay = Math.min(3000 * daemonRestartCount, 30000); // 지수 백오프 (최대 30초)
+        console.warn(`[AriDaemon] ⚠️ 비정상 종료 (code: ${code}). ${delay/1000}초 후 재시작 시도... (${daemonRestartCount}/${MAX_DAEMON_RESTARTS})`);
+        setTimeout(startAriDaemon, delay);
+      } else {
+        console.log('[AriDaemon] 정상 종료.');
+      }
+    });
+    daemonProcess.on('spawn', () => {
+      daemonRestartCount = 0; // 성공적으로 기동되면 카운트 리셋
+      console.log('[AriDaemon] ✅ 독립 두뇌 프로세스 연결 완료 (Port 5050)');
+    });
+  }
+
+  startAriDaemon();
+
+  // 메인 서버 종료 시 데몬도 함께 종료
+  process.on('SIGTERM', () => { daemonProcess?.kill('SIGTERM'); process.exit(0); });
+  process.on('SIGINT',  () => { daemonProcess?.kill('SIGTERM'); process.exit(0); });
+
   // ─── [Week 1] Boot Recovery Sequence ─────────────────────────────
   // 크래시 등 예기치 않은 종료로 인해 IN_PROGRESS 상태에 갇힌 미응답 Task 복구
   setTimeout(async () => {
@@ -1483,7 +1727,7 @@ httpServer.listen(PORT, () => {
 4. 서버의 \`.env\` 파일 내 \`TELEGRAM_BOT_TOKEN\` 위치에 붙여넣기 (또는 시스템 설정화면에서 입력)
 
 연결이 완료되면 이 카드를 '완료' 칸으로 옮기거나 "텔레그램 연결 완료했다"고 말씀해 주세요!`;
-        const newTaskId = await dbManager.createTask(onboardingContent, 'system', 'Gemini-3-Flash', 'ari');
+        const newTaskId = await dbManager.createTask(onboardingContent, 'system', MODEL.FLASH, 'ari');
         await dbManager.updateTaskStatus(newTaskId, 'PENDING');
       }
     } catch (err) {

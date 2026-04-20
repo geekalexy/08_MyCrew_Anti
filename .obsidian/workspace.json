@@ -26,16 +26,30 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "01_Company_Operations/06_B2B_세일즈/01_온보딩_프로세스.md",
+                "file": "01_Company_Operations/FOLDER_STRUCTURE.legacy.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "01_온보딩_프로세스"
+              "title": "FOLDER_STRUCTURE.legacy"
+            }
+          },
+          {
+            "id": "a5668bf1e73d83b6",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "04_Dual-Model Insights_v1/Sonnet_4.6_인사이트/03_스킬맵/마케팅팀_스킬_목록_v1.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "마케팅팀_스킬_목록_v1"
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -92,7 +106,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 349.50271224975586
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -197,26 +211,52 @@
   },
   "active": "73276ca47e98c954",
   "lastOpenFiles": [
-    "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Prime_7th_Review.md",
-    "02_System_Development/00_아키텍처_문서/리뷰_아카이브",
-    "02_System_Development/00_아키텍처_문서/기획서_아카이브",
-    "01_Company_Operations/06_B2B_세일즈/01_2_온보딩_자동화버전.md",
-    "01_Company_Operations/06_B2B_세일즈/01_온보딩_프로세스.md",
-    "01_Company_Operations/06_B2B_세일즈/02_고객설치_가이드.md",
-    "01_Company_Operations/05_PR_마케팅/01_아키텍처_백서/스크린샷 2026-04-14 오후 11.29.06.png",
-    "01_Company_Operations/05_PR_마케팅/01_아키텍처_백서/mycrew_agent_core.md",
-    "01_Company_Operations/스킬 폴더 구조.md",
-    "01_Company_Operations/루카 복구 방법.md",
-    "01_Company_Operations/05_PR_마케팅/03_세일즈_소스/catchphrases.md",
-    "01_Company_Operations/05_PR_마케팅/03_세일즈_소스",
-    "01_Company_Operations/05_PR_마케팅/02_테크_블로그/anonymized_seniority.md",
-    "01_Company_Operations/05_PR_마케팅/02_테크_블로그",
-    "01_Company_Operations/05_PR_마케팅/01_아키텍처_백서",
-    "01_Company_Operations/05_PR_마케팅",
-    "File indes.base",
-    "02_System_Development/02_스킬_라이브러리/context-harness/SKILL.md",
-    "01_Company_Operations/01_전략_및_로드맵/v1.5/실행계획-1.5.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.0/아키텍처-2.0.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.0/실행계획-2.0.md"
+    "02_System_Development/01_아리_엔진/outputs/video_lab/video_1776644221335_12292d2e.mp4",
+    "02_System_Development/01_아리_엔진/remotion-poc/input-props-1776644221335.json",
+    "02_System_Development/01_아리_엔진/outputs/video_lab/video_1776644132645_97dac5f5.mp4",
+    "02_System_Development/01_아리_엔진/remotion-poc/input-props-1776644132648.json",
+    "02_System_Development/01_아리_엔진/outputs/video_lab/video_1776642715963_89d48135.mp4",
+    "02_System_Development/01_아리_엔진/remotion-poc/input-props-1776642715965.json",
+    "02_System_Development/01_아리_엔진/outputs/video_winners/winner_1776642709898.json",
+    "02_System_Development/01_아리_엔진/outputs/video_winners/winner_1776642709898.mp4",
+    "02_System_Development/01_아리_엔진/outputs/video_lab/video_1776642632706_08a7a80d.mp4",
+    "02_System_Development/01_아리_엔진/remotion-poc/input-props-1776642632706.json",
+    "02_System_Development/01_아리_엔진/outputs/video_lab/video_1776641699279_9d5c8aba.mp4",
+    "02_System_Development/01_아리_엔진/skill-library/09_video/SKILL.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/10_미디어파트_Gemini전환_Sonnet리뷰.md",
+    "02_System_Development/01_아리_엔진/outputs/nanobanana_1cc1d8f4_1776607121398.jpg",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776607097516.png",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/09_미디어파트_전환_검토_Prime.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/09_CKS_메트릭스_리뷰보완_계획서.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/CKS_메트릭스_리뷰보완_계획서.md",
+    "02_System_Development/01_아리_엔진/outputs/nanobanana_b738920e_1776603361363.jpg",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776603338037.png",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/08_지표센서_코드리뷰_Prime.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/Luca_Nexus_코딩리포트_지표센서_이식완료.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/08_기획보완_미디어파트_Gemini자동화.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/07_코딩리포트_지표센서_이식완료.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/CKS_분석탭_파이프라인_기획서.md",
+    "02_System_Development/01_아리_엔진/outputs/nanobanana_af8b111a_1776590269737.jpg",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776590242480.png",
+    "02_System_Development/01_아리_엔진/outputs/nanobanana_e739e0d2_1776589308449.jpg",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776589285117.png",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776588589573.png",
+    "02_System_Development/01_아리_엔진/outputs/lab_refs/ref_1776585747638.png",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_Plan/Anti_Bridge_확정안_v1.0.md",
+    "04_Dual-Model Insights_v1/팀_인사이트/Nexus_CKS_Context_Onboarding.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_Plan/README.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_Plan/Anti_Bridge_아키텍처_기획서_Luca.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_Plan/Anti_Bridge_보완검토서_Sonnet.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_Plan/Anti_Bridge_검토의견_Prime.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_검토의견_Prime.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_보완검토서_Sonnet.md",
+    "04_Dual-Model Insights_v1/🔬 CKS_연구프레임워크/연구계획서/Anti_Bridge_아키텍처_기획서_Luca.md",
+    "02_System_Development/01_아리_엔진/skill-library/00_team/TEAM_GROUND_RULES.md",
+    "02_System_Development/01_아리_엔진/node_modules/multer/README.md",
+    "02_System_Development/01_아리_엔진/node_modules/buffer-from/readme.md",
+    "02_System_Development/01_아리_엔진/node_modules/streamsearch/README.md",
+    "02_System_Development/01_아리_엔진/node_modules/xtend/README.md",
+    "02_System_Development/01_아리_엔진/node_modules/concat-stream/readme.md",
+    "무제.canvas"
   ]
 }

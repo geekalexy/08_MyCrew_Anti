@@ -1,6 +1,7 @@
 // src/components/Views/SettingsView.jsx — 워크스페이스 설정
 import { useEffect, useState } from 'react';
 import { useUiStore } from '../../store/uiStore';
+import IntegrationVault from './IntegrationVault';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -80,6 +81,7 @@ export default function SettingsView() {
   const { theme, toggleTheme } = useUiStore();
   const [serverOnline, setServerOnline] = useState(null);
   const [workspaceInfo, setWorkspaceInfo] = useState({ path: '', isObsidian: false });
+  const [settingsTab, setSettingsTab] = useState('general'); // 'general' | 'integrations'
 
   // 텔레그램 보고 설정 상태
   const [reportMode,   setReportMode]   = useState('daily');
@@ -147,6 +149,33 @@ export default function SettingsView() {
         <p className="board-header__subtitle">워크스페이스 환경 설정</p>
       </div>
 
+      {/* 탭 네비게이션 */}
+      <div className="agent-detail-tabs" style={{ marginTop: '1rem' }}>
+        <button
+          className={`agent-tab-btn ${settingsTab === 'general' ? 'agent-tab-btn--active' : ''}`}
+          onClick={() => setSettingsTab('general')}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '0.85rem', verticalAlign: 'middle', marginRight: '0.25rem' }}>tune</span>
+          General
+        </button>
+        <button
+          className={`agent-tab-btn ${settingsTab === 'integrations' ? 'agent-tab-btn--active' : ''}`}
+          onClick={() => setSettingsTab('integrations')}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '0.85rem', verticalAlign: 'middle', marginRight: '0.25rem' }}>extension</span>
+          Integrations
+        </button>
+      </div>
+
+      {/* Integrations 탭 */}
+      {settingsTab === 'integrations' && (
+        <div style={{ marginTop: '1.5rem', animation: 'fadeIn 0.25s' }}>
+          <IntegrationVault />
+        </div>
+      )}
+
+      {/* General 탭 */}
+      {settingsTab === 'general' && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
         {/* 테마 설정 */}
         <div className="settings-card glass-panel">
@@ -377,6 +406,7 @@ export default function SettingsView() {
           </div>
         </div>
       </div>
+      )} {/* /general tab */}
     </div>
   );
 }

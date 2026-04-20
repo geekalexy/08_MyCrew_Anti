@@ -2,7 +2,7 @@
 description: Luca의 코드를 Claude Opus 등 고성능 모델에게 교차 검증(Peer Review)받기 위한 워크플로우
 ---
 
-# Supreme Advisor (Opus) 전용 리뷰 워크플로우
+# Prime Advisor (Opus) 전용 리뷰 워크플로우
 
 이 워크플로우는 비용(과금) 발생 없이 Antigravity 환경의 모델 변경(수동)을 활용하여 내부 코드의 무결성과 보안 취약점을 레드팀(Red Teaming) 관점에서 검증받는 공식 절차입니다.
 
@@ -17,7 +17,7 @@ description: Luca의 코드를 Claude Opus 등 고성능 모델에게 교차 검
 
 ## 3. 🛡️ (User → Opus) 비판적 리뷰 명령
 대표님은 변경된 모델에게 다음 프롬프트를 전송합니다.
-> "현재 생성된 `[Opus_Review_Target.md]` 문서를 읽고, Supreme Advisor로서 이 설계의 보안적 결함, 아키텍처 한계, 그리고 더 나은 Best Practice 대안을 비판적으로 도출해 줘."
+> "현재 생성된 `[Opus_Review_Target.md]` 문서를 읽고, Prime Advisor로서 이 설계의 보안적 결함, 아키텍처 한계, 그리고 더 나은 Best Practice 대안을 비판적으로 도출해 줘."
 
 ## 4. 🛠️ (Luca) 피드백 수용 및 코드 수정
 Opus의 비판(아티팩트 등)이 도출되면, 대표님은 다시 모델을 **[Gemini] (Luca)**로 복구합니다.

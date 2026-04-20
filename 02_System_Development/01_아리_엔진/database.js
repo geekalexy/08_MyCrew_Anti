@@ -57,6 +57,11 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN assigned_agent TEXT DEFAULT NULL`);
       console.log('[DB] Phase 14 마이그레이션: assigned_agent 컬럼 추가 완료');
     }
+    // [v3.2] 워크플로우 분류를 위한 category 컬럼 추가
+    if (!names.includes('category')) {
+      db.run(`ALTER TABLE Task ADD COLUMN category TEXT DEFAULT 'QUICK_CHAT'`);
+      console.log('[DB] v3.2 마이그레이션: category 컬럼 추가 완료');
+    }
   });
 
   // Log 테이블 생성 (Phase 12: 1시간 배치 보고용 데이터 저장)
@@ -91,6 +96,23 @@ db.serialize(() => {
   db.run(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('heartbeat_auto_resume_level', 'SAFE_ONLY')`);
   db.run(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('batch_report_interval_min', '30')`);
 
+  // CKS 연구 프레임워크 지표 테이블 (Phase 4 도입)
+  db.run(`CREATE TABLE IF NOT EXISTS CksMetrics (
+    task_id     TEXT PRIMARY KEY,
+    team_type   TEXT,
+    tei_tokens  INTEGER DEFAULT 0,
+    ksi_r_score INTEGER DEFAULT 0,
+    ksi_s_score REAL DEFAULT 0.0,
+    her_count   INTEGER DEFAULT 0,
+    eii_score   REAL DEFAULT 0.0,
+    irc_count   INTEGER DEFAULT 0,
+    uxs_rating  INTEGER DEFAULT 0,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.run(`ALTER TABLE CksMetrics ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`, () => {});
+
+
   // DB 와치독 조회 효율화: 복합 인덱스 (Opus 권고)
   db.run(`CREATE INDEX IF NOT EXISTS idx_task_watchdog ON Task(status, updated_at)`);
 
@@ -106,7 +128,7 @@ db.serialize(() => {
   )`);
 
   // [Phase 17-4 Opus 보완] MVP 클린업: 브라우저 초기화 시 사라지는 프론트 전용 임시 에이전트들의 고아 레코드 원천 삭제
-  const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie'];
+  const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna'];
   const placeholders = KNOWN_AGENTS.map(() => '?').join(',');
   db.run(
     `DELETE FROM AgentSkill WHERE agent_id NOT IN (${placeholders})`,
@@ -135,18 +157,91 @@ db.serialize(() => {
           BEGIN
             DELETE FROM TaskFTS WHERE rowid = old.id;
           END`);
+
+  // ─── [v2.0] 콜럼 마이그레이션: priority + has_artifact 신설 ──────────────────
+  db.all(`PRAGMA table_info(Task)`, (err, cols) => {
+    if (err) return;
+    const names = (cols || []).map(c => c.name);
+    if (!names.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
+    if (!names.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
+  });
+
+  // ─── [v2.0] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
+  db.run(`CREATE TABLE IF NOT EXISTS projects (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    status     TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS teams (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT REFERENCES projects(id),
+    name        TEXT NOT NULL,
+    group_type  TEXT,
+    icon        TEXT,
+    color       TEXT,
+    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS team_agents (
+    team_id         TEXT REFERENCES teams(id),
+    agent_id        TEXT NOT NULL,
+    experiment_role TEXT,
+    PRIMARY KEY (team_id, agent_id)
+  )`);
+
+  // ─── [v2.0] 시더(종자) 데이터 ──────────────────────────────────────────
+  db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_cks',   '소시안 CKS 실험')`);
+  db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_planC', '소시안 Plan C 캠페인')`);
+
+  db.run(`INSERT OR IGNORE INTO teams (id, project_id, name, group_type, icon, color)
+    VALUES ('team_B', 'sosiann_planC', 'Team B — 협력적 CKS', '협력적 CKS', '🟢', '#4ade80')`);
+  db.run(`INSERT OR IGNORE INTO teams (id, project_id, name, group_type, icon, color)
+    VALUES ('team_A', 'sosiann_cks',   'Team A — 적대적 대조군', '적대적', '⛔', '#ffb963')`);
+  db.run(`INSERT OR IGNORE INTO teams (id, project_id, name, group_type, icon, color)
+    VALUES ('team_independent', NULL, '독립 심사관', '독립', '⚖️', '#b4c5ff')`);
+
+  // ─── [v3.2] Final Global Roster
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_independent','ari','공유 라우터 (Gemini Flash)')`);
+
+  // Team B 맴버 (LUNA, PICO, LUMI)
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','luna','Team B — 최종 합성자 (Claude Opus)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','pico','Team B — 영상 담당 (Claude Sonnet)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','lumi','Team B — 이미지 담당 (Gemini Flash)')`);
+  
+  // Team A 맴버 (OLLIE, LILY, NOVA)
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','ollie','Team A — 적대적 판관 (Claude Opus)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','lily', 'Team A — 영상 담당 (Claude Sonnet)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','nova', 'Team A — 이미지 담당 (Gemini Flash)')`);
+
+  // ─── [v2.0] 독립
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_independent','ari','독립 판관 (GPT-4o 심사 보조)')`);
+
+  // [Phase 18] Image Lab 전용 테이블
+  db.run(`CREATE TABLE IF NOT EXISTS image_lab_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT UNIQUE NOT NULL,
+    ref_path TEXT,
+    analysis_json TEXT,
+    prompt TEXT,
+    result_url TEXT,
+    score_avg REAL,
+    is_learned INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 });
 
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(content, requester, model = 'Gemini-2.5-Flash', assignedAgent = null) {
+  createTask(content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT') {
     const riskLevel = classifyRiskLevel(content);
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO Task (content, status, requester, model, risk_level, assigned_agent) VALUES (?, ?, ?, ?, ?, ?)`
+        `INSERT INTO Task (content, status, requester, model, risk_level, assigned_agent, category) VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
-      stmt.run([content, 'PENDING', requester, model, riskLevel, assignedAgent], function (err) {
+      stmt.run([content, 'PENDING', requester, model, riskLevel, assignedAgent, category], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -175,12 +270,12 @@ class DatabaseManager {
     });
   }
 
-  // ─── 프론트엔드 Hydration용: 전체 Task 목록 조회 ─────────────────────────
+  // ─── 프론트엔드 Hydration용: 전체 Task 목록 조회 (경량 DTO, latest_comment JOIN 제거) ───
   getAllTasks() {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at,
-          (SELECT content FROM TaskComment WHERE task_id = Task.id ORDER BY created_at DESC LIMIT 1) as latest_comment
+        `SELECT id, content, status, requester, model, assigned_agent, priority,
+                risk_level, execution_mode, has_artifact, created_at, updated_at
          FROM Task 
          WHERE deleted_at IS NULL
          ORDER BY id DESC LIMIT 200`,
@@ -222,16 +317,17 @@ class DatabaseManager {
   }
 
   // ─── [Phase 14] Task 모델 정보 업데이트 (실제 사용된 LLM 기록) ──────────────
-  updateTaskModel(id, modelName) {
+  updateTaskModel(id, modelName, category = null) {
     return new Promise((resolve, reject) => {
-      db.run(
-        `UPDATE Task SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [modelName, id],
-        function (err) {
-          if (err) reject(err);
-          else resolve(this.changes);
-        }
-      );
+      const sql = category 
+        ? `UPDATE Task SET model = ?, category = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+        : `UPDATE Task SET model = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      const params = category ? [modelName, category, id] : [modelName, id];
+      
+      db.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
     });
   }
 
@@ -249,13 +345,31 @@ class DatabaseManager {
     });
   }
 
+  // ─── Task 상세 정보 업데이트 (수동 편집용) ──────────────────────────────────
+  updateTaskDetails(id, content, assignedAgent, model) {
+    const riskLevel = classifyRiskLevel(content);
+    return new Promise((resolve, reject) => {
+      // title/content는 합쳐져서 content에 저장되므로 그대로 처리
+      db.run(
+        `UPDATE Task 
+         SET content = ?, assigned_agent = ?, model = ?, risk_level = ?, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = ?`,
+        [content, assignedAgent, model, riskLevel, id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
   // ─── 와치독용: 지연된 Task 조회 ──────────────────────────────────────────
   // staleMinutes: 마지막 업데이트로부터 경과 분 수 초과 시 반환
   getStaleTasks(staleMinutes = 5) {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT * FROM Task
-         WHERE status = 'in_progress'
+         WHERE LOWER(status) = 'in_progress'
            AND execution_mode != 'omo'
            AND updated_at < datetime('now', ? || ' minutes')`,
         [`-${staleMinutes}`],
@@ -352,10 +466,20 @@ class DatabaseManager {
     });
   }
 
-  // ─── 사용자 설정 읽기 ─────────────────────────────────────────────────────
+  // ─── 사용자 설정 단일 읽기 ──────────────────────────────────────────────────
+  getSetting(key) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT value FROM user_settings WHERE key = ?`, [key], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.value : null);
+      });
+    });
+  }
 
+  // ─── 사용자 설정 전체 읽기 ──────────────────────────────────────────────────
   getAllSettings() {
     return new Promise((resolve, reject) => {
+
       db.all(`SELECT key, value FROM user_settings`, (err, rows) => {
         if (err) reject(err);
         else {
@@ -407,6 +531,268 @@ class DatabaseManager {
           if (err) reject(err);
           else resolve(this.changes);
         }
+      );
+    });
+  }
+
+  // ─── [v2.0] 칸반 보드 전용 경량 DTO (콘텐츠 미포함) ───────────────────
+  getAllTasksLight() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, content, status, assigned_agent, priority, risk_level,
+                has_artifact, created_at, updated_at
+         FROM Task
+         WHERE deleted_at IS NULL
+         ORDER BY id DESC LIMIT 200`,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  // ─── [v2.0] Task 단건 전체 조회 (TaskDetailModal lazy-load용) ─────────────
+  getTaskByIdFull(id) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, content, status, requester, model, assigned_agent, priority,
+                risk_level, execution_mode, has_artifact, created_at, updated_at
+         FROM Task WHERE id = ? AND deleted_at IS NULL`,
+        [id],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  // ─── [v2.0] 조직도 벤크 조회 (teams + agents 중첩 JSON) ─────────────────
+  getRoster() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT t.id as team_id, t.name as team_name, t.group_type, t.icon, t.color,
+                p.id as project_id, p.name as project_name,
+                ta.agent_id, ta.experiment_role
+         FROM teams t
+         LEFT JOIN projects p ON t.project_id = p.id
+         LEFT JOIN team_agents ta ON t.id = ta.team_id
+         ORDER BY t.id, ta.agent_id`,
+        (err, rows) => {
+          if (err) return reject(err);
+          const teamMap = new Map();
+          for (const row of (rows || [])) {
+            if (!teamMap.has(row.team_id)) {
+              teamMap.set(row.team_id, {
+                id: row.team_id, name: row.team_name,
+                groupType: row.group_type, icon: row.icon, color: row.color,
+                project: row.project_id ? { id: row.project_id, name: row.project_name } : null,
+                agents: [],
+              });
+            }
+            if (row.agent_id) {
+              teamMap.get(row.team_id).agents.push({
+                id: row.agent_id, experimentRole: row.experiment_role,
+              });
+            }
+          }
+          const all = [...teamMap.values()];
+          const independent = all.find(t => t.id === 'team_independent');
+          const regularTeams = all.filter(t => t.id !== 'team_independent');
+          resolve({
+            teams: regularTeams,
+            independentAgents: independent ? independent.agents : [],
+          });
+        }
+      );
+    });
+  }
+
+  // ─── [v2.0] 팀 생성 (+ 선택적 신규 프로젝트 생성) ────────────────────
+  createTeam({ id, name, groupType, icon = '🟡', color = '#b4c5ff', projectId, newProjectName }) {
+    return new Promise((resolve, reject) => {
+      const teamId = id || `team_${Date.now()}`;
+      const insert = (pid) => {
+        db.run(
+          `INSERT INTO teams (id, project_id, name, group_type, icon, color) VALUES (?,?,?,?,?,?)`,
+          [teamId, pid, name, groupType || '협력적', icon, color],
+          function(err) {
+            if (err) reject(err);
+            else resolve({ teamId, projectId: pid });
+          }
+        );
+      };
+      if (newProjectName) {
+        const newPid = `proj_${Date.now()}`;
+        db.run(`INSERT INTO projects (id, name) VALUES (?,?)`, [newPid, newProjectName], (err) => {
+          if (err) reject(err); else insert(newPid);
+        });
+      } else {
+        insert(projectId || null);
+      }
+    });
+  }
+
+  // ─── [v2.0] Comment 위상(지시 흐름) 구조 조회 ──────────────────────────
+  getCommentsWithTopology(taskId, assignedAgent) {
+    const KNOWN_AGENTS = ['ari','nova','lumi','pico','ollie','lily','luna','devteam','system'];
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, author, content, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
+        [taskId],
+        (err, rows) => {
+          if (err) return reject(err);
+          const result = (rows || []).map((row, idx) => {
+            const isAgent = KNOWN_AGENTS.includes(row.author?.toLowerCase());
+            return {
+              step:        idx + 1,
+              source:      isAgent
+                ? { id: `agent-${row.author.toLowerCase()}`, name: row.author }
+                : { id: 'user-1', name: row.author || '대표님' },
+              target:      isAgent
+                ? { id: 'user-1', name: '대표님' }
+                : { id: `agent-${(assignedAgent||'ari').toLowerCase()}`, name: assignedAgent || 'ARI' },
+              action_type: isAgent ? 'RESPONSE' : 'ORDER',
+              content:     row.content,
+              created_at:  row.created_at,
+            };
+          });
+          resolve(result);
+        }
+      );
+    });
+  }  // ← getCommentsWithTopology 종료
+
+  // ─── [v3.2] 팀 멤버 목록 조회 ──────────────────────────
+  getTeamAgents(teamId) {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT agent_id, experiment_role FROM team_agents WHERE team_id = ?`,
+        [teamId],
+        (err, rows) => err ? reject(err) : resolve(rows || [])
+      );
+    });
+  }
+
+  // ─── [Phase 18] Image Lab 세션 관리 ──────────────────────────
+  createImageLabSession({ sessionId, refPath, analysisJson }) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO image_lab_sessions (session_id, ref_path, analysis_json) VALUES (?, ?, ?)`,
+        [sessionId, refPath, analysisJson],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  updateImageLabSession(sessionId, { prompt, resultUrl }) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE image_lab_sessions SET prompt = ?, result_url = ? WHERE session_id = ?`,
+        [prompt, resultUrl, sessionId],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  finalizeImageLabSession(sessionId, { scoreAvg }) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE image_lab_sessions SET score_avg = ?, is_learned = 1 WHERE session_id = ?`,
+        [scoreAvg, sessionId],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  // ─── [Phase 4] CKS 연구 지표 수집 연동 ──────────────────────────
+  saveCksMetrics(metrics) {
+    const { task_id, team_type, tei_tokens, ksi_r_score, ksi_s_score, her_count, eii_score, irc_count, uxs_rating } = metrics;
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT OR REPLACE INTO CksMetrics 
+         (task_id, team_type, tei_tokens, ksi_r_score, ksi_s_score, her_count, eii_score, irc_count, uxs_rating)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [task_id, team_type, tei_tokens || 0, ksi_r_score || 0, ksi_s_score || 0.0, her_count || 0, eii_score || 0.0, irc_count || 0, uxs_rating || 0],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  getCksMetricsStats() {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT 
+          AVG(tei_tokens) as avg_tei,
+          AVG(ksi_r_score) as avg_ksi_r,
+          AVG(ksi_s_score) as avg_ksi_s,
+          AVG(her_count) as avg_her,
+          AVG(eii_score) as avg_eii,
+          AVG(irc_count) as avg_irc,
+          AVG(uxs_rating) as avg_uxs,
+          COUNT(task_id) as total_samples
+         FROM CksMetrics`,
+        (err, row) => err ? reject(err) : resolve(row || {})
+      );
+    });
+  }
+
+  _getTeamType(agentId) {
+    if (!agentId) return null;
+    const a = agentId.toLowerCase();
+    if (['nova', 'lily', 'ollie'].includes(a)) return 'team_A';
+    if (['lumi', 'pico', 'luna'].includes(a)) return 'team_B';
+    return 'independent';
+  }
+
+  incrementCksIrc(taskId) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO CksMetrics (task_id, irc_count) VALUES (?, 1)
+         ON CONFLICT(task_id) DO UPDATE SET irc_count = irc_count + 1, updated_at = CURRENT_TIMESTAMP`,
+        [taskId],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  accumulateCksTokens(taskId, tokens, agentId) {
+    const safeTokens = Math.max(0, parseInt(tokens) || 0);
+    const teamType = this._getTeamType(agentId);
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO CksMetrics (task_id, team_type, tei_tokens) VALUES (?, ?, ?)
+         ON CONFLICT(task_id) DO UPDATE SET tei_tokens = tei_tokens + ?, team_type = COALESCE(team_type, ?), updated_at = CURRENT_TIMESTAMP`,
+        [taskId, teamType, safeTokens, safeTokens, teamType],
+        err => err ? reject(err) : resolve()
+      );
+    });
+  }
+
+  updateCksEvalMetrics(taskId, meta, agentId) {
+    const ksi_r = Math.max(0, parseInt(meta.ksi_r) || 0);
+    const ksi_s = Math.max(0, parseFloat(meta.ksi_s) || 0.0);
+    const her = Math.max(0, parseInt(meta.her) || 0);
+    const eii = Math.max(0, parseFloat(meta.eii) || 0.0);
+    const teamType = this._getTeamType(agentId);
+
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO CksMetrics (task_id, team_type, ksi_r_score, ksi_s_score, her_count, eii_score)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(task_id) DO UPDATE SET 
+           team_type = COALESCE(team_type, ?),
+           ksi_r_score = ?,
+           ksi_s_score = ?,
+           her_count = ?,
+           eii_score = ?,
+           updated_at = CURRENT_TIMESTAMP`,
+        [
+          taskId, teamType, ksi_r, ksi_s, her, eii,
+          teamType, ksi_r, ksi_s, her, eii
+        ],
+        err => err ? reject(err) : resolve()
       );
     });
   }

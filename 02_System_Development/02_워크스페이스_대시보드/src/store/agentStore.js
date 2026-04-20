@@ -13,43 +13,100 @@ export const ACTIVITY_LABEL = {
 // 5인의 초기 메타데이터 (동적 관리를 위해 스토어 내부 initialState로 편입)
 const INITIAL_AGENT_META = {
   ari: {
-    name: 'ARI (비서)',
-    role: 'AI 오케스트레이터',
-    skills: ['업무 라우팅', '태스크 큐 관리', '엔진 조율'],
+    name: 'ARI',
+    role: '공유 비서 · 라우터',
+    skills: ['태스크 접수', '팀 라우팅', '사용자 대화'],
     avatar: '/avatars/ari.svg',
-    model: 'Gemini 3.1 Pro (High)',
+    model: 'Gemini Flash',
+    teamGroup: 'independent',
+    experimentRole: '사용자 ⇔ 팀 가교 (팀 외부 독립)',
   },
   nova: {
-    name: 'NOVA (CMO)',
-    role: '최고 마케팅 책임자 (CMO)',
-    skills: ['마케팅 기획', '트렌드 수집', '카피라이팅'],
+    name: 'NOVA',
+    role: '이미지 크리에이터',
+    skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', '이미지 벤치마크'],
     avatar: '/avatars/nova.svg',
-    model: 'Claude Sonnet 4.6 (Thinking)',
+    model: 'Gemini Flash',
+    teamGroup: 'A',
+    experimentRole: 'Team A — 이미지 실무',
   },
-  lumi: {
-    name: 'LUMI (디자이너)',
-    role: '수석 디자이너',
-    skills: ['UI/UX 기획', '이미지 검수', '디자인 토큰'],
-    avatar: '/avatars/lumi.svg',
-    model: 'Gemini 3 Flash',
-  },
-  pico: {
-    name: 'PICO (컨텐츠매니저)',
-    role: '콘텐츠 매니저',
-    skills: ['SEO 포맷팅', '블로그 작성', '텍스트 윤문'],
-    avatar: '/avatars/pico.svg',
-    model: 'Claude Sonnet 4.6 (Thinking)',
+  lily: {
+    name: 'LILY',
+    role: '영상 프로듀서',
+    skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
+    avatar: '/avatars/lily.png',
+    model: 'Claude Sonnet 4.6',
+    teamGroup: 'A',
+    experimentRole: 'Team A — 영상/코드 실무',
   },
   ollie: {
-    name: 'OLLIE (분석가)',
-    role: '데이터 분석가',
-    skills: ['데이터 조회', '파이썬 실행', '시각화 코드'],
+    name: 'OLLIE',
+    role: '적대적 판관',
+    skills: ['비판적 검토', '오류 탐지', '품질 심사'],
     avatar: '/avatars/ollie.svg',
-    model: 'Claude Opus 4.6 (Thinking)',
+    model: 'Claude Opus',
+    teamGroup: 'A',
+    experimentRole: 'Team A — 적대적 판관 (Phase 2·4)',
+  },
+  lumi: {
+    name: 'LUMI',
+    role: '이미지 크리에이터',
+    skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', 'SKILL.md 학습'],
+    avatar: '/avatars/lumi.svg',
+    model: 'Gemini Flash',
+    teamGroup: 'B',
+    experimentRole: 'Team B — 이미지 실무',
+  },
+  pico: {
+    name: 'PICO',
+    role: '영상 프로듀서',
+    skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
+    avatar: '/avatars/pico.svg',
+    model: 'Claude Sonnet 4.6',
+    teamGroup: 'B',
+    experimentRole: 'Team B — 영상/코드 실무',
+  },
+  luna: {
+    name: 'LUNA',
+    role: '협력 합성자',
+    skills: ['결과물 통합', '지식 동기화', 'CKS 프로토콜'],
+    avatar: '/avatars/luna.png',
+    model: 'Claude Opus',
+    teamGroup: 'B',
+    experimentRole: 'Team B — 협력적 합성자 (Phase 2·4)',
+  },
+};
+
+// [v2.0] 팀 레지스트리 — OrgView 그룹핑 기준
+export const TEAMS_REGISTRY = {
+  A: {
+    id: 'A', name: 'Team A', type: '적대적 대조군',
+    icon: '⛔', color: '#ffb963', projectBadge: '소시안 CKS 실험',
+  },
+  B: {
+    id: 'B', name: 'Team B', type: '협력적 CKS',
+    icon: '🟢', color: '#4ade80', projectBadge: '소시안 Plan C 캠페인',
+  },
+  independent: {
+    id: 'independent', name: '독립 심사관', type: '독립',
+    icon: '⚖️', color: 'var(--brand)', projectBadge: '',
   },
 };
 
 export const useAgentStore = create((set) => ({
+  // 팀 그룹 메타데이터 (수정 가능하도록 상태화)
+  teamsRegistry: {
+    A: { id: 'A', name: 'Team A', type: '적대적 대조군', icon: '⛔', color: '#ff6b6b', projectBadge: 'CKS 실험 — 적대적 시나리오' },
+    B: { id: 'B', name: 'Team B', type: 'CKS 협력 실험군', icon: '🌙', color: '#4ade80', projectBadge: 'CKS 실험 — 협력 통합 시나리오' },
+    independent: { id: 'independent', name: '독립 라우터', type: '라우팅', icon: '⚡', color: 'var(--brand)', projectBadge: '' },
+  },
+  updateTeamRegistry: (teamKey, updates) => set((s) => ({
+    teamsRegistry: {
+      ...s.teamsRegistry,
+      [teamKey]: { ...s.teamsRegistry[teamKey], ...updates }
+    }
+  })),
+
   // 동적 메타데이터 (이름, 이미지 수정 등을 위해 상태화)
   agentMeta: INITIAL_AGENT_META,
   
@@ -62,7 +119,7 @@ export const useAgentStore = create((set) => ({
     })),
 
   // 신규 에이전트 생성
-  addAgent: (roleDesc) =>
+  addAgent: (roleDesc, teamGroup = 'B') =>
     set((s) => {
       const newId = `crew_${Date.now()}`;
       const newName = `NEW_CREW_${Math.floor(Math.random() * 100)}`;
@@ -73,8 +130,10 @@ export const useAgentStore = create((set) => ({
             name: newName,
             role: roleDesc,
             skills: ['신규 배정 업무'],
-            avatar: '/avatars/pico.svg', // 기본 아바타
-            model: 'Claude Sonnet 4.6 (Thinking)', // 기본 모델
+            avatar: '/avatars/pico.svg',
+            model: 'Claude Sonnet 4.6 (Thinking)',
+            teamGroup,
+            experimentRole: '신규 크루',
           }
         },
         agents: {

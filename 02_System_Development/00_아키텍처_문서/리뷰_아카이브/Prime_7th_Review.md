@@ -1,6 +1,6 @@
-# 🛡️ Supreme Advisor (Prime) — Phase 20 온보딩 아키텍처 2차 리뷰
+# 🛡️ Prime Advisor (Prime) — Phase 20 온보딩 아키텍처 2차 리뷰
 
-**리뷰어:** Prime (Claude Opus) — Supreme Advisor  
+**리뷰어:** Prime (Claude Opus) — Prime Advisor  
 **대상:** Phase 20 Onboarding + Practical Security (Revised)  
 **일시:** 2026-04-15 (7th Review Session)  
 

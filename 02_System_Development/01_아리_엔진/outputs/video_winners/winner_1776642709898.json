@@ -1,0 +1,69 @@
+{
+  "score": 4,
+  "memo": "",
+  "prompt": "다음 문구를 사용해서 인스타그램 DM 자동화 솔루션을 파는 숏폼 릴스를 만들어줘.\n1. 훅: \"댓글 문의, 매출로 연결하는 방법\"\n2. 솔루션: \"제품링크/문의, DM 자동화로 해결하세요.\"\n3. 소구점: 업계최저가, 2900원\n4. CTA: \"최고\" 댓글 달고, 시크릿 무료 쿠폰 받기",
+  "props": {
+    "durationInSeconds": 15,
+    "fps": 30,
+    "theme": {
+      "primaryColor": "#1E90FF",
+      "secondaryColor": "#FAFAFA",
+      "bgGradient": [
+        "#0F172A",
+        "#1E1B4B"
+      ]
+    },
+    "scenes": [
+      {
+        "type": "hook",
+        "durationFrames": 90,
+        "layoutType": "notification",
+        "assetType": "emoji",
+        "assetContent": "✉️",
+        "textLines": [
+          "댓글 문의,",
+          "매출로 연결하는 방법"
+        ],
+        "animationType": "bounceIn"
+      },
+      {
+        "type": "solution",
+        "durationFrames": 120,
+        "layoutType": "chat-bubble",
+        "assetType": "emoji",
+        "assetContent": "💬",
+        "textLines": [
+          "제품링크/문의,",
+          "DM 자동화로 해결하세요."
+        ],
+        "animationType": "slideLeft"
+      },
+      {
+        "type": "value",
+        "durationFrames": 120,
+        "layoutType": "centered",
+        "assetType": "emoji",
+        "assetContent": "💳",
+        "textLines": [
+          "업계 최저가,",
+          "단 2,900원"
+        ],
+        "animationType": "zoomIn",
+        "highlightColor": "#FBBF24"
+      },
+      {
+        "type": "cta",
+        "durationFrames": 120,
+        "layoutType": "centered",
+        "assetType": "emoji",
+        "assetContent": "🎁",
+        "textLines": [
+          "\"최고\" 댓글 달고,",
+          "시크릿 무료 쿠폰 받기"
+        ],
+        "animationType": "pulse",
+        "interactionElement": "comment_icon"
+      }
+    ]
+  }
+}

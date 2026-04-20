@@ -1,4 +1,4 @@
-// src/components/Sidebar/Sidebar.jsx — v5 (Phase 10: currentView 연동, Organization 메뉴 추가)
+// src/components/Sidebar/Sidebar.jsx — v7 (에이전트명 편집 → 에이전트 상세 페이지로 이전)
 import { useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -9,10 +9,14 @@ export default function Sidebar() {
   const { projects, selectedProjectId, selectProject, addProject, deleteProject } = useProjectStore();
   const { agents, selectedAgentId, selectAgent, clearAgentSelection, agentMeta } = useAgentStore();
   const tasks = useKanbanStore((s) => s.tasks);
-  const { currentView, setCurrentView, workspaceName, workspaceLogo } = useUiStore();
+  const { currentView, setCurrentView, workspaceName, workspaceLogo, teamPageTitle } = useUiStore();
+
+  // Projects 상태
   const [newProjectName, setNewProjectName] = useState('');
   const [isAddingProject, setIsAddingProject] = useState(false);
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
+  // Team 상태
+  const [isTeamCollapsed, setIsTeamCollapsed] = useState(false);
 
   const doneTasks = Object.values(tasks).filter((t) => t.column === 'done');
 
@@ -35,7 +39,10 @@ export default function Sidebar() {
     setCurrentView(view);
   };
 
-  
+  const handleAddTeam = () => {
+    handleNavClick('organization');
+  };
+
 
   return (
     <aside className="sidebar">
@@ -156,42 +163,119 @@ export default function Sidebar() {
           )}
         </button>
 
-        {/* Team */}
+        {/* Image Lab */}
         <button
-          className={`sidebar__nav-item ${currentView === 'organization' ? 'sidebar__nav-item--active' : ''}`}
-          onClick={() => handleNavClick('organization')}
+          id="sidebar-image-lab"
+          className={`sidebar__nav-item ${currentView === 'image-lab' ? 'sidebar__nav-item--active' : ''}`}
+          onClick={() => handleNavClick('image-lab')}
         >
-          <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: currentView === 'organization' ? "'FILL' 1" : "'FILL' 0" }}>group</span>
-          Team
+          <span
+            className="material-symbols-outlined sidebar__nav-icon"
+            style={{ fontVariationSettings: currentView === 'image-lab' ? "'FILL' 1" : "'FILL' 0" }}
+          >
+            experiment
+          </span>
+          Image Lab
+          <span style={{
+            fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px',
+            background: 'rgba(180,197,255,0.15)', color: 'var(--brand)',
+            fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px',
+          }}>BETA</span>
         </button>
+
+        {/* Video Lab */}
+        <button
+          id="sidebar-video-lab"
+          className={`sidebar__nav-item ${currentView === 'video-lab' ? 'sidebar__nav-item--active' : ''}`}
+          onClick={() => handleNavClick('video-lab')}
+        >
+          <span
+            className="material-symbols-outlined sidebar__nav-icon"
+            style={{ fontVariationSettings: currentView === 'video-lab' ? "'FILL' 1" : "'FILL' 0" }}
+          >
+            movie_filter
+          </span>
+          Video Lab
+          <span style={{
+            fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px',
+            background: 'rgba(238,42,123,0.15)', color: '#f472b6',
+            fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px',
+          }}>P1</span>
+        </button>
+
 
         {/* AI Crew 섹션 */}
         <div className="sidebar__section-header sidebar__section-header--mt">
           <span className="sidebar__section-label">AI Crew</span>
         </div>
 
-        <div className="sidebar__project-list" style={{ marginBottom: 0 }}>
-          {Object.keys(agentMeta).map((agentId) => {
-            const meta = agentMeta[agentId];
-            const agentState = agents[agentId];
-            const isActive = agentState?.status === 'active';
-            return (
-              <button
-                key={agentId}
-                className={`sidebar__project-item ${selectedAgentId === agentId && currentView === 'agent-detail' ? 'sidebar__project-item--active' : ''}`}
-                onClick={() => handleAgentClick(agentId)}
-              >
-                <span
-                  className={`sidebar__agent-dot sidebar__agent-dot--${isActive ? 'active' : 'idle'}`}
-                  style={{ flexShrink: 0 }}
-                />
-                <span className="sidebar__project-name" style={{ flex: 1, fontWeight: selectedAgentId === agentId ? 600 : 500 }}>
-                  {meta.name}
-                </span>
-              </button>
-            );
-          })}
+        {/* ── Team 행: Projects와 동일한 +/접기 패턴 ─────── */}
+        <div className="sidebar__projects-row">
+          <button
+            className={`sidebar__nav-item sidebar__nav-item--group ${currentView === 'organization' ? 'sidebar__nav-item--active' : ''}`}
+            onClick={() => handleNavClick('organization')}
+            style={{ flex: 1 }}
+          >
+            <span
+              className="material-symbols-outlined sidebar__nav-icon"
+              style={{ fontVariationSettings: currentView === 'organization' ? "'FILL' 1" : "'FILL' 0" }}
+            >
+              group
+            </span>
+            {teamPageTitle || 'Team'}
+          </button>
+          <div className="sidebar__projects-actions">
+            <button
+              className="sidebar__icon-btn"
+              title="새 팀 만들기"
+              onClick={handleAddTeam}
+              aria-label="새 팀 만들기"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>add</span>
+            </button>
+            <button
+              className="sidebar__icon-btn"
+              title={isTeamCollapsed ? '팀 목록 펼치기' : '팀 목록 접기'}
+              onClick={() => setIsTeamCollapsed(!isTeamCollapsed)}
+              aria-label="팀 목록 접기/펼치기"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
+                {isTeamCollapsed ? 'expand_more' : 'expand_less'}
+              </span>
+            </button>
+          </div>
         </div>
+
+        {/* 에이전트 목록 (접기 적용) */}
+        {!isTeamCollapsed && (
+          <div className="sidebar__project-list" style={{ marginBottom: 0 }}>
+            {Object.keys(agentMeta).map((agentId) => {
+              const meta = agentMeta[agentId];
+              const agentState = agents[agentId];
+              const isActive = agentState?.status === 'active';
+
+              return (
+                <button
+                  key={agentId}
+                  className={`sidebar__project-item ${selectedAgentId === agentId && currentView === 'agent-detail' ? 'sidebar__project-item--active' : ''}`}
+                  onClick={() => handleAgentClick(agentId)}
+                  style={{ width: '100%' }}
+                >
+                  <span
+                    className={`sidebar__agent-dot sidebar__agent-dot--${isActive ? 'active' : 'idle'}`}
+                    style={{ flexShrink: 0 }}
+                  />
+                  <span
+                    className="sidebar__project-name"
+                    style={{ flex: 1, fontWeight: selectedAgentId === agentId ? 600 : 500 }}
+                  >
+                    {meta.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       {/* ── 하단 (Settings + 유저 + Powered by) ────────── */}

@@ -53,10 +53,10 @@ export default function LogDrawer() {
     }
   }, [currentView, setActiveLogTab]);
 
-  // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 태스크 없는 글로벌 로그만
+  // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 태스크 ID 없는 로그 + 에이전트 응답 로그
   const displayLogs = activeLogTab === 'time'
     ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : [])
-    : logs.filter((log) => !log.taskId); // 태스크 ID가 없는 로그만 채팅 탭에 표시
+    : logs.filter((log) => !log.taskId || log.agentId); // taskId 없는 로그 + 에이전트 응답 모두 표시
 
   // 타임라인용 필터 (하위 호환성 및 스크롤 감지용)
   const filteredLogs = focusedTaskId
@@ -231,20 +231,25 @@ export default function LogDrawer() {
     }
 
     if (btnMode === 'stop') {
-      return (
-        <button
-          onClick={handleKill}
-          title="실행 프로세스 중단 (Kill)"
-          style={{
-            background: 'rgba(255,82,82,0.12)', color: '#ff6b6b',
-            border: '1px solid rgba(255,82,82,0.25)', borderRadius: '50%',
-            width: 30, height: 30, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>stop_circle</span>
-        </button>
-      );
+      // 텍스트가 입력되면 Kill 대신 Send 버튼 표시 (UX 보호)
+      if (inputText.trim()) {
+        // fall-through: 아래 send 버튼으로 표시
+      } else {
+        return (
+          <button
+            onClick={handleKill}
+            title="실행 프로세스 중단 (Kill)"
+            style={{
+              background: 'rgba(255,82,82,0.12)', color: '#ff6b6b',
+              border: '1px solid rgba(255,82,82,0.25)', borderRadius: '50%',
+              width: 30, height: 30, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>stop_circle</span>
+          </button>
+        );
+      }
     }
 
     if (btnMode === 'sending') {
@@ -386,7 +391,23 @@ export default function LogDrawer() {
                     : 'AI Crew와의 대화가 없습니다.'}
                 </div>
               ) : (
-                displayLogs.map((log, i) => {
+                <>
+                  {displayLogs.length >= 15 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                        background: 'rgba(124,110,248,0.08)', borderRadius: 20,
+                        padding: '0.4rem 1rem', border: '1px solid rgba(124,110,248,0.2)',
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--brand)' }}>auto_awesome</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                          대화가 길어져 오래된 내용은 시야에서 사라져요.<br/>
+                          하지만 질문하시면 아리가 기억해요! ✨
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  {displayLogs.map((log, i) => {
                   const isUser   = log.agentId === '대표님' || log.agentId === 'user';
                   const isSystem = log.agentId === 'system';
                   const time     = new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
@@ -481,7 +502,8 @@ export default function LogDrawer() {
                       </div>
                     </div>
                   );
-                })
+                })}
+                </>
               )}
               <div ref={bottomRef} />
             </div>
@@ -515,7 +537,7 @@ export default function LogDrawer() {
                   overflow: 'hidden'
                 }}
               >
-                {activeLogTab === 'chat' ? (
+                {activeLogTab === 'interaction' ? (
                   // [Chatting 탭] @멘션 하이라이트
                   inputText.split(/(@[a-zA-Z가-힣0-9_]+)/g).map((part, i) => {
                     if (part.startsWith('@')) {

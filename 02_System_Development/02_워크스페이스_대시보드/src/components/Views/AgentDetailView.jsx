@@ -4,6 +4,7 @@ import { useAgentStore } from '../../store/agentStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useUiStore } from '../../store/uiStore';
 import SkillSection from '../Skills/SkillSection';
+import SkillAddDrawer from '../Skills/SkillAddDrawer';
 
 const COLUMNS = ['todo', 'in_progress', 'review', 'done'];
 const COLUMN_LABELS = { todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done' };
@@ -54,6 +55,7 @@ export default function AgentDetailView() {
   const { setLogPanelOpen } = useUiStore();
 
   const [activeTab, setActiveTab] = useState('PERFORMANCE');
+  const [showSkillDrawer, setShowSkillDrawer] = useState(false);
   // 이름 편집 상태
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
@@ -214,6 +216,25 @@ export default function AgentDetailView() {
           {meta.skills.map((skill) => (
             <span key={skill} className="skill-badge">{skill}</span>
           ))}
+          {/* 스킬 추가하기 버튼 */}
+          <button
+            onClick={() => setShowSkillDrawer(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+              padding: '0.25rem 0.65rem',
+              borderRadius: '99px',
+              border: '1px dashed rgba(100,135,242,0.45)',
+              background: 'rgba(100,135,242,0.06)',
+              color: 'var(--brand)',
+              fontSize: '0.72rem', fontWeight: 700,
+              cursor: 'pointer', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,135,242,0.14)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(100,135,242,0.06)'}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>add</span>
+            스킬 추가하기
+          </button>
         </div>
       </div>
 
@@ -274,11 +295,11 @@ export default function AgentDetailView() {
                     onChange={(e) => updateAgentMeta(agentId, { model: e.target.value })}
                     style={{ background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '0.6rem', borderRadius: '6px', width: '100%', outline: 'none' }}
                   >
-                    <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High) — 수석 에이전트 용</option>
-                    <option value="Claude Opus 4.6 (Thinking)">Claude Opus 4.6 (Thinking) — 논리 심층 분석</option>
-                    <option value="Claude Sonnet 4.6 (Thinking)">Claude Sonnet 4.6 (Thinking) — 속도/지능 밸런스</option>
+                    <option value="Gemini 3.1 Pro">Gemini 3.1 Pro — 수석 에이전트 용</option>
+                    <option value="Claude Opus 4.6">Claude Opus 4.6 — 논리 심층 분석</option>
+                    <option value="Claude Sonnet 4.6">Claude Sonnet 4.6 — 속도/지능 밸런스</option>
                     <option value="Gemini 3 Flash">Gemini 3 Flash — 경량 고속 처리</option>
-                    <option value="GPT-OSS 120B (Medium)">GPT-OSS 120B (Medium) — 오픈소스 호환</option>
+                    <option value="GPT-OSS 120B">GPT-OSS 120B — 오픈소스 호환</option>
                   </select>
                   <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: 1.4 }}>* 엔진 변경 시 즉시 추론 로직과 응답 품질이 달라집니다.</p>
                 </div>
@@ -303,7 +324,10 @@ export default function AgentDetailView() {
             </div>
 
             {/* 3. 스킬 라이브러리 섹션 → SkillSection 컴포넌트 */}
-            <SkillSection agentId={agentId} />
+            <SkillSection
+              agentId={agentId}
+              onOpenDrawer={() => setShowSkillDrawer(true)}
+            />
           </div>
         )}
 
@@ -352,9 +376,18 @@ export default function AgentDetailView() {
           </>
         )}
 
+
       </div>
 
+
       {/* 스킬 상세 팝업 → SkillSection 내부로 이동됨 */}
+
+      {/* 스킬 추가 드로어 (프로필 헤더 버튼 & 퍼포먼스 탭 버튼 공통) */}
+      <SkillAddDrawer
+        isOpen={showSkillDrawer}
+        onClose={() => setShowSkillDrawer(false)}
+        agentId={agentId}
+      />
 
     </div>
   );

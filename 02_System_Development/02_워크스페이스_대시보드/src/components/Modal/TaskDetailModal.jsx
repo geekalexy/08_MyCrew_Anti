@@ -2,6 +2,243 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
+import { useAgentStore } from '../../store/agentStore';
+import { useLogStore } from '../../store/logStore';
+
+// ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
+const WORKFLOW_STEPS = [
+  { step: 0, label: '엔진 가동',         icon: 'rocket_launch',  color: '#b4c5ff' },
+  { step: 1, label: 'Phase 1 병렬 생성', icon: 'fork_right',     color: '#4ade80' },
+  { step: 2, label: 'Phase 2 합성/검토', icon: 'merge',          color: '#fbbf24' },
+  { step: 3, label: '완료',              icon: 'check_circle',   color: '#4ade80' },
+];
+
+const TEAM_AGENTS = {
+  team_A: { img: 'NOVA', vid: 'LILY', brain: 'OLLIE', protocol: '적대적 검토' },
+  team_B: { img: 'LUMI', vid: 'PICO', brain: 'LUNA',  protocol: 'CKS 협력'   },
+};
+
+const SERVER_URL_TL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+
+function WorkflowTimeline({ taskId }) {
+  const logs = useLogStore((s) => s.logs);
+
+  // Anti-Bridge 대기 상태
+  const [bridgeWaiting, setBridgeWaiting] = useState([]);
+
+  // 워크플로우 로그 필터
+  const wfLogs = logs.filter(
+    (l) => String(l.taskId) === String(taskId) && l.step !== undefined
+  );
+  const currentStep = wfLogs.length > 0
+    ? Math.max(...wfLogs.map((l) => l.step ?? 0))
+    : -1;
+
+  const teamLog = wfLogs.find((l) => l.message?.includes('team_'));
+  const teamId  = teamLog?.message?.includes('team_A') ? 'team_A' : 'team_B';
+  const agents  = TEAM_AGENTS[teamId] || TEAM_AGENTS['team_B'];
+
+  const phase1Logs = wfLogs.filter((l) => l.step === 1);
+  const imgDone   = phase1Logs.some((l) => l.agentId === agents.img.toLowerCase() && l.message?.includes('완료'));
+  const vidDone   = phase1Logs.some((l) => l.agentId === agents.vid.toLowerCase() && l.message?.includes('완료'));
+  const imgActive = phase1Logs.some((l) => l.agentId === agents.img.toLowerCase());
+  const vidActive = phase1Logs.some((l) => l.agentId === agents.vid.toLowerCase());
+
+  const phase2Logs  = wfLogs.filter((l) => l.step === 2);
+  const brainDone   = phase2Logs.some((l) => l.message?.includes('완료'));
+  const brainActive = phase2Logs.length > 0;
+
+  // ── Anti-Bridge 폴링 (Phase 2 활성 시 3초 간격) ───────────────────────
+  useEffect(() => {
+    if (currentStep !== 2 || brainDone) {
+      setBridgeWaiting([]);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res  = await fetch(`${SERVER_URL_TL}/api/bridge/status`);
+        const data = await res.json();
+        if (!cancelled) setBridgeWaiting(data.waiting || []);
+      } catch { /* 서버 미응답 시 무시 */ }
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [currentStep, brainDone]);
+
+  if (currentStep < 0) return null;
+
+  const AGENT_LABEL = { prime: 'PRIME (Opus)', nexus: 'NEXUS (GPT)' };
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(100,135,242,0.06), rgba(74,222,128,0.04))',
+      border: '1px solid rgba(180,197,255,0.15)',
+      borderRadius: '14px',
+      padding: '1rem 1.1rem',
+      marginBottom: '1.25rem',
+    }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.9rem' }}>
+        <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: '#b4c5ff' }}>account_tree</span>
+        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#b4c5ff', letterSpacing: '0.08em', fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase' }}>
+          3인 협업 워크플로우 · {agents.protocol}
+        </span>
+        <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'Space Grotesk, sans-serif' }}>
+          {teamId === 'team_A' ? '⛔ Team A' : '🌙 Team B'}
+        </span>
+      </div>
+
+      {/* 스텝 프로그레스바 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0', marginBottom: '1rem' }}>
+        {WORKFLOW_STEPS.map((s, i) => {
+          const isDone    = currentStep > s.step;
+          const isActive  = currentStep === s.step;
+          return (
+            <div key={s.step} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                <div style={{
+                  width: '30px', height: '30px', borderRadius: '50%',
+                  background: isDone ? s.color : isActive ? 'rgba(180,197,255,0.2)' : 'rgba(255,255,255,0.05)',
+                  border: `2px solid ${isDone || isActive ? s.color : 'rgba(255,255,255,0.1)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: isActive ? `0 0 12px ${s.color}55` : 'none',
+                  transition: 'all 0.3s ease',
+                  animation: isActive ? 'thinking-glow-pulse 2s ease-in-out infinite' : 'none',
+                }}>
+                  <span className="material-symbols-outlined" style={{
+                    fontSize: '0.9rem',
+                    color: isDone || isActive ? (isDone ? 'var(--bg-base)' : s.color) : 'var(--text-muted)',
+                  }}>{isDone ? 'check' : s.icon}</span>
+                </div>
+                <span style={{
+                  fontSize: '0.6rem', fontWeight: 600, color: isDone || isActive ? s.color : 'var(--text-muted)',
+                  fontFamily: 'Space Grotesk, sans-serif', whiteSpace: 'nowrap', textAlign: 'center',
+                  letterSpacing: '0.04em',
+                }}>{s.label}</span>
+              </div>
+              {i < 3 && (
+                <div style={{
+                  flex: 1, height: '2px', margin: '0 4px', marginBottom: '18px',
+                  background: isDone ? `linear-gradient(to right, ${s.color}, ${WORKFLOW_STEPS[i+1].color})` : 'rgba(255,255,255,0.08)',
+                  transition: 'background 0.4s ease',
+                }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Phase 1: 병렬 에이전트 미니 상태바 */}
+      {currentStep >= 1 && (
+        <div style={{ display: 'flex', gap: '0.6rem', marginBottom: currentStep >= 2 ? '0.6rem' : 0 }}>
+          {[
+            { id: agents.img, role: '🖼 이미지', done: imgDone, active: imgActive && !imgDone },
+            { id: agents.vid, role: '🎬 영상',   done: vidDone, active: vidActive && !vidDone },
+          ].map((ag) => (
+            <div key={ag.id} style={{
+              flex: 1, background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.45rem 0.65rem',
+              border: `1px solid ${ag.done ? 'rgba(74,222,128,0.3)' : ag.active ? 'rgba(180,197,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
+              transition: 'border-color 0.3s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.3rem' }}>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{ag.role}</span>
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif',
+                  color: ag.done ? '#4ade80' : ag.active ? '#b4c5ff' : 'var(--text-muted)',
+                  marginLeft: 'auto',
+                }}>{ag.done ? '✓ 완료' : ag.active ? '● 작업중' : '대기'}</span>
+              </div>
+              <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: '2px',
+                  width: ag.done ? '100%' : ag.active ? '60%' : '0%',
+                  background: ag.done ? '#4ade80' : 'var(--brand)',
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.2rem', fontFamily: 'SF Mono, monospace' }}>
+                {ag.id}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Phase 2: 합성자 상태 */}
+      {currentStep >= 2 && (
+        <div style={{
+          background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '0.45rem 0.65rem',
+          border: `1px solid ${brainDone ? 'rgba(74,222,128,0.3)' : brainActive ? 'rgba(251,191,36,0.3)' : 'rgba(255,255,255,0.07)'}`,
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+        }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: brainDone ? '#4ade80' : '#fbbf24' }}>
+            {brainDone ? 'check_circle' : 'psychology'}
+          </span>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {teamId === 'team_B' ? '🌙 LUNA' : '⛔ OLLIE'} · {agents.protocol}
+              </span>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif',
+                color: brainDone ? '#4ade80' : brainActive ? '#fbbf24' : 'var(--text-muted)',
+                marginLeft: 'auto',
+              }}>{brainDone ? '✓ 통합 완료' : brainActive ? '● 분석 중' : '대기'}</span>
+            </div>
+            <div style={{ height: '3px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden', marginTop: '0.3rem' }}>
+              <div style={{
+                height: '100%', borderRadius: '2px',
+                width: brainDone ? '100%' : brainActive ? '45%' : '0%',
+                background: '#fbbf24',
+                transition: 'width 0.5s ease',
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── [Anti-Bridge] 대기 인디케이터 ── */}
+      {bridgeWaiting.length > 0 && (
+        <div style={{ marginTop: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {bridgeWaiting.map((b) => {
+            const mins = Math.floor(b.elapsedSec / 60);
+            const secs = b.elapsedSec % 60;
+            const elapsed = mins > 0 ? `${mins}분 ${secs}초` : `${secs}초`;
+            return (
+              <div key={b.agentKey} style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                background: b.timedOut ? 'rgba(255,82,82,0.07)' : 'rgba(251,191,36,0.07)',
+                border: `1px solid ${b.timedOut ? 'rgba(255,82,82,0.25)' : 'rgba(251,191,36,0.25)'}`,
+                borderRadius: '8px', padding: '0.5rem 0.75rem',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: b.timedOut ? '#ff5449' : '#fbbf24', flexShrink: 0 }}>
+                  {b.timedOut ? 'warning' : 'hourglass_top'}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: b.timedOut ? '#ff5449' : '#fbbf24', fontFamily: 'Space Grotesk, sans-serif' }}>
+                    {b.timedOut ? `⏰ 대기 시간 초과 → Flash Fallback 전환 중` : `⏳ ${AGENT_LABEL[b.agentKey] || b.agentKey} — 대표님의 트리거 대기 중`}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                    {b.timedOut ? '5분 초과 — 자동으로 Gemini Flash가 대역 실행합니다' : `경과: ${elapsed} / 최대 5분`}
+                  </div>
+                </div>
+                {!b.timedOut && (
+                  <div style={{ fontSize: '0.68rem', color: '#fbbf24', fontFamily: 'SF Mono, monospace', flexShrink: 0 }}>
+                    {elapsed}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// ── 워크플로우 타임라인 끝 ──────────────────────────────────────────────
+
 
 const STATUS_LABEL = {
   PENDING:    { text: '대기 중',    color: 'var(--text-muted)' },
@@ -15,7 +252,7 @@ const STATUS_LABEL = {
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 export default function TaskDetailModal() {
-  const { activeDetailTaskId, setActiveDetailTaskId, setFocusedTaskId, focusedTaskId } = useUiStore();
+  const { activeDetailTaskId, setActiveDetailTaskId, setFocusedTaskId, focusedTaskId, openArtifact } = useUiStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const removeTask = useKanbanStore((s) => s.removeTask);
   const updateTaskStatus = useKanbanStore((s) => s.updateTaskStatus);
@@ -25,10 +262,17 @@ export default function TaskDetailModal() {
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   
+  // 패스 21: 댓글 전송 시 함께 업데이트할 필드 상태
+  const [commentColumn, setCommentColumn] = useState('');
+  const [commentAssignee, setCommentAssignee] = useState('');
+  const [commentPriority, setCommentPriority] = useState('medium');
+  
   // 편집 기능 상태 
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [editAssignee, setEditAssignee] = useState('');
+  const [editModel, setEditModel] = useState('');
   
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [reworkReason, setReworkReason] = useState('');
@@ -37,14 +281,10 @@ export default function TaskDetailModal() {
   const textareaRef = useRef(null);
   const moreMenuRef = useRef(null);
 
-  const [displayLang, setDisplayLang] = useState('KOR'); // KOR | ENG
-  const [translatedText, setTranslatedText] = useState(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
 
-  // 댓글 로드
+  // 댓글 로드 및 초기 폼 세팅
   useEffect(() => {
     if (!activeDetailTaskId) return;
     setIsLoadingComments(true);
@@ -53,6 +293,13 @@ export default function TaskDetailModal() {
       .then((data) => setComments(Array.isArray(data.comments) ? data.comments : []))
       .catch(() => setComments([]))
       .finally(() => setIsLoadingComments(false));
+      
+    // 초기 폼 상태 동기화 (최초 1회만)
+    if (task) {
+      setCommentColumn(task.column || '');
+      setCommentAssignee(task.assignee || '');
+      setCommentPriority(task.priority || 'medium');
+    }
   }, [activeDetailTaskId]);
 
   // 텍스트에어리어 자동 높이 조절
@@ -74,13 +321,31 @@ export default function TaskDetailModal() {
   const handleEditTask = () => {
     setEditTitle(task.title);
     setEditContent(task.content || '');
+    setEditAssignee(task.assignee || '');
+    setEditModel(task.model || '');
     setIsEditing(true);
     setShowMoreMenu(false);
   };
 
   const handleSaveEdit = () => {
     if (!editTitle.trim()) return;
-    patchTask(task.id, { title: editTitle.trim(), content: editContent.trim() });
+    
+    const payload = {
+      title: editTitle.trim(), 
+      content: editContent.trim(),
+      assignee: editAssignee || '미할당',
+      model: editModel || '미지정'
+    };
+    
+    patchTask(task.id, payload);
+    
+    // REST API로 Backend(DB)에 동기화
+    fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).catch(console.error);
+
     setIsEditing(false);
   };
 
@@ -103,27 +368,37 @@ export default function TaskDetailModal() {
     return () => window.removeEventListener('mousedown', handleClickOutside);
   }, [showMoreMenu]);
 
-  // 댓글 전송 (소켓 경유 → 실시간 브로드캐스트)
+  // 댓글 전송 (REST → 실시간 반영)
   const handleSubmitComment = () => {
     if (!commentText.trim() || !task) return;
-    // 소켓으로 서버에 전달 (useSocket의 싱글턴 직접 접근)
-    import('../../hooks/useSocket').then(({ useSocket }) => {
-      // 소켓 직접 emit — 모달에서 socket ref 인스턴스 사용
-    });
-    // REST fallback (간단한 구현)
+
+    const finalAssignee = commentColumn === 'review' ? '대표님 (나)' : commentAssignee;
+    const hasUpdates = (commentPriority !== task.priority) || (finalAssignee !== task.assignee) || (commentColumn !== task.column);
+
+    if (hasUpdates) {
+       patchTask(task.id, {
+         priority: commentPriority,
+         assignee: finalAssignee,
+         column: commentColumn
+       });
+       if (commentColumn && commentColumn !== task.column) {
+         useKanbanStore.getState().moveTask(task.id, commentColumn);
+       }
+    }
+
+    setCommentAssignee(finalAssignee);
+
+    const newComment = { author: '대표님', content: commentText.trim(), created_at: new Date().toISOString() };
+    // Optimistic update — 즉시 반영
+    setComments((prev) => [...prev, newComment]);
+    setCommentText('');
+
+    // REST 동기화 (백그라운드)
     fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: '대표님', content: commentText.trim() }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === 'ok') {
-          setComments((prev) => [...prev, { author: '대표님', content: commentText.trim(), created_at: new Date().toISOString() }]);
-          setCommentText('');
-        }
-      })
-      .catch(console.error);
+      body: JSON.stringify({ author: '대표님', content: newComment.content }),
+    }).catch(console.error);
   };
 
   // Kill 실행
@@ -150,37 +425,6 @@ export default function TaskDetailModal() {
     }).catch(console.error);
     handleClose();
   };
-
-  // [Phase 16] 실시간 번역 로직 추가
-  const handleTranslate = async (lang) => {
-    setDisplayLang(lang);
-    if (lang === 'ENG' && (!translatedText || translatedText.taskId !== task.id)) {
-      setIsTranslating(true);
-      try {
-        const res = await fetch(`${SERVER_URL}/api/system/translate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            text: task.content || task.title,
-            target: 'english',
-            taskId: task.id
-          }),
-        });
-        const data = await res.json();
-        setTranslatedText({ taskId: task.id, text: data.translated });
-      } catch (err) {
-        console.error('번역 실패:', err);
-      } finally {
-        setIsTranslating(false);
-      }
-    }
-  };
-
-  // 태스크 변경 시 번역 캐시 초기화
-  useEffect(() => {
-    setTranslatedText(null);
-    setDisplayLang('KOR');
-  }, [activeDetailTaskId]);
 
   // Soft Delete 실행
   const handleDelete = () => {
@@ -213,8 +457,43 @@ export default function TaskDetailModal() {
     >
       <div className="modal modal--detail">
 
-        {/* 헤더 */}
-        <div className="modal__header" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
+      <div className="modal__header" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
+
+          {/* ↗ 확장 버튼 — 좌상단 재배치 (루카 기획 반영) */}
+          {(task.column === 'done' || task.column === 'in_progress' || task.latestComment) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openArtifact({
+                  id: task.id,
+                  title: task.title || task.content || `Task #${task.id}`,
+                  content: task.latestComment
+                    ? `# ${task.title || 'Task Result'}\n\n${task.latestComment}\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`
+                    : `# ${task.title || 'Task Result'}\n\n이 태스크의 산출물입니다.\n\n**상태:** ${task.column}\n**담당자:** ${task.assignee || '미할당'}`,
+                  type: 'Document',
+                  agentName: task.assignee || 'AI Agent',
+                });
+              }}
+              title="산출물 풀스크린 뷰어 열기"
+              style={{
+                background: 'rgba(180,197,255,0.07)',
+                border: '1px solid rgba(180,197,255,0.18)',
+                cursor: 'pointer', padding: '6px 8px',
+                color: 'var(--brand)',
+                display: 'flex', alignItems: 'center',
+                transition: 'all 0.15s',
+                borderRadius: '8px',
+                flexShrink: 0,
+                alignSelf: 'flex-start',
+                marginTop: '2px',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(180,197,255,0.14)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(180,197,255,0.07)'; }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1.15rem' }}>open_in_full</span>
+            </button>
+          )}
+
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
               <span style={{ 
@@ -240,6 +519,7 @@ export default function TaskDetailModal() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+
             {/* 더보기 메뉴 드롭다운 */}
             <div style={{ position: 'relative' }} ref={moreMenuRef}>
               <button
@@ -310,30 +590,6 @@ export default function TaskDetailModal() {
         {/* 본문 (스크롤 가능) */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
 
-          {/* 랭귀지 탭 컨트롤 (KOR/ENG) */}
-          <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.2rem', padding: '0.3rem', background: 'var(--bg-surface-3)', borderRadius: '8px', width: 'fit-content' }}>
-            <button 
-              onClick={() => handleTranslate('KOR')}
-              style={{
-                padding: '0.3rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px',
-                border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk',
-                background: displayLang === 'KOR' ? 'var(--brand)' : 'none',
-                color: displayLang === 'KOR' ? '#fff' : 'var(--text-muted)',
-                transition: 'all 0.2s'
-              }}
-            >KOR</button>
-            <button 
-              onClick={() => handleTranslate('ENG')}
-              style={{
-                padding: '0.3rem 0.8rem', fontSize: '0.75rem', fontWeight: 700, borderRadius: '6px',
-                border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk',
-                background: displayLang === 'ENG' ? 'var(--brand)' : 'none',
-                color: displayLang === 'ENG' ? '#fff' : 'var(--text-muted)',
-                transition: 'all 0.2s'
-              }}
-            >ENG</button>
-          </div>
-
           {/* 태스크 내용 */}
           {isEditing ? (
             <div style={{ marginBottom: '1.25rem' }}>
@@ -341,35 +597,70 @@ export default function TaskDetailModal() {
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 rows={5}
-                style={{ width: '100%', background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.8rem', outline: 'none', resize: 'vertical', fontSize: '0.96rem', lineHeight: 1.6 }}
+                style={{ width: '100%', background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.8rem', outline: 'none', resize: 'vertical', fontSize: '1.05rem', lineHeight: 1.6 }}
                 placeholder="태스크 상세 내용..."
               />
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '140px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>담당자 (Assignee)</label>
+                  <select 
+                    value={editAssignee} 
+                    onChange={(e) => setEditAssignee(e.target.value)}
+                    style={{ width: '100%', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.5rem', outline: 'none', fontSize: '0.85rem' }}
+                  >
+                    <option value="">미할당</option>
+                    {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
+                      <option key={m.name} value={m.name}>{m.name} ({m.role})</option>
+                    ))}
+                  </select>
+                </div>
+                <div style={{ flex: 1, minWidth: '140px' }}>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>모델 (Model)</label>
+                  <select 
+                    value={editModel} 
+                    onChange={(e) => setEditModel(e.target.value)}
+                    style={{ width: '100%', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.5rem', outline: 'none', fontSize: '0.85rem' }}
+                  >
+                    <option value="">선택 안함</option>
+                    <option value="Claude Opus 4.6 (Thinking)">Claude Opus 4.6 (Thinking)</option>
+                    <option value="Claude Sonnet 4.6 (Thinking)">Claude Sonnet 4.6 (Thinking)</option>
+                    <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High)</option>
+                    <option value="Gemini 3 Flash">Gemini 3 Flash</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn--ghost btn--sm" onClick={() => setIsEditing(false)}>취소</button>
                 <button className="btn btn--primary btn--sm" onClick={handleSaveEdit}>저장</button>
               </div>
             </div>
           ) : (
             <div className="task-content-area" style={{ position: 'relative', minHeight: '60px' }}>
-              {isTranslating ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--brand)', fontSize: '0.9rem', padding: '1rem 0' }}>
-                  <span className="material-symbols-outlined rotating" style={{ fontSize: '1.2rem' }}>sync</span>
-                  번역 엔진 구동 중...
-                </div>
-              ) : (
-                <p style={{ fontSize: '0.96rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem', whiteSpace: 'pre-wrap' }}>
-                  {displayLang === 'ENG' ? (translatedText?.text || 'Translation not available.') : (task.content || task.title)}
-                </p>
-              )}
+              <p style={{
+                fontSize: '1.05rem',
+                color: 'var(--text-secondary)',
+                lineHeight: 1.75,
+                marginBottom: '20px',
+                whiteSpace: 'pre-wrap',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+              }}>
+                {(task.content || task.title)}
+              </p>
             </div>
           )}
 
           {/* 메타 정보 */}
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>edit_square</span>
+              작성: {task.author || '시스템'}
+            </div>
             {task.assignee && task.assignee !== '미할당' && (
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>person</span>
-                {task.assignee}
+                담당: {task.assignee}
               </div>
             )}
             {task.createdAt && (
@@ -399,6 +690,11 @@ export default function TaskDetailModal() {
               </div>
             )}
           </div>
+
+          {/* [CKS] WORKFLOW 태스크 — 3인 협업 실시간 타임라인 */}
+          {task.category === 'WORKFLOW' && (
+            <WorkflowTimeline taskId={task.id} />
+          )}
 
           {/* in_progress: KILL 컨트롤 */}
           {task.status === 'in_progress' && (
@@ -431,8 +727,21 @@ export default function TaskDetailModal() {
 
           {/* 댓글 목록 */}
           <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.75rem' }}>
+            <h3 style={{
+              fontSize: '0.82rem', color: 'var(--text-muted)',
+              fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase',
+              letterSpacing: '0.1em', marginBottom: '0.75rem',
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>forum</span>
               Discussion ({comments.length})
+              {task.assignee && task.assignee !== '미할당' && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.5rem', opacity: 0.6 }}>
+                  <span style={{ fontSize: '0.72rem' }}>대표님</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.78rem' }}>arrow_forward</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--brand)' }}>{task.assignee}</span>
+                </span>
+              )}
             </h3>
             {isLoadingComments ? (
               <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>댓글 불러오는 중...</p>
@@ -461,56 +770,209 @@ export default function TaskDetailModal() {
                         })()}
                       </span>
                     </div>
-                    <p style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>{c.content}</p>
+                    <div style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
+                      {(() => {
+                        // ── 미디어 + 마크다운 통합 렌더러 ──────────────────────────────
+                        // 처리 순서: <video> 태그 → ![img] 마크다운 → 다운로드 링크 → 굵게/기울임/줄바꿈
+                        const raw = c.content || '';
+                        const parts = [];
+                        let remaining = raw;
+                        let keyIdx = 0;
+
+                        // 1) <video ...> 태그 파싱 (remotionRenderer.js 출력 포맷 대응)
+                        const videoTagRegex = /<video([^>]*)>([\s\S]*?)<\/video>/gi;
+                        // 2) 이미지 마크다운 ![alt](url)
+                        const imgMdRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+                        // 3) 마크다운 링크 [text](url) — 다운로드 링크
+                        const linkMdRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+
+                        // 통합 토크나이저: 위치 기반으로 먼저 등장하는 토큰 우선 처리
+                        const tokenize = (text) => {
+                          const tokens = [];
+                          const patterns = [
+                            { re: /<video([^>]*)>([\s\S]*?)<\/video>/gi, type: 'video' },
+                            { re: /!\[([^\]]*)\]\(([^)]+)\)/g,           type: 'img' },
+                            { re: /> 🎬[^\n]*/g,                          type: 'caption' },
+                            { re: /\[([^\]]+)\]\(([^)]+)\)/g,            type: 'link' },
+                          ];
+                          let cursor = 0;
+                          while (cursor < text.length) {
+                            let earliest = null;
+                            for (const { re, type } of patterns) {
+                              re.lastIndex = cursor;
+                              const m = re.exec(text);
+                              if (m && (earliest === null || m.index < earliest.index)) {
+                                earliest = { ...m, type, re };
+                              }
+                            }
+                            if (!earliest) {
+                              tokens.push({ type: 'text', value: text.slice(cursor) });
+                              break;
+                            }
+                            if (earliest.index > cursor) {
+                              tokens.push({ type: 'text', value: text.slice(cursor, earliest.index) });
+                            }
+                            tokens.push({ type: earliest.type, match: earliest });
+                            cursor = earliest.index + earliest[0].length;
+                          }
+                          return tokens;
+                        };
+
+                        // 인라인 마크다운 렌더(굵게/기울임/줄바꿈) — 텍스트 노드에만 적용
+                        const renderInline = (text, baseKey) => {
+                          const lines = text.split('\n');
+                          return lines.map((line, li) => {
+                            const boldParts = line.split(/\*\*([^*]+)\*\*/g);
+                            const rendered = boldParts.map((seg, si) =>
+                              si % 2 === 1
+                                ? <strong key={si} style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{seg}</strong>
+                                : seg
+                            );
+                            return (
+                              <span key={`${baseKey}-l${li}`}>
+                                {rendered}
+                                {li < lines.length - 1 && <br />}
+                              </span>
+                            );
+                          });
+                        };
+
+                        const tokens = tokenize(raw);
+                        tokens.forEach((tok, ti) => {
+                          const k = `tok-${ti}`;
+                          if (tok.type === 'text') {
+                            parts.push(<span key={k}>{renderInline(tok.value, k)}</span>);
+                          } else if (tok.type === 'video') {
+                            // <video> 태그에서 src 추출
+                            const srcMatch = /<source\s+src="([^"]+)"/i.exec(tok.match[0]);
+                            const videoSrc = srcMatch ? srcMatch[1] : null;
+                            if (videoSrc) {
+                              parts.push(
+                                <div key={k} style={{ margin: '1rem 0', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(180,197,255,0.2)', background: '#000' }}>
+                                  <video controls width="100%" style={{ display: 'block', maxHeight: '320px' }}>
+                                    <source src={videoSrc} type="video/mp4" />
+                                    브라우저가 비디오 태그를 지원하지 않습니다.
+                                  </video>
+                                </div>
+                              );
+                            }
+                          } else if (tok.type === 'img') {
+                            parts.push(
+                              <div key={k} style={{ margin: '1rem 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <img src={tok.match[2]} alt={tok.match[1]} style={{ width: '100%', display: 'block' }} loading="lazy" />
+                              </div>
+                            );
+                          } else if (tok.type === 'caption') {
+                            // > 🎬 캡션 라인 스킵 (video 카드 아래 중복 방지)
+                          } else if (tok.type === 'link') {
+                            parts.push(
+                              <a key={k} href={tok.match[2]} target="_blank" rel="noopener noreferrer"
+                                style={{ color: 'var(--brand)', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                                {tok.match[1]}
+                              </a>
+                            );
+                          }
+                        });
+
+                        return parts.length > 0 ? parts : raw;
+                      })()}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* 댓글 입력 */}
+          {/* 댓글 입력 영역과 함께 상태/할당 컨트롤 */}
           <div style={{
             background: 'var(--bg-surface-2)', border: '1px solid var(--border)',
-            borderRadius: '12px', padding: '0.65rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'
+            borderRadius: '12px', padding: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem'
           }}>
+            {/* 업무 이관 및 상태 컨트롤 (Phase 21 요구사항) */}
+            <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>view_column</span>
+                <select
+                  value={commentColumn}
+                  onChange={(e) => setCommentColumn(e.target.value)}
+                  style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem' }}
+                >
+                  <option value="todo">진행 전 (To Do)</option>
+                  <option value="in_progress">진행 중 (In Progress)</option>
+                  <option value="review">승인 대기 (Review)</option>
+                  <option value="done">완료 (Done)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>person</span>
+                <select
+                  value={commentColumn === 'review' ? '대표님 (나)' : commentAssignee}
+                  onChange={(e) => setCommentAssignee(e.target.value)}
+                  disabled={commentColumn === 'review'}
+                  style={{ background: 'var(--bg-surface-1)', color: commentColumn === 'review' ? 'var(--brand)' : 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem', fontWeight: commentColumn === 'review' ? 700 : 400 }}
+                >
+                  <option value="">미할당</option>
+                  <option value="대표님 (나)">대표님 (나)</option>
+                  {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
+                    <option key={m.name} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>flag</span>
+                <select
+                  value={commentPriority}
+                  onChange={(e) => setCommentPriority(e.target.value)}
+                  style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem' }}
+                >
+                  <option value="low">낮음</option>
+                  <option value="medium">보통</option>
+                  <option value="high">높음</option>
+                </select>
+              </div>
+            </div>
+
             <textarea
               ref={textareaRef}
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="지시사항 또는 피드백을 입력하세요..."
+              placeholder="업무 지시나 피드백을 전달하세요..."
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment(); }}
               style={{
-                background: 'none', border: 'none', resize: 'none', outline: 'none',
-                color: 'var(--text-primary)', fontSize: '1.15rem', fontFamily: 'inherit',
-                lineHeight: 1.5, minHeight: '60px', maxHeight: '140px', padding: '0.2rem 0.3rem'
+                background: 'var(--bg-surface-1)', border: '1px solid var(--border)', borderRadius: '8px',
+                resize: 'none', outline: 'none',
+                color: 'var(--text-primary)', fontSize: '1.05rem', fontFamily: 'inherit',
+                lineHeight: 1.5, minHeight: '80px', maxHeight: '200px', padding: '0.8rem'
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
-                +Enter 전송
+                +Enter 업데이트 전송
               </span>
               <button
                 onClick={handleSubmitComment}
-                disabled={!commentText.trim()}
+                disabled={!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority}
                 style={{
-                  background: commentText.trim() ? 'var(--brand-dim, #2668ff)' : 'var(--bg-surface-highest, #323459)',
-                  color: commentText.trim() ? '#ffffff' : 'var(--text-muted)',
+                  background: 'var(--brand-dim, #2668ff)',
+                  color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
                   padding: '0.4rem 1rem',
-                  cursor: commentText.trim() ? 'pointer' : 'default',
+                  cursor: 'pointer',
                   fontSize: '0.9rem',
                   fontWeight: 700,
                   fontFamily: 'Space Grotesk, sans-serif',
                   transition: 'all 0.18s ease',
                   letterSpacing: '0.02em',
-                  boxShadow: commentText.trim() ? '0 2px 8px rgba(38,104,255,0.35)' : 'none',
+                  boxShadow: '0 2px 8px rgba(38,104,255,0.35)',
                 }}
-                onMouseEnter={(e) => { if (commentText.trim()) e.currentTarget.style.background = '#1a52e8'; }}
-                onMouseLeave={(e) => { if (commentText.trim()) e.currentTarget.style.background = 'var(--brand-dim, #2668ff)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#1a52e8'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand-dim, #2668ff)'; }}
               >
-                전송
+                전송 및 반영
               </button>
             </div>
           </div>

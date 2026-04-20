@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { useKanbanStore } from '../store/kanbanStore';
 import { useAgentStore } from '../store/agentStore';
 import { useLogStore } from '../store/logStore';
+import { useProjectStore } from '../store/projectStore';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -47,11 +48,11 @@ export function useSocket() {
         useAgentStore.getState().syncAgentStates(stateMap);
       });
 
-      socketInstance.on('task:created', ({ taskId, content, column, agentId, priority }) => {
+      socketInstance.on('task:created', ({ taskId, title, content, column, agentId, priority }) => {
         useKanbanStore.getState().addTask({
           id: String(taskId),
-          content,
-          title: content,
+          content: content || title,
+          title: title || content,
           column: column || 'todo',
           agentId: agentId || null,
           assignee: agentId && agentId !== 'null' ? agentId : null,
@@ -59,7 +60,7 @@ export function useSocket() {
           riskLevel: 'SAFE',
           status: column === 'in_progress' ? 'in_progress' : 'PENDING',
           latestComment: null,
-          projectId: 'proj-1',
+          projectId: useProjectStore.getState().selectedProjectId || 'proj-1',
         });
       });
 

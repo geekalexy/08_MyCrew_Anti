@@ -394,7 +394,7 @@ html, body, #root {
   display: flex; gap: 1rem; min-height: 100%; align-items: flex-start;
   min-width: max-content;
 }
-.kanban-board--readonly { pointer-events: none; opacity: 0.75; }
+.kanban-board--readonly { /* D&D는 React 코드에서 제어되므로 클릭 차단 해제 */ opacity: 0.85; }
 
 .column {
   width: 284px; flex-shrink: 0;
@@ -752,7 +752,7 @@ html, body, #root {
   to   { opacity: 1; }
 }
 .modal--detail {
-  width: 100%; max-width: 560px; max-height: 90dvh;
+  width: 90vw; max-width: 900px; max-height: 90dvh;
   display: flex; flex-direction: column;
   background: var(--bg-surface-2);
   border: 1px solid var(--border);
@@ -1280,84 +1280,251 @@ html, body, #root {
 .status-badge { padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.78rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
 .status-badge--done { background: var(--bg-surface-2); color: var(--text-muted); border: 1px solid var(--border); }
 
-/* Organization */
-.org-view { padding: 0 0 2rem; }
+/* ═══════════════════════════════════════════════════════════
+   OrgView v2.1 — Y-Shape 조직도 + 상용화 UI (기획안 v2.1 확정)
+═══════════════════════════════════════════════════════════ */
 
-/* 조직도 전체 컨테이너 */
-.org-tree {
-  border-radius: 14px; border: 1px solid var(--border);
-  padding: 2rem 1.5rem 2.5rem;
-  display: flex; flex-direction: column; align-items: center;
-  margin-top: 1rem; gap: 0;
-  position: relative;
+/* ── Y-Shape 조직도 레이아웃 ──────────────────────────────── */
+.y-org {
+  display: flex; flex-direction: column;
+  align-items: center; width: 100%;
 }
-
-/* CEO → Crew 수직 라인 */
-.org-tree__ceo { display: flex; justify-content: center; position: relative; }
-.org-tree__connector {
-  position: relative;
-  width: 2px; height: 2.5rem;
-  margin: 0 auto;
-  background: linear-gradient(to bottom, var(--brand), rgba(100,135,242,0.2));
-  box-shadow: 0 0 6px rgba(100,135,242,0.4);
+.y-org__root {
+  display: flex; justify-content: center;
 }
-
-/* 크루 영역: 가로 라인 + 각 노드 아래로 수직선 */
-.org-tree__crew-wrapper {
-  display: flex; flex-direction: column; align-items: center; width: 100%;
+.y-org__root-label {
+  font-size: 0.65rem; color: var(--text-muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  text-align: center; margin-top: 0.35rem;
+  font-family: 'Space Grotesk', sans-serif;
 }
-.org-tree__hline {
-  height: 2px;
-  width: 70%;
-  max-width: 600px;
-  background: linear-gradient(to right, transparent, var(--brand), transparent);
-  box-shadow: 0 0 8px rgba(100,135,242,0.3);
-  margin: 0 auto;
+.y-org__connector-v {
+  width: 2px; height: 2rem;
+  background: linear-gradient(to bottom, var(--brand), rgba(100,135,242,0.25));
+  box-shadow: 0 0 6px rgba(100,135,242,0.3);
 }
-.org-tree__crew {
-  display: flex; flex-wrap: wrap; gap: 1.5rem;
-  justify-content: center; margin-top: 0.75rem;
+.y-org__hline-wrap {
+  width: 70%; max-width: 640px; position: relative;
+  display: flex; justify-content: center;
 }
-
-/* 노드 카드 */
-.org-node {
-  position: relative; display: flex; flex-direction: column;
-  align-items: center; gap: 0.5rem;
-  padding: 1.25rem 1rem 1rem; border-radius: 14px;
-  border: 1px solid var(--border); background: var(--bg-surface-2);
-  min-width: 120px; text-align: center;
-  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+.y-org__hline {
+  height: 2px; width: 100%;
+  background: linear-gradient(to right, transparent, var(--brand) 30%, var(--brand) 70%, transparent);
+  box-shadow: 0 0 8px rgba(100,135,242,0.25);
 }
-.org-node:hover {
+.y-org__branch-connectors {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; pointer-events: none;
+}
+.y-org__branch-connector-v {
+  width: 2px; height: 2rem;
+  background: linear-gradient(to bottom, var(--brand), rgba(100,135,242,0.15));
+}
+.y-org__branches {
+  display: flex; gap: 2rem; width: 100%;
+  max-width: 860px; margin-top: 2rem;
+  align-items: flex-start;
+}
+.y-org__branch {
+  flex: 1; min-width: 0;
+}
+/* ARI 루트 카드 — 더 크게 */
+.agent-roster-card--root {
   border-color: var(--brand);
-  transform: translateY(-3px);
-  box-shadow: 0 4px 18px rgba(100,135,242,0.15);
+  background: rgba(100,135,242,0.05);
+  box-shadow: 0 0 20px rgba(100,135,242,0.12);
+  min-width: 140px;
 }
-.org-node--ceo {
-  background: rgba(180,197,255,0.06); border-color: var(--brand);
-  min-width: 140px; padding: 1.5rem 1.25rem;
-  box-shadow: 0 0 20px rgba(100,135,242,0.1);
-}
-
-/* 아바타 — CEO: 크게, Crew: 중간 */
-.org-node--ceo .org-node__avatar {
+.agent-roster-card--root .agent-roster-card__avatar {
   width: 80px; height: 80px;
 }
-.org-node__avatar {
-  width: 64px; height: 64px;
-  border-radius: 50%;
-  background: transparent;
-  overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+
+/* ── 팀 그룹 섹션 ─────────────────────────────────────────── */
+.team-group-section {
+  margin-bottom: 2.5rem;
 }
-.org-node--ceo .org-node__avatar { border: none; }
-.org-node__avatar img {
+.team-group-header {
+  display: flex; align-items: center; gap: 0.6rem;
+  margin-bottom: 1rem; padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.team-group-header__icon { font-size: 1.1rem; line-height: 1; }
+.team-group-header__name {
+  font-size: 1rem; font-weight: 700; color: var(--text-primary);
+  font-family: 'Space Grotesk', sans-serif;
+}
+.team-group-header__type {
+  font-size: 0.7rem; color: var(--text-muted); font-weight: 500;
+  background: var(--bg-surface-2); border-radius: 4px;
+  padding: 0.15rem 0.5rem; border: 1px solid var(--border);
+}
+.project-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.68rem; font-weight: 600; padding: 0.18rem 0.55rem;
+  border-radius: 999px; border: 1px solid var(--brand);
+  color: var(--brand); background: rgba(100,135,242,0.07);
+  margin-left: auto;
+  font-family: 'Space Grotesk', sans-serif; letter-spacing: 0.02em;
+}
+
+/* ── 에이전트 카드 그리드 ──────────────────────────────────── */
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1rem;
+}
+.agent-roster-card {
+  position: relative; display: flex; flex-direction: column;
+  align-items: center; gap: 0.5rem;
+  padding: 1.4rem 1rem 1rem; border-radius: 16px;
+  border: 1px solid var(--border); background: var(--bg-surface-2);
+  text-align: center; cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+}
+.agent-roster-card:hover {
+  border-color: var(--brand);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(100,135,242,0.15);
+}
+.agent-roster-card__avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.agent-roster-card__avatar img {
   width: 100%; height: 100%; object-fit: contain;
 }
-.org-node__name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); margin-top: 0.15rem; }
-.org-node__role { font-size: 0.68rem; color: var(--text-muted); }
-.org-node__model { font-size: 0.6rem; color: var(--text-muted); opacity: 0.6; }
+.agent-roster-card__name {
+  font-size: 0.85rem; font-weight: 700; color: var(--text-primary);
+  margin-top: 0.1rem;
+}
+.agent-roster-card__role {
+  font-size: 0.68rem; color: var(--text-muted); line-height: 1.4;
+}
+.experiment-role-badge {
+  font-size: 0.6rem; font-weight: 600; padding: 0.12rem 0.45rem;
+  border-radius: 999px; border: 1px solid rgba(180,197,255,0.25);
+  color: var(--brand); background: rgba(100,135,242,0.08);
+  font-family: 'Space Grotesk', sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 100%;
+}
+.agent-roster-card__status-dot {
+  position: absolute; top: 0.6rem; right: 0.6rem;
+  width: 7px; height: 7px; border-radius: 50%;
+}
+.agent-roster-card__controls {
+  display: flex; gap: 5px; justify-content: center;
+  padding: 4px; background: var(--bg-surface-3);
+  border-radius: 8px; border: 1px solid var(--border);
+  opacity: 0; transition: opacity 0.15s;
+  width: 100%;
+}
+.agent-roster-card:hover .agent-roster-card__controls {
+  opacity: 1;
+}
+
+/* ── 채용 고스트 카드 ─────────────────────────────────────── */
+.recruit-slot-card {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 0.5rem;
+  padding: 1.4rem 1rem; border-radius: 16px;
+  border: 1px dashed var(--border); background: transparent;
+  cursor: pointer; opacity: 0.55; min-height: 170px;
+  transition: opacity 0.2s, border-color 0.2s, background 0.2s;
+}
+.recruit-slot-card:hover {
+  opacity: 1; border-color: var(--brand);
+  background: rgba(100,135,242,0.04);
+}
+.recruit-slot-card__icon {
+  font-size: 1.4rem; color: var(--text-muted);
+}
+.recruit-slot-card__label {
+  font-size: 0.72rem; color: var(--text-muted);
+  font-weight: 600; font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.03em;
+}
+
+/* ── 새 팀 만들기 모달 ────────────────────────────────────── */
+.new-team-modal__overlay {
+  position: fixed; inset: 0; z-index: 950;
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s;
+}
+.new-team-modal__card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 18px; padding: 2rem 2rem 1.75rem;
+  width: min(660px, 90vw); box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  animation: slideUp 0.2s;
+}
+.new-team-modal__title {
+  font-size: 1.1rem; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 1.5rem; font-family: 'Space Grotesk', sans-serif;
+}
+.new-team-modal__label {
+  font-size: 0.75rem; color: var(--text-muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 0.4rem; display: block;
+}
+.new-team-modal__project-options {
+  display: flex; flex-direction: column; gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.new-team-modal__project-option {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.6rem 0.8rem; border-radius: 8px;
+  border: 1px solid var(--border); cursor: pointer;
+  background: var(--bg-surface-2);
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 0.85rem; color: var(--text-secondary);
+}
+.new-team-modal__project-option--selected {
+  border-color: var(--brand); background: rgba(100,135,242,0.08);
+  color: var(--text-primary);
+}
+.new-team-modal__footer {
+  display: flex; justify-content: flex-end; gap: 0.75rem;
+  margin-top: 1.75rem;
+}
+
+/* ── CKS 분석 메트릭 그리드 ───────────────────────────────── */
+.analytics-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1rem; margin: 1.25rem 0;
+}
+.metric-card {
+  background: var(--bg-surface-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.25rem 1rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+  transition: border-color 0.2s;
+}
+.metric-card:hover { border-color: rgba(100,135,242,0.3); }
+.metric-card__value {
+  font-size: 1.6rem; font-weight: 800; color: var(--text-primary);
+  font-family: 'Space Grotesk', sans-serif; line-height: 1;
+}
+.metric-card__label {
+  font-size: 0.72rem; color: var(--text-muted); font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.metric-card__sub {
+  font-size: 0.68rem; color: var(--brand); font-weight: 600;
+}
+
+/* LEGACY: org-tree (이전 트리 UI — 비활성화됨) ─────────────────
+.org-tree { ... }
+.org-tree__ceo { ... }
+.org-tree__connector { ... }
+.org-tree__crew-wrapper { ... }
+.org-tree__hline { ... }
+.org-tree__crew { ... }
+.org-node { ... }
+.org-node--ceo { ... }
+──────────────────────────────────────────────────────────────── */
 
 /* 채용 섹션 래퍼 */
 .recruit-section {
@@ -1570,6 +1737,27 @@ html, body, #root {
   background: rgba(74,222,128,0.08);
   color: #4ade80;
   border: 1px solid rgba(74,222,128,0.2);
+}
+.layer-badge--workflow {
+  background: rgba(167,139,250,0.10);
+  color: #a78bfa;
+  border: 1px solid rgba(167,139,250,0.25);
+}
+
+/* ── Required Skill Card ── */
+.skill-card--required {
+  cursor: default;
+  border-color: rgba(167,139,250,0.25);
+  background: rgba(167,139,250,0.05);
+}
+.skill-card--required:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: rgba(167,139,250,0.35);
+}
+.skill-card--required .skill-card__lock {
+  color: #a78bfa;
+  opacity: 0.8;
 }
 
 /* ── Skill Toggle Switch ── */

@@ -1,0 +1,7 @@
+{
+  "artifactType": "ARTIFACT_TYPE_OTHER",
+  "summary": "MyCrew 신규 크루 캐릭터 20종 기획서 (업데이트). 픽셀 격자 32~36px로 수정. 배경 정책 2가지 추가: 투명 배경 버전(final_png_v2/)과 캐릭터별 파스텔톤 배경 버전(final_png_v2_bg/). 각 캐릭터별 BG 색상 지정 완료. 실행 프롬프트 템플릿 포함.",
+  "updatedAt": "2026-04-15T07:06:54.612746Z",
+  "version": "1",
+  "requestFeedback": true
+}

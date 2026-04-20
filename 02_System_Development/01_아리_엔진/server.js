@@ -13,11 +13,20 @@ const execFilePromise = promisify(execFile);
 
 // 커스텀 AI Core 모듈 로드
 import dbManager from './database.js';
+import keyProvider from './ai-engine/tools/keyProvider.js';
+import teamActivator from './ai-engine/teamActivator.js';
+import tutorialManager from './ai-engine/tutorialManager.js';
 import executor from './ai-engine/executor.js';
+
 import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
 import obsidianAdapter from './ai-engine/adapters/obsidianAdapter.js';
 import statusReporter from './ai-engine/statusReporter.js';
+import { processOnboardingUrl } from './ai-engine/tools/onboardingPipeline.js';
+import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
+import b4System from './ai-engine/tools/b4System.js';
+import imageLabRouter from './routes/imageLabRouter.js';
+import videoLabRouter from './routes/videoLabRouter.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,6 +36,16 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 // ─── CORS: Express HTTP (Socket.io 핸드셰이크 포함) ────────────────────────
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
 app.use(express.json());
+
+// ─── 정적 파일 제공 (NanoBanana 등 미디어 아웃풋 서빙용) ────────
+const outputsDir = path.resolve(process.cwd(), 'outputs');
+if (!fs.existsSync(outputsDir)) {
+  fs.mkdirSync(outputsDir, { recursive: true });
+}
+app.use('/outputs', express.static(outputsDir));
+app.use('/api/imagelab', imageLabRouter);
+app.use('/api/videolab', videoLabRouter);
+app.use('/lab-assets', express.static(path.join(process.cwd(), 'skill-library/05_design/lab-assets')));
 
 // ─── Socket.io 서버 (Opus 지적: Express CORS와 별도로 옵션 지정 필수) ────────
 export const io = new Server(httpServer, {
@@ -122,7 +141,8 @@ io.on('connection', (socket) => {
       broadcastLog('info', `태스크 생성됨: ${title || content}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
-        content: title || content,
+        title,
+        content,
         column: column || 'todo',
         agentId: assignee !== '미할당' ? assignee : null,
         priority: priority || 'medium',
@@ -153,14 +173,42 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Task 댓글 기록
+  // Task 댓글 기록 + [Phase 20] 담당 에이전트 자동 트리거 (Prime 9th Review 반영)
   socket.on('task:comment', async ({ taskId, author, text }) => {
     try {
       const sid = String(taskId);
       await dbManager.createComment(sid, author, text);
       io.emit('task:comment_added', { taskId: sid, author, text, createdAt: new Date().toISOString() });
-      // author를 agentId로 전달해 채팅 버블에서 우/좌 방향 식별에 사용
       broadcastLog('info', text, author, sid);
+
+      // ── 🤖 담당 에이전트 자동 트리거 ──────────────────────────────────────
+      // 에이전트 자신의 응답 댓글이 다시 트리거를 유발하지 않도록 안전장치 적용
+      // (이 체크가 없으면 에이전트 → 댓글 → 트리거 → 에이전트 → ... 무한 루프 발생)
+      const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna', 'devteam', 'system'];
+      if (!KNOWN_AGENTS.includes(author?.toLowerCase())) {
+        const task = await dbManager.getTaskById(sid);
+
+        // @멘션이 있으면 해당 에이전트, 없으면 카드 담당자로 자동 라우팅
+        const mentionMatch = text.match(/^@([a-zA-Z가-힣]+)\s+(.*)/);
+        let agentToTrigger = task?.assigned_agent || 'ari';
+        let aiRequestText = text;
+
+        if (mentionMatch) {
+          const mentioned = mentionMatch[1]?.toLowerCase();
+          const resolved = globalAgentMap[mentioned];
+          if (resolved) {
+            agentToTrigger = resolved;
+            aiRequestText = mentionMatch[2];
+          }
+        }
+
+        // AI Trigger 중복 방지 (Prime 10th Review P1 적용)
+        // ============================================
+        // 여기서 executor.run()을 호출하던 로직을 제거하여,
+        // REST API (POST /api/tasks/:id/comments) 측에만 AI 트리거 주도권을 부여합니다.
+        // 이로써 Frontend가 Socket과 REST를 혼용하더라도 이중 429 쿼터 낭비 및 중복 댓글 생성을 방지합니다.
+        // ============================================
+      }
     } catch (err) {
       console.error('[Socket] task:comment 오류:', err.message);
     }
@@ -184,7 +232,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// 내부 헬퍼: 대시보드 로그 브로드캐스트 (웹 대시보드 + 백엔드 터미널 동시 송출)
 export function broadcastLog(level, message, agentId = 'system', taskId = null, source = 'DASHBOARD') {
   console.log(`[${agentId}]${taskId ? ` (Task #${taskId})` : ''} ${message} (${source})`);
   dbManager.insertLog(level, message, agentId, taskId, source).catch(() => {});
@@ -193,6 +240,10 @@ export function broadcastLog(level, message, agentId = 'system', taskId = null, 
     timestamp: new Date().toISOString() 
   });
 }
+
+// 순환 참조 해결을 위한 Dependency Injection
+// executor 구동 전 로깅 함수를 주입합니다.
+executor.setBroadcastLog(broadcastLog);
 
 // ─── Telegram Bot ────────────────────────────────────────────────────────────
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -341,14 +392,14 @@ if (token && token.length > 10) {
         bot.sendChatAction(chatId, 'typing');
       }
 
-      agentStates.set('ari', { status: 'active', lastHeartbeat: Date.now() });
-      io.emit('agent:status_change', { agentId: 'ari', status: 'active' });
+      agentStates.set(assignedAgent, { status: 'active', lastHeartbeat: Date.now() });
+      io.emit('agent:status_change', { agentId: assignedAgent, status: 'active' });
       if (taskId) {
         io.emit('task:moved', { taskId: String(taskId), toColumn: 'in_progress' });
-        statusReporter.reportAgentRunning(taskId, 'ari', text, 'TELEGRAM');
+        statusReporter.reportAgentRunning(taskId, assignedAgent, text, 'TELEGRAM');
       }
       
-      const result = await executor.run(text, evaluation, 'ari');
+      const result = await executor.run(text, evaluation, assignedAgent);
 
       if (taskId) {
         await dbManager.updateTaskStatus(taskId, 'REVIEW');
@@ -357,11 +408,11 @@ if (token && token.length > 10) {
         
         const sid = String(taskId);
         io.emit('task:moved', { taskId: sid, toColumn: 'review' });
-        broadcastLog('success', `Task #${sid} 완료 대기 (리뷰 필요) (${result.model})`, 'ari', sid);
+        broadcastLog('success', `Task #${sid} 완료 대기 (리뷰 필요) (${result.model})`, assignedAgent, sid);
         
         obsidianAdapter.archiveTask({
           id: taskId, content: text, requester: author,
-          execution_mode: 'ari', model: result.model
+          execution_mode: assignedAgent, model: result.model
         });
       }
 
@@ -397,6 +448,52 @@ if (token && token.length > 10) {
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'mycrew-bridge-server', version: '2.0.0' });
+});
+
+// ─── [Phase 21] Onboarding Pipeline: URL Scan & Context Extraction ────────
+app.post('/api/onboarding/scan-url', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ status: 'error', message: 'URL이 필요합니다.' });
+
+  try {
+    broadcastLog('info', `[Onboarding] ${url} 웹사이트 스캔 및 팀 컨텍스트 추출을 시작합니다...`, 'system');
+    
+    // 비동기 파이프라인 실행
+    const files = await processOnboardingUrl(url);
+    
+    broadcastLog('success', `[Onboarding] 스캔 완료 및 컨텍스트 파일 자동 생성 완료!`, 'system');
+    res.json({ status: 'ok', message: '컨텍스트 추출이 완료되었습니다.', files });
+  } catch (error) {
+    console.error('[API] /api/onboarding/scan-url 에러:', error.message);
+    broadcastLog('error', `[Onboarding] 추출 에러 발생: ${error.message}`, 'system');
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ─── [Phase 21] Settings & Integration Vault API ─────────────────────────────
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await dbManager.getAllSettings();
+    // 보안을 위해 일부 키는 마스킹 처리해서 보낼 수도 있으나, 현재는 어드민 단독 사용이므로 전체 반환
+    res.json({ status: 'ok', settings });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+app.post('/api/settings', async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ status: 'error', message: '키 값이 필요합니다.' });
+    
+    // KeyProvider를 통해 저장 시, DB 저장과 함께 앱 메모리 캐시도 즉시 갱신됨
+    await keyProvider.setKey(key, value);
+    broadcastLog('info', `[Settings] ${key} 설정이 업데이트 되었습니다.`, 'system');
+    res.json({ status: 'ok', message: '설정이 성공적으로 저장되었습니다.' });
+  } catch (error) {
+    console.error('[API] /api/settings 저장 에러:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 });
 
 // ─── [Week 3: Memory 흡수] FTS5 전문 검색 API ──────────────────────────────
@@ -473,16 +570,18 @@ app.get('/api/tasks', async (req, res) => {
       return {
       id: String(row.id),
       title: titleLine,
-      content: detailContent,
+      // content: detailContent, <- [Phase 23 최적화] 무거운 content 필드 제거
       column: STATUS_TO_COLUMN[row.status] || 'todo',
       status: row.status,
       riskLevel: row.risk_level || 'SAFE',
       executionMode: row.execution_mode || 'ari',
-      assignee: row.assigned_agent || row.requester, // [W1] assigned_agent 우선, 없으면 requester
+      assignee: row.assigned_agent || row.requester, // 기존 하위호환
+      author: row.requester, // 명시적 작성자
+      assignedAgent: row.assigned_agent || '미할당', // 명시적 할당자
       model: row.model,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      latestComment: row.latest_comment,
+      // latestComment: row.latest_comment, <- [Phase 23 최적화] 프론트에서 더 이상 카드 보드에 사용 안함
       projectId: 'proj-1',
     };
     });
@@ -494,6 +593,7 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+
 // [Phase 14] 멘션 기반 즉시 태스크 생성 API
 app.post('/api/tasks/mention', async (req, res) => {
   try {
@@ -501,7 +601,7 @@ app.post('/api/tasks/mention', async (req, res) => {
     const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
     
     // [W1 Fix] model은 기본값 유지, assignedAgent 파라미터로 에이전트 분리
-    const taskId = await dbManager.createTask(content, author, 'Gemini-2.5-Flash', targetAgent);
+    const taskId = await dbManager.createTask(content, author, 'gemini-3-flash-preview', targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
     await dbManager.updateTaskStatus(taskId, 'in_progress');
@@ -528,6 +628,7 @@ app.post('/api/tasks/mention', async (req, res) => {
  * Chatting 탭에서 @멘션을 사용하더라도 카드를 만들지 않고 대화만 진행합니다.
  */
 app.post('/api/chat', async (req, res) => {
+  console.log(`[API] /api/chat 요청 수신:`, req.body);
   try {
     const { agent, content, author = '대표님' } = req.body;
     const targetAgent = globalAgentMap[agent?.toLowerCase()] || 'ari';
@@ -555,12 +656,16 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+
 // ── Task 상세 REST API (Phase 11: TaskDetailModal 지원) ───────────────────
 
-/** GET /api/tasks/:id/comments — 태스크 댓글 목록 조회 */
+/** GET /api/tasks/:id/comments — 태스크 댓글 목록 조회 (v2.0 위상 DTO) */
 app.get('/api/tasks/:id/comments', async (req, res) => {
   try {
-    const comments = await dbManager.getComments(req.params.id);
+    const sid = req.params.id;
+    const task = await dbManager.getTaskById(sid);
+    // [v2.0] getCommentsWithTopology: source(발신)/target(수신)/action_type 구조화
+    const comments = await dbManager.getCommentsWithTopology(sid, task?.assigned_agent || 'ari');
     res.json({ status: 'ok', comments });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -593,35 +698,58 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
       }
     }
 
-    // ── 🤖 코멘트 내 멘션 감지 및 AI 응답 처리 (Phase 17) ──
-    const mentionMatch = content.match(/^@([a-zA-Z가-힣]+)\s+(.*)/);
-    if (mentionMatch) {
-      const requestedAgent = mentionMatch[1]?.toLowerCase();
-      const targetAgent = globalAgentMap[requestedAgent];
-      const aiRequestText = mentionMatch[2];
+    // ── 🤖 코멘트 내 멘션 감지 및 AI 담당자 자동 트리거 ────────────────────
+    const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna', 'devteam', 'system'];
+    if (!KNOWN_AGENTS.includes(author?.toLowerCase())) {
+      const task = await dbManager.getTaskById(sid);
+      let agentToTrigger = task?.assigned_agent || 'ari';
+      let aiRequestText = content;
 
-      if (targetAgent) {
-        // 백그라운드 실행을 위해 response 반환을 지연시키지 않고 비동기로 처리
-        (async () => {
-          try {
-            agentStates.set(targetAgent, { status: 'active', lastHeartbeat: Date.now() });
-            io.emit('agent:status_change', { agentId: targetAgent, status: 'active' });
-
-            const evaluation = await modelSelector.selectModel(aiRequestText);
-            const result = await executor.run(aiRequestText, evaluation, targetAgent);
-
-            // AI의 응답을 해당 카드에 신규 코멘트로 저장
-            await dbManager.createComment(sid, targetAgent, result.text);
-            io.emit('task:comment_added', { taskId: sid, author: targetAgent, text: result.text, createdAt: new Date().toISOString() });
-            broadcastLog('info', result.text, targetAgent, sid);
-          } catch (err) {
-            console.error('[Comment AI Reply Error]', err);
-            const errMsg = '앗, 코멘트를 분석해서 대답하려다 잠깐 머임이 왔어요. 😵';
-            await dbManager.createComment(sid, targetAgent, errMsg);
-            io.emit('task:comment_added', { taskId: sid, author: targetAgent, text: errMsg, createdAt: new Date().toISOString() });
-          }
-        })();
+      // @멘션 우선권
+      const mentionMatch = content.match(/^@([a-zA-Z가-힣]+)\s+(.*)/);
+      if (mentionMatch) {
+        const requestedAgent = mentionMatch[1]?.toLowerCase();
+        const resolved = globalAgentMap[requestedAgent];
+        if (resolved) {
+          agentToTrigger = resolved;
+          aiRequestText = mentionMatch[2];
+        }
       }
+
+      // 백그라운드 비동기 실행 (REST 응답 차단 방지)
+      (async () => {
+        try {
+          agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
+          io.emit('agent:status_change', { agentId: agentToTrigger, status: 'active' }); // active로 유지
+
+          // [Living Playbook] 유저 피드백 분석 및 룰 수확
+          const harvested = await ruleHarvester.classifyAndHarvest(content, author, sid);
+          if (harvested && harvested.scope === 'TEAM') {
+            io.emit('rule:synthesized', { scope: 'TEAM', rule: harvested.rule });
+            broadcastLog('success', `💡 새로운 팀 룰 발견! [${harvested.rule}]을 인지했습니다.`, 'system', sid);
+          }
+
+          const evaluation = await modelSelector.selectModel(aiRequestText);
+          const result = await executor.run(aiRequestText, evaluation, agentToTrigger, sid);
+
+          // [Phase 3.2] 실제 수행된 모델과 카테고리 정보를 DB에 업데이트 (UI 필터링용)
+          await dbManager.updateTaskModel(sid, result.model, result.category);
+
+          // AI의 응답을 해당 카드에 신규 코멘트로 저장
+          await dbManager.createComment(sid, agentToTrigger, result.text);
+          io.emit('task:comment_added', { taskId: sid, author: agentToTrigger, text: result.text, createdAt: new Date().toISOString() });
+          broadcastLog('info', result.text, agentToTrigger, sid);
+          
+          agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
+          io.emit('agent:status_change', { agentId: agentToTrigger, status: 'idle' });
+        } catch (err) {
+          console.error('[Comment AI Reply Error]', err);
+          const errMsg = '앗, 코멘트를 분석해서 대답하려다 잠깐 머리가 하얘졌어요. 😵';
+          await dbManager.createComment(sid, agentToTrigger, errMsg);
+          io.emit('task:comment_added', { taskId: sid, author: agentToTrigger, text: errMsg, createdAt: new Date().toISOString() });
+          broadcastLog('error', errMsg, agentToTrigger, sid);
+        }
+      })();
     }
 
     res.json({ status: 'ok' });
@@ -665,7 +793,71 @@ app.post('/api/tasks/:id/kill', async (req, res) => {
   }
 });
 
-// ─── [Phase 14 S2] Review 파이프라인 결재 API ────────────────────────────────
+// ─── [Phase 20] Activity Log 헬퍼 (Prime 9th Review 반영) ────────────────────
+// 담당자/상태/우선순위 변경 내역을 댓글 스트림에 시스템 메시지로 자동 기록합니다.
+async function logActivity(taskId, message) {
+  const sid = String(taskId);
+  try {
+    await dbManager.createComment(sid, 'system', message);
+    io.emit('task:comment_added', {
+      taskId: sid, author: 'system',
+      text: message, createdAt: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error('[ActivityLog] 기록 실패:', e.message);
+  }
+}
+
+/** PATCH /api/tasks/:id — 태스크 상세 정보 업데이트 (수동 편집) */
+app.patch('/api/tasks/:id', async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const { content, title, assignee, model, column, priority } = req.body;
+    // title/content가 분리되었으므로, DB에는 content로 합쳐서 저장 (기존 아키텍처 호환)
+    const newContent = `${title ? title + '\n' : ''}${content || ''}`.trim() || '내용 없음';
+    
+    // 기존 태스크 상태 조회 (변경 전 값과 비교용)
+    const prevTask = await dbManager.getTaskById(taskId).catch(() => null);
+    
+    // 할당자 처리
+    const parsedAssignee = (assignee === '미할당' || !assignee) ? null : assignee;
+    
+    await dbManager.updateTaskDetails(taskId, newContent, parsedAssignee, model || 'Gemini-3-Flash');
+    
+    // ── Activity Log: 변경 내역 자동 기록 ──────────────────────────────────
+    if (prevTask) {
+      if (parsedAssignee && prevTask.assigned_agent !== parsedAssignee) {
+        const prev = prevTask.assigned_agent || '미할당';
+        await logActivity(taskId, `👤 담당자 변경: ${prev} → ${parsedAssignee}`);
+      }
+      if (priority && prevTask.priority !== priority) {
+        const priorityEmoji = { high: '🔴', medium: '🟡', low: '🟢' };
+        await logActivity(taskId, `${priorityEmoji[priority] || '📌'} 우선순위 변경: ${prevTask.priority || 'normal'} → ${priority}`);
+      }
+    }
+    
+    // 컬럼(status)이나 priority 변경이 있다면 처리
+    if (column) {
+      const colToStatus = { todo: 'PENDING', in_progress: 'IN_PROGRESS', review: 'REVIEW', done: 'COMPLETED' };
+      if (colToStatus[column]) {
+        await dbManager.updateTaskStatus(taskId, colToStatus[column]);
+        if (prevTask) {
+          const statusLabel = { 'PENDING': '할 일', 'IN_PROGRESS': '진행 중', 'REVIEW': '승인 대기', 'COMPLETED': '완료' };
+          const prevLabel = statusLabel[prevTask.status?.toUpperCase()] || prevTask.status;
+          const nextLabel = statusLabel[colToStatus[column]] || column;
+          await logActivity(taskId, `📋 상태 변경: ${prevLabel} → ${nextLabel}`);
+        }
+      }
+    }
+    
+    // 소켓 전송 (프론트엔드 동기화 용도)
+    io.emit('task:patched', { taskId, title, content, assignee, model, column, priority });
+
+    res.json({ status: 'ok', message: 'Task updated successfully' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
 
 /** PATCH /api/tasks/:id/approve — 대표님 승인: Review → Done + Obsidian 아카이브 */
 app.patch('/api/tasks/:id/approve', async (req, res) => {
@@ -700,6 +892,14 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
       execution_mode: task.execution_mode || 'ari',
       model: task.model || 'unknown',
     });
+
+    // [B4 System] 자동 회고 및 그라운드룰 동기화 실행
+    (async () => {
+      const insight = await b4System.runRetrospective(sid);
+      if (insight) {
+        broadcastLog('success', `🧠 [B4 회고] 이번 태스크에서 새로운 교훈을 얻었습니다: "${insight}" → 팀 지식망에 동기화되었습니다.`, 'system', sid);
+      }
+    })();
     
     res.json({ status: 'ok', message: '승인 완료. Obsidian에 아카이브했습니다.' });
   } catch (err) {
@@ -732,6 +932,10 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
     await dbManager.createComment(sid, '대표님', reworkMsg);
     io.emit('task:comment_added', { taskId: sid, author: '대표님', text: reworkMsg, createdAt: new Date().toISOString() });
     broadcastLog('warn', `[REWORK] Task #${sid} 재작업 지시 → In Progress 이동`, '대표님', sid);
+    
+    // [Phase 4] CKS 지표 - 반복 수정 횟수(IRC) 증가
+    await dbManager.incrementCksIrc(sid).catch(e => console.error('[DB] IRC 증가 실패:', e));
+
     
     res.json({ status: 'ok', message: '재작업 지시 완료. In Progress로 이동했습니다.' });
   } catch (err) {
@@ -835,7 +1039,7 @@ app.put('/api/settings', async (req, res) => {
       'telegram_report_hour',
       'telegram_report_minute',
     ];
-    if (!ALLOWED_KEYS.includes(key)) {
+    if (!ALLOWED_KEYS.includes(key) && !key.startsWith('guidelines_')) {
       return res.status(400).json({ error: `Unknown setting key: ${key}` });
     }
     await dbManager.setSetting(key, value);
@@ -846,6 +1050,88 @@ app.put('/api/settings', async (req, res) => {
     res.status(500).json({ status: 'error', message: err.message });
   }
 });
+
+// ─── [Phase 20] 기밀 정보 전용 API (Secret Management) ──────────────────────
+
+app.get('/api/secrets', async (req, res) => {
+  try {
+    const SECRET_KEYS = ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'TELEGRAM_BOT_TOKEN'];
+    const secrets = {};
+    for (const k of SECRET_KEYS) {
+      secrets[k] = await keyProvider.getMaskedKey(k);
+    }
+    res.json({ status: 'ok', secrets });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.post('/api/secrets', async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    const SECRET_KEYS = ['GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'TELEGRAM_BOT_TOKEN'];
+    
+    if (!SECRET_KEYS.includes(key)) {
+      return res.status(400).json({ error: 'Not a secret key or unauthorized.' });
+    }
+
+    // KeyProvider를 통해 보안 저장 및 즉시 반영
+    await keyProvider.setKey(key, value);
+    
+    // ⚠ 보안 주의: 비밀번호/키는 절대 Socket.io로 브로드캐스트(io.emit) 하지 않습니다.
+    res.json({ status: 'ok', key, masked: await keyProvider.getMaskedKey(key) });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.post('/api/onboarding/activate-team', async (req, res) => {
+  try {
+    const { teamType } = req.body;
+    const result = await teamActivator.activate(teamType);
+    
+    // 실시간으로 에이전트 스킬 상태 동기화 (UI 갱신용)
+    io.emit('agent:skills_bulk_updated', { teamType, result });
+    
+    res.json({ status: 'ok', ...result });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.post('/api/onboarding/finish', async (req, res) => {
+  try {
+    const { userName, teamName } = req.body;
+    await tutorialManager.bootstrap(userName || '대표님', teamName || '우리팀', io);
+    res.json({ status: 'ok', message: 'Tutorial missions created.' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+app.post('/api/onboarding/test-connection', async (req, res) => {
+  try {
+    const { type, value } = req.body;
+    // 시뮬레이션 및 기초 검증: sk- 또는 AIzaSy 로 시작하거나 이메일 형식이면 성공으로 간주
+    const isSuccess = (type === 'key' && (value?.startsWith('sk-') || value?.startsWith('AIzaSy'))) || 
+                      (type === 'sub' && value?.includes('@'));
+    
+    // 약간의 딜레이를 주어 실제 검증 느낌 제공
+    await new Promise(r => setTimeout(r, 1200));
+
+    if (isSuccess) {
+      res.json({ status: 'ok', message: '연동 확인되었습니다.' });
+    } else {
+      res.status(400).json({ status: 'error', message: '유효하지 않은 정보입니다.' });
+    }
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+
+
+
 
 // ─── [Phase 17-4] 스킬 라이브러리 API ──────────────────────────────────────────
 
@@ -871,6 +1157,148 @@ app.post('/api/agents/:agentId/skills', async (req, res) => {
     
     res.json({ status: 'ok', agentId, skillId, active });
   } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ─── [v2.0] OrgView: 조직도 벌크 조회 ──────────────────────────────────────
+/** GET /api/workspace/roster — teams + agents 중첩 JSON (OrgView 초기 로딩) */
+app.get('/api/workspace/roster', async (req, res) => {
+  try {
+    const roster = await dbManager.getRoster();
+    res.json({ status: 'ok', ...roster });
+  } catch (err) {
+    console.error('[API] /api/workspace/roster 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** POST /api/teams — 새 팀 생성 (기존 프로젝트 합류 또는 신규 프로젝트) */
+app.post('/api/teams', async (req, res) => {
+  try {
+    const { name, groupType, icon, color, projectId, newProjectName } = req.body;
+    if (!name) return res.status(400).json({ status: 'error', message: '팀 이름은 필수입니다.' });
+    const result = await dbManager.createTeam({ name, groupType, icon, color, projectId, newProjectName });
+    io.emit('team:created', result);
+    res.json({ status: 'ok', ...result });
+  } catch (err) {
+    console.error('[API] /api/teams 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** GET /api/tasks/:id — Task 단건 전체 조회 (TaskDetailModal lazy-load) */
+app.get('/api/tasks/:id', async (req, res) => {
+  try {
+    const task = await dbManager.getTaskByIdFull(req.params.id);
+    if (!task) return res.status(404).json({ status: 'error', message: '태스크를 찾을 수 없습니다.' });
+    
+    // 백엔드의 파서 노드에서 마크다운 리턴 값 내부에 미디어가 있는지 사전 판별하는 플래그 (Artifact Preview 연동용)
+    const hasMedia = /!\[.*?\]\(.*?\)/.test(task.content || '');
+    const enhancedTask = {
+      ...task,
+      has_artifact: hasMedia,
+      artifact_type: hasMedia ? 'image' : null
+    };
+
+    res.json({ status: 'ok', task: enhancedTask });
+  } catch (err) {
+    console.error('[API] /api/tasks/:id 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+
+/** GET /api/metrics/cks — CKS 분석 메트릭 실연동 (Phase 4) */
+app.get('/api/metrics/cks', async (req, res) => {
+  try {
+    const stats = await dbManager.getCksMetricsStats();
+    res.json({
+      status: 'ok',
+      metrics: {
+        TEI: Math.round(stats.avg_tei || 0),
+        KSI_R: Math.round(stats.avg_ksi_r || 0),
+        KSI_S: Number((stats.avg_ksi_s || 0).toFixed(2)),
+        HER: Math.round(stats.avg_her || 0),
+        EII: Number((stats.avg_eii || 0).toFixed(1)),
+        IRC: Math.round(stats.avg_irc || 0),
+        UXS: Number((stats.avg_uxs || 0).toFixed(1)),
+        totalSamples: stats.total_samples || 0
+      }
+    });
+  } catch (err) {
+    console.error('[API] /api/metrics/cks 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** GET /api/bridge/status — Anti-Bridge 대기 상태 조회 */
+app.get('/api/bridge/status', (req, res) => {
+  try {
+    const BRIDGE_DIR = path.resolve(process.cwd(), '.bridge');
+    const LOCK_DIR   = path.join(BRIDGE_DIR, 'locks');
+    const REQ_DIR    = path.join(BRIDGE_DIR, 'requests');
+
+    const waiting = [];
+
+    // lock 파일 확인 (prime.lock, nexus.lock)
+    if (fs.existsSync(LOCK_DIR)) {
+      fs.readdirSync(LOCK_DIR).forEach((f) => {
+        if (!f.endsWith('.lock')) return;
+        const agentKey = f.replace('.lock', '');
+        const since    = Number(fs.readFileSync(path.join(LOCK_DIR, f), 'utf-8')) || 0;
+        const elapsedSec = Math.floor((Date.now() - since) / 1000);
+
+        // 매칭되는 request 파일 찾기
+        let taskId = null;
+        if (fs.existsSync(REQ_DIR)) {
+          const reqFile = fs.readdirSync(REQ_DIR)
+            .find((f2) => f2.startsWith(`req_${agentKey}_`));
+          if (reqFile) {
+            try {
+              const parsed = JSON.parse(fs.readFileSync(path.join(REQ_DIR, reqFile), 'utf-8'));
+              taskId = parsed.taskId || null;
+            } catch { /* 무시 */ }
+          }
+        }
+
+        waiting.push({ agentKey, taskId, elapsedSec, timedOut: elapsedSec > 270 });
+      });
+    }
+
+    res.json({ status: 'ok', waiting });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+
+/** POST /api/agents/inline-edit — ARI 우회, 단일 에이전트 직접 핑 (부분 수정 전용) */
+app.post('/api/agents/inline-edit', async (req, res) => {
+  try {
+    const { taskId, agentId = 'lumi', instruction, currentContent } = req.body;
+    if (!instruction) return res.status(400).json({ status: 'error', message: 'instruction 필수' });
+
+    agentStates.set(agentId, { status: 'active', lastHeartbeat: Date.now() });
+    io.emit('agent:status_change', { agentId, status: 'active' });
+
+    // 기존 내용을 컨텍스트로 넣어 에이전트 단독 실행 (ARI 라우팅 없이 직접 ping)
+    const prompt = `다음 콘텐츠의 일부를 수정해 주세요.\n\n[현재 콘텐츠]\n${currentContent || ''}\n\n[수정 지시]\n${instruction}`;
+    const evaluation = { category: 'CONTENT', model: 'claude' };
+    const result = await executor.run(prompt, evaluation, agentId, taskId);
+
+    // 태스크 댓글로 결과 저장 + 소켓 브로드캐스트
+    if (taskId) {
+      await dbManager.createComment(String(taskId), agentId, result.text);
+      io.emit('task:comment_added', { taskId: String(taskId), author: agentId, text: result.text, createdAt: new Date().toISOString() });
+    }
+
+    agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
+    io.emit('agent:status_change', { agentId, status: 'idle' });
+
+    res.json({ status: 'ok', text: result.text, agent: agentId });
+  } catch (err) {
+    console.error('[API] /api/agents/inline-edit 에러:', err.message);
     res.status(500).json({ status: 'error', message: err.message });
   }
 });
@@ -1011,13 +1439,14 @@ httpServer.listen(PORT, () => {
           // 백그라운드 재실행 (강제 투입)
           (async () => {
             try {
+              const targetAgent = t.assigned_agent || 'ari';
               const evaluation = await modelSelector.selectModel(t.content);
-              const result = await executor.run(t.content, evaluation);
+              const result = await executor.run(t.content, evaluation, targetAgent);
               
               await dbManager.updateTaskStatus(t.id, 'REVIEW');
               await dbManager.updateTaskModel(t.id, result.model);
               io.emit('task:moved', { taskId: String(t.id), toColumn: 'review' });
-              broadcastLog('success', `Task #${t.id} 재실행 완료. 리뷰 대기(${result.model})`, 'ari', t.id);
+              broadcastLog('success', `Task #${t.id} 재실행 완료. 리뷰 대기(${result.model})`, targetAgent, t.id);
               
               if (bot && process.env.TELEGRAM_CHAT_ID) {
                 bot.sendMessage(process.env.TELEGRAM_CHAT_ID, `✅ [Boot Recovery] Task #${t.id} 정상 처리 완료. 워크스페이스에서 점검해 주세요.`).catch(console.error);

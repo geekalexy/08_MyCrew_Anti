@@ -57,6 +57,76 @@ export const SKILL_REGISTRY = {
     fullDescription: "소시안 브랜드만의 시장 특성, 톤앤매너, 컴플라이언스 기준을 데이터베이스화하여 실무에 접목시키는 도메인 역량입니다.",
   },
 
+  // ─── Layer 4: Workflow Skills (A팀 — 초안·검증 라인) ───
+  "draft": {
+    id: "draft", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "초안 발제", icon: "edit_note", color: "#ffb963",
+    crew: "NOVA",
+    description: "컨텍스트를 로드하여 템플릿 기반 마케팅 초안을 T+0에 선제 제출합니다.",
+    fullDescription: "유저 프롬프트와 소시안 컨텍스트를 통합하여 5가지 Hook 공식 중 최적을 선택, 플랫폼별 규격에 맞는 첫 기획안을 생성합니다.\n주요 크루: NOVA",
+    rules: ["Hook 5공식 중 1개 반드시 적용", "콘텐츠 피라미드 자동 제안", "컨텍스트 폴더 최신 정보 반드시 참조"],
+  },
+  "red-team": {
+    id: "red-team", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "검증 어택", icon: "gpp_bad", color: "#f87171",
+    crew: "OLLIE",
+    description: "상대 기획안의 치명적 약점 3개 이상을 먼저 지목한 후 대안을 제시합니다.",
+    fullDescription: "예산 한도·UX·컴플라이언스·데이터 관점에서 기획안을 해체합니다.\n규칙: 약점 열거 → 대안 제시 순서 역전 불가.\n주요 크루: OLLIE",
+    rules: ["약점 3개 이상 먼저 나열 필수", "약점 없이 대안 제시 금지", "팩트·데이터 기반 지적만 허용"],
+  },
+  "judge-merge": {
+    id: "judge-merge", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "판관 병합", icon: "balance", color: "#a78bfa",
+    crew: "ARI",
+    description: "양측 결과물을 루브릭 채점 후 최상의 요소를 강제 병합하여 최종안을 도출합니다.",
+    fullDescription: "Hook·CTA·플랫폼규격·해시태그·브랜드톤 5항목을 1~10점 채점 후 상위 요소를 통합합니다.\n주요 크루: ARI",
+    rules: ["5-Points QA 전수 검사", "채점 근거 명시", "CEO 보고 전 최종 검수"],
+  },
+
+  // ─── Layer 4: Workflow Skills (B팀 — 협력·발전 라인) ───
+  "ideate": {
+    id: "ideate", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "창의 발산", icon: "auto_awesome", color: "#4ade80",
+    crew: "PICO",
+    description: "논리보다 감성에 꽂히는 마케팅 카피와 아이디어 뼈대를 무한 발산합니다.",
+    fullDescription: "템플릿 제약 없이 높은 창의성으로 바이럴 트리거 언어, Hook 후보, 감성 카피를 발산합니다.\n주요 크루: PICO",
+    rules: ["3개 이상의 Hook 후보 제시", "해시태그 불필요 (LUMI가 처리)", "발산 후 정리는 LUMI에 위임"],
+  },
+  "peer-enhance": {
+    id: "peer-enhance", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "크로스 리뷰", icon: "sync_alt", color: "#38bdf8",
+    crew: "PICO / LUMI",
+    description: "동료의 산출물을 파괴 없이 흡수·재해석하여 자신의 강점을 덧입힙니다.",
+    fullDescription: "Phase 3 교차 흡수 단계에서 발동. 동료 텍스트를 단순 복사 금지 — 반드시 자신만의 관점으로 재구성합니다.\n주요 크루: PICO, LUMI",
+    rules: ["동료 산출물 단순 복사 절대 금지", "자신의 관점으로 재해석 필수", "흡수한 개념 2~3개 명시"],
+  },
+  "anti-sycophancy": {
+    id: "anti-sycophancy", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "동조 방지", icon: "warning", color: "#fb923c",
+    crew: "ARI",
+    description: "양 에이전트가 의미 없는 합의만 반복하면 개입하여 심층 협력을 유도합니다.",
+    fullDescription: "유사도 임계치 초과 시 멘토링 프롬프트를 발동, 각 에이전트가 자신만의 관점을 유지하도록 조율합니다.\n주요 크루: ARI",
+    rules: ["판정 없이 방향 제시만", "일방적 동의 발견 시 즉시 개입", "최소 2가지 관점 차이 확인"],
+  },
+
+  // ─── Layer 4: Workflow Skills (B4 — 자동화 시스템) ───
+  "retrospective": {
+    id: "retrospective", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "스프린트 회고", icon: "history_edu", color: "#94a3b8",
+    crew: "B4 System",
+    description: "태스크 Done 시 대표님의 수정 로그를 분석하여 회고 일지를 자동 생성합니다.",
+    fullDescription: "칸반 Done 상태 전환을 트리거로 사용자의 직접 수정 패턴을 분석, 잘된점·아쉬운점·개선안을 자동 작성합니다.\n주요 크루: B4 System (코드 실행, LLM 호출 없음)",
+    rules: ["태스크 Done 전환 시 자동 발동", "LLM 호출 없이 코드 실행만", "그라운드룰 동기화로 자동 연결"],
+  },
+  "rule-sync": {
+    id: "rule-sync", layer: 4, layerLabel: "WORKFLOW", isRequired: true,
+    name: "그라운드룰 동기화", icon: "sync", color: "#94a3b8",
+    crew: "B4 System",
+    description: "회고 일지에서 '하지 말아야 할 규칙'을 추출해 팀 그라운드룰 파일에 누적 갱신합니다.",
+    fullDescription: "스프린트 회고 결과물에서 부정 패턴을 추출하여 팀_그라운드룰.md에 자동 Append합니다.\n이 파일은 다음 Sprint에서 B팀 컨텍스트로 자동 로드됩니다.\n주요 크루: B4 System",
+    rules: ["규칙은 구체적 행동 금지형으로 작성", "중복 규칙 자동 제거", "스프린트 완료 후 자동 실행"],
+  },
+
   // ─── Layer 3: Infra Skills (Builtin) ───
   "claude-code-native": {
     id: "claude-code-native", layer: 3, layerLabel: "INFRA", isBuiltin: true,

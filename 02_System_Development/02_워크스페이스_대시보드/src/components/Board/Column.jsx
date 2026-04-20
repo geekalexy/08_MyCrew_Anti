@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import TaskCard from './TaskCard';
 import { useDroppable } from '@dnd-kit/core';
 import { useSocket } from '../../hooks/useSocket';
+import { useAgentStore } from '../../store/agentStore';
 
 const COLUMN_LABELS = {
   todo:        'To Do',
@@ -12,11 +13,11 @@ const COLUMN_LABELS = {
 };
 
 const PRIORITY_OPTIONS = ['urgent', 'high', 'medium', 'low'];
-const ASSIGNEE_OPTIONS = ['ari', 'sonnet', 'opus', 'luca', '미할당'];
 
 export default function Column({ columnId, tasks, disableDnD }) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId });
   const { emitTaskCreate } = useSocket();
+  const agentMeta = useAgentStore((s) => s.agentMeta) || {};
 
   // ── 태스크 생성 폼 상태
   const [isAdding, setIsAdding] = useState(false);
@@ -178,8 +179,9 @@ export default function Column({ columnId, tasks, disableDnD }) {
                 value={form.assignee}
                 onChange={(e) => setForm({ ...form, assignee: e.target.value })}
               >
-                {ASSIGNEE_OPTIONS.map((a) => (
-                  <option key={a} value={a}>{a}</option>
+                <option value="미할당">미할당</option>
+                {Object.values(agentMeta).map((m) => (
+                  <option key={m.name} value={m.name}>{m.name.toLowerCase()}</option>
                 ))}
               </select>
               <select

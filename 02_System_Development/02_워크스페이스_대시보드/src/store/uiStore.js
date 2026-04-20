@@ -17,7 +17,9 @@ export const useUiStore = create(
       activeDetailTaskId: null, // 상세 모달 오픈용
 
       workspaceName: 'Socian',
-      workspaceLogo: null, // null 이면 기본 아이콘 사용
+      workspaceLogo: null,
+      teamPageTitle: 'Team',
+      teamPageSubtitle: 'AI 팀 구성원 및 프로젝트 현황',
       
       // Phase 17-3: 온보딩 체크
       hasCompletedOnboarding: false,
@@ -27,7 +29,7 @@ export const useUiStore = create(
         set((s) => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
 
       setLogPanelOpen: (open) =>
-        set({ isLogPanelOpen: open, isBoardReadOnly: open }),
+        set({ isLogPanelOpen: open }),
 
       setActiveLogTab: (tab) => set({ activeLogTab: tab }),
 
@@ -39,7 +41,25 @@ export const useUiStore = create(
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       
       // 워크스페이스 업데이트
-      updateWorkspace: (updates) => set((s) => ({ ...s, ...updates }))
+      updateWorkspace: (updates) => set((s) => ({ ...s, ...updates })),
+
+      // Phase 21: ArtifactViewer 풀스크린
+      // activeArtifact: null | { id, title, content, type, agentName }
+      activeArtifact: null,
+      openArtifact: (artifact) => set({ activeArtifact: artifact }),
+      closeArtifact: () => set({ activeArtifact: null }),
+
+      // [v2.0] Multi-Team 아키텍체 상태
+      teams: [
+        { id: 'team_B', group: 'B', name: 'Team B (초안 & 크로스체크)', projectId: 'sosiann_verify', projectName: '소시안 검수 프로젝트' },
+        { id: 'team_A', group: 'A', name: 'Team A (크리에이티브)',    projectId: 'sosiann_creative',   projectName: '소시안 기획 프로젝트'    },
+      ],
+      projects: [
+        { id: 'sosiann_creative',   name: '소시안 기획 프로젝트',     active: true },
+        { id: 'sosiann_verify', name: '소시안 검수 프로젝트', active: true },
+      ],
+      addTeam:    (teamDef)    => set((s) => ({ teams:    [...s.teams,    teamDef]    })),
+      addProject: (projectDef) => set((s) => ({ projects: [...s.projects, projectDef] })),
     }),
     {
       name: 'mycrew-ui',
@@ -47,8 +67,10 @@ export const useUiStore = create(
         theme: s.theme, 
         workspaceName: s.workspaceName, 
         workspaceLogo: s.workspaceLogo,
-        hasCompletedOnboarding: s.hasCompletedOnboarding
-      }), // theme, workspace 정보 persist
+        hasCompletedOnboarding: s.hasCompletedOnboarding,
+        teamPageTitle: s.teamPageTitle,
+        teamPageSubtitle: s.teamPageSubtitle,
+      }), // theme, workspace, 팀 메타 정보 persist
     }
   )
 );

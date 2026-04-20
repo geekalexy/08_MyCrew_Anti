@@ -11,6 +11,7 @@ const LAYER_ORDER = [
   { layer: 3, label: 'Layer 3 · INFRA (코어 시스템)' },
   { layer: 1, label: 'Layer 1 · ENGINE (전문 실행)' },
   { layer: 2, label: 'Layer 2 · DOMAIN (도메인 특화)' },
+  { layer: 4, label: 'Layer 4 · WORKFLOW (멀티에이전트 워크플로우)' },
 ];
 
 /**
@@ -19,16 +20,15 @@ const LAYER_ORDER = [
  * Props:
  *   agentId — 현재 에이전트 ID
  */
-export default function SkillSection({ agentId }) {
+export default function SkillSection({ agentId, onOpenDrawer }) {
   const { agentMeta, toggleAgentSkill } = useAgentStore();
   const skillConfig = agentMeta[agentId]?.skillConfig || {};
 
   const [selectedSkill, setSelectedSkill] = useState(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  // 스킬 활성 여부 확인 (Builtin은 항상 true, 나머지는 skillConfig 참조)
+  // 스킬 활성 여부 확인 (Builtin·Required는 항상 true, 나머지는 skillConfig 참조)
   const getIsActive = (skill) => {
-    if (skill.isBuiltin) return true;
+    if (skill.isBuiltin || skill.isRequired) return true;
     return skillConfig[skill.id]?.active !== false; // undefined → true (기본 활성)
   };
 
@@ -39,8 +39,7 @@ export default function SkillSection({ agentId }) {
     skills: Object.values(SKILL_REGISTRY).filter((s) => s.layer === layer),
   })).filter((group) => group.skills.length > 0);
 
-  // 이미 장착된 스킬 ID 목록 (Drawer에서 중복 제거용)
-  const installedSkillIds = Object.keys(SKILL_REGISTRY);
+  // 이미 장착된 스킬 ID 목록 — 삭제됨 (Drawer가 상위에서 관리)
 
   const handleToggle = (skillId, nextActive) => {
     toggleAgentSkill(agentId, skillId, nextActive);
@@ -63,7 +62,7 @@ export default function SkillSection({ agentId }) {
           </div>
           <button
             className="skill-section__add-btn"
-            onClick={() => setIsDrawerOpen(true)}
+            onClick={() => onOpenDrawer?.()}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>add</span>
             스킬 추가
@@ -81,14 +80,16 @@ export default function SkillSection({ agentId }) {
             <p className="skill-section__layer-label">{label}</p>
             <div className="skill-grid">
               {skills.map((skill) => {
-                const isActive = getIsActive(skill);
-                const isBuiltin = !!skill.isBuiltin;
+                const isActive   = getIsActive(skill);
+                const isBuiltin  = !!skill.isBuiltin;
+                const isRequired = !!skill.isRequired;
                 return (
                   <SkillCard
                     key={skill.id}
                     skill={skill}
                     isActive={isActive}
                     isBuiltin={isBuiltin}
+                    isRequired={isRequired}
                     onToggle={handleToggle}
                     onClick={handleCardClick}
                   />
@@ -108,18 +109,10 @@ export default function SkillSection({ agentId }) {
           onClose={() => setSelectedSkill(null)}
           onToggle={(skillId, nextActive) => {
             handleToggle(skillId, nextActive);
-            setSelectedSkill(null); // 토글 후 모달 닫기
+            setSelectedSkill(null);
           }}
         />
       )}
-
-      {/* 스킬 추가 Drawer (Local) */}
-      <SkillAddDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        agentId={agentId}
-        installedSkillIds={installedSkillIds}
-      />
     </>
   );
 }

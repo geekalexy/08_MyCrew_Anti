@@ -83,6 +83,18 @@ export default function TaskCard({ task, isDragging }) {
             transition: 'color 0.15s, opacity 0.15s',
             flexShrink: 0,
           }}
+          onMouseEnter={(e) => {
+            if (!isFocused) {
+              e.currentTarget.style.color = 'var(--text-primary)';
+              e.currentTarget.style.opacity = 1;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isFocused) {
+              e.currentTarget.style.color = 'var(--text-muted)';
+              e.currentTarget.style.opacity = 0.6;
+            }
+          }}
         >
           <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>
             {isFocused ? 'target' : 'adjust'}
@@ -113,12 +125,14 @@ export default function TaskCard({ task, isDragging }) {
             {PRIORITY_LABEL[task.priority] || task.priority.toUpperCase()}
           </span>
         )}
-        
-        {/* Phase 17-2: HELP_USER_ACTION 점멸등 (우측 상단 고정) */}
+
+        {/* HELP_USER_ACTION 점멸등 — 우선순위 옆 유지 */}
         {task.status === 'HELP_USER_ACTION' && (
           <div className="help-user-action-dot" title="대표님의 결제/권한 승인이 필요합니다" />
         )}
+
       </div>
+
 
       {/* ── L2. 제목 (2줄 최대) — margin 0으로 기준선 통일 ── */}
       {task.title && (
@@ -128,14 +142,6 @@ export default function TaskCard({ task, isDragging }) {
         >
           {task.title}
         </p>
-      )}
-
-      {/* ── L3. 最신 코멘트 미리보기 ────────────────────────── */}
-      {task.latestComment && (
-        <div className="task-card__latest-comment">
-          <span className="material-symbols-outlined task-card__latest-comment-icon">chat_bubble</span>
-          <span className="line-clamp-1">{task.latestComment}</span>
-        </div>
       )}
 
       {/* ── L5. Footer: 담당자 + Risk ─────────────────────── */}
@@ -175,6 +181,7 @@ export default function TaskCard({ task, isDragging }) {
             }}
           />
         )}
+
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ const LAYER_CLASS = {
   3: 'infra',
   1: 'engine',
   2: 'domain',
+  4: 'workflow',
 };
 
 /**
@@ -35,22 +36,26 @@ function SkillToggle({ checked, onToggle, disabled }) {
  * SkillCard — 스킬 단위 카드
  *
  * Props:
- *   skill      — SKILL_REGISTRY의 스킬 객체
- *   isActive   — 현재 활성화 여부 (boolean)
- *   isBuiltin  — 해제 불가 여부 (boolean)
- *   onToggle   — (skillId, nextActive) => void
- *   onClick    — 상세 모달 오픈 콜백 () => void
+ *   skill       — SKILL_REGISTRY의 스킬 객체
+ *   isActive    — 현재 활성화 여부 (boolean)
+ *   isBuiltin   — 해제 불가 여부 INFRA 전용 (boolean)
+ *   isRequired  — 필수 스킬 (boolean) — WORKFLOW 스킬, 항상 활성
+ *   onToggle    — (skillId, nextActive) => void
+ *   onClick     — 상세 모달 오픈 콜백 () => void
  */
-export default function SkillCard({ skill, isActive, isBuiltin, onToggle, onClick }) {
+export default function SkillCard({ skill, isActive, isBuiltin, isRequired, onToggle, onClick }) {
   const layerKey = LAYER_CLASS[skill.layer] || 'engine';
+  const locked   = isBuiltin || isRequired;
 
   const cardClass = [
     'skill-card',
-    isBuiltin ? 'skill-card--builtin' : (isActive ? 'skill-card--active' : 'skill-card--inactive'),
+    isBuiltin    ? 'skill-card--builtin'  :
+    isRequired   ? 'skill-card--required' :
+    isActive     ? 'skill-card--active'   : 'skill-card--inactive',
   ].join(' ');
 
   const handleToggle = () => {
-    if (!isBuiltin) onToggle(skill.id, !isActive);
+    if (!locked) onToggle(skill.id, !isActive);
   };
 
   const handleCardClick = () => {
@@ -73,8 +78,11 @@ export default function SkillCard({ skill, isActive, isBuiltin, onToggle, onClic
           <span className="skill-card__name">{skill.name}</span>
         </div>
 
-        {isBuiltin ? (
-          <span className="material-symbols-outlined skill-card__lock" title="코어 시스템 스킬: 해제 불가">
+        {locked ? (
+          <span
+            className="material-symbols-outlined skill-card__lock"
+            title={isBuiltin ? '코어 시스템 스킬: 해제 불가' : '필수 워크플로우 스킬: 해제 불가'}
+          >
             lock
           </span>
         ) : (
@@ -90,11 +98,31 @@ export default function SkillCard({ skill, isActive, isBuiltin, onToggle, onClic
       {/* 설명 */}
       <p className="skill-card__desc">{skill.description}</p>
 
-      {/* 푸터: 레이어 뱃지 */}
+      {/* 푸터: 레이어 배지 + 담당 크루 (WORKFLOW만) */}
       <div className="skill-card__footer">
         <span className={`layer-badge layer-badge--${layerKey}`}>
           L{skill.layer} {skill.layerLabel}
         </span>
+        {skill.crew && (
+          <span style={{
+            fontSize: '0.62rem', color: 'var(--text-muted)',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '4px', padding: '1px 5px',
+          }}>
+            @{skill.crew}
+          </span>
+        )}
+        {isRequired && (
+          <span style={{
+            fontSize: '0.6rem', fontWeight: 800, color: '#a78bfa',
+            background: 'rgba(167,139,250,0.12)',
+            border: '1px solid rgba(167,139,250,0.3)',
+            borderRadius: '4px', padding: '1px 5px', letterSpacing: '0.04em',
+          }}>
+            필수
+          </span>
+        )}
       </div>
     </div>
   );

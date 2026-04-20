@@ -13,7 +13,12 @@ import AgentDetailView from './components/Views/AgentDetailView';
 import ArchiveView from './components/Views/ArchiveView';
 import OrgView from './components/Views/OrgView';
 import SettingsView from './components/Views/SettingsView';
+import OnboardingWizard from './components/Views/OnboardingWizard';
+import ArtifactViewer from './components/Views/ArtifactViewer';
+import ImageLabView from './components/Views/ImageLabView';
+import VideoLabView from './components/Views/VideoLabView';
 import './styles/colors.css';
+
 import './styles/animations.css';
 import './styles/app.css';
 
@@ -35,7 +40,7 @@ const IcoCheckCircle = () => (
 );
 
 export default function App() {
-  const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding } = useUiStore();
+  const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding, activeArtifact } = useUiStore();
   const { fetchSettings } = useSettingsStore();
   const { projects, selectedProjectId, updateProject } = useProjectStore();
   const { selectedAgentId, addAgent } = useAgentStore();
@@ -52,9 +57,10 @@ export default function App() {
     if (!hasCompletedOnboarding) {
       setLogPanelOpen(true);
       setActiveLogTab('interaction');
-      completeOnboarding(); // 한 번 띄우고 플래그 끔 (원하면 끌 수 있도록)
+      // completeOnboarding(); // Phase 20: 위저드에서 직접 완료 처리하므로 주석 처리/삭제
     }
   }, []);
+
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -100,6 +106,8 @@ export default function App() {
       case 'archive':      return <ArchiveView />;
       case 'organization': return <OrgView />;
       case 'settings':     return <SettingsView />;
+      case 'image-lab':    return <ImageLabView />;
+      case 'video-lab':    return <VideoLabView />;
       case 'projects':
       default:
         return (
@@ -139,61 +147,32 @@ export default function App() {
     }
   };
 
+  if (!hasCompletedOnboarding) {
+    return <OnboardingWizard />;
+  }
+
+  // Phase 21: ArtifactViewer — 사이드바/헤더 위를 완전히 덮는 풀스크린
+  if (activeArtifact) {
+    return <ArtifactViewer />;
+  }
+
   return (
     <div className="app">
       {/* ── 좌측 사이드바 ─────────────────────────────────────── */}
       <Sidebar />
 
+
       {/* ── 중앙 + 우측 래퍼 ────────────────────────────────────── */}
       <div className="app__content">
         {/* ── 헤더 ──────────────────────────────────────────────── */}
         <header className="app__header glass-panel">
-          {currentView === 'organization' ? (
-            <div className="recruit-section" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-             {!isRecruiting && !recruitStatus && (
-               <button
-                 className="btn btn--primary recruit-section__btn"
-                 onClick={() => setIsRecruiting(true)}
-                 style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', borderRadius: '8px' }}
-               >
-                 <IcoPersonAdd />
-                 팀원 채용 (Recruit)
-               </button>
-             )}
-             {isRecruiting && !recruitStatus && (
-               <form className="recruit-form glass-panel" onSubmit={handleRecruit} style={{ padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: 0 }}>
-                 <IcoPersonAdd />
-                 <input
-                   className="inline-task-form__textarea"
-                   placeholder="어떤 역할이 필요한가요?"
-                   value={recruitInput}
-                   onChange={(e) => setRecruitInput(e.target.value)}
-                   autoFocus
-                   style={{ height: '32px', margin: 0, padding: '0.2rem 0.6rem', width: '220px', borderRadius: '4px' }}
-                 />
-                 <button type="submit" className="btn btn--primary btn--sm">지시</button>
-                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setIsRecruiting(false)}>취소</button>
-               </form>
-             )}
-             {recruitStatus === 'loading' && (
-               <div className="recruit-loading" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--brand)' }}>
-                 <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
-                 <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>수석 AI가 면접 중...</span>
-               </div>
-             )}
-             {recruitStatus === 'done' && (
-               <div className="recruit-done" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--status-active)' }}>
-                 <IcoCheckCircle />
-                 <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>팀원이 성공적으로 합류했습니다! 🎉</span>
-               </div>
-             )}
-            </div>
-          ) : (
-            <div className="app__search">
-              <span className="material-symbols-outlined app__search-icon" style={{ fontSize: '1rem' }}>search</span>
-              <input className="app__search-input" placeholder="Global search commands..." />
-            </div>
-          )}
+            {currentView !== 'organization' && currentView !== 'agent-detail' && (
+              <div className="app__search">
+                <span className="material-symbols-outlined app__search-icon" style={{ fontSize: '1rem' }}>search</span>
+                <input className="app__search-input" placeholder="Global search commands..." />
+              </div>
+            )}
+
 
           <div className="app__header-actions">
             <span
@@ -235,8 +214,8 @@ export default function App() {
         </main>
       </div>
 
-      {/* ── 우측 로그 드로어 ──────────────────────────────────── */}
-      <LogDrawer />
+      {/* ── 우측 로그 드로어 — Image Lab에서는 숨김 (3-Panel 레이아웃 보호) ── */}
+      {currentView !== 'image-lab' && currentView !== 'video-lab' && <LogDrawer />}
       {/* ── Phase 11: 태스크 상세 모달 ────────────────────────── */}
       <TaskDetailModal />
       {/* ── 모바일 하단 네비게이션 ────────────────────────────── */}

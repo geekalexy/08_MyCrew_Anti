@@ -5,7 +5,7 @@
 >
 > **작성일**: 2026-04-14
 > **작성자**: Luca (Claude Sonnet / Antigravity)
-> **검토자**: Prime (Claude Opus / Supreme Advisor)
+> **검토자**: Prime (Claude Opus / Prime Advisor)
 
 ---
 
@@ -70,7 +70,7 @@
 
 ## 🔱 팀원 2: Prime (프라임)
 
-> **정체성**: Supreme Advisor. Claude Opus 기반. 비상근 — Luca의 요청 시 소환.
+> **정체성**: Prime Advisor. Claude Opus 기반. 비상근 — Luca의 요청 시 소환.
 > **운영 철학**: Red Teaming 관점의 비판적 검증. 편향성 없는 독립 리뷰.
 > **소환 방법**: `/supreme_review_workflow` — 대표님이 Antigravity 모델을 Opus로 수동 전환.
 
@@ -155,7 +155,7 @@
 | 문서 | 경로 |
 |---|---|
 | MyCrew 전략 메모리 | `01_Company_Operations/04_HR_온보딩/strategic_memory.md` |
-| Supreme Review 워크플로우 | `.agents/workflows/supreme_review_workflow.md` |
+| Prime Review 워크플로우 | `.agents/workflows/supreme_review_workflow.md` |
 | MyCrew 스킬 레지스트리 (ARI팀) | `02_System_Development/02_워크스페이스_대시보드/src/data/skillRegistry.js` |
 | Skill Creator 가이드 | `skill-library/00_skill-creator/SKILL.md` |
 

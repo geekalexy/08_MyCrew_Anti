@@ -55,10 +55,16 @@ class KeyProvider {
     await dbManager.setSetting(keyName, value);
     
     // 캐시 즉시 갱신
-
     this._cache.set(keyName, value);
     
     console.log(`[KeyProvider] ${keyName} 보안 키가 갱신되었습니다. (즉시 반영됨)`);
+  }
+
+  /**
+   * DB에 저장하지 않고 메모리에만 휘발성으로 키를 유지합니다. (OAuth 토큰용)
+   */
+  setVolatileKey(keyName, value) {
+    this._cache.set(keyName, value);
   }
 
   /**

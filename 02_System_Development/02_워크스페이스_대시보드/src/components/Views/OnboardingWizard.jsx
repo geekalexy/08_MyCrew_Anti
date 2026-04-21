@@ -38,7 +38,7 @@ const PROVIDERS = [
     logo: 'auto_awesome',           // material icon
     accent: '#4285F4',
     glow: 'rgba(66,133,244,0.16)',
-    tagSub: ['Gemini Advanced', '1.5 Pro / Flash'],
+    tagSub: ['Gemini Advanced', '2.5 Flash'],
     tagKey: ['AIza...  형식', 'Flash / Pro 선택'],
     keyPlaceholder: 'AIzaSy...',
     keyLabel: 'Gemini API Key',

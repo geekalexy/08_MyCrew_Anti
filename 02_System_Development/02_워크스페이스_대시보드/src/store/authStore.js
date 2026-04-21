@@ -16,6 +16,24 @@ export const useAuthStore = create(
       googleUser: null,             // { name, email, picture }
       isSigningIn: false,
 
+      // 앱 실행 시 백엔드와 토큰 상태 동기화
+      syncWithBackend: async () => {
+        const { oauthToken, oauthExpiry, authMode } = get();
+        if (authMode === 'google_oauth' && oauthToken && oauthExpiry > Date.now()) {
+          const expiresIn = Math.floor((oauthExpiry - Date.now()) / 1000);
+          try {
+            await fetch(`${SERVER_URL}/api/auth/google-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: oauthToken, expiresIn }),
+            });
+            console.log('[AuthStore] 🔄 백엔드와 Google OAuth 토큰 동기화 완료');
+          } catch (e) {
+            console.warn('[AuthStore] 백엔드 토큰 동기화 실패', e);
+          }
+        }
+      },
+
       // ── Google OAuth 로그인 ────────────────────────────────
       signInWithGoogle: () => {
         if (!GOOGLE_CLIENT_ID) {

@@ -1,0 +1,19 @@
+[Scene 1] (5초)
+텍스트: 🤯 개발자분들 주목! 구글 재미나이에서 역대급 업데이트가 나왔습니다!
+비주얼 기획: Dynamic shot of a professional-looking man (Professor Lee Jong-bo) with a wide, excited smile and surprised eyes. Bright, energetic studio background with abstract tech elements. Large, bold text overlay '🤯 개발자분들 주목!' (Developers, pay attention!) flashes on screen.
+
+[Scene 2] (5초)
+텍스트: 안녕하세요, AI 겸민 교수 이종보입니다. 드디어 기다리던 기능이 공개됐는데요...
+비주얼 기획: Mid-shot of Professor Lee Jong-bo, dressed in smart casual attire, looking directly at the camera with a confident and engaging expression. A subtle, futuristic Google Gemini logo is blurred in the background. A glowing 'NEW FEATURE' icon or a question mark animation briefly appears next to him.
+
+[Scene 3] (8초)
+텍스트: 바로, 채팅 내역이 노트북 LM 소스로 바로 전환되는 혁신적인 기능입니다!
+비주얼 기획: Split screen view. On the left, a clean, modern AI chat interface (like Google Gemini) showing a conversation about coding ideas. On the right, a notebook environment (like Jupyter Notebook or Google Colab) with Python code appearing dynamically. A sleek animated arrow bridges the two screens, flowing from the chat bubbles to the code editor.
+
+[Scene 4] (7초)
+텍스트: 이제 아이디어를 바로 코드로! 개발 생산성이 폭발적으로 증가합니다.
+비주얼 기획: A developer (diverse, gender-neutral) sitting in front of a monitor, looking focused and productive, with lines of code rapidly appearing on their screen. A stylized graphic of a lightbulb transforming into lines of clean, functional code is overlaid, symbolizing rapid idea-to-code conversion. A subtle upward-trending graph representing 'productivity' is in the background.
+
+[Scene 5] (5초)
+텍스트: 지금 바로 구글 재미나이에서 경험해보세요!
+비주얼 기획: A vibrant, close-up shot of the Google Gemini logo, glowing and prominent. Professor Lee Jong-bo's hand gestures towards the logo with an inviting expression. A subtle call to action text '지금 바로 경험해보세요!' (Experience it now!) appears at the bottom.

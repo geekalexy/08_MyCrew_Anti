@@ -1,0 +1,39 @@
+[Scene 1] (4초)
+텍스트: 시간은 금! 10초 안에 당신의 디자인 시간을 100배 단축시켜 줄 AI 기술을 소개합니다.
+비주얼 기획: A split screen showing a frustrated designer struggling with complex software on one side, and a dazzling, AI-generated website design appearing instantly on the other side, with a prominent '10x Faster' badge.
+
+[Scene 2] (3초)
+텍스트: 기존에는 상상도 못 했던 일이죠. 복잡한 코딩, 시간 걸리는 디자인 작업... 이제 AI와 함께라면?
+비주얼 기획: A montage of quick cuts: a developer looking overwhelmed by lines of code, a graphic designer meticulously adjusting pixels, a complex 3D model rendering slowly. These are juxtaposed with sleek, futuristic icons representing AI.
+
+[Scene 3] (5초)
+텍스트: 구글의 혁신적인 AI 플랫폼 'Anti-Gravity'를 소개합니다. 여러 프로젝트를 동시에, AI 에이전트와 협업하며 개발 생산성을 극대화하세요.
+비주얼 기획: A dynamic animation of the 'Anti-Gravity' logo unfolding, revealing a clean, futuristic interface. Show multiple project windows (represented by abstract shapes) floating and interacting harmoniously around a central AI core.
+
+[Scene 4] (6초)
+텍스트: AI가 코드 생성부터 버그 수정, 테스트까지. 당신은 오직 아이디어에만 집중하면 됩니다. 마치 최고의 동료와 함께 일하는 것처럼요.
+비주얼 기획: A split-screen or picture-in-picture view. On one side, a developer confidently types prompts. On the other, animated AI agents (represented by glowing orbs or stylized robots) are shown actively writing code, debugging (red X's disappearing), and running tests in a simulated browser environment.
+
+[Scene 5] (5초)
+텍스트: 이 놀라운 AI는 웹사이트 디자인에도 적용됩니다. '라이트 모드 웹사이트 디자인'이라고 입력하면...
+비주얼 기획: Close-up on a sleek, minimalist text input field within the Anti-Gravity interface. The text 'Generate a light mode website design' is typed in real-time. As the text completes, the screen transitions to a stunning, fully rendered website design.
+
+[Scene 6] (7초)
+텍스트: 단 몇 초 만에 이렇게 멋진 디자인이 짠! 포토샵으로 몇 시간 걸릴 작업이 순식간에 끝납니다. 이제 전문가급 편집도 누구나 할 수 있어요.
+비주얼 기획: A dramatic reveal of a beautiful, modern website design, showcasing clean layout, appealing typography, and vibrant imagery. Overlay text highlights '10 Seconds!' and 'Photoshop Killer'. Show a before-and-after comparison of a complex image editing task, with the AI version being vastly superior and faster.
+
+[Scene 7] (4초)
+텍스트: 마음에 안 드는 부분은요? 걱정 마세요. 특정 영역만 선택해서 텍스트, 색상, 심지어 요소까지 완벽하게 수정할 수 있습니다.
+비주얼 기획: The previously generated website design is shown. A user interface element (e.g., a button or header text) is highlighted. A selection tool draws a precise box around it, and then the text is edited directly, changing instantly. Then, a color swatch is selected, and the element's color smoothly transitions.
+
+[Scene 8] (4초)
+텍스트: 처음부터 다시 만들 필요 없이, 피드백을 반영해 원하는 결과물을 얻으세요. 이것이 바로 AI와의 효율적인 협업입니다.
+비주얼 기획: An animation showing the iterative process: a design element is adjusted, then another, then a color is changed, all with minimal clicks and instant visual feedback, demonstrating a seamless refinement loop.
+
+[Scene 9] (5초)
+텍스트: 구글의 최첨단 AI 기술로 미래 개발과 디자인의 새로운 기준을 경험하세요. 당신의 잠재력을 최대로 끌어낼 시간입니다.
+비주얼 기획: A wide shot of the Anti-Gravity interface, with data streams flowing and connecting. The Google 'G' logo subtly appears. The scene fades to a person looking inspired and empowered, with a subtle glow around them, signifying unlocked potential.
+
+[Scene 10] (2초)
+텍스트: 지금 바로 Anti-Gravity를 경험해보세요!
+비주얼 기획: A clear call-to-action screen with the Anti-Gravity logo, a QR code, and the text 'Try Anti-Gravity Now!' with a subtle animation pulsing on the button.

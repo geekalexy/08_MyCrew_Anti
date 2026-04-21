@@ -38,11 +38,14 @@ class WorkflowOrchestrator {
 
     try {
       const teamAgents = await dbManager.getTeamAgents(teamId);
-      const imgAgent = teamAgents.find(a => a.experiment_role.includes('이미지'));
-      const vidAgent = teamAgents.find(a => a.experiment_role.includes('영상'));
-      const brainAgent = teamAgents.find(a => a.experiment_role.includes('합성') || a.experiment_role.includes('판관'));
+      // DB의 experiment_role 문자열 매칭이 완벽하지 않을 수 있으므로, 에이전트 ID로도 폴백 매칭합니다.
+      const imgAgent = teamAgents.find(a => a.experiment_role.includes('이미지') || a.agent_id === 'lumi' || a.agent_id === 'nova');
+      const vidAgent = teamAgents.find(a => a.experiment_role.includes('영상') || a.agent_id === 'pico' || a.agent_id === 'lily');
+      const brainAgent = teamAgents.find(a => a.experiment_role.includes('합성') || a.experiment_role.includes('판관') || a.agent_id === 'luna' || a.agent_id === 'ollie');
 
-      if (!imgAgent || !vidAgent || !brainAgent) throw new Error('팀 구성 미비');
+      if (!imgAgent || !vidAgent || !brainAgent) {
+        throw new Error(`팀 구성 미비 (발견된 에이전트 수: img=${!!imgAgent}, vid=${!!vidAgent}, brain=${!!brainAgent})`);
+      }
 
       // 1. Phase 1: 병렬 생성 (이미지 + 영상)
       this.log('info', `[Phase 1] ${imgAgent.agent_id}와 ${vidAgent.agent_id}가 동시에 작업을 시작합니다.`, 'system', taskId, 1);

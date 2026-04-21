@@ -5,6 +5,7 @@ import { useUiStore } from './store/uiStore';
 import { useSettingsStore } from './store/settingsStore';
 import { useProjectStore } from './store/projectStore';
 import { useAgentStore } from './store/agentStore';
+import { useAuthStore } from './store/authStore';
 import Sidebar from './components/Sidebar/Sidebar';
 import KanbanBoard from './components/Board/KanbanBoard';
 import LogDrawer from './components/Log/LogDrawer';
@@ -68,6 +69,7 @@ export default function App() {
 
   useEffect(() => {
     fetchSettings();
+    useAuthStore.getState().syncWithBackend();
     const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
     fetch(`${SERVER_URL}/health`)
       .then((r) => setServerOnline(r.ok))

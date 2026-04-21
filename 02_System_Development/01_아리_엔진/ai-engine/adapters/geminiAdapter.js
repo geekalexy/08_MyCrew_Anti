@@ -9,6 +9,35 @@ class GeminiAdapter {
         this.ai = null;
     }
 
+    // ─── OAuth 토큰으로 Gemini REST API 직접 호출 (구독인증 모드) ──────────────
+    async _generateWithOAuth(oauthToken, model, userPrompt, systemPrompt) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const body = {
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            systemInstruction: systemPrompt ? { parts: [{ text: systemPrompt }] } : undefined,
+            generationConfig: { temperature: 0.7 },
+        };
+
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${oauthToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!resp.ok) {
+            const errBody = await resp.text();
+            throw new Error(`OAuth Gemini API 오류 (${resp.status}): ${errBody}`);
+        }
+
+        const data = await resp.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const tokens = data?.usageMetadata?.totalTokenCount || 0;
+        return { text, model: `${model} (OAuth)`, tokenUsage: tokens, _meta: { fallback: false } };
+    }
+
     async _ensureClient() {
         if (this.ai) return;
         
@@ -36,8 +65,19 @@ class GeminiAdapter {
      * 제미나이 모델을 사용하여 응답을 생성합니다.
      */
     async generateResponse(userPrompt, systemPrompt, initialModelName = 'gemini-2.5-flash') {
+        // ── [구독인증 우선] OAuth 토큰이 유효하면 API Key 없이 직접 호출 ──────────
+        try {
+            const { getGoogleOAuthToken } = await import('../../server.js');
+            const oauthToken = getGoogleOAuthToken?.();
+            if (oauthToken) {
+                console.log(`[GeminiAdapter] 🔐 구독인증 모드로 호출 (${initialModelName})`);
+                return await this._generateWithOAuth(oauthToken, initialModelName, userPrompt, systemPrompt);
+            }
+        } catch (_) { /* server.js import 실패 시 무시 — API Key 방식으로 폴백 */ }
+
         await this._ensureClient();
         if (!this.ai) throw new Error("GEMINI_API_KEY를 찾을 수 없습니다.");
+
 
         return requestQueue.enqueue(async () => {
             // [Phase 0] 모델 자동 Fallback 체인 (modelRegistry.js의 공식 배열 사용)
@@ -125,38 +165,82 @@ class GeminiAdapter {
         if (!this.ai) throw new Error("GEMINI_API_KEY를 찾을 수 없습니다.");
 
         return requestQueue.enqueue(async () => {
-            try {
-                console.log(`[Gemini Adapter] 이미지 분석 중... (Model: ${MODEL.FLASH})`);
-                
-                const imageData = fs.readFileSync(imagePath);
-                const base64Image = imageData.toString('base64');
+            const imageData = fs.readFileSync(imagePath);
+            const base64Image = imageData.toString('base64');
+            
+            let lastError;
+            let retryCount = 0; // 단일 모델당 재시도 횟수
+            
+            // Vision 분석은 Flash 계열이 적합하므로 FLASH_FALLBACK_CHAIN을 기본 사용
+            const fallbackChain = FLASH_FALLBACK_CHAIN && FLASH_FALLBACK_CHAIN.length > 0 ? FLASH_FALLBACK_CHAIN : [MODEL.FLASH];
 
-                const response = await this.ai.models.generateContent({
-                    model: MODEL.FLASH,   // ← modelRegistry SSOT (하드코딩 제거)
-                    contents: [
-                        { text: "이 이미지를 분석해서 정해진 JSON 형식으로 출력하세요." },
-                        {
-                            inlineData: {
-                                data: base64Image,
-                                mimeType: 'image/jpeg'
+            for (let i = 0; i < fallbackChain.length; i++) {
+                const currentModel = fallbackChain[i];
+                console.log(`[Gemini Adapter] 이미지 분석 시도 중... (Model: ${currentModel}, Step: ${i+1}/${fallbackChain.length}, Retry: ${retryCount})`);
+                
+                try {
+                    const response = await this.ai.models.generateContent({
+                        model: currentModel,
+                        contents: [
+                            { text: "이 이미지를 분석해서 정해진 JSON 형식으로 출력하세요." },
+                            {
+                                inlineData: {
+                                    data: base64Image,
+                                    mimeType: 'image/jpeg'
+                                }
+                            }
+                        ],
+                        config: {
+                            systemInstruction: systemPrompt,
+                            temperature: 0.2, // 분석 정확도를 위해 낮게 조정
+                            responseMimeType: 'application/json'
+                        }
+                    });
+
+                    return {
+                        text: response.text,
+                        model: `${currentModel} (Vision)`
+                    };
+                } catch (err) {
+                    lastError = err;
+                    const isRateLimit = err.message?.includes('429') || err.message?.includes('Quota') || err.status === 429;
+                    const isServerError = err.message?.includes('503') || err.status === 503;
+                    
+                    if (isRateLimit || isServerError) {
+                        console.warn(`⚠️ [GeminiAdapter] Vision 호출 실패 (${currentModel}): ${err.message}`);
+                        
+                        // 1. 503 등 일시적 오류 시, 2초 대기 후 동일 모델 재시도
+                        if (retryCount < 1) {
+                            console.log(`⏳ [GeminiAdapter] Vision 과부하 감지. 2초 후 동일 모델(${currentModel}) 재시도...`);
+                            await new Promise(r => setTimeout(r, 2000));
+                            retryCount++;
+                            i--; // 현재 모델 다시
+                            continue;
+                        }
+
+                        // 2. 재시도 실패 및 백업 키 사용 시도
+                        if (i === fallbackChain.length - 1) {
+                            const switched = await this._switchToBackupKey();
+                            if (switched) {
+                                retryCount = 0; // 예비 키로 카운트 리셋
+                                i--; // 현재 모델 다시
+                                continue;
                             }
                         }
-                    ],
-                    config: {
-                        systemInstruction: systemPrompt,
-                        temperature: 0.2, // 분석 정확도를 위해 낮게 조정
-                        responseMimeType: 'application/json'
+                        
+                        // 3. 재시도 실패 시 다음 모델로
+                        console.log(`🔄 [GeminiAdapter] 다음 하위 모델로 Fallback 시도...`);
+                        retryCount = 0;
+                        continue;
+                    } else {
+                        // 그 외 권한 오류나 기타 오류는 즉시 중단
+                        throw new Error(`Vision 오류 (${currentModel}): ${err.message}`);
                     }
-                });
-
-                return {
-                    text: response.text,
-                    model: 'Gemini 2.5 Flash (Vision)'
-                };
-            } catch (error) {
-                console.error('[Gemini Adapter] 이미지 분석 오류:', error);
-                throw new Error(`Vision 오류: ${error.message}`);
+                }
             }
+            
+            console.error('[Gemini Adapter] Vision Fallback 체인 최종 실패:', lastError);
+            throw new Error(`Vision 최종 오류: 모든 가용 모델 호출 실패. (${lastError?.message})`);
         });
     }
 }

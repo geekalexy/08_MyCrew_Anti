@@ -1,6 +1,7 @@
 // src/components/Views/SettingsView.jsx — 워크스페이스 설정
 import { useEffect, useState } from 'react';
 import { useUiStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 import IntegrationVault from './IntegrationVault';
 import AdapterStatusPanel from '../Sidebar/AdapterStatusPanel';
 
@@ -80,6 +81,7 @@ const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 export default function SettingsView() {
   const { theme, toggleTheme } = useUiStore();
+  const { authMode, googleUser, isSigningIn, isOAuthValid, signInWithGoogle, signOut, setAuthMode } = useAuthStore();
   const [serverOnline, setServerOnline] = useState(null);
   const [workspaceInfo, setWorkspaceInfo] = useState({ path: '', isObsidian: false });
   const [settingsTab, setSettingsTab] = useState('general'); // 'general' | 'integrations'
@@ -387,6 +389,134 @@ export default function SettingsView() {
             </div>
           </div>
         </div>
+
+        {/* ── Google 구독인증 카드 ── */}
+        {(() => {
+          const oauthConnected = authMode === 'google_oauth' && isOAuthValid();
+          return (
+        <div className="settings-card glass-panel" style={{
+          borderColor: oauthConnected ? '#4ade80' : undefined,
+          boxShadow: oauthConnected ? '0 0 0 1px #4ade8044, 0 4px 24px rgba(74,222,128,0.08)' : undefined,
+          transition: 'border-color 0.3s, box-shadow 0.3s',
+        }}>
+          <div className="settings-card__header">
+            {/* Google G 아이콘 */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            <span>Google 구독인증</span>
+            {oauthConnected && (
+              <span style={{
+                marginLeft: 'auto', fontSize: '0.7rem',
+                background: 'rgba(74,222,128,0.15)',
+                color: '#4ade80',
+                padding: '2px 8px', borderRadius: '20px', fontWeight: 700,
+                border: '1px solid rgba(74,222,128,0.3)',
+                display: 'flex', alignItems: 'center', gap: '3px',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '0.75rem' }}>check_circle</span>
+                연결됨
+              </span>
+            )}
+          </div>
+          <div className="settings-card__body" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <p style={{ opacity: 0.6, fontSize: '0.82rem', margin: 0 }}>
+              Google 계정(One Ultra 등 구독 플랜)으로 로그인하면 API 키 없이 구독 한도 내에서 아리를 사용할 수 있습니다.
+            </p>
+
+            {/* 인증 방식 토글 */}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                id="auth-mode-api"
+                onClick={() => setAuthMode('api_key')}
+                style={{
+                  flex: 1, padding: '0.5rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, transition: 'all 0.2s',
+                  background: authMode === 'api_key' ? 'var(--brand)' : 'var(--bg-surface)',
+                  color: authMode === 'api_key' ? 'var(--bg-base)' : 'var(--text-muted)',
+                  border: authMode === 'api_key' ? 'none' : '1px solid var(--border)',
+                }}
+              >
+                🔑 API Key 방식
+              </button>
+              <button
+                id="auth-mode-oauth"
+                onClick={() => setAuthMode('google_oauth')}
+                style={{
+                  flex: 1, padding: '0.5rem', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, transition: 'all 0.2s',
+                  // 연결됨: 초록 글로우 / 선택만 됨: brand / 미선택: 기본
+                  background: oauthConnected
+                    ? 'rgba(74,222,128,0.12)'
+                    : authMode === 'google_oauth'
+                      ? 'var(--brand)'
+                      : 'var(--bg-surface)',
+                  color: oauthConnected
+                    ? '#4ade80'
+                    : authMode === 'google_oauth'
+                      ? 'var(--bg-base)'
+                      : 'var(--text-muted)',
+                  border: oauthConnected
+                    ? '1px solid rgba(74,222,128,0.4)'
+                    : authMode === 'google_oauth'
+                      ? 'none'
+                      : '1px solid var(--border)',
+                  boxShadow: oauthConnected ? '0 0 10px rgba(74,222,128,0.2)' : 'none',
+                }}
+              >
+                {oauthConnected ? '✅ 구독인증 연결됨' : '☁️ 구독인증 방식'}
+              </button>
+            </div>
+
+            {/* 로그인 상태 표시 */}
+            {authMode === 'google_oauth' && (
+              googleUser && isOAuthValid() ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.8rem', background: 'rgba(79,142,247,0.08)', borderRadius: '8px', border: '1px solid rgba(79,142,247,0.2)' }}>
+                  <img src={googleUser.picture} alt="" style={{ width: 32, height: 32, borderRadius: '50%' }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{googleUser.name}</div>
+                    <div style={{ fontSize: '0.75rem', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{googleUser.email}</div>
+                  </div>
+                  <button
+                    id="google-sign-out"
+                    onClick={signOut}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: '6px', padding: '0.25rem 0.6rem', cursor: 'pointer', fontSize: '0.75rem' }}
+                  >
+                    로그아웃
+                  </button>
+                </div>
+              ) : (
+                <button
+                  id="google-sign-in"
+                  onClick={signInWithGoogle}
+                  disabled={isSigningIn}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    padding: '0.6rem 1rem', borderRadius: '8px', cursor: isSigningIn ? 'not-allowed' : 'pointer',
+                    background: '#fff', color: '#1f1f1f', border: 'none', fontWeight: 600, fontSize: '0.875rem',
+                    opacity: isSigningIn ? 0.7 : 1, transition: 'opacity 0.2s',
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  {isSigningIn ? '로그인 처리 중...' : 'Google 계정으로 로그인'}
+                </button>
+              )
+            )}
+
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0, opacity: 0.7 }}>
+              💡 VITE_GOOGLE_CLIENT_ID를 .env에 설정한 뒤 사용하세요.
+              <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" style={{ color: 'var(--brand)', marginLeft: '0.3rem' }}>Google Cloud Console →</a>
+            </p>
+          </div>
+        </div>
+          );
+        })()}
 
         {/* 위험 구역 */}
         <div className="settings-card settings-card--danger glass-panel">

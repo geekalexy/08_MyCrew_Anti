@@ -34,7 +34,9 @@ import videoLabRouter from './routes/videoLabRouter.js';
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4000;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
+  ? process.env.FRONTEND_ORIGIN.split(',')
+  : ['http://localhost:5173', 'http://localhost:5174']; // 포트 5173/5174 동시 허용
 
 // ─── CORS: Express HTTP (Socket.io 핸드셰이크 포함) ────────────────────────
 app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
@@ -320,8 +322,7 @@ ariNs.on('connection', (socket) => {
       }
       
       // --- [Phase 22] 독립 구동되는 Ari Daemon (포트 5050)으로 포워딩 ---
-      // 일상 대화, 지식 등은 5050 포트(독립 자아 세션)로 프록시하여 스트리밍 중계
-      const postData = JSON.stringify({ content, author });
+      const postData = JSON.stringify({ content, author, oauthToken: _googleOAuthToken });
       const reqDaemon = http.request({
         hostname: 'localhost',
         port: 5050,
@@ -1176,6 +1177,56 @@ app.post('/webhook/paperclip/event', async (req, res) => {
     console.error('[Bridge] Error relaying to Antigravity:', error);
     res.status(500).json({ status: 'error', message: error.message });
   }
+});
+
+// ─── Google OAuth 구독인증 API ─────────────────────────────────────────────────
+// 프론트엔드에서 Google OAuth 토큰을 백엔드에 등록 → Gemini API를 token으로 호출
+
+// 현재 등록된 OAuth 토큰 (메모리 보관 — 서버 재시작 시 초기화, 재로그인 필요)
+let _googleOAuthToken = null;
+let _googleOAuthExpiry = 0;
+
+/** 외부에서 현재 OAuth 토큰 조회 (geminiAdapter에서 사용) */
+export function getGoogleOAuthToken() {
+  if (_googleOAuthToken && Date.now() < _googleOAuthExpiry) {
+    return _googleOAuthToken;
+  }
+  return null;
+}
+
+/** POST /api/auth/google-token — 프론트엔드가 OAuth 토큰 등록 */
+app.post('/api/auth/google-token', (req, res) => {
+  const { token, expiresIn } = req.body;
+  if (!token) return res.status(400).json({ error: 'token is required' });
+
+  _googleOAuthToken = token;
+  _googleOAuthExpiry = Date.now() + ((expiresIn || 3600) - 60) * 1000; // 60초 버퍼
+
+  // 전역 캐시에 등록 (순환 참조 문제 해결을 위함)
+  keyProvider.setVolatileKey('OAUTH_TOKEN', token);
+  keyProvider.setVolatileKey('OAUTH_TOKEN_EXPIRY', _googleOAuthExpiry);
+
+  console.log('[Auth] ✅ Google OAuth 토큰 등록 및 캐시 공유 완료. 구독인증 모드 활성화.');
+  res.json({ status: 'ok', mode: 'google_oauth', expiresAt: new Date(_googleOAuthExpiry).toISOString() });
+});
+
+/** DELETE /api/auth/google-token — 로그아웃 시 토큰 제거 */
+app.delete('/api/auth/google-token', (req, res) => {
+  _googleOAuthToken = null;
+  _googleOAuthExpiry = 0;
+  console.log('[Auth] Google OAuth 토큰 제거. API Key 모드로 복귀.');
+  res.json({ status: 'ok', mode: 'api_key' });
+});
+
+/** GET /api/auth/status — 현재 인증 모드 확인 */
+app.get('/api/auth/status', (req, res) => {
+  const hasValidToken = !!_googleOAuthToken && Date.now() < _googleOAuthExpiry;
+  res.json({
+    status: 'ok',
+    mode: hasValidToken ? 'google_oauth' : 'api_key',
+    hasApiKey: !!(process.env.GEMINI_API_KEY),
+    tokenExpiresAt: hasValidToken ? new Date(_googleOAuthExpiry).toISOString() : null,
+  });
 });
 
 // ─── 설정 API (GET/PUT /api/settings) ────────────────────────────────────────

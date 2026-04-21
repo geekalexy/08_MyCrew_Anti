@@ -1,11 +1,27 @@
-// src/components/Views/ImageLabView.jsx — 🧪 Image Lab v2 (Phase 1~C)
-// 풀스크린 디자인 스튜디오 | 스타일 프리셋(A) + 충실도 슬라이더(B) + 인라인 재생성(C)
-// Claude Design UX 인사이트 반영 | 2026-04-19
+// src/components/Views/ImageLabView.jsx — 🎨 Image Lab v2.0
+// Mode A: 트레이닝 랩 (NanoBanana 학습, LoRA 데이터 수집)
+// Mode B: 브랜드 스튜디오 (고지능 모델 활용, 소시안 브랜드 에셋 생성)
+// 2026-04-21 v2.0
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useUiStore } from '../../store/uiStore';
-
+// html-to-image: npm install html-to-image 설치 후 사용
+import { toPng } from 'html-to-image';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+
+// ── Brand Studio 데이터 (프론트 표시용) ─────────────────────────────────────
+// 브랜드 커스텀 컬러 레이블 (3슬롯)
+const CUSTOM_COLOR_LABELS = ['주색', '강조색', '보조색'];
+const DEFAULT_CUSTOM_COLORS = ['#1A1A2E', '#E94560', '#F5F5F5'];
+
+
+const CONTENT_TYPES = [
+  { id: 'feed',    label: '인스타 피드',  icon: 'grid_on',       ratio: '1:1',  badge: '1080×1080' },
+  { id: 'reels',   label: '릴스 썸네일', icon: 'play_circle',   ratio: '9:16', badge: '1080×1920' },
+  { id: 'product', label: '제품 광고',   icon: 'shopping_bag',  ratio: '4:5',  badge: '1080×1350' },
+  { id: 'blog',    label: '블로그 헤더', icon: 'article',       ratio: '16:9', badge: '1280×720'  },
+  { id: 'carousel', label: '인스타 캐러셀', icon: 'view_carousel', ratio: '4:5', badge: '1080×1350' },
+];
 
 // ── A. 스타일 프리셋 ─────────────────────────────────────────────────────────
 const STYLE_PRESETS = [
@@ -65,6 +81,77 @@ const RUBRIC_DIMS = [
   { id: 'color',    label: '색상',   icon: 'colorize',         desc: '팔레트·강도 일치도' },
   { id: 'ratio',    label: '비율',   icon: 'aspect_ratio',     desc: '캐릭터 비율, 규격 준수' },
   { id: 'brand',    label: '브랜드', icon: 'verified',         desc: '소시안 브랜드 톤 적합성' },
+];
+
+// ── Imagen 3 스타일 카탈로그 ─────────────────────────────────────────────────
+const IMAGEN_STYLE_CATALOG = [
+  {
+    id: 'photo', category: '사진 & 실사', icon: '📷',
+    styles: [
+      { label: '극사실주의',  backendId: 'realistic', hint: 'hyperrealism, ultra-detailed photorealistic render, skin pores visible, fabric texture, micro detail' },
+      { label: '스튜디오',    backendId: 'realistic', hint: 'studio photography, clean background, professional product photo, perfect lighting setup' },
+      { label: '필름 사진',   backendId: 'realistic', hint: '35mm analog film photography, film grain, vintage kodak look, soft halation, retro vibe' },
+      { label: '흑백 사진',   backendId: 'realistic', hint: 'black and white photography, dramatic high contrast, monochrome, classic editorial' },
+      { label: '매크로',      backendId: 'realistic', hint: 'macro photography, extreme close-up detail, shallow depth of field, beautiful bokeh' },
+      { label: '야생/풍경',   backendId: 'realistic', hint: 'National Geographic wildlife photography, nature landscape, golden hour, natural light' },
+    ]
+  },
+  {
+    id: 'painting', category: '회화 & 미술', icon: '🎨',
+    styles: [
+      { label: '유화',   backendId: 'custom', hint: 'oil painting style, impasto brushstrokes, rich deep colors, expressive texture, Van Gogh style' },
+      { label: '수채화', backendId: 'custom', hint: 'watercolor painting, soft transparent color washes, delicate bleeding edges, paper texture visible' },
+      { label: '스케치', backendId: 'custom', hint: 'pencil sketch, hand-drawn illustration, ink pen line art, cross-hatching shading' },
+      { label: '동양화', backendId: 'custom', hint: 'Korean traditional ink wash painting, sumi-e brush style, minhwa folk art, oriental calligraphy' },
+      { label: '팝아트', backendId: 'custom', hint: 'pop art, halftone dots, Andy Warhol bold flat colors, Roy Lichtenstein comic style, screenprint' },
+      { label: '판화',   backendId: 'custom', hint: 'woodblock print, linocut texture, etching style, vintage printmaking, hand-carved look' },
+    ]
+  },
+  {
+    id: 'illustration', category: '일러스트', icon: '🖌️',
+    styles: [
+      { label: '벡터 일러스트',   backendId: 'illustration', hint: null },
+      { label: '플랫 아이콘',     backendId: 'flatminimal',  hint: null },
+      { label: '3D 렌더',         backendId: 'toy3d',        hint: null },
+      { label: '아이소메트릭',    backendId: 'custom', hint: 'isometric illustration, 2.5D axonometric projection, geometric 3D style, equal angle view' },
+      { label: '동화책 일러스트', backendId: 'custom', hint: 'storybook illustration, children book art, soft whimsical colors, gentle fantasy scene' },
+      { label: '클레이',          backendId: 'custom', hint: 'claymation style, clay texture, stop motion feel, handmade clay figures, soft matte plastic' },
+    ]
+  },
+  {
+    id: 'anime', category: '만화 & 애니', icon: '🌏',
+    styles: [
+      { label: '애니메이션',   backendId: 'custom', hint: 'anime style illustration, manga art, large expressive eyes, Japanese animation, clean cel shading' },
+      { label: '카툰',         backendId: 'custom', hint: 'cartoon animation style, Disney Pixar look, cute exaggerated proportions, bright cheerful colors' },
+      { label: '코믹북',       backendId: 'custom', hint: 'American comic book, bold black outlines, Marvel DC superhero art, dynamic dramatic shadows' },
+      { label: '동화 일러스트', backendId: 'custom', hint: 'storybook fairy tale illustration, Pixar concept, magical world, soft color palette' },
+    ]
+  },
+  {
+    id: 'digital', category: 'SF & 디지털', icon: '🤖',
+    styles: [
+      { label: '사이버펑크',   backendId: 'custom', hint: 'cyberpunk aesthetic, neon lights, rain-soaked futuristic city, dark atmosphere, neon glow reflections' },
+      { label: '컨셉 아트',    backendId: 'custom', hint: 'concept art, epic fantasy game art, cinematic dramatic lighting, world-building illustration' },
+      { label: '스팀펑크',     backendId: 'custom', hint: 'steampunk, Victorian era gears and cogs, brass machinery, retro-futuristic, sepia tone' },
+      { label: '베이퍼웨이브', backendId: 'custom', hint: 'vaporwave aesthetic, retro 80s 90s digital, pastel pink and blue, lo-fi nostalgia, CRT screen effect' },
+      { label: '글리치 아트',  backendId: 'custom', hint: 'glitch art style, digital distortion, RGB color separation, scan lines, corrupted data visual' },
+    ]
+  },
+  {
+    id: 'material', category: '특수 소재', icon: '🏺',
+    styles: [
+      { label: '클레이메이션',  backendId: 'custom', hint: 'claymation, clay sculpture texture, plasticine material, stop motion animation feel' },
+      { label: '종이 공예',     backendId: 'custom', hint: 'papercraft art, paper cutting, quilling layers, origami-inspired, layered paper depth' },
+      { label: '자수/뜨개',     backendId: 'custom', hint: 'embroidery texture, knitting pattern, textile fabric art, thread stitching, handmade craft' },
+      { label: '유리/크리스탈', backendId: 'custom', hint: 'glass crystal material, transparent refraction, light dispersion prism, crystal clear gem' },
+    ]
+  },
+  {
+    id: 'freeform', category: '직접 입력', icon: '✏️',
+    styles: [
+      { label: '커스텀', backendId: 'custom', hint: null, isCustomInput: true },
+    ]
+  },
 ];
 
 // ── 별점 컴포넌트 ────────────────────────────────────────────────────────────
@@ -189,7 +276,373 @@ function AnalyzingOverlay() {
 export default function ImageLabView() {
   const { setLogPanelOpen, setCurrentView } = useUiStore();
 
-  // ─ 소시안 이미지 풀 (Full Auto Loop용)
+  // ─ 모드: 'training' | 'studio'
+  const [labMode, setLabMode] = useState('studio');
+
+  // ─ 브랜드 스튜디오 상태 ─────────────────────────────────────────────────
+  const [customColors, setCustomColors] = useState(DEFAULT_CUSTOM_COLORS); // 커스텀 브랜드 컴러 3슬롯
+  const codeTextareaRef = useRef(null); // 코드박스 스크롤용
+  const [contentType,    setContentType]    = useState('feed');
+  const [brandDesc,      setBrandDesc]      = useState('');
+  const [lumiDirecting,  setLumiDirecting]  = useState(false);
+  const [brandGenerating,setBrandGenerating]= useState(false);
+  const [brandResult,    setBrandResult]    = useState(null);
+  const [brandError,     setBrandError]     = useState('');
+  const [archiveItems,   setArchiveItems]   = useState([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveTab,     setArchiveTab]     = useState('generate');
+  const [archivingSrc,   setArchivingSrc]   = useState(false);
+
+  // ─ 브랜드 스튜디오: 레퍼런스 이미지 분석 상태 ──────────────────────────────
+  const studioFileRef     = useRef(null);
+  const [studioRefFile,   setStudioRefFile]   = useState(null);
+  const [studioRefPreview,setStudioRefPreview]= useState(null);
+  const [studioStyle,     setStudioStyle]     = useState('illustration'); // 분석 스타일
+  const [studioAnalyzing, setStudioAnalyzing] = useState(false);
+  const [studioAnalysisOk,setStudioAnalysisOk]= useState(false); // 분석 성공 상태 표시
+  const [studioRefDragging,setStudioRefDragging]= useState(false);
+  const [studioCustomStyle,setStudioCustomStyle]= useState(''); // 커스텀 스타일 힌트 입력창
+  const [studioCatId,      setStudioCatId]      = useState('illustration'); // 카탈로그 선택 카테고리
+  const [studioSelectedStyles, setStudioSelectedStyles] = useState([
+    { label: '벡터 일러스트', backendId: 'illustration', hint: null }
+  ]); // 다중 선택(최대 2개)
+  const [studioDropdownOpen, setStudioDropdownOpen] = useState(null); // 드롭다운 열린 카테고리 ID
+
+  // ─ Brand Studio: HTML 디자인 모드 상태 ─────────────────────────────────
+  const [genMode,         setGenMode]         = useState('image');  // 'image' | 'html'
+  const [htmlCode,        setHtmlCode]        = useState('');
+  const [htmlGenerating,  setHtmlGenerating]  = useState(false);
+  const [htmlError,       setHtmlError]       = useState('');
+  const [htmlRetryIn,     setHtmlRetryIn]     = useState(0);  // 카운트다운 (초)
+  const htmlPreviewRef = useRef(null); // 이미지 캐청용 ref
+  const [resultTab,     setResultTab]     = useState('ai-image'); // 'ai-image' | 'html'
+  const [htmlEditMode,  setHtmlEditMode]  = useState(false);       // HTML 편집 모드
+
+  // ─ Brand Studio: 아카이브 로드 ────────────────────────────────────────────
+  const loadArchive = useCallback(async () => {
+    setArchiveLoading(true);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/imagelab/archive`);
+      const data = await res.json();
+      if (data.items) setArchiveItems(data.items);
+    } catch { /* 무시 */ }
+    finally { setArchiveLoading(false); }
+  }, []);
+
+  // ─ 결과 탭 자동 전환 ──────────────────────────────────────────────────────
+  useEffect(() => { if (brandResult?.imageUrl) setResultTab('ai-image'); }, [brandResult]);
+  useEffect(() => { if (htmlCode)              setResultTab('html');     }, [htmlCode]);
+
+  // ─ HTML 편집모드: 진입 시 innerHTML 초기화 ─────────────────────────────────
+  useEffect(() => {
+    if (htmlEditMode && htmlPreviewRef.current) {
+      htmlPreviewRef.current.innerHTML = htmlCode;
+    }
+  }, [htmlEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleHtmlEdit = () => {
+    if (!htmlEditMode) {
+      setHtmlEditMode(true);
+      setHtmlElProps({ text: '', fontSize: 16, color: '#ffffff', background: '#000000', borderRadius: 0, tag: '', hasBg: false });
+    } else {
+      if (htmlSelectedElRef.current) {
+        htmlSelectedElRef.current.style.outline = '';
+        htmlSelectedElRef.current.style.outlineOffset = '';
+        htmlSelectedElRef.current = null;
+      }
+      if (htmlPreviewRef.current) setHtmlCode(htmlPreviewRef.current.innerHTML);
+      setHtmlEditMode(false);
+      setHtmlElProps({ text: '', fontSize: 16, color: '#ffffff', background: '#000000', borderRadius: 0, tag: '', hasBg: false });
+    }
+  };
+
+  // HTML 편집: 클릭 인스펙터 ─────────────────────────────────────────────────
+  const htmlSelectedElRef = useRef(null);
+  const [htmlElProps, setHtmlElProps] = useState({ text: '', fontSize: 16, color: '#ffffff', background: '#000000', borderRadius: 0, tag: '', hasBg: false });
+
+  const rgbToHex = (rgb) => {
+    if (!rgb || rgb === 'transparent' || rgb === 'rgba(0, 0, 0, 0)') return null;
+    const m = rgb.match(/\d+/g);
+    if (!m || m.length < 3) return null;
+    if (m.length >= 4 && Number(m[3]) === 0) return null;
+    return '#' + m.slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+  };
+
+  const handleEditClick = (e) => {
+    if (!htmlEditMode) return;
+    const el = e.target;
+    if (el === htmlPreviewRef.current) return;
+    if (htmlSelectedElRef.current && htmlSelectedElRef.current !== el) {
+      htmlSelectedElRef.current.style.outline = '';
+      htmlSelectedElRef.current.style.outlineOffset = '';
+    }
+    el.style.outline = '2px solid #ff6b6b';
+    el.style.outlineOffset = '2px';
+    htmlSelectedElRef.current = el;
+    const cs = window.getComputedStyle(el);
+    let directText = '';
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE && child.textContent.trim()) { directText = child.textContent.trim(); break; }
+    }
+    if (!directText && el.children.length === 0) directText = el.textContent;
+    const bgHex = rgbToHex(cs.backgroundColor);
+    setHtmlElProps({
+      text: directText,
+      fontSize: Math.round(parseFloat(cs.fontSize)) || 16,
+      color: rgbToHex(cs.color) || '#ffffff',
+      background: bgHex || '#111111',
+      hasBg: !!bgHex,
+      borderRadius: Math.round(parseFloat(cs.borderRadius)) || 0,
+      tag: el.tagName.toLowerCase(),
+    });
+    // 코드박스를 해당 요소 줄로 스크롤
+    scrollCodeToElement(el);
+  };
+
+
+  const applyElProp = (prop, value) => {
+    const el = htmlSelectedElRef.current;
+    if (!el) return;
+    switch (prop) {
+      case 'fontSize': el.style.fontSize = value + 'px'; break;
+      case 'color': el.style.color = value; break;
+      case 'background': el.style.backgroundColor = value; break;
+      case 'borderRadius': el.style.borderRadius = value + 'px'; break;
+      case 'text': {
+        let replaced = false;
+        for (const child of el.childNodes) {
+          if (child.nodeType === Node.TEXT_NODE) { child.textContent = value; replaced = true; break; }
+        }
+        if (!replaced) el.textContent = value;
+        break;
+      }
+      default: break;
+    }
+    setHtmlElProps(prev => ({ ...prev, [prop]: value }));
+  };
+
+  // ─ 코드박스 스크롤: 클릭한 요소에 해당하는 줄로 이동 ─────────────────────
+  const scrollCodeToElement = useCallback((el) => {
+    const ta = codeTextareaRef.current;
+    if (!ta || !htmlCode) return;
+    const lines = htmlCode.split('\n');
+    let targetLine = -1;
+    // 1순위: id 속성
+    if (el.id) targetLine = lines.findIndex(l => l.includes(`id="${el.id}"`));
+    // 2순위: class 첫 번째 값
+    if (targetLine === -1 && el.className && typeof el.className === 'string') {
+      const cls = el.className.trim().split(/\s+/)[0];
+      if (cls) targetLine = lines.findIndex(l => l.includes(cls));
+    }
+    // 3순위: 텍스트 일치
+    if (targetLine === -1) {
+      const txt = el.textContent?.trim().slice(0, 30);
+      if (txt) targetLine = lines.findIndex(l => l.includes(txt));
+    }
+    if (targetLine === -1) return;
+    // 줄 높이 계산 후 스크롤
+    const lineH = ta.scrollHeight / Math.max(lines.length, 1);
+    ta.scrollTop = Math.max(0, (targetLine - 3) * lineH);
+    // 해당 줄 선택 하이라이트
+    const charStart = lines.slice(0, targetLine).join('\n').length + (targetLine > 0 ? 1 : 0);
+    const charEnd = charStart + (lines[targetLine]?.length || 0);
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(charStart, charEnd);
+  }, [htmlCode]);
+
+  // 스타일 선택은 IMAGEN_STYLE_CATALOG(외부 상수) 사용
+
+  /** 스타일 칩 토글 — 최대 2개, 초과 시 가장 오래된 것 교체 */
+  const toggleStyle = (item) => {
+    setStudioSelectedStyles(prev => {
+      const exists = prev.find(s => s.label === item.label);
+      let next;
+      if (exists) {
+        next = prev.filter(s => s.label !== item.label);           // 선택 해제
+      } else if (prev.length >= 2) {
+        next = [prev[1], item];                                    // 오래된 것 빼고 추가
+      } else {
+        next = [...prev, item];                                    // 추가
+      }
+      // studioStyle / studioCustomStyle 동기화
+      if (next.length === 0) {
+        setStudioStyle('illustration'); setStudioCustomStyle('');
+      } else if (next.length === 1) {
+        setStudioStyle(next[0].backendId);
+        setStudioCustomStyle(next[0].hint || '');
+      } else {
+        // 2개 조합 → custom 모드로, 두 힌트 결합
+        setStudioStyle('custom');
+        setStudioCustomStyle(next.map(s => s.hint || s.label).join('. '));
+      }
+      return next;
+    });
+    setStudioAnalysisOk(false);
+  };
+
+  const handleStudioAnalyze = async () => {
+    if (!studioRefFile) return;
+    setStudioAnalyzing(true); setStudioAnalysisOk(false);
+    try {
+      // studioSelectedStyles 기반으로 최종 스타일 파라미터 결정
+      let finalStyleId, finalHint;
+      if (studioSelectedStyles.length === 0) {
+        finalStyleId = 'illustration'; finalHint = '';
+      } else if (studioSelectedStyles.length === 1) {
+        finalStyleId = studioSelectedStyles[0].backendId;
+        finalHint    = studioSelectedStyles[0].hint || '';
+      } else {
+        // 2개 스타일 조합 → custom with combined prompt
+        finalStyleId = 'custom';
+        finalHint    = studioSelectedStyles.map(s => s.hint || s.label).join('. ');
+      }
+      const formData = new FormData();
+      formData.append('image', studioRefFile);
+      formData.append('stylePresetId', finalStyleId);
+      if (finalStyleId === 'custom' && finalHint.trim()) {
+        formData.append('customStyleHint', finalHint.trim());
+      } else if (studioCatId === 'freeform' && studioCustomStyle.trim()) {
+        formData.append('customStyleHint', studioCustomStyle.trim());
+      }
+      const res = await fetch(`${SERVER_URL}/api/imagelab/analyze`, { method: 'POST', body: formData });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '분석 실패');
+      // 생성된 프롬프트를 브랜드 설명 input에 자동 주입
+      if (data.generatedPrompt) {
+        setBrandDesc(data.generatedPrompt);
+        setStudioAnalysisOk(true);
+        setTimeout(() => setStudioAnalysisOk(false), 3000);
+      }
+    } catch (err) {
+      setBrandError(`분석 오류: ${err.message}`);
+    } finally {
+      setStudioAnalyzing(false);
+    }
+  };
+
+  // ─ Brand Studio: 이미지 생성 ──────────────────────────────────────────────
+  const handleBrandGenerate = async () => {
+    if (!brandDesc.trim()) return;
+    setBrandGenerating(true); setBrandError(''); setBrandResult(null);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/imagelab/brand-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: brandDesc,
+          brandPresetId: 'custom',
+          brandColors: customColors,
+          contentType,
+          lumiDirecting,
+          // 콘텐츠 유형에 맞는 이미지 사이즈 전달
+          imageSize: (() => {
+            const ct = CONTENT_TYPES.find(c => c.id === contentType);
+            if (!ct) return { width: 1080, height: 1080 };
+            const [w, h] = ct.badge.replace('×','x').split('x').map(Number);
+            return { width: w || 1080, height: h || 1080 };
+          })(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '생성 실패');
+      setBrandResult(data);
+    } catch (err) {
+      setBrandError(err.message);
+    } finally {
+      setBrandGenerating(false);
+    }
+  };
+
+  // ─ Brand Studio: HTML 디자인 생성 ────────────────────────────────────────
+  const handleHtmlGenerate = async () => {
+    if (!brandDesc.trim()) return;
+    setHtmlGenerating(true); setHtmlError(''); setHtmlCode(''); setHtmlRetryIn(0);
+    setResultTab('html'); // 즉시 HTML 탭으로 전환
+    try {
+      const ct = CONTENT_TYPES.find(c => c.id === contentType);
+      const [w, h] = ct ? ct.badge.replace('×','x').split('x').map(Number) : [1080, 1080];
+      // customColors 배열을 직접 사용
+
+      const res = await fetch(`${SERVER_URL}/api/imagelab/html-generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: brandDesc,
+          width: w, height: h,
+          colors: customColors,
+          brandName: '\ube0c\ub79c\ub4dc',
+          contentLabel: ct?.label || '\ud53c\ub4dc',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // 429: retryAfterSec 카운트다운 시작
+        if (data.retryAfterSec) {
+          setHtmlRetryIn(data.retryAfterSec);
+          const timer = setInterval(() => {
+            setHtmlRetryIn(prev => {
+              if (prev <= 1) { clearInterval(timer); return 0; }
+              return prev - 1;
+            });
+          }, 1000);
+        }
+        throw new Error(data.error || 'HTML 생성 실패');
+      }
+      setHtmlCode(data.html);
+    } catch (err) {
+      setHtmlError(err.message);
+    } finally {
+      setHtmlGenerating(false);
+    }
+  };
+
+
+  // ─ Brand Studio: HTML → PNG 다운로드 ────────────────────────────────────
+  const handleHtmlDownload = async () => {
+    if (!htmlPreviewRef.current) return;
+    try {
+      const ct = CONTENT_TYPES.find(c => c.id === contentType);
+      const [w, h] = ct ? ct.badge.replace('×','x').split('x').map(Number) : [1080, 1080];
+      const dataUrl = await toPng(htmlPreviewRef.current, {
+        width: w, height: h, pixelRatio: 2,
+        style: { transform: 'none', transformOrigin: 'top left' },
+      });
+      const a = document.createElement('a');
+      a.download = `design-${contentType}-${Date.now()}.png`;
+      a.href = dataUrl;
+      a.click();
+    } catch (err) {
+      setHtmlError('이미지 저장 실패: ' + err.message);
+    }
+  };
+
+
+  const handleArchive = async () => {
+    if (!brandResult?.imageUrl) return;
+    setArchivingSrc(true);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/imagelab/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: brandResult.imageUrl, contentType, brandPresetId: brandPreset, description: brandDesc }),
+      });
+      if (res.ok) {
+        await loadArchive();
+        setArchiveTab('archive');
+      }
+    } catch { /* 무시 */ }
+    finally { setArchivingSrc(false); }
+  };
+
+  // ─ Brand Studio: 아카이브 삭제 ────────────────────────────────────────────
+  const handleArchiveDelete = async (id) => {
+    await fetch(`${SERVER_URL}/api/imagelab/archive/${id}`, { method: 'DELETE' });
+    setArchiveItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  // 소시안 이미지 풀 (Full Auto Loop용)
+
   const [refPool,       setRefPool]       = useState([]);   // { name, url }[]
   const [poolIndex,     setPoolIndex]     = useState(0);
   const [fullAutoMode,  setFullAutoMode]  = useState(false); // 완전 자동 루프 ON/OFF
@@ -546,9 +999,30 @@ export default function ImageLabView() {
           fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.08em',
           padding: '2px 6px', borderRadius: '4px',
           background: 'rgba(100,100,246,0.2)', color: '#a0a8ff',
-        }}>BETA</span>
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontFamily: 'Space Grotesk' }}>
-          LUMI 프롬프트 트레이닝 · NanoBanana 이미지 벤치마크
+        }}>v2.0</span>
+
+        {/* ── 모드 전환 탭 ── */}
+        <div style={{ display: 'flex', gap: '2px', padding: '2px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', marginLeft: '0.5rem' }}>
+          {[
+            { id: 'training', label: '🎓 트레이닝 랩', tip: 'NanoBanana 학습 루프' },
+            { id: 'studio',   label: '🎨 브랜드 스튜디오', tip: '소시안 에셋 생성' },
+          ].map(m => (
+            <button
+              key={m.id}
+              id={`imagelab-mode-${m.id}`}
+              title={m.tip}
+              onClick={() => { setLabMode(m.id); if (m.id === 'studio') loadArchive(); }}
+              style={{
+                padding: '3px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 600, transition: 'all 0.15s',
+                background: labMode === m.id ? 'rgba(100,100,246,0.25)' : 'transparent',
+                color: labMode === m.id ? '#c4caff' : 'var(--text-muted)',
+              }}
+            >{m.label}</button>
+          ))}
+        </div>
+        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'Space Grotesk' }}>
+          {labMode === 'training' ? 'NanoBanana 학습 · LoRA 데이터 수집' : '소시안 브랜드 에셋 · 자연어 생성'}
         </span>
 
         {/* 에러 뱃지 */}
@@ -638,8 +1112,813 @@ export default function ImageLabView() {
       </div>
 
 
-      {/* ══ 메인 4컬럼 ════════════════════════════════════════════════════ */}
+
+      {/* ══ BRAND STUDIO MODE ════════════════════════════════════════════════ */}
+      {labMode === 'studio' && (
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', gap: 0 }}>
+
+          {/* ── 좌측 패널: 설정 */}
+          <div style={{
+            width: '260px', flexShrink: 0,
+            borderRight: '1px solid var(--border)',
+            overflowY: 'auto', padding: '1.25rem 1rem',
+            display: 'flex', flexDirection: 'column', gap: '1.25rem',
+            background: 'rgba(255,255,255,0.01)',
+          }}>
+
+            {/* ── 레퍼런스 이미지 분석 섹션 ── */}
+            <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.1rem' }}>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '0.55rem', fontFamily: 'Space Grotesk', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span style={{ fontSize: '0.82rem' }}>📸</span> 레퍼런스 이미지 분석
+              </div>
+
+              {/* 이미지 업로드 드롭존 */}
+              <div
+                onDrop={e => { e.preventDefault(); setStudioRefDragging(false); const f = e.dataTransfer.files[0]; if (f?.type.startsWith('image/')) { setStudioRefFile(f); setStudioRefPreview(URL.createObjectURL(f)); setStudioAnalysisOk(false); } }}
+                onDragOver={e => { e.preventDefault(); setStudioRefDragging(true); }}
+                onDragLeave={() => setStudioRefDragging(false)}
+                onClick={() => studioFileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${studioRefDragging ? 'var(--brand)' : studioRefPreview ? 'rgba(180,197,255,0.35)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: '10px', cursor: 'pointer',
+                  background: studioRefDragging ? 'rgba(100,100,246,0.06)' : 'rgba(255,255,255,0.02)',
+                  transition: 'all 0.2s', overflow: 'hidden',
+                  minHeight: studioRefPreview ? 'auto' : '80px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginBottom: '0.55rem',
+                }}
+              >
+                {studioRefPreview ? (
+                  <img src={studioRefPreview} alt="레퍼런스" style={{ width: '100%', display: 'block', maxHeight: '130px', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '1rem 0.75rem', color: 'var(--text-muted)' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', opacity: 0.3 }}>add_photo_alternate</span>
+                    <div style={{ fontSize: '0.65rem', marginTop: '0.3rem' }}>이미지 드래그 또는 클릭</div>
+                  </div>
+                )}
+              </div>
+              <input ref={studioFileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files[0]; if (f) { setStudioRefFile(f); setStudioRefPreview(URL.createObjectURL(f)); setStudioAnalysisOk(false); } }} />
+
+              {/* ── 스타일 선택: 3×2 그리드 버튼 + 드롭다운 ─────────────── */}
+              <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.4rem', textTransform: 'uppercase', letterSpacing: '0.07em' }}>스타일 선택 <span style={{ opacity: 0.5 }}>(최대 2개 조합)</span></div>
+
+              {/* 6개 카테고리 버튼 3×2 그리드 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.25rem', marginBottom: '0.3rem' }}>
+                {IMAGEN_STYLE_CATALOG.filter(c => c.id !== 'freeform').map(cat => {
+                  const selInCat = studioSelectedStyles.find(s => cat.styles.some(cs => cs.label === s.label));
+                  const isOpen = studioDropdownOpen === cat.id;
+                  const btnLabel = selInCat ? selInCat.label : cat.icon;
+                  return (
+                    <div key={cat.id} style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setStudioDropdownOpen(isOpen ? null : cat.id)}
+                        title={cat.category}
+                        style={{
+                          width: '100%', padding: '0.28rem 0.2rem',
+                          borderRadius: '7px', cursor: 'pointer',
+                          fontSize: selInCat ? '0.62rem' : '1rem',
+                          fontWeight: selInCat ? 700 : 400,
+                          background: selInCat ? 'rgba(100,100,246,0.18)' : isOpen ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                          border: `1px solid ${selInCat ? 'rgba(100,100,246,0.5)' : isOpen ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                          color: selInCat ? '#c4caff' : 'var(--text-muted)',
+                          transition: 'all 0.15s',
+                          textAlign: 'center', overflow: 'hidden',
+                          textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {btnLabel}
+                      </button>
+
+                      {/* 드롭다운 */}
+                      {isOpen && (
+                        <div style={{
+                          position: 'absolute', top: 'calc(100% + 3px)', left: 0,
+                          minWidth: '130px', zIndex: 200,
+                          background: '#13131f',
+                          border: '1px solid rgba(100,100,246,0.35)',
+                          borderRadius: '9px', overflow: 'hidden',
+                          boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
+                        }}>
+                          <div style={{ padding: '0.3rem 0.6rem', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: '0.6rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                            {cat.icon} {cat.category}
+                          </div>
+                          {cat.styles.map(item => {
+                            const selIdx = studioSelectedStyles.findIndex(s => s.label === item.label);
+                            const isSelected = selIdx !== -1;
+                            const is2nd = selIdx === 1;
+                            return (
+                              <button
+                                key={item.label}
+                                onClick={() => { toggleStyle(item); setStudioDropdownOpen(null); }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                                  width: '100%', padding: '0.38rem 0.65rem',
+                                  textAlign: 'left', cursor: 'pointer',
+                                  background: isSelected
+                                    ? is2nd ? 'rgba(251,191,36,0.12)' : 'rgba(100,100,246,0.15)'
+                                    : 'transparent',
+                                  border: 'none',
+                                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                  color: isSelected ? (is2nd ? '#fbbf24' : '#c4caff') : 'var(--text-secondary)',
+                                  fontSize: '0.72rem', fontWeight: isSelected ? 700 : 400,
+                                  transition: 'background 0.1s',
+                                }}
+                              >
+                                {isSelected && <span style={{ fontSize: '0.55rem', fontWeight: 900, opacity: 0.8 }}>{selIdx + 1}</span>}
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 직접 입력 버튼 (freeform) */}
+              <div style={{ position: 'relative', marginBottom: '0.35rem' }}>
+                <button
+                  onClick={() => setStudioDropdownOpen(studioDropdownOpen === 'freeform' ? null : 'freeform')}
+                  style={{
+                    width: '100%', padding: '0.25rem 0.5rem',
+                    borderRadius: '7px', cursor: 'pointer', fontSize: '0.67rem',
+                    background: studioCatId === 'freeform' ? 'rgba(255,255,255,0.06)' : 'transparent',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    color: 'var(--text-muted)', textAlign: 'center',
+                  }}
+                >
+                  ✏️ 직접 입력
+                </button>
+                {studioDropdownOpen === 'freeform' && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 3px)', left: 0, right: 0, zIndex: 200,
+                    background: '#13131f', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '9px', padding: '0.5rem',
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
+                  }}>
+                    <input
+                      id="studio-custom-style-input"
+                      autoFocus
+                      value={studioCustomStyle}
+                      onChange={e => { setStudioCustomStyle(e.target.value); setStudioStyle('custom'); setStudioCatId('freeform'); }}
+                      onKeyDown={e => { if (e.key === 'Enter') setStudioDropdownOpen(null); }}
+                      placeholder="스타일 입력 후 Enter (예: 80년대 레트로 포스터)"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(180,197,255,0.2)',
+                        borderRadius: '6px', padding: '0.4rem 0.6rem',
+                        color: 'var(--text-primary)', fontSize: '0.72rem',
+                        fontFamily: 'Inter, sans-serif', outline: 'none',
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 선택된 스타일 태그 표시 */}
+              {studioSelectedStyles.length > 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap',
+                  marginBottom: '0.4rem', padding: '0.2rem 0.45rem',
+                  background: 'rgba(100,100,246,0.05)',
+                  borderRadius: '6px', border: '1px solid rgba(100,100,246,0.12)',
+                }}>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', flexShrink: 0 }}>선택:</span>
+                  {studioSelectedStyles.map((s, i) => (
+                    <span key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span style={{
+                        fontSize: '0.68rem', fontWeight: 700,
+                        color: i === 0 ? '#c4caff' : '#fbbf24',
+                        padding: '1px 5px', borderRadius: '4px',
+                        background: i === 0 ? 'rgba(100,100,246,0.15)' : 'rgba(251,191,36,0.12)',
+                      }}>{s.label}</span>
+                      {i < studioSelectedStyles.length - 1 && <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>+</span>}
+                    </span>
+                  ))}
+                  {studioSelectedStyles.length === 2 && <span style={{ fontSize: '0.58rem', color: '#a78bfa', marginLeft: 'auto' }}>조합</span>}
+                </div>
+              )}
+
+              {/* 이미지 분석 버튼 — 하단 고정 */}
+              <button
+                id="studio-analyze-btn"
+                onClick={handleStudioAnalyze}
+                disabled={!studioRefFile || studioAnalyzing}
+                style={{
+                  width: '100%', padding: '0.55rem',
+                  borderRadius: '8px', cursor: !studioRefFile || studioAnalyzing ? 'not-allowed' : 'pointer',
+                  background: studioAnalysisOk
+                    ? 'rgba(74,222,128,0.15)'
+                    : !studioRefFile || studioAnalyzing
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'rgba(180,197,255,0.1)',
+                  border: `1px solid ${ studioAnalysisOk ? 'rgba(74,222,128,0.35)' : 'rgba(180,197,255,0.18)' }`,
+                  color: studioAnalysisOk ? '#4ade80' : !studioRefFile ? 'var(--text-muted)' : 'var(--text-primary)',
+                  fontSize: '0.8rem', fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+                  transition: 'all 0.2s', opacity: !studioRefFile ? 0.4 : 1,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '0.95rem' }}>
+                  {studioAnalyzing ? 'hourglass_empty' : studioAnalysisOk ? 'check_circle' : 'image_search'}
+                </span>
+                {studioAnalyzing ? 'AI 분석 중...' : studioAnalysisOk ? '✅ 프롬프트 자동 입력됨!' : '이미지 분석'}
+              </button>
+            </div>
+
+
+            {/* 브랜드 팔레트 */}
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '0.55rem', fontFamily: 'Space Grotesk' }}>브랜드 팔레트</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                {customColors.map((color, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    {/* 컬러 피커 */}
+                    <label style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: color, border: '2px solid rgba(255,255,255,0.2)', cursor: 'pointer', transition: 'transform 0.15s' }} />
+                      <input type="color" value={color}
+                        onChange={e => setCustomColors(prev => prev.map((c, i) => i === idx ? e.target.value : c))}
+                        style={{ position: 'absolute', top: 0, left: 0, width: '28px', height: '28px', opacity: 0, cursor: 'pointer' }}
+                      />
+                    </label>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '1px' }}>{CUSTOM_COLOR_LABELS[idx]}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#c4caff', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{color.toUpperCase()}</div>
+                    </div>
+                    <button onClick={() => setCustomColors(prev => prev.map((c, i) => i === idx ? DEFAULT_CUSTOM_COLORS[idx] : c))}
+                      title="기본값으로 초기화"
+                      style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}>↺</button>
+                  </div>
+                ))}
+                {/* 미리보기 스와치 */}
+                <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+                  {customColors.map((c, i) => <div key={i} style={{ flex: 1, height: '8px', borderRadius: '4px', background: c }} />)}
+                </div>
+              </div>
+            </div>
+
+
+            {/* 콘텐츠 유형 */}
+            <div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.09em', textTransform: 'uppercase', marginBottom: '0.55rem', fontFamily: 'Space Grotesk' }}>콘텐츠 유형</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                {CONTENT_TYPES.map(ct => (
+                  <button
+                    key={ct.id}
+                    id={`content-type-${ct.id}`}
+                    onClick={() => setContentType(ct.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '0.45rem 0.75rem', borderRadius: '8px',
+                      border: `1px solid ${contentType === ct.id ? 'rgba(100,100,246,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                      background: contentType === ct.id ? 'rgba(100,100,246,0.12)' : 'transparent',
+                      cursor: 'pointer', color: contentType === ct.id ? '#c4caff' : 'var(--text-muted)',
+                      fontSize: '0.78rem', fontWeight: contentType === ct.id ? 600 : 400,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>{ct.icon}</span>
+                      {ct.label}
+                    </div>
+                    <span style={{ fontSize: '0.6rem', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '4px', fontFamily: 'Space Grotesk', letterSpacing: '0.03em' }}>{ct.badge}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Lumi 크리에이티브 디렉팅 */}
+            <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(164,232,167,0.05)', border: '1px solid rgba(164,232,167,0.15)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '1rem' }}>🌿</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#a4e8a7' }}>Lumi 크리에이티브 디렉팅</span>
+                </div>
+                <button
+                  id="lumi-directing-toggle"
+                  onClick={() => setLumiDirecting(v => !v)}
+                  style={{
+                    width: '32px', height: '18px', borderRadius: '9px', border: 'none', cursor: 'pointer', position: 'relative',
+                    background: lumiDirecting ? 'rgba(164,232,167,0.4)' : 'rgba(255,255,255,0.1)',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <div style={{
+                    position: 'absolute', top: '3px', left: lumiDirecting ? '16px' : '3px',
+                    width: '12px', height: '12px', borderRadius: '50%',
+                    background: lumiDirecting ? '#a4e8a7' : '#666', transition: 'left 0.18s',
+                  }} />
+                </button>
+              </div>
+              <div style={{ fontSize: '0.62rem', color: 'rgba(164,232,167,0.7)', lineHeight: 1.5 }}>
+                {lumiDirecting ? '✅ Lumi가 먼저 창의적 컨셉을 제안합니다' : 'OFF: 설명 그대로 생성'}
+              </div>
+            </div>
+          </div>
+
+          {/* ── 중앙 패널: 생성 영역 */}
+          <div style={{ width: '380px', flexShrink: 0, borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+            {/* 내부 탭 */}
+            <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+              {[{ id: 'generate', label: '✨ 생성' }, { id: 'archive', label: `📦 아카이브 (${archiveItems.length})` }].map(t => (
+                <button key={t.id} onClick={() => { setArchiveTab(t.id); if (t.id === 'archive') loadArchive(); }}
+                  style={{
+                    padding: '5px 14px', borderRadius: '7px', border: 'none', cursor: 'pointer',
+                    background: archiveTab === t.id ? 'rgba(100,100,246,0.2)' : 'transparent',
+                    color: archiveTab === t.id ? '#c4caff' : 'var(--text-muted)',
+                    fontSize: '0.8rem', fontWeight: archiveTab === t.id ? 700 : 400,
+                    transition: 'all 0.15s',
+                  }}
+                >{t.label}</button>
+              ))}
+            </div>
+
+            {archiveTab === 'generate' && (
+              <>
+                {/* ── 생성 모드 토글 ─── */}
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', padding: '3px' }}>
+                  {[
+                    { id: 'image', icon: '🖼', label: 'AI 이미지' },
+                    { id: 'html',  icon: '💻', label: 'HTML 디자인' },
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => setGenMode(m.id)}
+                      style={{
+                        flex: 1, padding: '0.4rem', borderRadius: '7px', border: 'none', cursor: 'pointer',
+                        background: genMode === m.id ? 'rgba(100,100,246,0.25)' : 'transparent',
+                        color: genMode === m.id ? '#c4caff' : 'var(--text-muted)',
+                        fontSize: '0.8rem', fontWeight: genMode === m.id ? 700 : 400,
+                        transition: 'all 0.15s',
+                      }}
+                    >{m.icon} {m.label}</button>
+                  ))}
+                </div>
+
+                {/* 설명 입력 (공통) */}
+                <div>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.5rem', fontFamily: 'Space Grotesk' }}>
+                    {genMode === 'html' ? '어떤 디자인을 만들까요?' : '어떤 이미지를 만들까요?'}
+                  </div>
+                  <textarea
+                    id="brand-desc-input"
+                    value={brandDesc}
+                    onChange={e => setBrandDesc(e.target.value)}
+                    placeholder={genMode === 'html'
+                      ? '예: 봄 신제품 출시 공지. 상단에 제품 이름, 중앙에 할인율 30%, 하단에 소시안 로고. 핑크톤.'
+                      : '예: 한강변에서 커피를 마시는 20대 여성, 소시안 제품을 들고 있음. 봄 분위기.'}
+                    rows={genMode === 'html' ? 5 : 9}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        genMode === 'html' ? handleHtmlGenerate() : handleBrandGenerate();
+                      }
+                    }}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px', padding: '0.75rem 1rem',
+                      color: 'var(--text-primary)', fontSize: '0.85rem', lineHeight: 1.6,
+                      resize: 'vertical', fontFamily: 'Inter, sans-serif', outline: 'none',
+                    }}
+                  />
+                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '4px' }}>Ctrl+Enter로 생성</div>
+                </div>
+
+                {/* ══ AI 이미지 모드 ══ */}
+                {genMode === 'image' && (
+                  <>
+                    <button
+                      id="brand-generate-btn"
+                      onClick={handleBrandGenerate}
+                      disabled={brandGenerating || !brandDesc.trim()}
+                      style={{
+                        padding: '0.75rem 1.5rem', borderRadius: '10px',
+                        background: brandGenerating ? 'rgba(100,100,246,0.1)' : 'linear-gradient(135deg, rgba(100,100,246,0.3), rgba(180,197,255,0.2))',
+                        border: '1px solid rgba(100,100,246,0.4)',
+                        cursor: brandGenerating || !brandDesc.trim() ? 'not-allowed' : 'pointer',
+                        color: '#c4caff', fontSize: '0.9rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                        transition: 'all 0.2s', opacity: !brandDesc.trim() ? 0.5 : 1,
+                      }}
+                    >
+                      {brandGenerating
+                        ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> 생성 중...</>
+                        : <><span>✨</span> 소시안 에셋 생성</>}
+                    </button>
+
+                    {brandResult?.lumiConcept && (
+                      <div style={{ padding: '0.75rem 1rem', borderRadius: '10px', background: 'rgba(164,232,167,0.05)', border: '1px solid rgba(164,232,167,0.15)' }}>
+                        <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#a4e8a7', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🌿 Lumi 크리에이티브 컨셉</div>
+                        <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>{brandResult.lumiConcept}</div>
+                      </div>
+                    )}
+
+                    {brandError && (
+                      <div style={{ padding: '0.6rem 1rem', borderRadius: '8px', background: 'rgba(255,100,100,0.08)', border: '1px solid rgba(255,100,100,0.2)', fontSize: '0.8rem', color: '#ff8a8a' }}>
+                        ⚠ {brandError}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* ══ HTML 디자인 모드 ══ */}
+                {genMode === 'html' && (
+                  <>
+                    {/* 생성 버튼 */}
+                    <button
+                      id="html-generate-btn"
+                      onClick={handleHtmlGenerate}
+                      disabled={htmlGenerating || !brandDesc.trim()}
+                      style={{
+                        padding: '0.75rem 1.5rem', borderRadius: '10px',
+                        background: htmlGenerating ? 'rgba(100,100,246,0.1)' : 'linear-gradient(135deg, rgba(130,90,246,0.3), rgba(200,150,255,0.2))',
+                        border: '1px solid rgba(150,100,246,0.45)',
+                        cursor: htmlGenerating || !brandDesc.trim() ? 'not-allowed' : 'pointer',
+                        color: '#d4b8ff', fontSize: '0.9rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                        transition: 'all 0.2s', opacity: !brandDesc.trim() ? 0.5 : 1,
+                      }}
+                    >
+                      {htmlGenerating
+                        ? <><span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span> HTML 생성 중...</>
+                        : <><span>💻</span> HTML 디자인 생성</>}
+                    </button>
+
+                    {htmlError && (
+                      <div style={{ padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(255,100,100,0.08)', border: '1px solid rgba(255,100,100,0.2)' }}>
+                        <div style={{ fontSize: '0.8rem', color: '#ff8a8a', marginBottom: htmlRetryIn > 0 ? '0.5rem' : 0 }}>
+                          ⚠ {htmlError}
+                        </div>
+                        {htmlRetryIn > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 700, background: 'rgba(251,191,36,0.1)', padding: '3px 10px', borderRadius: '20px', border: '1px solid rgba(251,191,36,0.3)' }}>
+                              ⏱ {htmlRetryIn}초 후 재시도 가능
+                            </div>
+                          </div>
+                        )}
+                        {htmlRetryIn === 0 && htmlError && (
+                          <button onClick={handleHtmlGenerate}
+                            style={{ marginTop: '0.4rem', padding: '0.3rem 0.8rem', borderRadius: '6px', border: '1px solid rgba(150,100,246,0.4)', background: 'rgba(150,100,246,0.15)', color: '#d4b8ff', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                          >↺ 다시 시도</button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* ── 코드 에디터 (2열 고정) ── */}
+                    {htmlCode && (
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>💡 HTML 코드 <span style={{ opacity: 0.5 }}>(직접 편집 가능)</span></span>
+                          <span style={{ opacity: 0.5 }}>{htmlCode.length} chars</span>
+                        </div>
+                        <textarea
+                          ref={codeTextareaRef}
+                          value={htmlCode}
+                          onChange={e => setHtmlCode(e.target.value)}
+                          spellCheck={false}
+                          style={{
+                            flex: 1, minHeight: '240px', maxHeight: '420px',
+                            width: '100%', boxSizing: 'border-box',
+                            background: '#0a0a18', border: '1px solid rgba(150,100,246,0.2)',
+                            borderRadius: '8px', padding: '0.65rem 0.75rem',
+                            color: '#a4c8ff', fontSize: '0.72rem', lineHeight: 1.55,
+                            fontFamily: '"Fira Code", "JetBrains Mono", monospace',
+                            resize: 'vertical', outline: 'none',
+                          }}
+                        />
+                        <div style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)', marginTop: '4px', textAlign: 'right' }}>
+                          👆 우측 프리뷰 클릭 → 해당 줄 자동 이동
+                        </div>
+                      </div>
+                    )}
+
+                  </>
+                )}
+
+              </>
+            )}
+
+
+            {/* 아카이브 갤러리 */}
+            {archiveTab === 'archive' && (
+              <div>
+                {archiveLoading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>로딩 중...</div>
+                ) : archiveItems.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem', opacity: 0.4 }}>📦</div>
+                    <div style={{ fontSize: '0.85rem' }}>아직 저장된 에셋이 없습니다</div>
+                    <div style={{ fontSize: '0.72rem', marginTop: '0.4rem', opacity: 0.6 }}>생성 후 아카이브 저장을 눌러 보관하세요</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                    {archiveItems.map(item => (
+                      <div key={item.id} style={{
+                        borderRadius: '10px', overflow: 'hidden', position: 'relative',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(255,255,255,0.03)',
+                        transition: 'all 0.15s',
+                      }}>
+                        <img src={`${SERVER_URL}${item.url}`} alt={item.description}
+                          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />
+                        <div style={{ padding: '0.5rem 0.6rem' }}>
+                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#a0a8ff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.contentType}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.description || '—'}</div>
+                          <button
+                            onClick={() => handleArchiveDelete(item.id)}
+                            style={{ marginTop: '4px', fontSize: '0.6rem', color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                          >삭제</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 우측 패널: 결과 미리보기 (탭 분리) */}
+          <div style={{
+            flex: 1, minWidth: '460px',
+            borderLeft: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column',
+            background: 'rgba(255,255,255,0.01)',
+          }}>
+            {/* 탭 헤더 */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0, alignItems: 'center' }}>
+              {[{ id: 'ai-image', label: '🖼 AI 이미지' }, { id: 'html', label: '💻 HTML 디자인' }].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setResultTab(tab.id); if (htmlEditMode) { if (htmlPreviewRef.current) setHtmlCode(htmlPreviewRef.current.innerHTML); setHtmlEditMode(false); } }}
+                  style={{
+                    flex: 1, padding: '0.75rem 0.5rem',
+                    background: resultTab === tab.id ? 'rgba(100,100,246,0.12)' : 'transparent',
+                    border: 'none',
+                    borderBottom: resultTab === tab.id ? '2px solid #6464F6' : '2px solid transparent',
+                    color: resultTab === tab.id ? '#c4caff' : 'var(--text-muted)',
+                    fontSize: '0.78rem', fontWeight: resultTab === tab.id ? 700 : 400,
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >{tab.label}</button>
+              ))}
+              {/* Edit / Save 버튼 — HTML 탭일 때만 + htmlCode가 있을 때 */}
+              {resultTab === 'html' && htmlCode && (
+                <button
+                  onClick={toggleHtmlEdit}
+                  title={htmlEditMode ? '편집 내용 저장' : '비주얼 편집 모드'}
+                  style={{
+                    padding: '0.45rem 0.85rem', marginRight: '0.5rem',
+                    background: htmlEditMode ? 'rgba(74,222,128,0.18)' : 'rgba(100,100,246,0.15)',
+                    border: `1px solid ${htmlEditMode ? 'rgba(74,222,128,0.45)' : 'rgba(100,100,246,0.4)'}`,
+                    borderRadius: '6px', cursor: 'pointer',
+                    color: htmlEditMode ? '#4ade80' : '#b4c5ff',
+                    fontSize: '0.72rem', fontWeight: 700,
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  {htmlEditMode
+                    ? <><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>save</span> 저장</>
+                    : <><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>edit</span> Edit</>}
+                </button>
+              )}
+            </div>
+
+            {/* AI 이미지 탭 */}
+            {resultTab === 'ai-image' && (
+            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+              {brandGenerating && (
+                <div style={{ width: '100%', maxWidth: '480px', aspectRatio: '1', borderRadius: '16px', background: 'rgba(100,100,246,0.05)', border: '2px dashed rgba(100,100,246,0.2)', display: 'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'0.75rem' }}>
+                  <span style={{ fontSize: '3rem', animation: 'spin 1.5s linear infinite', display:'inline-block' }}>✨</span>
+                  <div style={{ fontSize: '1rem', color: '#a0a8ff', fontWeight: 700 }}>소시안 에셋 생성 중</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lumiDirecting ? '🌿 Lumi 컨셉 → 이미지 변환 중...' : '브랜드 프롬프트 최적화 중...'}</div>
+                </div>
+              )}
+              {brandResult?.imageUrl && !brandGenerating && (
+                <div style={{ width: '100%', maxWidth: '520px', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {brandResult.lumiConcept && (
+                    <div style={{ padding: '0.75rem 1rem', borderRadius: '10px', background: 'rgba(164,232,167,0.06)', border: '1px solid rgba(164,232,167,0.18)' }}>
+                      <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#a4e8a7', marginBottom: '0.3rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>🌿 Lumi 크리에이티브 컨셉</div>
+                      <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>{brandResult.lumiConcept}</div>
+                    </div>
+                  )}
+                  <img
+                    src={`${SERVER_URL}${brandResult.imageUrl}`}
+                    alt="Brand Asset"
+                    style={{ width: '100%', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.1)', display: 'block', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
+                  />
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      id="brand-archive-btn"
+                      onClick={handleArchive}
+                      disabled={archivingSrc}
+                      style={{
+                        flex: 1, padding: '0.7rem', borderRadius: '9px',
+                        background: archivingSrc ? 'rgba(100,100,246,0.05)' : 'rgba(100,100,246,0.18)',
+                        border: '1px solid rgba(100,100,246,0.35)',
+                        cursor: archivingSrc ? 'not-allowed' : 'pointer',
+                        color: '#c4caff', fontSize: '0.85rem', fontWeight: 700,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!archivingSrc) e.currentTarget.style.background = 'rgba(100,100,246,0.28)'; }}
+                      onMouseLeave={e => { if (!archivingSrc) e.currentTarget.style.background = 'rgba(100,100,246,0.18)'; }}
+                    >
+                      {archivingSrc ? '저장 중...' : '📦 아카이브 저장'}
+                    </button>
+                    <a
+                      href={`${SERVER_URL}${brandResult.imageUrl}`}
+                      download="socian-asset.png"
+                      style={{
+                        padding: '0.7rem 1rem', borderRadius: '9px',
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600,
+                        textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px',
+                      }}
+                    >⬇ 다운로드</a>
+                  </div>
+                  {/* 프롬프트 정보 */}
+                  <div style={{ padding: '0.6rem 0.75rem', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.3rem' }}>
+                      {brandResult.brandPreset} · {brandResult.contentType}
+                    </div>
+                    <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', lineHeight: 1.5, wordBreak: 'break-word' }}>{brandResult.finalPrompt?.slice(0, 160)}...</div>
+                  </div>
+                </div>
+              )}
+              {!brandResult && !brandGenerating && (
+                <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '3.5rem', marginBottom: '0.75rem', opacity: 0.25 }}>🎨</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.3rem' }}>소시안 에셋을 생성해보세요</div>
+                  <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>컬러 톤 · 콘텐츠 유형 · 설명 입력 후 생성</div>
+                </div>
+              )}
+            </div>
+            )} {/* end resultTab === 'ai-image' */}
+
+            {/* HTML 디자인 탭 */}
+            {resultTab === 'html' && (() => {
+              const ct = CONTENT_TYPES.find(c => c.id === contentType);
+              const [pw, ph] = ct ? ct.badge.replace('×','x').split('x').map(Number) : [1080, 1080];
+              const scale = Math.min(1, 520 / pw);
+              const displayW = Math.round(pw * scale);
+              const displayH = Math.round(ph * scale);
+              return (
+                <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {htmlGenerating && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', padding: '4rem 1rem' }}>
+                      <span style={{ fontSize: '3rem', animation: 'spin 1.5s linear infinite', display: 'inline-block' }}>💻</span>
+                      <div style={{ fontSize: '1rem', color: '#d4b8ff', fontWeight: 700 }}>HTML 디자인 생성 중...</div>
+                    </div>
+                  )}
+                  {!htmlCode && !htmlGenerating && (
+                    <div style={{ textAlign: 'center', padding: '4rem 1rem', color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: '3.5rem', marginBottom: '0.75rem', opacity: 0.25 }}>💻</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.3rem' }}>HTML 디자인을 생성해보세요</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>2열에서 "HTML 디자인 생성" 버튼 클릭</div>
+                    </div>
+                  )}
+                  {htmlCode && !htmlGenerating && (
+                    <>
+                      {/* 라이브 프리뷰 + 편집모드 툴바 */}
+
+                      <div>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{htmlEditMode ? '✏️ 편집 모드 — 클릭하여 텍스트 수정' : '👁 라이브 프리뷰'}</span>
+                          <span style={{ opacity: 0.5 }}>{pw}×{ph}px (scale {Math.round(scale * 100)}%)</span>
+                        </div>
+
+                        {/* 클릭 인스펙터 패널 */}
+                        {htmlEditMode && (
+                          htmlElProps.tag ? (
+                            <div style={{
+                              padding: '0.65rem 0.85rem', marginBottom: '6px',
+                              background: 'rgba(8,5,20,0.92)', borderRadius: '10px',
+                              border: '1px solid rgba(255,107,107,0.35)',
+                              display: 'flex', flexDirection: 'column', gap: '0.55rem',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#ff8a8a', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                  ✓ 선택: &lt;{htmlElProps.tag}&gt;
+                                </span>
+                                <span style={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.25)' }}>Cmd+Z 실행취소</span>
+                              </div>
+                              {htmlElProps.text !== '' && (
+                                <div>
+                                  <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginBottom: '3px' }}>TT 텍스트</div>
+                                  <input value={htmlElProps.text} onChange={e => applyElProp('text', e.target.value)}
+                                    style={{ width: '100%', boxSizing: 'border-box', background: '#0d0d1a', border: '1px solid rgba(255,107,107,0.25)', borderRadius: '6px', padding: '0.35rem 0.6rem', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
+                                  />
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', width: '52px', flexShrink: 0 }}>A 크기</span>
+                                <input type="range" min="8" max="120" value={htmlElProps.fontSize}
+                                  onChange={e => applyElProp('fontSize', Number(e.target.value))}
+                                  style={{ flex: 1, accentColor: '#ff6b6b' }}
+                                />
+                                <span style={{ fontSize: '0.7rem', color: '#c4caff', width: '32px', textAlign: 'right' }}>{htmlElProps.fontSize}px</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.68rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                  글자색
+                                  <input type="color" value={htmlElProps.color} onChange={e => applyElProp('color', e.target.value)}
+                                    style={{ width: '30px', height: '22px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                  />
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.68rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                                  배경색
+                                  <input type="color" value={htmlElProps.hasBg ? htmlElProps.background : '#111111'}
+                                    onChange={e => { applyElProp('background', e.target.value); setHtmlElProps(p => ({ ...p, hasBg: true })); }}
+                                    style={{ width: '30px', height: '22px', padding: 0, border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                  />
+                                </label>
+                                {htmlElProps.hasBg && (
+                                  <button onClick={() => { applyElProp('background', 'transparent'); setHtmlElProps(p => ({ ...p, hasBg: false })); }}
+                                    style={{ fontSize: '0.6rem', color: '#ff8a8a', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>✕ 배경 제거</button>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', width: '52px', flexShrink: 0 }}>◻ 모서리</span>
+                                <input type="range" min="0" max="60" value={htmlElProps.borderRadius}
+                                  onChange={e => applyElProp('borderRadius', Number(e.target.value))}
+                                  style={{ flex: 1, accentColor: '#a0a8ff' }}
+                                />
+                                <span style={{ fontSize: '0.7rem', color: '#c4caff', width: '32px', textAlign: 'right' }}>{htmlElProps.borderRadius}px</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '0.6rem 0.75rem', marginBottom: '6px', borderRadius: '8px', background: 'rgba(0,0,0,0.2)', border: '1px dashed rgba(255,107,107,0.2)', fontSize: '0.72rem', color: 'rgba(255,255,255,0.35)', textAlign: 'center' }}>
+                              👆 클릭하여 요소를 선택하세요
+                            </div>
+                          )
+                        )}
+
+                        <div style={{
+                          width: displayW, height: displayH,
+                          overflow: 'hidden', borderRadius: '8px',
+                          border: htmlEditMode ? '2px dashed #6464F6' : '1px solid rgba(150,100,246,0.2)',
+                          position: 'relative',
+                          boxShadow: htmlEditMode ? '0 0 0 3px rgba(100,100,246,0.15)' : 'none',
+                          transition: 'all 0.2s',
+                        }}>
+                          <div
+                            ref={htmlPreviewRef}
+                            contentEditable={htmlEditMode}
+                            suppressContentEditableWarning
+                            onClick={htmlEditMode ? handleEditClick : undefined}
+                            style={{
+                              width: pw, height: ph,
+                              transform: `scale(${scale})`,
+                              transformOrigin: 'top left',
+                              overflow: 'hidden',
+                              outline: 'none',
+                              cursor: htmlEditMode ? 'pointer' : 'default',
+                            }}
+                            {...(!htmlEditMode && { dangerouslySetInnerHTML: { __html: htmlCode } })}
+                          />
+                        </div>
+
+                      </div>
+                      {/* 다운로드 버튼 */}
+                      <button
+                        id="html-download-btn"
+                        onClick={handleHtmlDownload}
+                        style={{
+                          padding: '0.65rem 1.2rem', borderRadius: '10px',
+                          background: 'linear-gradient(135deg, rgba(74,222,128,0.2), rgba(34,197,94,0.15))',
+                          border: '1px solid rgba(74,222,128,0.35)',
+                          cursor: 'pointer', color: '#4ade80',
+                          fontSize: '0.88rem', fontWeight: 700,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>download</span>
+                        PNG로 다운로드 ({ct?.badge || '1080×1080'})
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+          </div> {/* end 우측 패널 */}
+
+          <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
+
+      {/* ══ TRAINING LAB MODE ════════════════════════════════════════════════ */}
+      {labMode === 'training' && (
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '240px 300px 1fr 280px', overflow: 'hidden' }}>
+        {/* ══ 메인 4컬럼 ════════════════════════════════════════════════════ */}
 
         {/* ══ COL 1: 컨트롤 패널 */}
         <div style={{
@@ -1093,6 +2372,7 @@ export default function ImageLabView() {
         </div>
 
       </div>
+      )} {/* end labMode === 'training' */}
     </div>
   );
 }

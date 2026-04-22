@@ -1,14 +1,17 @@
 import "./index.css";
-import { Composition } from "remotion";
+import { Composition, getInputProps } from "remotion";
 import { MyComposition } from "./Composition";
 
 export const RemotionRoot: React.FC = () => {
+  const dynamicProps = getInputProps() || {};
+  const currentDuration = dynamicProps?.totalDurationFrames || 450;
+
   return (
     <>
       <Composition
         id="MyComp"
         component={MyComposition}
-        durationInFrames={450} // 15초(기본) * 30fps
+        durationInFrames={currentDuration}
         fps={30}
         width={1080}
         height={1920}

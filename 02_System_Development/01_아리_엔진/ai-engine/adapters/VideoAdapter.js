@@ -19,8 +19,9 @@ export class VideoAdapter {
                 await fs.writeFile(propsFilePath, JSON.stringify(scenarioJSON, null, 2), 'utf-8');
                 console.log(`[VideoAdapter] ➡️ 시나리오 변수 매핑 완료 (${propsFilePath})`);
 
-                // 2. Remotion 터미널 명령어 조립
-                const command = `npx remotion render src/index.ts MyComp public/${outputFileName} --props=./auto-input.json`;
+                // 2. Remotion 터미널 명령어 조립 (동적 영상 길이 지원)
+                const framesFlag = scenarioJSON.totalDurationFrames ? `--frames=0-${scenarioJSON.totalDurationFrames - 1}` : '';
+                const command = `npx remotion render src/index.ts MyComp public/${outputFileName} --props=./auto-input.json ${framesFlag}`.trim();
                 console.log(`[VideoAdapter] ⚙️ 렌더링 엔진 시동 중... 명령어: ${command}`);
 
                 // 3. 자식 프로세스(Child Process)를 통해 실제 렌더링 구동

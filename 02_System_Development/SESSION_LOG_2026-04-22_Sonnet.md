@@ -150,5 +150,38 @@ Edit 모드에서 요소 클릭 시 `scrollCodeToElement()` 실행:
 | API 서버 | `http://localhost:4000` |
 | 주요 파일 | `src/components/Views/ImageLabView.jsx` |
 | 백엔드 파일 | `01_아리_엔진/routes/imageLabRouter.js` |
-| Git 커밋 | `32f7ddf` |
+| Git 커밋 | `32f7ddf` (B+C), `de5f90c` (D+E) |
+
+---
+
+## ✅ 세션 3 완료 (2026-04-22 23:06 KST)
+
+### D. 아카이브 기능 보강
+- **[backend]** `POST /archive`: `htmlCode` 필드 수신 → `meta.json`에 함께 저장
+- **[frontend]** `handleArchive`: `htmlCode`도 함께 전달
+- **[frontend]** 아카이브 갤러리 카드 개선:
+  - HTML 보유 카드에 보라색 `HTML` 뱃지 표시
+  - **"HTML 불러오기"** 버튼 → 클릭 시 코드 복원 + HTML 탭 자동 전환
+  - 이미지 전용 카드는 기존 "배경 적용" 유지
+  - 카드 hover 시 파란 테두리 효과 추가
+
+### E. 반응형 프리뷰 디바이스 토글
+- `previewDevice` state 추가 (`'desktop'|'tablet'|'mobile'`)
+- HTML 탭 헤더에 **PC / 태블릿 / 모바일** 토글 버튼 3종 추가
+- 디바이스별 최대 표시 폭: `desktop=520px`, `tablet=320px`, `mobile=200px`
+- scale을 동적 계산하여 프리뷰 자동 축소
+
+---
+
+## 📋 다음 세션 작업 예정
+
+### 남은 작업
+- 없음 (B, C, D, E 모두 완료)
+
+### 신규 기능 후보 (대표님 결정 필요)
+- 아카이브 PNG 다운로드 기능
+- HTML 코드 직접 편집 후 즉시 preview 반영 (실시간 라이브 모드)
+- 생성 히스토리 타임라인 뷰
+
+
 

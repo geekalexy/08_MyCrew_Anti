@@ -42,7 +42,7 @@ export const useAuthStore = create(
         }
         set({ isSigningIn: true });
 
-        // Google OAuth 팝업 (implicit flow — 빠른 구현)
+        // Google OAuth 팝업 (Offline Access Authorization Code Flow)
         const scope = [
           'https://www.googleapis.com/auth/cloud-platform', // Vertex/Gemini 통합 스코프
           'https://www.googleapis.com/auth/generative-language.retriever', // Gemini 특화 스코프
@@ -53,9 +53,10 @@ export const useAuthStore = create(
         const params = new URLSearchParams({
           client_id: GOOGLE_CLIENT_ID,
           redirect_uri: window.location.origin + '/oauth-callback',
-          response_type: 'token',   // implicit flow → 즉시 access_token 반환
+          response_type: 'code',   // Authorization Code 플로우로 변경
           scope,
-          prompt: 'select_account',
+          access_type: 'offline',  // refresh_token 발급 필수
+          prompt: 'consent',       // 강제 동의를 통해 refresh_token 확보
         });
 
         const popup = window.open(
@@ -64,38 +65,43 @@ export const useAuthStore = create(
           'width=500,height=600,scrollbars=yes'
         );
 
-        // 팝업에서 토큰 수신 대기
+        // 팝업에서 인가 코드(Code) 수신 대기
         const handleMessage = async (event) => {
           if (event.origin !== window.location.origin) return;
-          if (!event.data?.googleOAuthToken) return;
+          if (!event.data?.googleOAuthCode) return;
 
           window.removeEventListener('message', handleMessage);
-          const { token, expiresIn } = event.data.googleOAuthToken;
+          const { code, redirectUri } = event.data.googleOAuthCode;
 
-          // 토큰으로 사용자 정보 조회
           try {
+            // 백엔드와 Code 교환 (refresh_token 저장 및 access_token 발급)
+            const tokenRes = await fetch(`${SERVER_URL}/api/auth/google-code`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code, redirectUri }),
+            });
+            const data = await tokenRes.json();
+            if (data.status !== 'ok') throw new Error(data.error || '토큰 교환 실패');
+
+            const token = data.token;
+            const expiresIn = data.expiresIn || 3600;
+
+            // 새 토큰으로 사용자 정보 조회
             const userInfo = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
               headers: { Authorization: `Bearer ${token}` },
             }).then(r => r.json());
 
             set({
               oauthToken: token,
-              oauthExpiry: Date.now() + (expiresIn - 60) * 1000, // 60초 버퍼
+              oauthExpiry: Date.now() + (expiresIn - 60) * 1000,
               googleUser: { name: userInfo.name, email: userInfo.email, picture: userInfo.picture },
               authMode: 'google_oauth',
               isSigningIn: false,
             });
 
-            // 백엔드에 토큰 등록
-            await fetch(`${SERVER_URL}/api/auth/google-token`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token, expiresIn }),
-            }).catch(() => {});
-
-            console.log('[AuthStore] ✅ Google OAuth 인증 완료:', userInfo.email);
+            console.log('[AuthStore] ✅ Google OAuth 영구 인증 완료:', userInfo.email);
           } catch (err) {
-            console.error('[AuthStore] 사용자 정보 조회 실패:', err);
+            console.error('[AuthStore] 인증 처리 실패:', err);
             set({ isSigningIn: false });
           }
 

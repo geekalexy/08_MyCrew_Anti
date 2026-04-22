@@ -6,36 +6,43 @@
   "scenes": [
     {
       "type": "hook",
-      "durationFrames": 150,
+      "durationFrames": 241,
       "layoutType": "split-impact",
       "assetContent": "🔥",
       "textLines": [
         "글로벌 1위 주식의 몰락?",
         "알고 보니 세력들의 개미털기!"
       ],
-      "interactionElement": "1분 완벽 정리 🚀"
+      "interactionElement": "1분 완벽 정리 🚀",
+      "assetImage": "/api/imagelab/archive-file/socian_hook_1776873642920.png",
+      "audioFile": "audio/scene_0_1776873727243.mp3"
     },
     {
       "type": "problem",
-      "durationFrames": 210,
+      "durationFrames": 281,
       "layoutType": "split-impact",
       "assetContent": "📉",
       "textLines": [
         "어제까지 90% 팔아치운 한국인들,",
         "오늘 땅을 치며 후회 중입니다."
       ],
-      "interactionElement": "도대체 왜? 👀"
+      "interactionElement": "도대체 왜? 👀",
+      "assetImage": "/api/imagelab/archive-file/socian_problem_1776873694095.png",
+      "audioFile": "audio/scene_1_1776873727243.mp3"
     },
     {
       "type": "proof",
-      "durationFrames": 240,
+      "durationFrames": 234,
       "layoutType": "split-impact",
       "assetContent": "🕵️",
       "textLines": [
         "월가 큰손들이 밤새워 쓸어담은",
         "단 하나의 종목 대공개!"
       ],
-      "interactionElement": "충격적 진실공개"
+      "interactionElement": "충격적 진실공개",
+      "assetImage": "/api/imagelab/archive-file/socian_proof_1776873727223.png",
+      "audioFile": "audio/scene_2_1776873727243.mp3"
     }
-  ]
+  ],
+  "totalDurationFrames": 756
 }

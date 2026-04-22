@@ -67,8 +67,9 @@ class GeminiAdapter {
     async generateResponse(userPrompt, systemPrompt, initialModelName = 'gemini-2.5-flash') {
         // ── [구독인증 우선] OAuth 토큰이 유효하면 API Key 없이 직접 호출 ──────────
         try {
+            process.env.NO_SERVER = 'true';
             const { getGoogleOAuthToken } = await import('../../server.js');
-            const oauthToken = getGoogleOAuthToken?.();
+            const oauthToken = await getGoogleOAuthToken?.();
             if (oauthToken) {
                 console.log(`[GeminiAdapter] 🔐 구독인증 모드로 호출 (${initialModelName})`);
                 return await this._generateWithOAuth(oauthToken, initialModelName, userPrompt, systemPrompt);

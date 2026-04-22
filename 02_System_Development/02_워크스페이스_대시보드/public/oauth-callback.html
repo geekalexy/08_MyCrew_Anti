@@ -18,22 +18,20 @@
     <p>Google 인증 처리 중...</p>
   </div>
   <script>
-    // URL 해시에서 OAuth implicit flow 토큰 추출
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
-    const token = params.get('access_token');
-    const expiresIn = parseInt(params.get('expires_in') || '3600', 10);
+    // URL 쿼리 파라미터에서 Authorization Code 추출 (Offline Access)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
 
-    if (token) {
-      // 부모 창으로 토큰 전달
+    if (code) {
+      // 부모 창으로 Code 및 리다이렉트 URI 전달
       window.opener?.postMessage(
-        { googleOAuthToken: { token, expiresIn } },
+        { googleOAuthCode: { code, redirectUri: window.location.origin + '/oauth-callback' } },
         window.location.origin
       );
-      document.querySelector('p').textContent = '✅ 인증 완료! 창이 닫힙니다...';
-      setTimeout(() => window.close(), 800);
+      document.querySelector('p').textContent = '✅ 인증 완료! 서버와 교환 중입니다...';
+      setTimeout(() => window.close(), 1500);
     } else {
-      document.querySelector('p').textContent = '❌ 인증 실패. 다시 시도해 주세요.';
+      document.querySelector('p').textContent = '❌ 인증 실패. 코드를 찾을 수 없습니다.';
       setTimeout(() => window.close(), 2000);
     }
   </script>

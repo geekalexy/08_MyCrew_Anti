@@ -1,27 +1,39 @@
-# 🚀 MyCrew Development Record
-
-## 📅 오늘 수행한 작업 (세션로그_26.04.21 )
-1. **Video Lab UI/UX 및 데이터 바인딩 버그 수정**
-   - 썸네일(Thumbnail) 이미지 깨짐 및 채널명(Author) '정보 없음' 노출 문제 해결 (`yt-search` 파싱 로직 개선).
-   - 심층 분석 리포트 확인 패널에 **[복사]** 및 **[다운로드/저장]** 기능 추가.
-   - Step 4(씬 검수) 상단에 AI가 추천하는 시선을 끄는 **훅킹 타이틀 후보 3종** 노출 UI 구현.
-
-2. **프롬프트 엔지니어링 고도화**
-   - 스크립트 작성 시 사용자가 요청한 총 영상 길이(Target Length)와 개별 씬의 시간(Duration) 총합이 수학적으로 오차 없이 일치하도록 절대적 제약 조건(Absolute Math Constraint) 추가.
-
-3. **NotebookLM 자동화 파이프라인 개조 시도 (Native Node.js vs Python MCP)**
-   - 불안정하고 터미널 PATH 설정 문제를 일으키던 하드코딩된 파이썬 서드파티(`nlm` CLI)를 거둬내고, **아리엔진 자체 내장 Node.js 어댑터(`NotebookLMAdapter.js`)**를 스캐폴딩.
-   - Mac의 구글 로그인 봇 차단(Bot-detection) 방어를 위해 전용 독립 프로필(`.socian-notebook-profile`) 우회 방법(Puppeteer 제어)을 실험하여 유의미한 수동 세션 인증 매커니즘 확보.
+# 📅 Session Log: 2026-04-22
+**작성자:** Luca
 
 ---
 
-## 🎯 내일 진행할 작업 (Tomorrow's Next Steps)
-**목표:** B2B/B2C 서비스 상용화(Commercialization)를 대비한 아키텍처 재설계
+## 🎯 오늘 완료한 업무 (Done)
 
-1. **마이크루 전용 독립 NotebookLM MCP 서버 구축**
-   - 화면이 팝업되거나 사용자 단말의 쿠키에 의존하는 스크래핑 방식 버리기.
-   - `@modelcontextprotocol/sdk`를 사용하여 `mycrew-notebooklm-mcp` 패키지 구축.
-2. **Headless & HTTP Reverse-API 통신 구현**
-   - 브라우저 제어가 아닌 HTTP 리퀘스트 레벨에서 세션 통신 로직을 구현하여 속도 향상시키기.
-3. **토큰 및 멀티테넌트 세션 관리 시스템 설계**
-   - 사용자 계정별로 NotebookLM 세션 토큰을 관리할 수 있는 체계 기획.
+**1. Phase 24: "Zero-Touch" 무인 유튜브 공장 아키텍처 및 PRD 기획**
+- 기존 비디오랩 기반의 '수동 렌더링' 방식에서 일절 개입 없는 '다중 에이전트 100% 자동화' 머신으로 아키텍처 업그레이드 완료 (기획 문서 작성 100%).
+
+**2. Data Harvester (수집 에이전트) 고도화 완성**
+- 구글 뉴스 실시간 트렌드 크롤링(채널별 키워드 매핑 완료).
+- **[KOL 딥 트래킹]** 일론 머스크, 샘 알트만 등 글로벌 산업 핵심 인물의 X(구 트위터) 최신 발언을 전용 추적하고, '정보 비대칭성'이 강한 프리미엄 데이터는 Engagement Score를 대폭 높게 폭증시키는 1급 정보 필터링 로직 구현 완료.
+
+**3. Curation Director (분석/채택 에이전트) 완성**
+- 수 백개의 원시 데이터를 100점 만점으로 정량 평가 후 5단계 체제(Hook, Problem, Proof, Solution, CTA)의 바이럴 스크립트 도출.
+- 무료 API 제한(429 Too Many Requests) 우회를 위해 모델 격하 적용(`gemini-1.5-flash`) 및 안전장치(Fallback Mock)를 이중 설계하여 무정지 루프 보장.
+
+**4. 통제 스크립트(Master Daemon) 및 TTS/Sync 매핑 시뮬레이터 구축**
+- `index.js`에 시나리오 변환 즉시 성우 목소리의 음절 프레임을 계산하는 립싱크 맵핑 시뮬레이터 연동 완료 (예: 1번 씬 6.2s 계산 완료).
+
+**5. `VideoAdapter` 브릿지 개발 및 물리적 영상 출력 검증**
+- 에이전트가 만든 `.json`을 MyCrew 백엔드에서 Remotion 렌더러로 다이렉트 꽂아 스크린샷과 모션을 자동 굽는 어댑터 개발.
+- 하단 중앙의 아이콘 겹침 쳐짐(`sagging`) 문제를 `paddingBottom` 오프셋으로 시각적 비율 패치 완료 및 `auto-autopilot-test.mp4` 시험 구동 검증 통과.
+
+---
+
+## 🚀 다음 세션에서 진행할 할당 목표 (Next Steps)
+
+**1. TTS(음성) 및 오디오 믹싱 실제 결합**
+- (Mock) 프레임 타임 계산을 넘어서, 실제로 Google API 등으로 생성된 `audio.mp3` 파일을 다운로드 받아 보관.
+- `Composition.tsx` 내에 `<Audio src={...} />` 트랙을 추가하여 실제 쇳소리가 아닌 기계 렌더링 내에 더빙 오디오를 이중 믹싱.
+
+**2. 토큰 제한 이슈를 위한 1차 필터링 렌즈 달기**
+- 한 번에 400개가 넘는 기사가 들어왔을 때, 구글에 통째로 넘기지 않도록 `DataHarvester.js` 안에서 반응도 지수 기준 **Top 20개**만 추려 AI에게 넘기는 Pre-Filter 개발 (Token 초과 근본적 해결).
+
+**3. 비디오 랩 동적 스킨 패치 (Dynamic Sizing & Assets)**
+- **가변 길이 렌더링:** `Root.tsx`에 걸린 15초(450프레임) 하드코딩 락을 풀고, 넘어오는 JSON 길이에 맞춰 동적으로 늘어나는 변동 프레임 설계 적용.
+- **이미트 컴포넌트 정리:** PICO 및 FLO 오퍼레이터 캐릭터들의 배경 누끼(투명) 처리 및 고품질 디자인 에셋 갈아끼우기. 

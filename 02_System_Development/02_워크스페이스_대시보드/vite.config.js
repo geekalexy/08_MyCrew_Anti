@@ -10,7 +10,7 @@ function oauthCallbackPlugin() {
     name: 'oauth-callback',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (req.url === '/oauth-callback' || req.url === '/oauth-callback?') {
+        if (req.url && req.url.startsWith('/oauth-callback')) {
           const file = path.resolve(__dirname, 'public/oauth-callback.html');
           if (fs.existsSync(file)) {
             res.setHeader('Content-Type', 'text/html; charset=utf-8');

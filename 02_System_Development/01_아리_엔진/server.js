@@ -1182,17 +1182,110 @@ app.post('/webhook/paperclip/event', async (req, res) => {
 // ─── Google OAuth 구독인증 API ─────────────────────────────────────────────────
 // 프론트엔드에서 Google OAuth 토큰을 백엔드에 등록 → Gemini API를 token으로 호출
 
-// 현재 등록된 OAuth 토큰 (메모리 보관 — 서버 재시작 시 초기화, 재로그인 필요)
+// 현재 등록된 OAuth 토큰 (Refresh 지원)
 let _googleOAuthToken = null;
 let _googleOAuthExpiry = 0;
+let _googleRefreshToken = null;
 
-/** 외부에서 현재 OAuth 토큰 조회 (geminiAdapter에서 사용) */
-export function getGoogleOAuthToken() {
-  if (_googleOAuthToken && Date.now() < _googleOAuthExpiry) {
+const TOKEN_PATH = path.resolve(process.cwd(), 'token.json');
+
+try {
+  if (fs.existsSync(TOKEN_PATH)) {
+    const data = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+    _googleRefreshToken = data.refresh_token;
+    _googleOAuthToken = data.access_token;
+    _googleOAuthExpiry = data.expiry_date;
+    console.log('[Auth] 🔄 token.json 오프라인 토큰 로드 완료');
+  }
+} catch (e) {
+  console.log('[Auth] token.json 로드 실패', e.message);
+}
+
+/** 외부에서 현재 OAuth 토큰 조회 (geminiAdapter에서 사용) — 만약 만료 시 자동 갱신 지원 */
+export async function getGoogleOAuthToken() {
+  if (_googleOAuthToken && Date.now() < _googleOAuthExpiry - 60000) {
     return _googleOAuthToken;
+  }
+  
+  if (_googleRefreshToken) {
+    console.log('[Auth] 🔄 Access Token 만료 임박. Refresh Token으로 재발급 시도...');
+    try {
+      const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: process.env.VITE_GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          refresh_token: _googleRefreshToken,
+          grant_type: 'refresh_token'
+        })
+      });
+      const data = await response.json();
+      if (data.access_token) {
+        _googleOAuthToken = data.access_token;
+        _googleOAuthExpiry = Date.now() + data.expires_in * 1000;
+        
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify({
+          access_token: _googleOAuthToken,
+          refresh_token: _googleRefreshToken,
+          expiry_date: _googleOAuthExpiry
+        }));
+        
+        keyProvider.setVolatileKey('OAUTH_TOKEN', _googleOAuthToken);
+        console.log('[Auth] ✅ Access Token 백그라운드 재발급 성공!');
+        return _googleOAuthToken;
+      }
+    } catch (err) {
+      console.error('[Auth] 토큰 갱신 에러:', err.message);
+    }
   }
   return null;
 }
+
+/** POST /api/auth/google-code — Authorization Code 토큰 교환 */
+app.post('/api/auth/google-code', async (req, res) => {
+  const { code, redirectUri } = req.body;
+  if (!code) return res.status(400).json({ error: 'code is required' });
+
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: process.env.VITE_GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: redirectUri
+      })
+    });
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error_description || data.error);
+
+    _googleOAuthToken = data.access_token;
+    _googleOAuthExpiry = Date.now() + (data.expires_in * 1000);
+    if (data.refresh_token) {
+      _googleRefreshToken = data.refresh_token; // Consent 화면에서 최초 1회 발급
+    }
+
+    fs.writeFileSync(TOKEN_PATH, JSON.stringify({
+      access_token: _googleOAuthToken,
+      refresh_token: _googleRefreshToken,
+      expiry_date: _googleOAuthExpiry
+    }));
+    
+    keyProvider.setVolatileKey('OAUTH_TOKEN', _googleOAuthToken);
+    keyProvider.setVolatileKey('OAUTH_TOKEN_EXPIRY', _googleOAuthExpiry);
+
+    console.log('[Auth] ✅ Google OAuth Offline 토큰 발급 및 저장 완료.');
+    res.json({ status: 'ok', mode: 'google_oauth', token: _googleOAuthToken, expiresIn: data.expires_in });
+
+  } catch (err) {
+    console.error('[Auth] google-code 토큰 교환 실패:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** POST /api/auth/google-token — 프론트엔드가 OAuth 토큰 등록 */
 app.post('/api/auth/google-token', (req, res) => {
@@ -1214,7 +1307,9 @@ app.post('/api/auth/google-token', (req, res) => {
 app.delete('/api/auth/google-token', (req, res) => {
   _googleOAuthToken = null;
   _googleOAuthExpiry = 0;
-  console.log('[Auth] Google OAuth 토큰 제거. API Key 모드로 복귀.');
+  _googleRefreshToken = null;
+  try { if (fs.existsSync(TOKEN_PATH)) fs.unlinkSync(TOKEN_PATH); } catch (e) {}
+  console.log('[Auth] Google OAuth 토큰 및 파일 제거. API Key 모드로 복귀.');
   res.json({ status: 'ok', mode: 'api_key' });
 });
 
@@ -1662,7 +1757,8 @@ async function runWatchdog() {
 }
 
 // ─── 서버 기동 (app.listen → httpServer.listen으로 변경: socket.io 필수) ────
-httpServer.listen(PORT, () => {
+if (process.env.NO_SERVER !== 'true') {
+  httpServer.listen(PORT, () => {
   console.log(`🚀 MyCrew Bridge Server v2.0 running on http://127.0.0.1:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);
   console.log(`📡 Linked to Local SQLite Database & AI Engine`);
@@ -1785,4 +1881,5 @@ httpServer.listen(PORT, () => {
       console.error('[Onboarding Error]', err);
     }
   }, 3000); // 3초 여유 대기 후 시작
-});
+  });
+}

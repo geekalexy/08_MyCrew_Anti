@@ -171,13 +171,15 @@ const SceneContent = ({ scene, fps, theme }: { scene: SceneProps; fps: number; t
               </div>
             )}
 
-            {/* 피코 캐릭터 — 말하는 애니메이션 오버레이 */}
-            <PicoCharacter
-              placement={theme.picoPlacement ?? "right"}
-              withCircle={theme.picoWithCircle ?? false}
-              size={theme.picoSize ?? 300}
-              talking={true}
-            />
+            {/* 피코 캐릭터 — theme.showPico: true일 때만 표시 (AI꿀팁 채널용) */}
+            {theme.showPico && (
+              <PicoCharacter
+                placement={theme.picoPlacement ?? "right"}
+                withCircle={theme.picoWithCircle ?? false}
+                size={theme.picoSize ?? 300}
+                talking={true}
+              />
+            )}
             
             {/* 묵직한 하단 그라데이션 (가독성 보완) */}
             <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', zIndex: 10 }} />

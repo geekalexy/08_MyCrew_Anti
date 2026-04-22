@@ -42,15 +42,25 @@ export class YouTubeUploader {
    * @param {string} options.description  - 영상 설명 (시나리오 대본 요약)
    * @param {string[]} options.tags       - 해시태그 배열 (예: ['주식', '엔비디아'])
    * @param {string} options.publishAt    - 예약 발행 ISO 시간 (없으면 즉시)
+   * @param {boolean} options.dryRun      - true면 실제 업로드 없이 로그만 출력 (파인튜닝 단계 안전장치)
+   * @param {'private'|'unlisted'|'public'} options.privacy - 공개 범위 (기본: private)
    * @returns {{ videoId, url }}
    */
-  async uploadShorts({ filePath, title, description = '', tags = [], publishAt = null }) {
+  async uploadShorts({ filePath, title, description = '', tags = [], publishAt = null, dryRun = false, privacy = 'private' }) {
     if (!fs.existsSync(filePath)) {
       throw new Error(`[YouTubeUploader] 파일이 존재하지 않습니다: ${filePath}`);
     }
 
-    console.log(`\n📤 [YouTubeUploader] 업로드 시작: "${title}"`);
+    console.log(`\n📤 [YouTubeUploader] 업로드 준비: "${title}"`);
     console.log(`   파일: ${path.basename(filePath)} (${(fs.statSync(filePath).size / 1024 / 1024).toFixed(1)}MB)`);
+    console.log(`   공개 범위: ${privacy} ${dryRun ? '| 🔒 DRY RUN 모드 — 실제 업로드 없음' : ''}`);
+
+    // ── DRY RUN: 실제 업로드 없이 검증만 수행 ──────────────────────────
+    if (dryRun) {
+      console.log(`\n✅ [DRY RUN] 업로드 시뮬레이션 완료. 실제 유튜브 전송은 하지 않았습니다.`);
+      console.log(`   → 파인튜닝 완료 후 dryRun: false, privacy: 'public' 으로 전환하세요.`);
+      return { videoId: 'dry-run-no-upload', url: 'https://youtube.com (dry-run)' };
+    }
 
     // 제목 끝에 '#Shorts' 없으면 자동 추가 (유튜브 쇼츠 알고리즘 인식)
     const finalTitle = title.endsWith(SHORTS_TAG) ? title : `${title} ${SHORTS_TAG}`;
@@ -66,8 +76,8 @@ export class YouTubeUploader {
         defaultLanguage: 'ko',
       },
       status: {
-        privacyStatus: publishAt ? 'private' : 'public', // 예약이면 일단 private
-        ...(publishAt && { publishAt }),                  // 예약 시각 세팅
+        privacyStatus: publishAt ? 'private' : privacy,  // 예약이면 private, 아니면 지정값
+        ...(publishAt && { publishAt }),
         selfDeclaredMadeForKids: false,
       },
     };

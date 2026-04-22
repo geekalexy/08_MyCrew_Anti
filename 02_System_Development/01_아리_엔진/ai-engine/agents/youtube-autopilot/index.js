@@ -84,6 +84,8 @@ export async function runAutopilotPipeline(channelType = 'finance') {
                 title:       hookText.slice(0, 90),
                 description: `${allText}\n\n#MyCrew #소시안 #Shorts`,
                 tags:        [channelType === 'finance' ? '주식' : 'AI', '쇼츠', '자동화'],
+                dryRun:      true,      // ⚠️ 파인튜닝 완료 후 false로 전환
+                privacy:     'private', // ⚠️ 실제 공개 시 'public'으로 전환
             });
 
             console.log(`\n🎉 [완료] 유튜브 업로드 성공!`);

@@ -3,7 +3,7 @@ import { CurationAgent } from './CurationAgent.js';
 import { ImageLabAgent } from './ImageLabAgent.js';       // Phase 24.5 ⭐
 import { TTSAgent } from './TTSAgent.js';
 import { VideoAdapter } from '../../adapters/VideoAdapter.js';
-// import { YouTubeUploader } from '../../services/youtubeUploader.js'; // YouTube API 전송
+import { YouTubeUploader } from '../../services/youtubeUploader.js'; // Phase 24 ✅
 
 /**
  * [Youtube Autopilot Master Daemon]
@@ -64,15 +64,33 @@ export async function runAutopilotPipeline(channelType = 'finance') {
     const top1 = enrichedScenarios[0];
     if (top1) {
         console.log(`\n>> [${top1.selectedSourceTitle}] VideoAdapter 인코딩 시작...`);
+        const outputFileName = 'auto-autopilot-test.mp4';
         const remotionProps = {
             theme:  top1.scenario.theme,
             scenes: top1.scenario.scenes,
             totalDurationFrames: top1.scenario.totalDurationFrames
         };
         try {
-            await VideoAdapter.renderVideo(remotionProps, 'auto-autopilot-test.mp4');
+            const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
+
+            // 5. YouTube 자동 업로드 ────────────────────────────────────────────
+            console.log(`\n📤 [Step 5] YouTube 쇼츠 자동 업로드 시작...`);
+            const uploader = new YouTubeUploader();
+            const hookText = top1.scenario.scenes[0]?.textLines?.join(' ') || top1.selectedSourceTitle;
+            const allText  = top1.scenario.scenes.map(s => s.textLines?.join(' ')).join('\n');
+
+            const { videoId, url: videoUrl } = await uploader.uploadShorts({
+                filePath:    outputPath,
+                title:       hookText.slice(0, 90),
+                description: `${allText}\n\n#MyCrew #소시안 #Shorts`,
+                tags:        [channelType === 'finance' ? '주식' : 'AI', '쇼츠', '자동화'],
+            });
+
+            console.log(`\n🎉 [완료] 유튜브 업로드 성공!`);
+            console.log(`   📺 ${videoUrl}`);
+
         } catch (e) {
-            console.error('렌더링 중 에러 발생:', e);
+            console.error('렌더링 또는 업로드 중 에러 발생:', e.message);
         }
     }
 

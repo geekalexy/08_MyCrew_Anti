@@ -847,7 +847,7 @@ Make it premium, modern, and visually impactful.`;
  */
 router.post('/archive', async (req, res) => {
   try {
-    const { imageUrl, contentType, brandPresetId, description, tags = [] } = req.body;
+    const { imageUrl, contentType, brandPresetId, description, tags = [], htmlCode } = req.body;
     if (!imageUrl) return res.status(400).json({ error: 'imageUrl 필요' });
 
     // URL → 실제 파일 경로
@@ -864,7 +864,7 @@ router.post('/archive', async (req, res) => {
       return res.status(404).json({ error: '원본 파일을 찾을 수 없습니다.' });
     }
 
-    // 메타데이터 저장
+    // 메타데이터 저장 (htmlCode 포함)
     const meta = {
       id: timestamp,
       file: archiveName,
@@ -873,6 +873,7 @@ router.post('/archive', async (req, res) => {
       brandPreset: brandPresetId || 'signature',
       description: description || '',
       tags,
+      htmlCode: htmlCode || null,   // HTML 디자인 코드 보관
       archivedAt: new Date().toISOString(),
     };
     fs.writeFileSync(

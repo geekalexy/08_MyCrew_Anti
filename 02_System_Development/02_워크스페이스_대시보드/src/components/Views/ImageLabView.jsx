@@ -445,6 +445,7 @@ export default function ImageLabView() {
   const htmlPreviewRef = useRef(null); // 이미지 캐청용 ref
   const [resultTab,     setResultTab]     = useState('ai-image'); // 'ai-image' | 'html'
   const [htmlEditMode,  setHtmlEditMode]  = useState(false);       // HTML 편집 모드
+  const [previewDevice, setPreviewDevice] = useState('desktop');   // 'desktop'|'tablet'|'mobile'
 
   // ─ Brand Studio: 아카이브 로드 ────────────────────────────────────────────
   const loadArchive = useCallback(async () => {
@@ -878,7 +879,13 @@ export default function ImageLabView() {
       const res = await fetch(`${SERVER_URL}/api/imagelab/archive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageUrl: brandResult.imageUrl, contentType, brandPresetId: brandPreset, description: brandDesc }),
+        body: JSON.stringify({
+          imageUrl: brandResult.imageUrl,
+          contentType,
+          brandPresetId: brandPreset,
+          description: brandDesc,
+          htmlCode: htmlCode || null,  // HTML 디자인 코드 함께 보관
+        }),
       });
       if (res.ok) {
         await loadArchive();
@@ -1973,31 +1980,53 @@ export default function ImageLabView() {
                         border: '1px solid rgba(255,255,255,0.08)',
                         background: 'rgba(255,255,255,0.03)',
                         transition: 'all 0.15s',
-                      }}>
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.border = '1px solid rgba(100,100,246,0.35)'}
+                        onMouseLeave={e => e.currentTarget.style.border = '1px solid rgba(255,255,255,0.08)'}
+                      >
                         <img src={`${SERVER_URL}${item.url}`} alt={item.description}
                           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }} />
                         <div style={{ padding: '0.5rem 0.6rem' }}>
-                          <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#a0a8ff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.contentType}</div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.description || '—'}</div>
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
-                            <button
-                              onClick={() => {
-                                if (htmlPreviewRef.current) {
-                                  const preview = htmlPreviewRef.current;
-                                  const bgImg = preview.querySelector('img.bg-image') || preview.querySelector('img');
-                                  if (bgImg) bgImg.src = `${SERVER_URL}${item.url}`;
-                                  else {
-                                    preview.style.backgroundImage = `url(${SERVER_URL}${item.url})`;
-                                    preview.style.backgroundSize = 'cover';
-                                    preview.style.backgroundPosition = 'center';
-                                  }
-                                  setHtmlCode(preview.innerHTML);
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#a0a8ff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.contentType}</div>
+                            {item.htmlCode && (
+                              <span style={{ fontSize: '0.52rem', background: 'rgba(150,100,246,0.2)', color: '#d4b8ff', padding: '0 4px', borderRadius: '3px', fontWeight: 700, letterSpacing: '0.04em' }}>HTML</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.description || '—'}</div>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {/* HTML 불러오기 버튼 — htmlCode 보유 시만 활성 */}
+                            {item.htmlCode ? (
+                              <button
+                                onClick={() => {
+                                  setHtmlCode(item.htmlCode);
                                   setResultTab('html');
                                   setGenMode('html');
-                                }
-                              }}
-                              style={{ flex: 1, fontSize: '0.6rem', color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: '4px', cursor: 'pointer', padding: '3px 0' }}
-                            >배경 적용</button>
+                                  setArchiveTab('generate');
+                                  setHtmlEditMode(false);
+                                }}
+                                style={{ flex: 1, fontSize: '0.6rem', color: '#d4b8ff', background: 'rgba(150,100,246,0.15)', border: '1px solid rgba(150,100,246,0.3)', borderRadius: '4px', cursor: 'pointer', padding: '3px 0', fontWeight: 700 }}
+                              >HTML 불러오기</button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (htmlPreviewRef.current) {
+                                    const preview = htmlPreviewRef.current;
+                                    const bgImg = preview.querySelector('img.bg-image') || preview.querySelector('img');
+                                    if (bgImg) bgImg.src = `${SERVER_URL}${item.url}`;
+                                    else {
+                                      preview.style.backgroundImage = `url(${SERVER_URL}${item.url})`;
+                                      preview.style.backgroundSize = 'cover';
+                                      preview.style.backgroundPosition = 'center';
+                                    }
+                                    setHtmlCode(preview.innerHTML);
+                                    setResultTab('html');
+                                    setGenMode('html');
+                                  }
+                                }}
+                                style={{ flex: 1, fontSize: '0.6rem', color: '#4ade80', background: 'rgba(74,222,128,0.1)', border: '1px solid rgba(74,222,128,0.2)', borderRadius: '4px', cursor: 'pointer', padding: '3px 0' }}
+                              >배경 적용</button>
+                            )}
                             <button
                               onClick={() => handleArchiveDelete(item.id)}
                               style={{ flex: 1, fontSize: '0.6rem', color: '#ff6b6b', background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.2)', borderRadius: '4px', cursor: 'pointer', padding: '3px 0' }}
@@ -2135,7 +2164,10 @@ export default function ImageLabView() {
             {resultTab === 'html' && (() => {
               const ct = CONTENT_TYPES.find(c => c.id === contentType);
               const [pw, ph] = ct ? ct.badge.replace('×','x').split('x').map(Number) : [1080, 1080];
-              const scale = Math.min(1, 520 / pw);
+              // ── E. 디바이스 뷰 토글: desktop(원본), tablet(768px 기준), mobile(390px 기준) ──
+              const DEVICE_WIDTHS = { desktop: 520, tablet: 320, mobile: 200 };
+              const maxDisplayW = DEVICE_WIDTHS[previewDevice] || 520;
+              const scale = Math.min(1, maxDisplayW / pw);
               const displayW = Math.round(pw * scale);
               const displayH = Math.round(ph * scale);
               return (
@@ -2158,9 +2190,33 @@ export default function ImageLabView() {
                       {/* 라이브 프리뷰 + 편집모드 툴바 */}
 
                       <div>
-                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span>{htmlEditMode ? '✏️ 편집 모드 — 클릭하여 텍스트 수정' : '👁 라이브 프리뷰'}</span>
-                          <span style={{ opacity: 0.5 }}>{pw}×{ph}px (scale {Math.round(scale * 100)}%)</span>
+                          {/* ── E. 디바이스 뷰 토글 버튼 ── */}
+                          <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+                            {[
+                              { id: 'desktop', icon: 'desktop_windows', label: 'PC' },
+                              { id: 'tablet',  icon: 'tablet',          label: '태블릿' },
+                              { id: 'mobile',  icon: 'smartphone',      label: '모바일' },
+                            ].map(dv => (
+                              <button key={dv.id}
+                                onClick={() => setPreviewDevice(dv.id)}
+                                title={dv.label}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: '2px',
+                                  padding: '2px 6px', borderRadius: '5px', border: 'none',
+                                  cursor: 'pointer', fontSize: '0.58rem', fontWeight: 600,
+                                  background: previewDevice === dv.id ? 'rgba(100,100,246,0.25)' : 'rgba(255,255,255,0.04)',
+                                  color: previewDevice === dv.id ? '#c4caff' : 'var(--text-muted)',
+                                  transition: 'all 0.15s',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: '0.75rem' }}>{dv.icon}</span>
+                                {dv.label}
+                              </button>
+                            ))}
+                            <span style={{ opacity: 0.35, fontSize: '0.58rem', marginLeft: '4px' }}>{pw}×{ph} · {Math.round(scale*100)}%</span>
+                          </div>
                         </div>
 
                         {/* 클릭 인스펙터 패널 */}

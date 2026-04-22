@@ -14,10 +14,11 @@ import { clearSkillCache } from '../ai-engine/executor.js';
 const router = express.Router();
 
 // ── 용도별 저장 디렉토리 설정 ──────────────────────────────────
-const REFS_DIR = path.resolve(process.cwd(), 'outputs/lab_refs');
-const GEN_DIR = path.resolve(process.cwd(), 'outputs/lab');
+const REFS_DIR      = path.resolve(process.cwd(), 'outputs/lab_refs');
+const GEN_DIR       = path.resolve(process.cwd(), 'outputs/lab');
+const SNAPSHOTS_DIR = path.resolve(process.cwd(), 'outputs/lab_snapshots'); // html-snapshot 임시
 
-[REFS_DIR, GEN_DIR].forEach(dir => {
+[REFS_DIR, GEN_DIR, SNAPSHOTS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
@@ -347,6 +348,65 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
   }
 });
 
+
+/**
+ * [POST] /api/imagelab/html-snapshot
+ * HTML 콘텐츠를 Puppeteer로 렌더링하여 투명 PNG로 도출
+ * 투명도(Alpha)는 Luca 콘벤션 준수: omitBackground:true 로 배경이 비치는 PNG 보장
+ * ImageLabAgent가 일반 커맸드
+ */
+router.post('/html-snapshot', async (req, res) => {
+  const { html, width = 1080, height = 1080, transparent = true } = req.body;
+  if (!html) return res.status(400).json({ error: 'html 콘텐츠가 필요합니다.' });
+
+  let browser;
+  try {
+    const CHROME_PATH = process.platform === 'darwin'
+      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+      : '/usr/bin/google-chrome';
+
+    browser = await puppeteer.launch({
+      executablePath: CHROME_PATH,
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', `--window-size=${width},${height}`],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width, height, deviceScaleFactor: 1 });
+
+    // HTML 콘텐츠 직접 주입 (파일 저장 불필요)
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 15000 }).catch(() => {});
+
+    // 배경이 더이상 필요 없으면 제거 — Remotion split-impact 취합상 투명도 필수
+    if (transparent) {
+      await page.evaluate(() => {
+        document.documentElement.style.background = 'transparent';
+        document.body.style.background = 'transparent';
+      });
+    }
+
+    const timestamp = Date.now();
+    const snapName = `snap_${timestamp}.png`;
+    const snapPath = path.join(SNAPSHOTS_DIR, snapName);
+
+    await page.screenshot({
+      path: snapPath,
+      type: 'png',
+      omitBackground: transparent,   // true = 알파 쳄널 보존
+      clip: { x: 0, y: 0, width, height },
+    });
+    await browser.close();
+
+    const snapshotUrl = `/outputs/lab_snapshots/${snapName}`;
+    console.log(`[ImageLab] html-snapshot 완료: ${snapName} (${width}×${height}, transparent=${transparent})`);
+    res.json({ status: 'ok', snapshotUrl, snapPath });
+
+  } catch (err) {
+    if (browser) await browser.close().catch(() => {});
+    console.error('[ImageLab] html-snapshot 오류:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /** [POST] /api/imagelab/extract-colors - URL에서 색상 추출 */
 router.post('/extract-colors', async (req, res) => {

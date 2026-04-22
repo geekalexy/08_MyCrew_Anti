@@ -108,7 +108,7 @@ export const PicoCharacter = ({
              ${isTurning ? 'blur(0.5px)' : ''}`,
   };
 
-  const picoSrc = staticFile('pico.png');
+  const picoSrc = staticFile('캐릭터이미지/pico.png');
 
   if (withCircle) {
     return (

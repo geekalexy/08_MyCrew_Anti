@@ -73,8 +73,10 @@ export async function runAutopilotPipeline(channelType = 'finance') {
         try {
             const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
 
-            // 5. YouTube 자동 업로드 ────────────────────────────────────────────
-            console.log(`\n📤 [Step 5] YouTube 쇼츠 자동 업로드 시작...`);
+            // 5. YouTube 자동 업로드 (테스트 기간 임시 정지) ────────────────────────────────────────────
+            console.log(`\n⏸️ [Step 5] YouTube 쇼츠 자동 업로드는 테스트를 위해 일시 생략합니다.`);
+            console.log(`   📂 렌더링된 영상 경로: ${outputPath}`);
+            /*
             const uploader = new YouTubeUploader();
             const hookText = top1.scenario.scenes[0]?.textLines?.join(' ') || top1.selectedSourceTitle;
             const allText  = top1.scenario.scenes.map(s => s.textLines?.join(' ')).join('\n');
@@ -90,6 +92,7 @@ export async function runAutopilotPipeline(channelType = 'finance') {
 
             console.log(`\n🎉 [완료] 유튜브 업로드 성공!`);
             console.log(`   📺 ${videoUrl}`);
+            */
 
         } catch (e) {
             console.error('렌더링 또는 업로드 중 에러 발생:', e.message);

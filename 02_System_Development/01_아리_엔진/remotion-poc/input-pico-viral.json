@@ -1,0 +1,57 @@
+{
+  "durationInSeconds": 30,
+  "fps": 30,
+  "theme": {
+    "primaryColor": "#111827",
+    "secondaryColor": "#FAFAFA",
+    "bgGradient": ["#000000", "#1E1B4B"],
+    "operatorImage": "/pico.png"
+  },
+  "scenes": [
+    {
+      "type": "hook",
+      "durationFrames": 150,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "🔥",
+      "textLines": ["한국 주식 수익률 1등!", "그런데 한국인만 파는 이유?"],
+      "interactionElement": "1분 완벽 분석 🚀"
+    },
+    {
+      "type": "problem",
+      "durationFrames": 210,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "📉",
+      "textLines": ["외국인은 쓸어담고 있는데,", "개미들만 피눈물 흘리며 도망갑니다!"],
+      "interactionElement": "도대체 왜? 👀"
+    },
+    {
+      "type": "proof",
+      "durationFrames": 240,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "🕵️",
+      "textLines": ["월가 기관투자자들과", "슈퍼 개미들의 은밀한 세팅 완료!"],
+      "interactionElement": "숨겨진 진실 공개"
+    },
+    {
+      "type": "climax",
+      "durationFrames": 210,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "🚀",
+      "textLines": ["지금 당장 주목해야 할", "저평가 1순위 텐배거 섹터는?"],
+      "interactionElement": "기회는 단 1번뿐 🎯"
+    },
+    {
+      "type": "cta",
+      "durationFrames": 90,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "👆",
+      "textLines": ["매일 돈이 되는 시크릿! 💸", "지금 바로 구독하고 받아보세요"],
+      "interactionElement": "구독 버튼 클릭!"
+    }
+  ]
+}

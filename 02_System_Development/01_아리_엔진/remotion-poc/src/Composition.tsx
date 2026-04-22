@@ -1,9 +1,10 @@
-import { AbsoluteFill, useVideoConfig, useCurrentFrame, Sequence, spring, interpolate } from "remotion";
+import { AbsoluteFill, useVideoConfig, useCurrentFrame, Sequence, spring, interpolate, staticFile } from "remotion";
 
 type ThemeProps = {
   primaryColor?: string;
   secondaryColor?: string;
   bgGradient?: string[];
+  operatorImage?: string;
 };
 
 type SceneProps = {
@@ -52,7 +53,7 @@ export const MyComposition = ({
         
         return (
           <Sequence key={index} from={start} durationInFrames={duration}>
-            <SceneContent scene={scene} fps={fps} />
+            <SceneContent scene={scene} fps={fps} theme={theme} />
           </Sequence>
         );
       })}
@@ -60,7 +61,7 @@ export const MyComposition = ({
   );
 };
 
-const SceneContent = ({ scene, fps }: { scene: SceneProps; fps: number; }) => {
+const SceneContent = ({ scene, fps, theme }: { scene: SceneProps; fps: number; theme: ThemeProps; }) => {
   const frame = useCurrentFrame();
 
   const opacity = interpolate(frame, [0, 12], [0, 1], { extrapolateRight: "clamp" });
@@ -116,6 +117,64 @@ const SceneContent = ({ scene, fps }: { scene: SceneProps; fps: number; }) => {
                 <div key={i} style={{ fontSize: i===texts.length-1 ? '60px' : '50px', fontWeight: i===texts.length-1 ? 900 : 700, color: i===texts.length-1 ? '#3B7BF5' : '#111827', wordBreak: 'keep-all' }}>{text}</div>
               ))}
             </div>
+          </div>
+        </div>
+      );
+    }
+    else if (scene.layoutType === 'split-impact') {
+      // 4. 메가 바이럴 금융/지식 채널 포맷 (상단 텍스트 + 중앙 과장된 이미지 + 하단 배너)
+      const isImage = scene.assetType === 'imageUrl' || (asset && asset.startsWith('http'));
+      const kenBurnsScale = interpolate(frame, [0, 150], [1, 1.15], { extrapolateRight: "clamp" });
+      const slideInY = spring({ frame, fps, config: { damping: 12, stiffness: 90 } });
+      const bannerY = interpolate(slideInY, [0, 1], [300, 0]);
+
+      return (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {/* Top 25%: Text Hook Zone */}
+          <div style={{ height: '30%', width: '100%', backgroundColor: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 20, boxShadow: '0 20px 50px rgba(0,0,0,0.3)', padding: '40px 20px', boxSizing: 'border-box' }}>
+            {texts.map((text, i) => {
+              // 텍스트 강조(빨간색 등) 로직: '!'나 '?'로 끝나거나 특정 키워드가 있으면 빨간색 처리
+              const isHighlight = text.includes('!') || text.includes('이유') || text.includes('1위') || text.includes('폭망');
+              return (
+                <div key={i} style={{ fontSize: i === 0 ? '70px' : '85px', fontWeight: 900, color: isHighlight ? '#E53E3E' : '#000000', lineHeight: 1.2, wordBreak: 'keep-all', textAlign: 'center', letterSpacing: '-2px' }}>
+                  {text}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bottom 75%: Impact Image Zone */}
+          <div style={{ height: '70%', width: '100%', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: '100%', transform: `scale(${kenBurnsScale})`, transformOrigin: 'center center' }}>
+              {isImage ? (
+                <img src={asset} alt="concept" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827', fontSize: '250px', paddingBottom: '250px', boxSizing: 'border-box' }}>
+                  {asset}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Banner Component (Interaction Element or CTA) */}
+            {(scene.interactionElement || scene.type === 'cta') && (
+              <div style={{ position: 'absolute', bottom: '80px', left: '5%', width: '90%', transform: `translateY(${bannerY}px)`, zIndex: 30 }}>
+                <div style={{ background: 'linear-gradient(90deg, #111827, #1F2937, #111827)', border: '6px solid #D1D5DB', borderRadius: '15px', padding: '30px 20px', textAlign: 'center', boxShadow: '0 30px 60px rgba(0,0,0,0.6)' }}>
+                  <span style={{ color: '#FBBF24', fontSize: '65px', fontWeight: 900, letterSpacing: '-1px' }}>
+                    {scene.interactionElement || '1분 완벽 정리 🚀'}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Virtual Operator Character (VTuber Style) */}
+            {theme.operatorImage && (
+              <div style={{ position: 'absolute', bottom: '250px', right: '5%', zIndex: 40, transform: `translateY(${interpolate(Math.sin(frame / 15), [-1, 1], [-20, 20]) * 0.5}px)` }}>
+                <img src={theme.operatorImage.startsWith('http') ? theme.operatorImage : staticFile(theme.operatorImage.replace(/^\//, ''))} style={{ width: '400px', filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.5))' }} />
+              </div>
+            )}
+            
+            {/* 묵직한 하단 그라데이션 (가독성 보완) */}
+            <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', zIndex: 10 }} />
           </div>
         </div>
       );

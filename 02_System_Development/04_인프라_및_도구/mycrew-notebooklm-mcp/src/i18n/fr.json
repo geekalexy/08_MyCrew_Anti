@@ -1,0 +1,120 @@
+{
+  "$schema": "./locale-schema.json",
+  "locale": "fr",
+  "name": "Français",
+  "description": "French UI selectors for NotebookLM",
+
+  "tabs": {
+    "sources": "Sources",
+    "discussion": "Discussion",
+    "studio": "Studio"
+  },
+
+  "buttons": {
+    "addSource": "Ajouter une source",
+    "addNote": "Ajouter une note",
+    "newNote": "Nouvelle note",
+    "insert": "Insérer",
+    "add": "Ajouter",
+    "upload": "Importer",
+    "delete": "Supprimer",
+    "remove": "Retirer",
+    "confirm": "Confirmer",
+    "yes": "Oui",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "done": "Terminé",
+    "create": "Créer",
+    "download": "Télécharger",
+    "generate": "Générer"
+  },
+
+  "sourceTypes": {
+    "uploadFiles": "Importer des fichiers",
+    "website": "Site web",
+    "link": "Lien",
+    "url": "URL",
+    "pastedText": "Texte copié",
+    "drive": "Drive",
+    "youtube": "YouTube"
+  },
+
+  "placeholders": {
+    "pasteUrl": "Collez",
+    "enterUrl": "Coller",
+    "pasteLinks": "liens"
+  },
+
+  "sourceNames": {
+    "pastedText": "Texte collé"
+  },
+
+  "contentTypes": {
+    "audio": "Audio",
+    "video": "Vidéo",
+    "presentation": "Diaporama",
+    "slides": "Diaporama",
+    "infographic": "Infographie",
+    "report": "Rapport",
+    "briefing": "Document de synthèse",
+    "dataTable": "Tableau",
+    "table": "Tableau"
+  },
+
+  "contentOptions": {
+    "videoStyles": {
+      "classroom": "Pédagogique",
+      "documentary": "Documentaire",
+      "animated": "Animation",
+      "corporate": "Entreprise",
+      "cinematic": "Cinématique",
+      "minimalist": "Minimaliste"
+    },
+    "videoFormats": {
+      "brief": "Bref",
+      "explainer": "Explicatif"
+    },
+    "presentationStyles": {
+      "detailedSlideshow": "Diaporama détaillé",
+      "presenterNotes": "Diapositive du présentateur"
+    },
+    "presentationLengths": {
+      "short": "Court",
+      "default": "Par défaut"
+    },
+    "infographicFormats": {
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
+    "reportFormats": {
+      "summary": "Résumé",
+      "detailed": "Détaillé"
+    }
+  },
+
+  "dialogs": {
+    "selectLanguage": "Sélectionner la langue",
+    "language": "Langue"
+  },
+
+  "actions": {
+    "openInSheets": "Ouvrir dans Sheets",
+    "openInSlides": "Ouvrir dans Slides",
+    "deepDive": "Analyse approfondie",
+    "audioOverview": "Synthèse audio",
+    "addToSources": "Ajouter aux sources",
+    "convertToSource": "Convertir en source"
+  },
+
+  "status": {
+    "generating": "Génération en cours...",
+    "processing": "Traitement en cours...",
+    "ready": "Prêt"
+  },
+
+  "errors": {
+    "error": "Erreur",
+    "rateLimitReached": "Vous avez atteint la limite quotidienne"
+  }
+}

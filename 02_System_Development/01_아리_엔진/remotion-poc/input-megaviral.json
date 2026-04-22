@@ -1,0 +1,21 @@
+{
+  "durationInSeconds": 5,
+  "fps": 30,
+  "theme": {
+    "primaryColor": "#111827",
+    "secondaryColor": "#FAFAFA",
+    "bgGradient": ["#000000", "#111827"]
+  },
+  "scenes": [
+    {
+      "type": "hook",
+      "durationFrames": 150,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "🔥",
+      "textLines": ["한국 주식 글로벌 1등!", "그런데 한국인만 파는 이유?"],
+      "interactionElement": "1분 완벽 분석 🚀",
+      "animationType": "slideIn"
+    }
+  ]
+}

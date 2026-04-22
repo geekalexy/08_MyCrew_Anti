@@ -5,6 +5,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── 전역 스크롤바 숨김 (스크롤 기능은 유지) ──────────────────────────── */
+* {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / Edge legacy */
+}
+*::-webkit-scrollbar {
+  display: none;               /* Chrome / Safari / macOS WebKit */
+}
+
 html, body, #root {
   height: 100%;
   font-family: 'Inter', 'Plus Jakarta Sans', sans-serif;
@@ -1955,7 +1964,53 @@ html, body, #root {
 
 
 /* ── Phase 22 Sprint 1: Ari 스트리밍 타이핑 커서 애니메이션 ── */
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+/* ── Lumi 프롬프트 고도화 — 무지개 shimmer 애니메이션 ──────────────────── */
+@keyframes lumi-rainbow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes lumi-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.lumi-rainbow-btn {
+  background: linear-gradient(
+    90deg,
+    #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #c77dff, #ff6b6b
+  ) !important;
+  background-size: 300% 300% !important;
+  animation: lumi-rainbow 1.4s ease infinite !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  border-radius: 4px !important;
+}
+.lumi-rainbow-btn .material-symbols-outlined {
+  -webkit-text-fill-color: initial;
+  color: #ffd93d;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Image Lab (디자인 스튜디오) — 라이트 모드 가독성 보정
+───────────────────────────────────────────────────────────────────────────── */
+[data-theme="light"] .imagelab-root {
+  background: #14151e !important;
+  color: #e2e1eb !important;
+}
+[data-theme="light"] .imagelab-header {
+  background: #0f1019 !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: #e2e1eb !important;
+}
+[data-theme="light"] .imagelab-panel {
+  background: #1a1b2b !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+[data-theme="light"] .imagelab-root * {
+  --text-primary:   #e2e1eb;
+  --text-secondary: #c4c6d5;
+  --text-muted:     #8e909e;
+  --border:         rgba(255,255,255,0.1);
+  --brand:          #b4c5ff;
 }

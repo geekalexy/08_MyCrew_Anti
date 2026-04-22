@@ -1,0 +1,120 @@
+{
+  "$schema": "./locale-schema.json",
+  "locale": "en",
+  "name": "English",
+  "description": "English UI selectors for NotebookLM",
+
+  "tabs": {
+    "sources": "Sources",
+    "discussion": "Discussion",
+    "studio": "Studio"
+  },
+
+  "buttons": {
+    "addSource": "Add source",
+    "addNote": "Add note",
+    "newNote": "New note",
+    "insert": "Insert",
+    "add": "Add",
+    "upload": "Upload",
+    "delete": "Delete",
+    "remove": "Remove",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save",
+    "done": "Done",
+    "create": "Create",
+    "download": "Download",
+    "generate": "Generate"
+  },
+
+  "sourceTypes": {
+    "uploadFiles": "Upload files",
+    "website": "Website",
+    "link": "Link",
+    "url": "URL",
+    "pastedText": "Copied text",
+    "drive": "Drive",
+    "youtube": "YouTube"
+  },
+
+  "placeholders": {
+    "pasteUrl": "Paste",
+    "enterUrl": "Enter",
+    "pasteLinks": "link"
+  },
+
+  "sourceNames": {
+    "pastedText": "Pasted text"
+  },
+
+  "contentTypes": {
+    "audio": "Audio",
+    "video": "Video",
+    "presentation": "Presentation",
+    "slides": "Slides",
+    "infographic": "Infographic",
+    "report": "Report",
+    "briefing": "Briefing doc",
+    "dataTable": "Data table",
+    "table": "Table"
+  },
+
+  "contentOptions": {
+    "videoStyles": {
+      "classroom": "Classroom",
+      "documentary": "Documentary",
+      "animated": "Animated",
+      "corporate": "Corporate",
+      "cinematic": "Cinematic",
+      "minimalist": "Minimalist"
+    },
+    "videoFormats": {
+      "brief": "Brief",
+      "explainer": "Explainer"
+    },
+    "presentationStyles": {
+      "detailedSlideshow": "Detailed slideshow",
+      "presenterNotes": "Presenter notes"
+    },
+    "presentationLengths": {
+      "short": "Short",
+      "default": "Default"
+    },
+    "infographicFormats": {
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
+    "reportFormats": {
+      "summary": "Summary",
+      "detailed": "Detailed"
+    }
+  },
+
+  "dialogs": {
+    "selectLanguage": "Select language",
+    "language": "Language"
+  },
+
+  "actions": {
+    "openInSheets": "Open in Sheets",
+    "openInSlides": "Open in Slides",
+    "deepDive": "Deep Dive",
+    "audioOverview": "Audio Overview",
+    "addToSources": "Add to sources",
+    "convertToSource": "Convert to source"
+  },
+
+  "status": {
+    "generating": "Generating...",
+    "processing": "Processing...",
+    "ready": "Ready"
+  },
+
+  "errors": {
+    "error": "Error",
+    "rateLimitReached": "You have reached the daily limit"
+  }
+}

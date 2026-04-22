@@ -1,0 +1,57 @@
+{
+  "durationInSeconds": 30,
+  "fps": 30,
+  "theme": {
+    "primaryColor": "#3B82F6",
+    "secondaryColor": "#FAFAFA",
+    "bgGradient": ["#EFF6FF", "#DBEAFE"],
+    "operatorImage": "/ari.png"
+  },
+  "scenes": [
+    {
+      "type": "hook",
+      "durationFrames": 150,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "🤖",
+      "textLines": ["AI 유료 강의?", "절대 돈 낭비하지 마세요!"],
+      "interactionElement": "꿀팁 대방출 💡"
+    },
+    {
+      "type": "problem",
+      "durationFrames": 210,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "📚",
+      "textLines": ["1시간 걸리던 PPT 작업,", "이 무료 AI 사이트 하나면 30초 컷!"],
+      "interactionElement": "직장인 필수 시청"
+    },
+    {
+      "type": "proof",
+      "durationFrames": 240,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "💻",
+      "textLines": ["클릭 두 번으로 자동 완성되는", "사기급 템플릿 무제한 제공!"],
+      "interactionElement": "지금 바로 써보세요"
+    },
+    {
+      "type": "climax",
+      "durationFrames": 210,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "✨",
+      "textLines": ["저장해두고 필요할 때마다", "꺼내 쓰는 나만의 AI 조수"],
+      "interactionElement": "링크는 댓글에! 👇"
+    },
+    {
+      "type": "cta",
+      "durationFrames": 90,
+      "layoutType": "split-impact",
+      "assetType": "emoji",
+      "assetContent": "❤️",
+      "textLines": ["도움이 되셨다면 좋아요 꾸욱!", "매일 AI 트렌드를 배달해드려요"],
+      "interactionElement": "채널 구독하기"
+    }
+  ]
+}

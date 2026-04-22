@@ -1,10 +1,14 @@
-import { AbsoluteFill, useVideoConfig, useCurrentFrame, Sequence, spring, interpolate, staticFile } from "remotion";
+import { AbsoluteFill, useVideoConfig, useCurrentFrame, Sequence, spring, interpolate, staticFile, Audio } from "remotion";
+import { PicoCharacter } from "./PicoCharacter";
 
 type ThemeProps = {
   primaryColor?: string;
   secondaryColor?: string;
   bgGradient?: string[];
   operatorImage?: string;
+  picoPlacement?: "right" | "left";  // 피코 배치 (기본: right)
+  picoWithCircle?: boolean;           // 원형 프레임 여부 (기본: false)
+  picoSize?: number;                  // 캐릭터 크기 px (기본: 320)
 };
 
 type SceneProps = {
@@ -54,6 +58,7 @@ export const MyComposition = ({
         return (
           <Sequence key={index} from={start} durationInFrames={duration}>
             <SceneContent scene={scene} fps={fps} theme={theme} />
+            {scene.audioFile && <Audio src={staticFile(scene.audioFile)} />}
           </Sequence>
         );
       })}
@@ -166,12 +171,13 @@ const SceneContent = ({ scene, fps, theme }: { scene: SceneProps; fps: number; t
               </div>
             )}
 
-            {/* Virtual Operator Character (VTuber Style) */}
-            {theme.operatorImage && (
-              <div style={{ position: 'absolute', bottom: '250px', right: '5%', zIndex: 40, transform: `translateY(${interpolate(Math.sin(frame / 15), [-1, 1], [-20, 20]) * 0.5}px)` }}>
-                <img src={theme.operatorImage.startsWith('http') ? theme.operatorImage : staticFile(theme.operatorImage.replace(/^\//, ''))} style={{ width: '400px', filter: 'drop-shadow(0 15px 30px rgba(0,0,0,0.5))' }} />
-              </div>
-            )}
+            {/* 피코 캐릭터 — 말하는 애니메이션 오버레이 */}
+            <PicoCharacter
+              placement={theme.picoPlacement ?? "right"}
+              withCircle={theme.picoWithCircle ?? false}
+              size={theme.picoSize ?? 300}
+              talking={true}
+            />
             
             {/* 묵직한 하단 그라데이션 (가독성 보완) */}
             <div style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '40%', background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)', zIndex: 10 }} />

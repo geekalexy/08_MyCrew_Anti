@@ -5,6 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
+import puppeteer from 'puppeteer-core';
 import dbManager from '../database.js';
 import { analyzeImageForPrompt } from '../ai-engine/services/imageAnalysisService.js';
 import { generateImage } from '../skill-library/05_design/nanoBananaGenerator.js';
@@ -347,6 +348,73 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
 });
 
 
+/** [POST] /api/imagelab/extract-colors - URL에서 색상 추출 */
+router.post('/extract-colors', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL을 입력해주세요.' });
+
+  let browser;
+  try {
+    const CHROME_PATH = process.platform === 'darwin'
+      ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+      : '/usr/bin/google-chrome';
+
+    browser = await puppeteer.launch({
+      executablePath: CHROME_PATH,
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1280,1024']
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 1024 });
+
+    const targetUrl = url.startsWith('http') ? url : `https://${url}`;
+    console.log(`[BrandStudio] 컬러 추출을 위한 스크린샷 캡쳐: ${targetUrl}`);
+    await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 15000 }).catch(() => console.warn('Navigation timeout, continuing...'));
+
+    const screenshotName = `screenshot_${Date.now()}.png`;
+    const screenshotPath = path.join(REFS_DIR, screenshotName);
+    
+    await page.screenshot({ path: screenshotPath });
+    await browser.close();
+
+    const systemPrompt = `You are a senior brand identity analyst with expertise in extracting corporate brand colors from websites.
+
+Analyze the provided website screenshot and identify the 3 MOST DISTINCTIVE brand colors:
+1. PRIMARY color: The dominant background or main brand color (could be dark, vivid, or neutral — whatever defines the brand)
+2. ACCENT color: The most eye-catching button, CTA, or highlight color (usually vivid/saturated)
+3. SECONDARY color: A supporting color used for text, borders, or secondary backgrounds
+
+STRICT RULES:
+- Return EXACTLY 3 HEX colors in order: [primary, accent, secondary]
+- Prefer VIVID, SATURATED colors that define the brand identity over plain white/black
+- AVOID pure white (#FFFFFF or near-white like #F8F8F8, #FAFAFA) UNLESS it is clearly the brand's primary background choice
+- AVOID pure black (#000000 or #111111) unless it is a dominant brand color (e.g. luxury brands)
+- Read actual CSS background-color, button colors, logo colors — not just dominant pixel colors
+- If the site uses a dark theme → primary should be the dark bg, accent should be the vivid color
+- If the site uses a light theme → primary should be the logo/brand color, accent the CTA color
+
+Return ONLY a JSON array of exactly 3 HEX codes. No markdown. No explanation.
+Example: ["#1A1A2E", "#E94560", "#F5F0FF"]`;
+
+    const result = await analyzeImageForPrompt(screenshotPath, systemPrompt);
+    let rawText = result?.text?.trim() || '[]';
+    rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    
+    const colors = JSON.parse(rawText);
+    if (!Array.isArray(colors) || colors.length === 0) throw new Error('색상 추출에 실패했습니다.');
+
+    // 찌꺼기 파일 삭제
+    fs.unlink(screenshotPath, () => {});
+
+    res.json({ status: 'ok', colors });
+  } catch (err) {
+    if (browser) await browser.close().catch(() => {});
+    console.error('[BrandStudio] 색상 추출 오류:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** [POST] /api/imagelab/generate - 이미지 생성 (Step 3) */
 router.post('/generate', async (req, res) => {
   try {
@@ -575,6 +643,7 @@ router.post('/brand-generate', async (req, res) => {
       brandPresetId = 'signature',
       contentType = 'feed',
       lumiDirecting = false, // true: Lumi가 창의적 컨셉 먼저 제안
+      upgradeOnly = false,   // true: 이미지 생성 없이 Lumi 컨셉만 반환 (프롬프트 고도화 전용)
       aspectRatio,
       imageSize,             // { width, height } — 프론트에서 콘텐츠 유형에 맞게 전달
     } = req.body;
@@ -643,6 +712,16 @@ Return ONLY the enhanced image prompt (2-3 sentences, Korean or English), no exp
       `NO: ${brand.forbidden}`,
     ].filter(Boolean).join('. ');
 
+    // ── upgradeOnly: 이미지 생성 없이 Lumi 컨셉만 즉시 반환 ─────────────────
+    if (upgradeOnly) {
+      return res.json({
+        status: 'ok',
+        lumiConcept: lumiConcept || finalDescription,
+        finalPrompt: null,
+        imageUrl: null,
+      });
+    }
+
     // ── 이미지 생성 — 콘텐츠 유형 사이즈 적용 ─────────────────────────────
     const genWidth  = imageSize?.width  || contentSpec.width  || 1080;
     const genHeight = imageSize?.height || contentSpec.height || 1080;
@@ -693,7 +772,8 @@ RULES:
 5. NO JavaScript — pure HTML+CSS only.
 6. Make it visually stunning: use gradients, shadows, layered backgrounds, bold typography.
 7. Text must be sharp, readable, and properly sized for the format (${contentLabel}).
-8. Return ONLY the raw HTML code, no markdown, no explanation, no code fences.`;
+8. CRITICAL: Add data-lumi-id="lumi-N" (N=1,2,3...) attribute to EVERY meaningful visible element — headings, paragraphs, buttons, divs with text/image, spans, img tags. Start from N=1 and increment. This enables click-to-code mapping. Every clickable/editable element must have this attribute.
+9. Return ONLY the raw HTML code, no markdown, no explanation, no code fences.`;
 
   const userPrompt = `Create a ${contentLabel} design card (${width}×${height}px) with this concept:
 ${description.trim()}

@@ -1,6 +1,7 @@
 import { DataHarvester } from './DataHarvester.js';
 import { CurationAgent } from './CurationAgent.js';
 import { ImageLabAgent } from './ImageLabAgent.js';       // Phase 24.5 ⭐
+import { TTSAgent } from './TTSAgent.js';
 import { VideoAdapter } from '../../adapters/VideoAdapter.js';
 // import { YouTubeUploader } from '../../services/youtubeUploader.js'; // YouTube API 전송
 
@@ -51,20 +52,12 @@ export async function runAutopilotPipeline(channelType = 'finance') {
         enrichedScenarios.push({ ...item, scenario: enriched });
     }
 
-    // 3. 음성 합성(TTS) 및 자막 립싱크(Sync) 매핑 — Luca 담당 모듈 (다음 단계)
-    // enrichedScenarios[i].scenario.scenes[j].textLines   → TTS 텍스트 소스 (보존됨)
-    // enrichedScenarios[i].scenario.scenes[j].durationFrames → 립싱크 기준값 (보존됨)
-    console.log(`\n🎙️ [TTS 모듈 대기 중] — Luca의 audio/sync 모듈 연동 예정`);
-    enrichedScenarios.forEach(item => {
-        let totalAudioDuration = 0;
-        item.scenario.scenes.forEach((scene, i) => {
-            const textToSpeak = scene.textLines.join(' ');
-            const simulatedDuration = Math.max(textToSpeak.length / 5, 2).toFixed(1);
-            totalAudioDuration += parseFloat(simulatedDuration);
-            console.log(`   - Scene ${i+1} [${scene.type}] → TTS: ${simulatedDuration}초 / assetImage: ${scene.assetImage}`);
-        });
-        console.log(`   ✅ 총 오디오 예상 길이: ${totalAudioDuration.toFixed(1)}초`);
-    });
+    // 3. 음성 합성(TTS) 및 자막 립싱크(Sync) 매핑 (Luca - TTSAgent)
+    console.log(`\n🎙️ [TTSAgent] 성우 음성 실제 변환 및 자막 싱크 매핑 중...`);
+    const publicDir = '/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/01_아리_엔진/remotion-poc/public';
+    for (let i = 0; i < enrichedScenarios.length; i++) {
+        enrichedScenarios[i].scenario = await TTSAgent.generateAudioForScenario(enrichedScenarios[i].scenario, publicDir);
+    }
 
     // 4. 비주얼 렌더링 및 물리적 MP4 추출 (Top 1만 즉시 렌더)
     console.log(`\n🛠️ [비주얼 렌더링 및 유튜브 업로드 큐 진입]`);
@@ -73,7 +66,8 @@ export async function runAutopilotPipeline(channelType = 'finance') {
         console.log(`\n>> [${top1.selectedSourceTitle}] VideoAdapter 인코딩 시작...`);
         const remotionProps = {
             theme:  top1.scenario.theme,
-            scenes: top1.scenario.scenes,  // ✅ assetImage 포함, textLines/durationFrames 보존
+            scenes: top1.scenario.scenes,
+            totalDurationFrames: top1.scenario.totalDurationFrames
         };
         try {
             await VideoAdapter.renderVideo(remotionProps, 'auto-autopilot-test.mp4');

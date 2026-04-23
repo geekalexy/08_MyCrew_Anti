@@ -1,9 +1,14 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DataHarvester } from './DataHarvester.js';
 import { CurationAgent } from './CurationAgent.js';
 import { ImageLabAgent } from './ImageLabAgent.js';       // Phase 24.5 ⭐
 import { TTSAgent } from './TTSAgent.js';
 import { VideoAdapter } from '../../adapters/VideoAdapter.js';
 import { YouTubeUploader } from '../../services/youtubeUploader.js'; // Phase 24 ✅
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
 
 /**
  * [Youtube Autopilot Master Daemon]
@@ -52,60 +57,73 @@ export async function runAutopilotPipeline(channelType = 'finance') {
         enrichedScenarios.push({ ...item, scenario: enriched });
     }
 
-    // 3. 음성 합성(TTS) 및 자막 립싱크(Sync) 매핑 (Luca - TTSAgent)
-    console.log(`\n🎙️ [TTSAgent] 성우 음성 실제 변환 및 자막 싱크 매핑 중...`);
-    const publicDir = '/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/01_아리_엔진/remotion-poc/public';
-    for (let i = 0; i < enrichedScenarios.length; i++) {
-        enrichedScenarios[i].scenario = await TTSAgent.generateAudioForScenario(enrichedScenarios[i].scenario, publicDir);
-    }
-
-    // 4. 비주얼 렌더링 및 물리적 MP4 추출 (Top 1만 즉시 렌더)
-    console.log(`\n🛠️ [비주얼 렌더링 및 유튜브 업로드 큐 진입]`);
+    // 3. 비주얼 렌더링 및 물리적 MP4 추출 (Top 1 시나리오에 대해 다중 TTS 버전 생성)
+    console.log(`\n🛠️ [비주얼 렌더링 및 음성 다중화(A/B/C) 큐 진입]`);
     const top1 = enrichedScenarios[0];
     if (top1) {
-        console.log(`\n>> [${top1.selectedSourceTitle}] VideoAdapter 인코딩 시작...`);
-        const outputFileName = 'auto-autopilot-test.mp4';
-        const remotionProps = {
-            theme:  top1.scenario.theme,
-            scenes: top1.scenario.scenes,
-            totalDurationFrames: top1.scenario.totalDurationFrames
-        };
-        try {
-            const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
+        // P1: 하드코딩 절대경로 → 상대경로 기반 동적 계산
+        const publicDir = process.env.REMOTION_PUBLIC_DIR
+            || path.resolve(__dirname, '../../../remotion-poc/public');
+        const ttsVersions = ['A', 'B', 'C'];
+        const renderedPaths = [];
 
-            // 5. YouTube 자동 업로드 (테스트 기간 임시 정지) ────────────────────────────────────────────
-            console.log(`\n⏸️ [Step 5] YouTube 쇼츠 자동 업로드는 테스트를 위해 일시 생략합니다.`);
-            console.log(`   📂 렌더링된 영상 경로: ${outputPath}`);
-            /*
-            const uploader = new YouTubeUploader();
-            const hookText = top1.scenario.scenes[0]?.textLines?.join(' ') || top1.selectedSourceTitle;
-            const allText  = top1.scenario.scenes.map(s => s.textLines?.join(' ')).join('\n');
+        for (const voiceKey of ttsVersions) {
+            console.log(`\n>> [${top1.selectedSourceTitle}] Voice ${voiceKey} 버전 렌더링 시작...`);
+            
+            // 시나리오 객체 깊은 복사 (독립적인 오디오/프레임 상태 유지를 위해)
+            const clonedScenario = JSON.parse(JSON.stringify(top1.scenario));
+            
+            // 🎙️ TTS 믹싱 (버전별)
+            const scenarioWithAudio = await TTSAgent.generateAudioForScenario(clonedScenario, publicDir, voiceKey);
 
-            const { videoId, url: videoUrl } = await uploader.uploadShorts({
-                filePath:    outputPath,
-                title:       hookText.slice(0, 90),
-                description: `${allText}\n\n#MyCrew #소시안 #Shorts`,
-                tags:        [channelType === 'finance' ? '주식' : 'AI', '쇼츠', '자동화'],
-                dryRun:      true,      // ⚠️ 파인튜닝 완료 후 false로 전환
-                privacy:     'private', // ⚠️ 실제 공개 시 'public'으로 전환
-            });
+            const outputFileName = `auto-autopilot-test-v${voiceKey}.mp4`;
+            const remotionProps = {
+                theme:  scenarioWithAudio.theme,
+                scenes: scenarioWithAudio.scenes,
+                totalDurationFrames: scenarioWithAudio.totalDurationFrames
+            };
 
-            console.log(`\n🎉 [완료] 유튜브 업로드 성공!`);
-            console.log(`   📺 ${videoUrl}`);
-            */
-
-        } catch (e) {
-            console.error('렌더링 또는 업로드 중 에러 발생:', e.message);
+            try {
+                // 🎥 비디오 렌더링
+                const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
+                renderedPaths.push(outputPath);
+                console.log(`   📂 Voice ${voiceKey} 렌더링 완료: ${outputPath}`);
+            } catch (e) {
+                console.error(`Voice ${voiceKey} 렌더링 중 에러 발생:`, e.message);
+            }
         }
+
+        // 5. YouTube 자동 업로드 (테스트 및 리뷰 모드 진입 전 대기)
+        console.log(`\n⏸️ [Step 5] 리뷰 스튜디오 모드 진입. YouTube 자동 업로드는 대기합니다.`);
+        console.log(`   총 ${renderedPaths.length}개의 TTS 버전 영상이 준비되었습니다.`);
+        /*
+        const uploader = new YouTubeUploader();
+        const hookText = top1.scenario.scenes[0]?.textLines?.join(' ') || top1.selectedSourceTitle;
+        const allText  = top1.scenario.scenes.map(s => s.textLines?.join(' ')).join('\n');
+
+        const { videoId, url: videoUrl } = await uploader.uploadShorts({
+            filePath:    renderedPaths[0], // 리뷰 후 선택된 파일 기준
+            title:       hookText.slice(0, 90),
+            description: `${allText}\n\n#MyCrew #소시안 #Shorts`,
+            tags:        [channelType === 'finance' ? '주식' : 'AI', '쇼츠', '자동화'],
+            dryRun:      true,      // ⚠️ 리뷰 완료 후 false로 전환
+            privacy:     'private', // ⚠️ 실제 공개 시 'public'으로 전환
+        });
+
+        console.log(`\n🎉 [완료] 유튜브 업로드 성공!`);
+        console.log(`   📺 ${videoUrl}`);
+        */
     }
 
     console.log(`\n✅ 오늘자 유튜브 무인 공장 1사이클 처리가 성공적으로 완료되었습니다.`);
 }
 
-// 직접 터미널에서 테스트 실행을 위한 진입점 (ESM 경로 이슈 회피)
-console.log('초기화 중...');
-try {
-    await runAutopilotPipeline('finance');
-} catch(e) {
-    console.error('실행 중 문제 발생:', e);
+// P2: import.meta.url 가드 — 직접 실행 시에만 파이프라인 가동 (import 시 사이드이펙트 방지)
+if (process.argv[1] && __filename === process.argv[1]) {
+    console.log('초기화 중...');
+    try {
+        await runAutopilotPipeline('finance');
+    } catch(e) {
+        console.error('실행 중 문제 발생:', e);
+    }
 }

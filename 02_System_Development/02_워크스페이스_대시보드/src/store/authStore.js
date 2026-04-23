@@ -18,19 +18,22 @@ export const useAuthStore = create(
 
       // 앱 실행 시 백엔드와 토큰 상태 동기화
       syncWithBackend: async () => {
-        const { oauthToken, oauthExpiry, authMode } = get();
-        if (authMode === 'google_oauth' && oauthToken && oauthExpiry > Date.now()) {
-          const expiresIn = Math.floor((oauthExpiry - Date.now()) / 1000);
-          try {
-            await fetch(`${SERVER_URL}/api/auth/google-token`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: oauthToken, expiresIn }),
+        try {
+          const res = await fetch(`${SERVER_URL}/api/auth/status`);
+          const data = await res.json();
+          if (data.status === 'ok' && data.mode === 'google_oauth' && data.token) {
+            set({ 
+              authMode: 'google_oauth', 
+              oauthToken: data.token, 
+              oauthExpiry: new Date(data.tokenExpiresAt).getTime()
             });
-            console.log('[AuthStore] 🔄 백엔드와 Google OAuth 토큰 동기화 완료');
-          } catch (e) {
-            console.warn('[AuthStore] 백엔드 토큰 동기화 실패', e);
+            console.log('[AuthStore] 🔄 백엔드 토큰 로드 완료 (자동 갱신됨)');
+          } else if (get().authMode === 'google_oauth' && !data.token) {
+            // 백엔드에 토큰이 없는데 프론트엔드는 google_oauth 모드인 경우
+            set({ oauthToken: null, oauthExpiry: null, authMode: 'api_key' });
           }
+        } catch (e) {
+          console.warn('[AuthStore] 백엔드 동기화 실패', e);
         }
       },
 
@@ -147,7 +150,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'mycrew-auth',
-      partialState: (state) => ({
+      partialize: (state) => ({
         authMode: state.authMode,
         oauthToken: state.oauthToken,
         oauthExpiry: state.oauthExpiry,

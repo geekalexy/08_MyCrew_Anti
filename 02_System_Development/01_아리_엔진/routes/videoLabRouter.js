@@ -42,6 +42,10 @@ import ytSearch from 'yt-search';
 import { extractTranscripts } from '../ai-engine/services/youtubeScraper.js';
 import GeminiAdapter from '../ai-engine/adapters/GeminiAdapter.js';
 import NotebookLMAdapter from '../ai-engine/adapters/NotebookLMAdapter.js';
+import { DataHarvester } from '../ai-engine/agents/youtube-autopilot/DataHarvester.js';
+import { CurationAgent } from '../ai-engine/agents/youtube-autopilot/CurationAgent.js';
+import { ImageLabAgent } from '../ai-engine/agents/youtube-autopilot/ImageLabAgent.js';
+import { TTSAgent } from '../ai-engine/agents/youtube-autopilot/TTSAgent.js';
 
 /** [POST] /discover-trend: (Step 1) 카테고리/주제 검색 및 유튜브 트렌드 데이터 리스팅 */
 router.post('/discover-trend', async (req, res) => {
@@ -403,6 +407,615 @@ router.post('/learn', async (req, res) => {
     } catch (err) {
         console.error('[VideoLab] Learn Error:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 25] AI 에이전트 판정 연동 엔드포인트
+//
+// 사용법:
+//   Antigravity(Sonnet/Prime/Luca) 또는 Gemini 멀티페르소나가
+//   POST /api/videolab/review/agent-verdict 를 호출하면
+//   판정 내용을 파일로 저장 후 Socket.io로 VideoLab UI에 실시간 전달합니다.
+//
+// Request Body:
+//   {
+//     agent:      "Sonnet" | "Prime" | "Luca",
+//     sessionId:  string,             // 어떤 리뷰 세션인지 식별
+//     focusedCard: number | null,     // 포커스된 씬/카드 인덱스 (null = 전체)
+//     verdict:    "PASS" | "FAIL" | "COMMENT",
+//     content:    string,             // 판정 메시지 / 분석 내용
+//     metadata:   object              // 추가 데이터 (optional)
+//   }
+// ─────────────────────────────────────────────────────────────────────────────
+
+const VERDICTS_DIR = path.resolve(process.cwd(), 'outputs/review_verdicts');
+if (!fs.existsSync(VERDICTS_DIR)) fs.mkdirSync(VERDICTS_DIR, { recursive: true });
+
+// io 인스턴스를 router에서 접근하기 위한 미들웨어 주입용 setter
+let _ioInstance = null;
+export function setIoForVideoLabRouter(io) { _ioInstance = io; }
+
+/** [POST] /review/agent-verdict — AI 에이전트 판정 수신 및 실시간 브로드캐스트 */
+router.post('/review/agent-verdict', async (req, res) => {
+    try {
+        const {
+            agent     = 'Sonnet',
+            sessionId = `session_${Date.now()}`,
+            focusedCard = null,
+            verdict   = 'COMMENT',        // PASS | FAIL | COMMENT
+            content   = '',
+            metadata  = {}
+        } = req.body;
+
+        if (!content.trim()) {
+            return res.status(400).json({ status: 'error', message: '판정 내용(content)이 필요합니다.' });
+        }
+
+        // 유효한 판정값 검증
+        const VALID_VERDICTS = ['PASS', 'FAIL', 'COMMENT'];
+        if (!VALID_VERDICTS.includes(verdict)) {
+            return res.status(400).json({ status: 'error', message: `verdict는 ${VALID_VERDICTS.join('|')} 중 하나여야 합니다.` });
+        }
+
+        const verdictRecord = {
+            id:          `verdict_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            agent,
+            sessionId,
+            focusedCard,
+            verdict,
+            content,
+            metadata,
+            createdAt:   new Date().toISOString()
+        };
+
+        // 1. 파일로 영구 저장 (세션별 누적)
+        const verdictFilePath = path.join(VERDICTS_DIR, `${sessionId}.json`);
+        let existing = [];
+        if (fs.existsSync(verdictFilePath)) {
+            try { existing = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8')); } catch {}
+        }
+        existing.push(verdictRecord);
+        fs.writeFileSync(verdictFilePath, JSON.stringify(existing, null, 2));
+
+        // 2. Socket.io로 VideoLab에 실시간 브로드캐스트
+        if (_ioInstance) {
+            _ioInstance.of('/review').emit('review:agent_verdict', verdictRecord);
+            console.log(`[VideoLab/Review] 판정 브로드캐스트 → [${agent}] ${verdict}: "${content.slice(0, 50)}..."`);
+        } else {
+            console.warn('[VideoLab/Review] io 인스턴스 미등록 — Socket 브로드캐스트 스킵');
+        }
+
+        res.json({ status: 'ok', verdictId: verdictRecord.id, record: verdictRecord });
+
+    } catch (err) {
+        console.error('[VideoLab/Review] agent-verdict 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+/** [GET] /review/verdicts/:sessionId — 세션의 모든 판정 이력 조회 */
+router.get('/review/verdicts/:sessionId', (req, res) => {
+    try {
+        const verdictFilePath = path.join(VERDICTS_DIR, `${req.params.sessionId}.json`);
+        if (!fs.existsSync(verdictFilePath)) {
+            return res.json({ status: 'ok', verdicts: [] });
+        }
+        const verdicts = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8'));
+        res.json({ status: 'ok', sessionId: req.params.sessionId, verdicts });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+/** [POST] /review/auto-analyze — 텍스트 + Vision 이미지 병행 검수 */
+router.post('/review/auto-analyze', async (req, res) => {
+    try {
+        const { sessionId, scriptScenes, ttsMetadata } = req.body;
+
+        if (!sessionId || !scriptScenes) {
+            return res.status(400).json({ status: 'error', message: 'sessionId와 scriptScenes가 필요합니다.' });
+        }
+
+        // ── 1단계: Vision 이미지 품질 검수 (이미지가 있는 씬만) ──────────────────
+        const { analyzeImageForPrompt } = await import('../ai-engine/services/imageAnalysisService.js');
+        const OUTPUTS_DIR = path.resolve(process.cwd(), 'outputs');
+
+        const visionPrompt = `당신은 유튜브 쇼츠 콘텐츠 품질 검수 전문가입니다.
+이 이미지가 유튜브 쇼츠 썸네일/씬 이미지로 사용될 때 품질을 평가하세요.
+
+반드시 아래 JSON 형식으로만 반환하세요 (백틱 없이):
+{
+  "visualScore": 1~10,
+  "readability": "높음" | "보통" | "낮음",
+  "issues": ["문제점1", "문제점2"],
+  "verdict": "PASS" | "FAIL",
+  "comment": "한 줄 코멘트"
+}`;
+
+        const visionResults = [];
+        for (let i = 0; i < scriptScenes.length; i++) {
+            const scene = scriptScenes[i];
+            const assetImage = scene.assetImage;
+            if (!assetImage) continue;
+
+            // URL → 로컬 파일 경로 변환
+            const localPath = assetImage.startsWith('http')
+                ? path.join(OUTPUTS_DIR, assetImage.replace(/^https?:\/\/[^/]+\/outputs\//, ''))
+                : assetImage;
+
+            if (!fs.existsSync(localPath)) continue;
+
+            try {
+                const ext = path.extname(localPath).toLowerCase();
+                const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                const visionResult = await analyzeImageForPrompt(localPath, visionPrompt, '', mimeType);
+                let parsed;
+                try { parsed = JSON.parse(visionResult.text.replace(/^```json?\s*/i, '').replace(/\s*```$/, '').trim()); } catch { continue; }
+                visionResults.push({ sceneIndex: i, ...parsed });
+                console.log(`[VideoLab/AutoAnalyze] Scene ${i+1} Vision: ${parsed.verdict} (점수: ${parsed.visualScore})`);
+            } catch (vErr) {
+                console.warn(`[VideoLab/AutoAnalyze] Scene ${i+1} Vision 분석 실패 (스킵):`, vErr.message);
+            }
+        }
+
+        // ── 2단계: 텍스트+TTS 기반 멀티페르소나 검수 ──────────────────────────────
+        const visionSummary = visionResults.length > 0
+            ? `\n\n[Vision 이미지 검수 결과]\n${visionResults.map(v =>
+                `Scene ${v.sceneIndex+1}: ${v.verdict} (시각점수 ${v.visualScore}/10, 가독성 ${v.readability}) — ${v.comment}${v.issues?.length ? ' 문제: ' + v.issues.join(', ') : ''}`
+              ).join('\n')}`
+            : '';
+
+        const systemPrompt = `당신은 모델 gemini-2.5-flash로서 Prime(전략), Sonnet(비주얼), Luca(기술)의 3인 전문가 그룹 역할을 수행합니다.
+
+[페르소나 1: Prime - 콘텐츠 전략 총괄]
+- Hook 씬 텍스트 15자 이내 확인 (초과 시 FAIL)
+- 5단계 시나리오 흐름(Hook→Problem→Proof→Climax→CTA) 완성도
+- CTA의 시리즈 연결 후킹 파워
+
+[페르소나 2: Sonnet - 비주얼 아트 디렉터]
+- Vision 이미지 검수 결과를 반드시 반영하여 코멘트 (이미지가 없으면 텍스트 기반 예측)
+- 시각적 품질 FAIL이 있으면 해당 씬 인덱스를 focusedCard에 명시하고 FAIL 판정
+- 가독성, 대비율, 브랜드 일관성 평가
+
+[페르소나 3: Luca - 파이프라인 엔지니어]
+- 오디오 프레임 총합 → 초 단위 확인 (60초 이내 쇼츠 규격)
+- 씬 수 5개 확인
+
+반드시 JSON 배열로만 반환 (백틱 없이):
+[{ "agent": "Prime"|"Sonnet"|"Luca", "verdict": "PASS"|"FAIL"|"COMMENT", "content": "코멘트", "focusedCard": null|number }]`;
+
+        const userPrompt = `[대본 시나리오]\n${JSON.stringify(scriptScenes, null, 2)}\n\n[TTS 메타데이터]\n${JSON.stringify(ttsMetadata || {}, null, 2)}${visionSummary}`;
+
+        console.log(`[VideoLab/AutoAnalyze] 멀티페르소나 + Vision 검수 시작 (Session: ${sessionId}, Vision씬: ${visionResults.length}개)`);
+        const aiOutput = await GeminiAdapter.generateResponse(userPrompt, systemPrompt, 'gemini-2.5-flash');
+
+        let jsonStr = (aiOutput.text || aiOutput).replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const reviews = JSON.parse(jsonStr);
+
+        const verdictFilePath = path.join(VERDICTS_DIR, `${sessionId}.json`);
+        let existing = [];
+        if (fs.existsSync(verdictFilePath)) {
+            try { existing = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8')); } catch {}
+        }
+
+        const generatedRecords = [];
+        for (const rev of reviews) {
+            const verdictRecord = {
+                id:          `verdict_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                agent:       rev.agent,
+                sessionId,
+                focusedCard: rev.focusedCard !== undefined ? rev.focusedCard : null,
+                verdict:     rev.verdict,
+                content:     rev.content,
+                createdAt:   new Date().toISOString()
+            };
+            existing.push(verdictRecord);
+            generatedRecords.push(verdictRecord);
+        }
+
+        fs.writeFileSync(verdictFilePath, JSON.stringify(existing, null, 2));
+
+        if (_ioInstance) {
+            for (const rec of generatedRecords) {
+                _ioInstance.of('/review').emit('review:agent_verdict', rec);
+            }
+        }
+
+        res.json({ status: 'ok', records: generatedRecords, visionResults });
+    } catch (err) {
+        console.error('[VideoLab/AutoAnalyze] 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 25] 씬별 이미지 재생성 엔드포인트
+//
+// FAIL 판정을 받은 특정 씬 하나만 골라서 이미지를 재생성합니다.
+// ImageLabAgent의 _generateAIImage / _generateHTMLCard 로직을 직접 재사용합니다.
+//
+// Request Body:
+//   {
+//     sessionId:   string,           // 리뷰 세션 식별자
+//     sceneIndex:  number,           // 재생성할 씬 인덱스 (0-based)
+//     scene:       object,           // 해당 씬 데이터 { type, textLines, ... }
+//     theme:       object,           // 채널 테마 { brandColors, brandPreset }
+//     channelType: string            // 채널 유형 ('finance' | 'ai-tips' | ...)
+//   }
+//
+// Response:
+//   { status: 'ok', sceneIndex, newImageUrl, verdictRecord }
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** [POST] /review/regenerate-scene-image — 특정 씬 이미지만 재생성 */
+router.post('/review/regenerate-scene-image', async (req, res) => {
+    try {
+        const {
+            sessionId,
+            sceneIndex,
+            scene,
+            theme        = {},
+            channelType  = 'general',
+            feedback     = ''
+        } = req.body;
+
+        if (sessionId === undefined || sceneIndex === undefined || !scene) {
+            return res.status(400).json({ status: 'error', message: 'sessionId, sceneIndex, scene 필드가 필요합니다.' });
+        }
+
+        // ImageLabAgent 로직을 직접 재활용 (서버 내부 호출이므로 fetch 대신 직접 import)
+        const { ImageLabAgent } = await import('../ai-engine/agents/youtube-autopilot/ImageLabAgent.js');
+        const agent = new ImageLabAgent(`http://localhost:${process.env.PORT || 4000}`);
+
+        const SCENE_STRATEGY = {
+            hook:    'ai-image',
+            problem: 'html-card',
+            proof:   'html-card',
+            climax:  'ai-image',
+            cta:     'html-card',
+        };
+
+        const strategy = SCENE_STRATEGY[scene.type] || 'html-card';
+        const brandColors = theme?.brandColors || ['#1A1A2E', '#E94560'];
+
+        console.log(`[VideoLab/Regen] Scene ${sceneIndex} (${scene.type}) 재생성 시작 — 전략: ${strategy}`);
+
+        let newImageUrl;
+        try {
+            if (strategy === 'ai-image') {
+                newImageUrl = await agent._generateAIImage(scene, theme, channelType, feedback);
+            } else {
+                newImageUrl = await agent._generateHTMLCard(scene, theme, brandColors);
+            }
+        } catch (imgErr) {
+            console.error('[VideoLab/Regen] 이미지 생성 실패:', imgErr.message);
+            return res.status(500).json({ status: 'error', message: `이미지 생성 실패: ${imgErr.message}` });
+        }
+
+        console.log(`[VideoLab/Regen] ✅ Scene ${sceneIndex} 재생성 완료: ${newImageUrl}`);
+
+        // 재생성 완료를 판정 레코드로 기록
+        const verdictRecord = {
+            id:          `regen_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            agent:       'System',
+            sessionId,
+            focusedCard: sceneIndex,
+            verdict:     'COMMENT',
+            content:     `🔁 Scene ${sceneIndex + 1} 이미지가 재생성되었습니다.`,
+            metadata:    { newImageUrl, regenerated: true },
+            createdAt:   new Date().toISOString(),
+        };
+
+        // 판정 파일에 누적 저장
+        const verdictFilePath = path.join(VERDICTS_DIR, `${sessionId}.json`);
+        let existing = [];
+        if (fs.existsSync(verdictFilePath)) {
+            try { existing = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8')); } catch {}
+        }
+        existing.push(verdictRecord);
+        fs.writeFileSync(verdictFilePath, JSON.stringify(existing, null, 2));
+
+        // Socket.io로 두 이벤트 동시 전송:
+        //   1. 재생성 알림 채팅 버블
+        //   2. 씬 이미지 교체 신호 (프론트엔드가 sceneIndex의 이미지를 바꿔치기)
+        if (_ioInstance) {
+            _ioInstance.of('/review').emit('review:agent_verdict', verdictRecord);
+            _ioInstance.of('/review').emit('review:scene_image_updated', {
+                sessionId,
+                sceneIndex,
+                newImageUrl,
+            });
+        }
+
+        res.json({ status: 'ok', sceneIndex, newImageUrl, verdictRecord });
+
+    } catch (err) {
+        console.error('[VideoLab/Regen] 씬 이미지 재생성 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 25.5] 텍스트 대본 재생성 (Script Correction)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/review/regenerate-scene-text', async (req, res) => {
+    try {
+        const { sessionId, sceneIndex, scene, feedback } = req.body;
+        if (sessionId === undefined || sceneIndex === undefined || !scene || !feedback) {
+            return res.status(400).json({ status: 'error', message: '필수 파라미터가 누락되었습니다.' });
+        }
+
+        const systemPrompt = `당신은 유튜브 쇼츠 전문 스크립터입니다.
+주어진 기존 대본과 검수자의 교정 피드백(Feedback)을 바탕으로 대본 텍스트를 수정하세요.
+수정된 대본 텍스트만을 문자열 배열(string[]) 형태의 JSON으로 반환하세요.
+예시: ["이전보다 더 강렬해진 새로운 훅입니다.", "구독 좋아요 부탁드려요"]`;
+
+        const userPrompt = `[기존 대본]\n${JSON.stringify(scene.textLines)}\n\n[검수자 피드백]\n${feedback}`;
+        
+        console.log(`[VideoLab/RegenText] Scene ${sceneIndex} 텍스트 교정 시작...`);
+        const aiOutput = await GeminiAdapter.generateResponse(userPrompt, systemPrompt, 'gemini-2.5-flash');
+        
+        let jsonStr = aiOutput.text || aiOutput;
+        jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const newTextLines = JSON.parse(jsonStr);
+
+        console.log(`[VideoLab/RegenText] ✅ 교정 완료:`, newTextLines);
+
+        const verdictRecord = {
+            id:          `regen_txt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            agent:       'System',
+            sessionId,
+            focusedCard: sceneIndex,
+            verdict:     'COMMENT',
+            content:     `📝 Scene ${sceneIndex + 1} 텍스트가 교정되었습니다.`,
+            createdAt:   new Date().toISOString(),
+        };
+
+        if (_ioInstance) {
+            _ioInstance.of('/review').emit('review:agent_verdict', verdictRecord);
+            _ioInstance.of('/review').emit('review:scene_text_updated', {
+                sessionId,
+                sceneIndex,
+                newTextLines
+            });
+        }
+
+        res.json({ status: 'ok', sceneIndex, newTextLines });
+    } catch (err) {
+        console.error('[VideoLab/RegenText] 대본 교정 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 25.5] TTS 오디오 재생성 (Audio Correction)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/review/regenerate-tts', async (req, res) => {
+    try {
+        const { sessionId, sceneIndex, scene, voiceKey = 'A', feedback = '' } = req.body;
+        // TTSAgent를 동적으로 가져옵니다
+        const { TTSAgent } = await import('../ai-engine/agents/youtube-autopilot/TTSAgent.js');
+        
+        console.log(`[VideoLab/RegenTTS] Scene ${sceneIndex} 음성 재생성 시작 (버전: ${voiceKey})... 피드백: ${feedback}`);
+        
+        const publicDir = process.env.REMOTION_PUBLIC_DIR || path.resolve(process.cwd(), 'remotion-poc/public');
+        
+        // 단일 씬에 대해 TTS를 다시 생성 (TTSAgent의 generateAudioForScenario 재활용을 위해 래핑)
+        const dummyScenario = { scenes: [scene] };
+        const updatedScenario = await TTSAgent.generateAudioForScenario(dummyScenario, publicDir, voiceKey, feedback);
+        
+        const updatedScene = updatedScenario.scenes[0];
+        
+        console.log(`[VideoLab/RegenTTS] ✅ 음성 재생성 완료. 길이: ${updatedScene.durationFrames}프레임`);
+
+        const verdictRecord = {
+            id:          `regen_tts_${Date.now()}`,
+            agent:       'System',
+            sessionId,
+            focusedCard: sceneIndex,
+            verdict:     'COMMENT',
+            content:     `🎙️ Scene ${sceneIndex + 1} 음성이 갱신되었습니다.`,
+            createdAt:   new Date().toISOString(),
+        };
+
+        if (_ioInstance) {
+            _ioInstance.of('/review').emit('review:agent_verdict', verdictRecord);
+            _ioInstance.of('/review').emit('review:scene_tts_updated', {
+                sessionId,
+                sceneIndex,
+                audioFile: updatedScene.audioFile,
+                durationFrames: updatedScene.durationFrames
+            });
+        }
+
+        res.json({ status: 'ok', sceneIndex, updatedScene });
+    } catch (err) {
+        console.error('[VideoLab/RegenTTS] 음성 교정 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 25.5] 최종 컴포지션 마스터 렌더링 (Finalize)
+// 교정된 최종 Scenario 배열 전체를 받아 단일 MP4를 굽습니다.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/review/finalize-render', async (req, res) => {
+    try {
+        const { sessionId, finalScenario, channelType, voiceKey = 'A' } = req.body;
+        if (!finalScenario) return res.status(400).json({ status: 'error', message: 'finalScenario가 누락되었습니다.' });
+
+        console.log(`[VideoLab/Finalize] 🚀 세션 ${sessionId} 최종 마스터 비디오 렌더링 시작...`);
+        const { VideoAdapter } = await import('../ai-engine/adapters/VideoAdapter.js');
+        
+        const outputFileName = `final-autopilot-${sessionId}.mp4`;
+        const remotionProps = {
+            theme: finalScenario.theme,
+            scenes: finalScenario.scenes,
+            totalDurationFrames: finalScenario.scenes.reduce((acc, s) => acc + (s.durationFrames || 150), 0)
+        };
+
+        const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
+        console.log(`[VideoLab/Finalize] ✅ 마스터 비디오 렌더링 완료: ${outputPath}`);
+
+        res.json({ status: 'ok', videoUrl: `http://localhost:${process.env.PORT || 4000}/outputs/${outputFileName}` });
+    } catch (err) {
+        console.error('[VideoLab/Finalize] 최종 렌더링 에러:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 26] 통합 워크플로우: Mock 제거 및 라이브 수집/에셋 생성
+// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 26] Legacy Lab 경쟁 채널 분석 엔드포인트 (복원 + DataHarvester 시드 연동)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * [POST] /analyze-competitor
+ * 유튜브 URL 2개를 받아 핵심 키워드와 Hook 패턴을 추출합니다.
+ * 추출된 키워드는 DataHarvester seedKeywords로 주입되어 뉴스 수집 정밀도를 높입니다.
+ */
+router.post('/analyze-competitor', async (req, res) => {
+    try {
+        const { urls } = req.body;
+        if (!Array.isArray(urls) || urls.length < 1) {
+            return res.status(400).json({ error: '최소 1개 이상의 유튜브 링크가 필요합니다.' });
+        }
+
+        const transcripts = await extractTranscripts(urls);
+        const successTranscripts = transcripts.filter(t => !t.isError);
+
+        if (successTranscripts.length === 0) {
+            return res.status(422).json({
+                error: 'TRANSCRIPT_EXTRACTION_FAILED',
+                message: '자막 추출에 실패했습니다. URL을 확인하거나 수동으로 키워드를 입력해주세요.',
+                failedUrls: transcripts.map(t => t.url)
+            });
+        }
+
+        const combinedText = successTranscripts
+            .map((t, idx) => `[영상 ${idx+1}]\n${t.transcript}`)
+            .join('\n\n');
+
+        const systemPrompt = `당신은 유튜브 쇼츠 트렌드 분석 전문가입니다.
+주어진 영상 자막에서 다음을 추출하세요:
+1. 핵심 키워드 3~5개 (뉴스 검색에 쓸 수 있는 명사)
+2. Hook 패턴 (첫 3초 구조)
+3. 채널 전략 요약 (1~2줄)
+
+반드시 아래 JSON 포맷으로만 반환하세요:
+{
+  "seedKeywords": ["키워드1", "키워드2", "키워드3"],
+  "hookPattern": "훅 패턴 설명",
+  "strategySummary": "전략 요약"
+}`;
+
+        const aiOutput = await GeminiAdapter.generateResponse(
+            combinedText,
+            systemPrompt,
+            'gemini-2.5-flash'
+        );
+
+        let jsonStr = (aiOutput.text || aiOutput).replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const analysis = JSON.parse(jsonStr);
+
+        res.json({
+            status: 'ok',
+            seedKeywords: analysis.seedKeywords || [],
+            hookPattern: analysis.hookPattern || '',
+            strategySummary: analysis.strategySummary || '',
+            analyzedCount: successTranscripts.length
+        });
+
+    } catch (err) {
+        console.error('[VideoLab/Competitor] 경쟁 분석 오류:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// [Phase 26] 통합 워크플로우: 실데이터 수집 + Vision 검수
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/run-pipeline', async (req, res) => {
+    try {
+        const { channelType, sessionId, seedKeywords = [] } = req.body;
+        
+        // HTTP 응답은 즉시 반환
+        res.json({ status: 'started', sessionId });
+
+        (async () => {
+            const emitProgress = (step, log) => {
+                console.log(`[VideoLab/Pipeline] ${log}`);
+                if (_ioInstance) {
+                    _ioInstance.of('/review').emit('review:pipeline_progress', { step, log, sessionId });
+                }
+            };
+
+            try {
+                const harvester    = new DataHarvester();
+                const curator      = new CurationAgent();
+                const imageLabAgent = new ImageLabAgent(`http://localhost:${process.env.PORT || 4000}`);
+
+                // 1단계: DataHarvester (Legacy Lab 시드 키워드 포함)
+                const seedInfo = seedKeywords.length > 0 ? ` (경쟁 분석 시드 ${seedKeywords.length}개 포함)` : '';
+                emitProgress(10, `🔍 [1단계] DataHarvester — 구글뉴스 수집 중${seedInfo}...`);
+
+                const harvestResult = await harvester.harvestDailySources(channelType || 'finance-viral', seedKeywords);
+
+                if (harvestResult.failed || harvestResult.totalCount === 0) {
+                    throw new Error(`DataHarvester 실패: 수집된 뉴스 소스 0건 (구글뉴스 RSS 연결을 확인하세요)`);
+                }
+
+                emitProgress(30, `✅ [DataHarvester] 실제 뉴스 ${harvestResult.totalCount}건 수집 완료`);
+
+                // 2단계: CurationAgent
+                emitProgress(40, '🧠 [2단계] CurationAgent — 실제 뉴스 기반 시나리오 구성 중...');
+                const topScenarios = await curator.analyzeAndSelectTop3(harvestResult.sources, channelType || 'finance-viral');
+                const top1 = topScenarios?.[0];
+                if (!top1) throw new Error('시나리오 추출에 실패했습니다.');
+                emitProgress(60, `✅ [CurationAgent] Top1 채택: "${top1.selectedSourceTitle.slice(0, 30)}..."`);
+
+                // 소켓으로 Top3 큐레이션 데이터 전송 (큐레이션 검수 뷰 진입용)
+                if (_ioInstance) {
+                    _ioInstance.of('/review').emit('review:curation_ready', {
+                        sessionId,
+                        sources: harvestResult.sources.slice(0, 10), // 상위 10건 출처 표시
+                        topScenarios: topScenarios.map(s => ({
+                            title: s.selectedSourceTitle,
+                            score: s.totalScore,
+                            hook:  s.scenario?.scenes?.[0]?.textLines?.[0] || ''
+                        }))
+                    });
+                }
+
+                // 3단계: ImageLabAgent
+                emitProgress(70, '🎨 [3단계] ImageLabAgent — 씬별 AI 이미지 생성 중...');
+                const scenarioWithImages = await imageLabAgent.generateAssetsForScenario(top1.scenario, channelType || 'finance-viral');
+
+                // 4단계: TTS
+                emitProgress(85, '🎙️ [4단계] TTSAgent — 오디오 프레임 동기화 중...');
+                const publicDir = process.env.REMOTION_PUBLIC_DIR || path.resolve(process.cwd(), 'remotion-poc/public');
+                const scenarioWithAudio = await TTSAgent.generateAudioForScenario(scenarioWithImages, publicDir, 'C');
+
+                emitProgress(100, '🎉 파이프라인 완료. 리뷰 스튜디오로 이동합니다.');
+
+                if (_ioInstance) {
+                    _ioInstance.of('/review').emit('review:pipeline_ready', {
+                        sessionId,
+                        scenario: scenarioWithAudio
+                    });
+                }
+
+            } catch (err) {
+                console.error('[VideoLab/Pipeline] 에러:', err);
+                emitProgress(0, `❌ 파이프라인 중단: ${err.message}`);
+                if (_ioInstance) _ioInstance.of('/review').emit('review:pipeline_error', { sessionId, message: err.message });
+            }
+        })();
+
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
     }
 });
 

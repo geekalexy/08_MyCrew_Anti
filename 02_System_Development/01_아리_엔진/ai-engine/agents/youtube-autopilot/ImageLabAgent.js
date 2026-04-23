@@ -89,8 +89,12 @@ export class ImageLabAgent {
   // ──────────────────────────────────────────────────────────────────
   // PRIVATE: AI 이미지 생성 (hook, climax — brand-generate)
   // ──────────────────────────────────────────────────────────────────
-  async _generateAIImage(scene, theme, channelType) {
-    const description = scene.textLines?.join(' ') || '임팩트 있는 장면';
+  async _generateAIImage(scene, theme, channelType, feedback = '') {
+    const baseDescription = scene.textLines?.join(' ') || '임팩트 있는 장면';
+    const description = feedback 
+        ? `[리뷰 피드백 반영 요망 - 반드시 다음 지적사항을 극복할 것: "${feedback}"] 기존 대본: ${baseDescription}` 
+        : baseDescription;
+        
     const brandPreset  = theme?.brandPreset || 'signature';
 
     const res = await fetch(`${this.serverUrl}/api/imagelab/brand-generate`, {

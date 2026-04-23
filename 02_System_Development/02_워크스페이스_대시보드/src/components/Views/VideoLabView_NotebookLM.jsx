@@ -33,6 +33,15 @@ export default function VideoLabView() {
   const [scriptTitles, setScriptTitles] = useState([]); // 타이틀 후보 저장용
   const [regeneratingSceneId, setRegeneratingSceneId] = useState(null);
 
+  // ── Step 4 리뷰 교정 State ───────────────────────────────────────────
+  const [textFeedbacks, setTextFeedbacks] = useState({}); // { [sceneIdx]: string }
+  const [ttsFeedbacks, setTtsFeedbacks] = useState({});   // { [sceneIdx]: string }
+  const [regenTextLoading, setRegenTextLoading] = useState(null); // sceneIdx | null
+  const [regenTtsLoading, setRegenTtsLoading] = useState(null);  // sceneIdx | null
+  const [finalizeLoading, setFinalizeLoading] = useState(false);
+  const [finalVideoUrl, setFinalVideoUrl] = useState(null);
+  const [sessionId] = useState(() => `nlm_session_${Date.now()}`);
+
   const showToast = (msg, duration = 4000) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), duration);
@@ -201,6 +210,87 @@ ${customInstructions || '없음'}`;
       showToast(err.message);
     } finally {
       setRegeneratingSceneId(null);
+    }
+  };
+
+  // ─── Step 4 텍스트 교정 로직 ───
+  const handleRegenText = async (sceneIdx) => {
+    const feedback = textFeedbacks[sceneIdx]?.trim();
+    if (!feedback) return showToast('교정 피드백을 입력하세요.');
+    setRegenTextLoading(sceneIdx);
+    try {
+      const scene = scriptScenes[sceneIdx];
+      const res = await fetch(`${SERVER_URL}/api/videolab/review/regenerate-scene-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, sceneIndex: sceneIdx, scene: { ...scene, textLines: [scene.text] }, feedback })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || '텍스트 교정 실패');
+      const newScenes = [...scriptScenes];
+      newScenes[sceneIdx] = { ...scene, text: data.newTextLines?.join(' ') || scene.text };
+      setScriptScenes(newScenes);
+      setTextFeedbacks(prev => ({ ...prev, [sceneIdx]: '' }));
+      showToast(`✅ Scene ${sceneIdx + 1} 텍스트 교정 완료!`);
+    } catch(err) {
+      showToast(err.message);
+    } finally {
+      setRegenTextLoading(null);
+    }
+  };
+
+  // ─── Step 4 TTS 교정 로직 ───
+  const handleRegenTTS = async (sceneIdx) => {
+    const feedback = ttsFeedbacks[sceneIdx]?.trim();
+    setRegenTtsLoading(sceneIdx);
+    try {
+      const scene = scriptScenes[sceneIdx];
+      const res = await fetch(`${SERVER_URL}/api/videolab/review/regenerate-tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, sceneIndex: sceneIdx, scene, voiceKey: 'C', feedback: feedback || '' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'TTS 교정 실패');
+      const newScenes = [...scriptScenes];
+      if (data.updatedScene?.durationFrames) {
+        newScenes[sceneIdx] = { ...scene, durationFrames: data.updatedScene.durationFrames, audioFile: data.updatedScene.audioFile };
+      }
+      setScriptScenes(newScenes);
+      setTtsFeedbacks(prev => ({ ...prev, [sceneIdx]: '' }));
+      showToast(`✅ Scene ${sceneIdx + 1} TTS 재생성 완료! (${data.updatedScene?.durationFrames || '?'}프레임)`);
+    } catch(err) {
+      showToast(err.message);
+    } finally {
+      setRegenTtsLoading(null);
+    }
+  };
+
+  // ─── 최종 렌더링 로직 ───
+  const handleFinalizeRender = async () => {
+    if (!scriptScenes || scriptScenes.length === 0) return showToast('스크립트가 비어있습니다.');
+    setFinalizeLoading(true);
+    setFinalVideoUrl(null);
+    try {
+      showToast('🎬 최종 MP4 렌더링 시작... (수십 초 소요)', 15000);
+      const res = await fetch(`${SERVER_URL}/api/videolab/review/finalize-render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          finalScenario: { scenes: scriptScenes },
+          channelType: 'nlm-export',
+          voiceKey: 'C'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || '렌더링 실패');
+      setFinalVideoUrl(data.videoUrl);
+      showToast('🎉 최종 렌더링 완료! 아래 링크에서 확인하세요.', 8000);
+    } catch(err) {
+      showToast(`❌ 렌더링 실패: ${err.message}`);
+    } finally {
+      setFinalizeLoading(false);
     }
   };
 
@@ -567,58 +657,130 @@ ${customInstructions || '없음'}`;
                 </div>
               )}
 
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
-                      <th style={{ padding: '12px', width: '80px', color: 'var(--text-muted)' }}>Scene</th>
-                      <th style={{ padding: '12px', width: '80px', color: 'var(--text-muted)' }}>초(s)</th>
-                      <th style={{ padding: '12px', color: 'var(--text-muted)' }}>내래이션 / 자막 텍스트</th>
-                      <th style={{ padding: '12px', color: 'var(--text-muted)' }}>이미지/비주얼 지시사항</th>
-                      <th style={{ padding: '12px', width: '70px', color: 'var(--text-muted)', textAlign: 'center' }}>교체</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scriptScenes.map((scene, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)', verticalAlign: 'top' }}>
-                        <td style={{ padding: '16px', fontWeight: 600 }}>{scene.sceneId || idx + 1}</td>
-                        <td style={{ padding: '16px', color: '#4ade80' }}>
-                          <input type="text" defaultValue={scene.duration} style={{ width: '40px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: '#4ade80', padding: '4px', borderRadius: '4px', textAlign: 'center' }} />초
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <textarea 
-                              defaultValue={scene.text} 
-                              key={`text-${idx}-${scene.text}`}
-                              style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: '#fff', padding: '8px', borderRadius: '4px', fontSize: '0.85rem' }} 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {scriptScenes.map((scene, idx) => (
+                  <div key={idx} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+                    {/* 씬 헤더 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ background: '#6464F6', color: '#fff', padding: '2px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700 }}>Scene {scene.sceneId || idx + 1}</span>
+                      <span style={{ color: '#4ade80', fontSize: '0.85rem' }}>{scene.duration}초</span>
+                      <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+                        {/* 씬 전체 교체 버튼 */}
+                        <button
+                          onClick={() => handleRegenerateScene(idx)}
+                          disabled={regeneratingSceneId === idx}
+                          title="이 씬 전체를 AI로 재작성"
+                          style={{ background: 'rgba(238,42,123,0.1)', color: '#f472b6', border: '1px solid rgba(238,42,123,0.3)', padding: '5px 10px', borderRadius: '6px', cursor: regeneratingSceneId === idx ? 'wait' : 'pointer', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: regeneratingSceneId === idx ? 'spin 1s linear infinite' : 'none' }}>
+                            {regeneratingSceneId === idx ? 'hourglass_empty' : 'autorenew'}
+                          </span>
+                          씬 전체 교체
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 씬 바디: 2컬럼 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                      {/* 텍스트 컬럼 */}
+                      <div style={{ padding: '1rem', borderRight: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>📝 내레이션 / 자막</div>
+                        <textarea
+                          value={scene.text}
+                          onChange={e => {
+                            const newScenes = [...scriptScenes];
+                            newScenes[idx] = { ...scene, text: e.target.value };
+                            setScriptScenes(newScenes);
+                          }}
+                          style={{ width: '100%', minHeight: '70px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: '#fff', padding: '8px', borderRadius: '6px', fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box' }}
+                        />
+                        {/* 텍스트 교정 */}
+                        <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            placeholder="교정 피드백 입력 (예: 더 강하게, 15자 이내로)..."
+                            value={textFeedbacks[idx] || ''}
+                            onChange={e => setTextFeedbacks(prev => ({ ...prev, [idx]: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleRegenText(idx)}
+                            style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(100,200,255,0.25)', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem' }}
                           />
-                        </td>
-                        <td style={{ padding: '16px' }}>
-                          <textarea 
-                              defaultValue={scene.visualPrompt} 
-                              key={`visual-${idx}-${scene.visualPrompt}`}
-                              style={{ width: '100%', minHeight: '60px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: '#b4c5ff', padding: '8px', borderRadius: '4px', fontSize: '0.85rem' }} 
-                          />
-                        </td>
-                        <td style={{ padding: '16px', textAlign: 'center', verticalAlign: 'middle' }}>
-                          <button 
-                            onClick={() => handleRegenerateScene(idx)}
-                            disabled={regeneratingSceneId === idx}
-                            style={{ background: 'rgba(238,42,123,0.1)', color: '#f472b6', border: '1px solid rgba(238,42,123,0.3)', padding: '8px', borderRadius: '8px', cursor: regeneratingSceneId === idx ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            title="이 씬만 AI로 새롭게 다시 생성교체"
+                          <button
+                            onClick={() => handleRegenText(idx)}
+                            disabled={regenTextLoading === idx}
+                            style={{ background: 'rgba(100,200,255,0.15)', color: '#7dd3fc', border: '1px solid rgba(100,200,255,0.3)', padding: '6px 12px', borderRadius: '6px', cursor: regenTextLoading === idx ? 'wait' : 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px' }}
                           >
-                            <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', animation: regeneratingSceneId === idx ? 'spin 1s linear infinite' : 'none' }}>
-                              {regeneratingSceneId === idx ? 'hourglass_empty' : 'autorenew'}
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', animation: regenTextLoading === idx ? 'spin 1s linear infinite' : 'none' }}>
+                              {regenTextLoading === idx ? 'sync' : 'text_fields'}
                             </span>
+                            {regenTextLoading === idx ? '교정 중...' : 'AI 교정'}
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+
+                      {/* 비주얼+TTS 컬럼 */}
+                      <div style={{ padding: '1rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>🖼️ 비주얼 지시사항</div>
+                        <textarea
+                          value={scene.visualPrompt}
+                          onChange={e => {
+                            const newScenes = [...scriptScenes];
+                            newScenes[idx] = { ...scene, visualPrompt: e.target.value };
+                            setScriptScenes(newScenes);
+                          }}
+                          style={{ width: '100%', minHeight: '70px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: '#b4c5ff', padding: '8px', borderRadius: '6px', fontSize: '0.85rem', resize: 'vertical', boxSizing: 'border-box' }}
+                        />
+                        {/* TTS 교정 */}
+                        <div style={{ marginTop: '8px', display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            placeholder="TTS 피드백 (예: 더 빠르게, 여성 목소리로)..."
+                            value={ttsFeedbacks[idx] || ''}
+                            onChange={e => setTtsFeedbacks(prev => ({ ...prev, [idx]: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && handleRegenTTS(idx)}
+                            style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(167,139,250,0.25)', color: '#fff', padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem' }}
+                          />
+                          <button
+                            onClick={() => handleRegenTTS(idx)}
+                            disabled={regenTtsLoading === idx}
+                            style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.3)', padding: '6px 12px', borderRadius: '6px', cursor: regenTtsLoading === idx ? 'wait' : 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '3px' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', animation: regenTtsLoading === idx ? 'spin 1s linear infinite' : 'none' }}>
+                              {regenTtsLoading === idx ? 'sync' : 'record_voice_over'}
+                            </span>
+                            {regenTtsLoading === idx ? '생성 중...' : 'TTS 재생성'}
+                          </button>
+                        </div>
+                        {/* TTS 결과 표시 */}
+                        {scene.audioFile && (
+                          <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>audio_file</span>
+                            {scene.audioFile} ({scene.durationFrames || '?'}f)
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
-              <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
-                <button 
+              {/* 최종 렌더링 결과 표시 */}
+              {finalVideoUrl && (
+                <div style={{ marginTop: '1.5rem', padding: '1rem 1.25rem', background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.3)', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span className="material-symbols-outlined" style={{ color: '#4ade80', fontSize: '1.5rem' }}>check_circle</span>
+                  <div>
+                    <div style={{ color: '#4ade80', fontWeight: 600, marginBottom: '4px' }}>🎉 최종 MP4 렌더링 완료!</div>
+                    <a href={finalVideoUrl} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc', fontSize: '0.85rem', wordBreak: 'break-all' }}>{finalVideoUrl}</a>
+                  </div>
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(finalVideoUrl); showToast('링크 복사 완료!'); }}
+                    style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                  >링크 복사</button>
+                </div>
+              )}
+
+              <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {/* 저장 */}
+                <button
                   onClick={async () => {
                     if (!scriptScenes || scriptScenes.length === 0) return showToast('스크립트가 비어있습니다.');
                     try {
@@ -637,12 +799,14 @@ ${customInstructions || '없음'}`;
                       setIsLoading(false);
                     }
                   }}
-                  disabled={isLoading}
-                  style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px', cursor: isLoading ? 'not-allowed' : 'pointer' }}
+                  disabled={isLoading || finalizeLoading}
+                  style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid var(--border)', padding: '12px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}
                 >
-                  저장만 하기
+                  💾 저장만 하기
                 </button>
-                <button 
+
+                {/* NotebookLM */}
+                <button
                   onClick={async () => {
                     if (!scriptScenes || scriptScenes.length === 0) return showToast('스크립트가 비어있습니다.');
                     setIsLoading(true);
@@ -662,10 +826,28 @@ ${customInstructions || '없음'}`;
                       setIsLoading(false);
                     }
                   }}
-                  disabled={isLoading}
-                  style={{ background: 'linear-gradient(135deg, #f472b6, #e81cff)', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: 600, cursor: isLoading ? 'wait' : 'pointer' }}
+                  disabled={isLoading || finalizeLoading}
+                  style={{ background: 'linear-gradient(135deg, #f472b6, #e81cff)', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: 600, cursor: isLoading ? 'wait' : 'pointer', fontSize: '0.9rem' }}
                 >
-                  {isLoading ? '노트북 LM으로 전송 중...' : '노트북 LM 슬라이드 & 오디오 생성 연동'}
+                  {isLoading ? '전송 중...' : '📓 NotebookLM 연동'}
+                </button>
+
+                {/* 최종 렌더링 */}
+                <button
+                  onClick={handleFinalizeRender}
+                  disabled={finalizeLoading || isLoading}
+                  style={{
+                    background: finalizeLoading ? 'var(--border)' : 'linear-gradient(135deg, #10b981, #6464F6)',
+                    color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px',
+                    fontWeight: 700, cursor: finalizeLoading ? 'wait' : 'pointer',
+                    fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px',
+                    boxShadow: finalizeLoading ? 'none' : '0 4px 20px rgba(100,100,246,0.4)'
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem', animation: finalizeLoading ? 'spin 1s linear infinite' : 'none' }}>
+                    {finalizeLoading ? 'sync' : 'movie'}
+                  </span>
+                  {finalizeLoading ? '렌더링 중...' : '🎬 업로드 준비 (최종 MP4 렌더)'}
                 </button>
               </div>
             </div>

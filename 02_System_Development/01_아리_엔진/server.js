@@ -29,7 +29,7 @@ import { MODEL } from './ai-engine/modelRegistry.js';
 import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
 import b4System from './ai-engine/tools/b4System.js';
 import imageLabRouter from './routes/imageLabRouter.js';
-import videoLabRouter from './routes/videoLabRouter.js';
+import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -60,6 +60,9 @@ export const io = new Server(httpServer, {
     credentials: true,
   },
 });
+
+// [Phase 25] videoLabRouter에 io 인스턴스 주입 (판정 엔드포인트 브로드캐스트용)
+setIoForVideoLabRouter(io);
 
 // 에이전트 상태 맵 { agentId: { status, lastHeartbeat } }
 const agentStates = new Map();
@@ -253,7 +256,52 @@ executor.setBroadcastLog(broadcastLog);
 // [Phase 1] 파일 폴링 어댑터 감시 데몬 실행 개시
 initAdapterWatcher(io, dbManager, broadcastLog);
 
-// ─── [Phase 22 Sprint 1] Ari 비서 전용 Socket 네임스페이스 ─────────────────
+// ─── [Phase 25] Review Studio 소켓 네임스페이스 ──────────────────────────────
+// VideoLab/ImageLab 리뷰 스튜디오 전용 실시간 채널
+// Antigravity(Sonnet/Prime/Luca)가 POST /api/videolab/review/agent-verdict 호출 시
+// 이 네임스페이스를 통해 연결된 모든 VideoLab 클라이언트에 판정 브로드캐스트됨
+const reviewNs = io.of('/review');
+reviewNs.on('connection', (socket) => {
+  console.log(`[Socket/review] 리뷰 스튜디오 세션 연결됨: ${socket.id}`);
+
+  // 연결 시 최근 판정 이력 동기화 (sessionId 기반)
+  socket.on('review:join_session', async ({ sessionId }) => {
+    if (!sessionId) return;
+    socket.join(sessionId);
+    console.log(`[Socket/review] ${socket.id} → 세션 [${sessionId}] 참여`);
+
+    // 기존 판정 이력 즉시 전송 (fs/path 는 상단 import 사용)
+    const verdictFilePath = path.resolve(process.cwd(), `outputs/review_verdicts/${sessionId}.json`);
+    if (fs.existsSync(verdictFilePath)) {
+      try {
+        const history = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8'));
+        socket.emit('review:history_sync', { sessionId, verdicts: history });
+      } catch {}
+    }
+  });
+
+  // 대표님 직접 채팅 (VideoLab 채팅창 → 소켓으로 전달)
+  socket.on('review:human_message', ({ sessionId, content, focusedCard }) => {
+    const msg = {
+      id:         `human_${Date.now()}`,
+      agent:      '대표님',
+      role:       'user',
+      sessionId,
+      focusedCard: focusedCard ?? null,
+      verdict:    'COMMENT',
+      content,
+      createdAt:  new Date().toISOString()
+    };
+    // 같은 세션의 모든 참여자에게 브로드캐스트
+    reviewNs.to(sessionId).emit('review:agent_verdict', msg);
+    console.log(`[Socket/review] 대표님 메시지 → 세션 [${sessionId}]: "${content.slice(0, 40)}..."`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket/review] 세션 해제: ${socket.id}`);
+  });
+});
+
 // HTTP REST /api/chat 완전 대체 — 실시간 스트리밍 응답 지원
 const ariNs = io.of('/ari');
 ariNs.on('connection', (socket) => {
@@ -1314,14 +1362,24 @@ app.delete('/api/auth/google-token', (req, res) => {
 });
 
 /** GET /api/auth/status — 현재 인증 모드 확인 */
-app.get('/api/auth/status', (req, res) => {
-  const hasValidToken = !!_googleOAuthToken && Date.now() < _googleOAuthExpiry;
-  res.json({
-    status: 'ok',
-    mode: hasValidToken ? 'google_oauth' : 'api_key',
-    hasApiKey: !!(process.env.GEMINI_API_KEY),
-    tokenExpiresAt: hasValidToken ? new Date(_googleOAuthExpiry).toISOString() : null,
-  });
+app.get('/api/auth/status', async (req, res) => {
+  try {
+    const validToken = await getGoogleOAuthToken();
+    const hasValidToken = !!validToken;
+    res.json({
+      status: 'ok',
+      mode: hasValidToken ? 'google_oauth' : 'api_key',
+      hasApiKey: !!(process.env.GEMINI_API_KEY),
+      tokenExpiresAt: hasValidToken ? new Date(_googleOAuthExpiry).toISOString() : null,
+      token: validToken
+    });
+  } catch (err) {
+    res.json({
+      status: 'error',
+      mode: 'api_key',
+      hasApiKey: !!(process.env.GEMINI_API_KEY)
+    });
+  }
 });
 
 // ─── 설정 API (GET/PUT /api/settings) ────────────────────────────────────────

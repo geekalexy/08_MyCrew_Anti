@@ -42,14 +42,18 @@ app.use(express.json());
 
 const PORT = 5050;
 
-// ─── API 키 관리 ───────────────────────────────────────────────────────────
-const API_KEYS = [
-  process.env.GEMINI_API_KEY,
-  process.env.GEMINI_API_KEY_2,
-].filter(Boolean);
+// ─── API 키 관리 (keyProvider 연동) ───────────────────────────────────────────────────────────
+import keyProvider from './tools/keyProvider.js';
+
+let API_KEYS = [];
+const key1 = await keyProvider.getKey('GEMINI_API_KEY');
+const key2 = await keyProvider.getKey('GEMINI_API_KEY_2');
+
+if (key1) API_KEYS.push(key1);
+if (key2) API_KEYS.push(key2);
 
 if (API_KEYS.length === 0) {
-  console.error('[AriDaemon] 🚨 GEMINI_API_KEY가 없습니다. .env를 확인해주세요.');
+  console.error('[AriDaemon] 🚨 GEMINI_API_KEY가 없습니다. 환경 변수(.env)나 온보딩 설정을 확인해주세요.');
   process.exit(1);
 }
 
@@ -127,7 +131,8 @@ const ARI_TOOLS = [
       // ── [도구 2] 칸반 카드 수정 ──────────────────────────────────────
       {
         name: 'updateKanbanTask',
-        description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자 등을 변경합니다.
+        description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자, 내용을 변경합니다.
+중요(Crucial): 사용자가 카드 내용을 지적하거나 업무적인 지시/보완 사항을 말할 때, 절대 채팅창에 말로만 대답하지 말고 **즉시 이 도구를 호출하여 카드 내용을 상세하게 업데이트** 해야 합니다.
 사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '내용 업데이트해줘' 등을 말할 때 이 도구를 반드시 사용합니다.
 새 카드를 생성하지 않고 기존 카드를 수정해야 할 때 적합합니다.`,
         parameters: {
@@ -198,6 +203,83 @@ const ARI_TOOLS = [
         },
       },
 
+      // ── [도구 5] 로컬 폴더 조회 ───────────────────────────────────────
+      {
+        name: 'listDirectoryContents',
+        description: `로컬 시스템의 폴더 내용을 조회합니다.
+사용자가 'outputs 폴더 확인해봐', '어떤 파일들이 있어?' 등을 말할 때 호출합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            dirPath: {
+              type: 'string',
+              description: '조회할 폴더 경로 (예: "outputs", "skill-library/05_design/lab-assets")',
+            },
+          },
+          required: ['dirPath'],
+        },
+      },
+      // ── [도구 6] 로컬 이미지 인식 (Vision) ───────────────────────────
+      {
+        name: 'analyzeLocalImage',
+        description: `로컬에 저장된 이미지 파일(.png, .jpg 등)을 시각적으로 분석(Vision)합니다.
+사용자가 '저장된 결과물 파일 확인해봐', '이미지 어떤지 봐줘' 등을 말할 때 파일 경로를 넣어 호출합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: {
+              type: 'string',
+              description: '분석할 이미지 파일 경로 (예: "outputs/result.png")',
+            },
+            prompt: {
+              type: 'string',
+              description: '이미지에 대해 알고 싶은 구체적인 질문 (예: "이 이미지의 전반적인 분위기와 객체들을 상세히 묘사해줘")',
+            },
+          },
+          required: ['filePath', 'prompt'],
+        },
+      },
+      // ── [도구 7] 에이전트 스킬 관리 (장착/해제) ───────────────────────
+      {
+        name: 'manageAgentSkills',
+        description: `본인(아리) 또는 다른 에이전트의 스킬을 장착(equip)하거나 해제(unequip)합니다.
+사용자가 '스킬 빼줘', '마케팅 스킬 장착해' 등을 말하거나, 아리 스스로 상황에 맞게 스킬 조정이 필요할 때 자율적으로 판단해 호출합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            agentId: {
+              type: 'string',
+              description: '스킬을 변경할 에이전트 ID (예: "ari", "nova", "lumi")',
+            },
+            skillId: {
+              type: 'string',
+              description: '장착/해제할 스킬 ID (예: "marketing", "content", "design", "analysis", "socian-analysis")',
+            },
+            action: {
+              type: 'string',
+              enum: ['equip', 'unequip'],
+              description: '장착할지 해제할지 여부',
+            },
+          },
+          required: ['agentId', 'skillId', 'action'],
+        },
+      },
+      // ── [도구 8] 대표님 관찰 에세이 작성 ───────────────────────
+      {
+        name: 'writeCEOLog',
+        description: `하루 일과를 마치거나 대표님이 요청할 때, 대표님의 리더십, 심리 상태, 의사결정 패턴 등을 객관적으로 분석한 짧은 에세이를 작성하여 05_My_history 폴더에 저장합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            essayContent: {
+              type: 'string',
+              description: '작성할 에세이의 본문 (대표님의 객관적 특성 분석 내용)',
+            },
+          },
+          required: ['essayContent'],
+        },
+      },
+
     ],
   },
 ];
@@ -213,7 +295,7 @@ function getAriSystemInstruction() {
 
   // ── Layer 1: ARI_BRAIN.md — 핵심 정체성 (정적, 고품질) ──────────────────
   const coreBrain = ARI_BRAIN ||
-    `당신은 MyCrew의 비서 아리(Ari)입니다. Gemini 2.5 Flash 기반 자율 행동형 비서입니다.`;
+    `당신은 MyCrew의 비서 아리(Ari)입니다. Gemini 2.5 Pro 기반 자율 행동형 비서입니다.`;
 
   // ── Layer 2: 런타임 컨텍스트 — 매 요청마다 최신화 ──────────────────────
   const runtimeCtx = [
@@ -256,6 +338,15 @@ async function executeTool(toolName, args) {
       // priority는 getAllTasksLight에서 쓰이므로 별도 처리
       const crewMember = CREW_INFO[assigneeId] || { name: assigneeId };
 
+      // [Phase 25] 할당 이벤트 발생 (서버의 Dispatcher 트리거)
+      try {
+        fetch(`http://localhost:4000/api/tasks/dispatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agentId: assigneeId })
+        }).catch(err => console.warn('[AriDaemon] Dispatch trigger failed:', err.message));
+      } catch (e) {}
+
       return {
         success: true,
         taskId,
@@ -267,21 +358,34 @@ async function executeTool(toolName, args) {
     if (toolName === 'updateKanbanTask') {
       const { taskId, content, assigneeId, status } = args;
 
-      // 현재 태스크 조회
-      const existing = await dbManager.getTaskByIdFull(taskId);
-      if (!existing) {
-        return { success: false, message: `#${taskId} 태스크를 찾을 수 없습니다.` };
-      }
+      // status -> column 매핑 (프론트엔드 API 호환용)
+      const statusToColumn = {
+        'PENDING': 'todo',
+        'in_progress': 'in_progress',
+        'done': 'done',
+        'CANCELLED': 'todo'
+      };
+      const column = status ? statusToColumn[status] : undefined;
 
-      if (status) {
-        await dbManager.updateTaskStatus(taskId, status);
-      }
+      // server.js의 REST API 호출 (Socket.io 브로드캐스트를 위해)
+      const updatePayload = {};
+      if (content) updatePayload.content = content;
+      if (assigneeId) updatePayload.assignee = assigneeId;
+      if (column) updatePayload.column = column;
 
-      if (content || assigneeId) {
-        const newContent = content || existing.content;
-        const newAgent   = assigneeId || existing.assigned_agent;
-        const newModel   = existing.model || MODEL.FLASH;
-        await dbManager.updateTaskDetails(taskId, newContent, newAgent, newModel);
+      try {
+        const resp = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload)
+        });
+        
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          return { success: false, message: `#${taskId} 수정 실패 (서버 에러): ${errBody}` };
+        }
+      } catch (err) {
+        return { success: false, message: `#${taskId} 서버 통신 오류: ${err.message}` };
       }
 
       return {
@@ -350,6 +454,78 @@ async function executeTool(toolName, args) {
       return { success: true, message: summary, tasks: filtered };
     }
 
+    // ── listDirectoryContents ────────────────────────────────────────────────
+    if (toolName === 'listDirectoryContents') {
+      const { dirPath } = args;
+      const targetPath = path.resolve(process.cwd(), dirPath);
+      if (!fs.existsSync(targetPath)) return { success: false, message: `경로를 찾을 수 없습니다: ${dirPath}` };
+      
+      const files = fs.readdirSync(targetPath);
+      return { success: true, message: `📂 ${dirPath} 폴더 내용:\n${files.join('\n')}` };
+    }
+
+    // ── analyzeLocalImage ────────────────────────────────────────────────────
+    if (toolName === 'analyzeLocalImage') {
+      const { filePath, prompt } = args;
+      const targetPath = path.resolve(process.cwd(), filePath);
+      if (!fs.existsSync(targetPath)) return { success: false, message: `파일을 찾을 수 없습니다: ${filePath}` };
+      
+      try {
+        const mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const imageBase64 = fs.readFileSync(targetPath).toString('base64');
+        
+        // Gemini API를 직접 호출하여 Vision 분석
+        const response = await ai.models.generateContent({
+            model: MODEL.FLASH,
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { inlineData: { mimeType, data: imageBase64 } },
+                        { text: prompt }
+                    ]
+                }
+            ]
+        });
+        const resultText = response.text;
+        return { success: true, message: `👁️ 이미지 분석 결과:\n${resultText}` };
+      } catch(err) {
+        return { success: false, message: `Vision 분석 실패: ${err.message}` };
+      }
+    }
+
+    // ── manageAgentSkills ────────────────────────────────────────────────────
+    if (toolName === 'manageAgentSkills') {
+      const { agentId, skillId, action } = args;
+      const isActive = action === 'equip';
+      await dbManager.toggleAgentSkill(agentId, skillId, isActive);
+      
+      // REST API로도 변경 사실을 알리기 (프론트 실시간 동기화를 위해)
+      fetch(`http://localhost:4000/api/agents/${agentId}/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skillId, active: isActive })
+      }).catch(() => {});
+      
+      return { success: true, message: `✅ ${agentId}의 ${skillId} 스킬이 ${action === 'equip' ? '장착' : '해제'}되었습니다.` };
+    }
+
+    // ── writeCEOLog ──────────────────────────────────────────────────────────
+    if (toolName === 'writeCEOLog') {
+      const { essayContent } = args;
+      const historyDir = '/Users/alex/Documents/08_MyCrew_Anti/05_My_history';
+      if (!fs.existsSync(historyDir)) {
+        fs.mkdirSync(historyDir, { recursive: true });
+      }
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filePath = path.join(historyDir, `CEO_ESSAY_${dateStr}.md`);
+      
+      const fileBody = `# CEO Observation Essay (${dateStr})\n\n${essayContent}\n`;
+      fs.writeFileSync(filePath, fileBody, 'utf-8');
+      
+      return { success: true, message: `✅ 대표님에 대한 객관적 관찰 에세이가 ${filePath} 에 안전하게 저장되었습니다.` };
+    }
+
     return { success: false, message: `알 수 없는 도구: ${toolName}` };
 
   } catch (err) {
@@ -357,6 +533,56 @@ async function executeTool(toolName, args) {
     return { success: false, message: `도구 실행 중 오류: ${err.message}` };
   }
 }
+
+// ─── OAuth 토큰 우회를 위한 로컬 프록시 라우터 ──────────────────────────────────
+// 구글 SDK가 자체 fetch를 강제하여 인터셉터를 무시하는 문제를 해결하기 위해,
+// SDK의 요청을 로컬에서 가로채 가짜 API 키를 제거한 후 구글 서버로 직접 포워딩합니다.
+app.post('/v1beta/models/:model::action', async (req, res) => {
+  try {
+    const { model, action } = req.params;
+    
+    const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}`;
+    const urlObj = new URL(targetUrl);
+    
+    // 원본 요청에서 쿼리 파라미터가 있으면 전달 (특히 alt=sse)
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'key') { // 가짜 key 제거
+        urlObj.searchParams.set(key, value);
+      }
+    }
+
+    const headers = { ...req.headers };
+    delete headers['host'];
+    delete headers['x-goog-api-client'];
+    delete headers['x-goog-api-key']; // 가짜 키 삭제
+    delete headers['content-length'];
+
+    const response = await fetch(urlObj.toString(), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req.body)
+    });
+
+    res.status(response.status);
+    response.headers.forEach((v, k) => {
+      if (k.toLowerCase() !== 'content-encoding') {
+        res.setHeader(k, v);
+      }
+    });
+    
+    if (response.body) {
+      for await (const chunk of response.body) {
+        res.write(chunk);
+      }
+      res.end();
+    } else {
+      res.send(await response.text());
+    }
+  } catch (err) {
+    console.error("[AriDaemon Proxy] 에러:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── 메인 대화 엔드포인트 ─────────────────────────────────────────────────
 app.post('/api/compute', async (req, res) => {
@@ -368,12 +594,13 @@ app.post('/api/compute', async (req, res) => {
   if (oauthToken) {
     try {
       localAi = new GoogleGenAI({
-        apiKey: 'empty', // @google/genai requires a string or ADC
+        apiKey: 'empty', 
         httpOptions: {
+          baseUrl: `http://localhost:${PORT}`,
           headers: { 'Authorization': `Bearer ${oauthToken}` }
         }
       });
-      console.log(`[AriDaemon] 🔐 구독인증 모드로 호출 (Model: ${MODEL.FLASH})`);
+      console.log(`[AriDaemon] 🔐 구독인증(OAuth) 모드로 호출 (Model: ${MODEL.FLASH})`);
     } catch {
       console.warn(`[AriDaemon] 구독인증 초기화 실패, 기본 키로 폴백`);
     }
@@ -392,9 +619,11 @@ app.post('/api/compute', async (req, res) => {
     const systemInstruction = getAriSystemInstruction();
     const contents = [...conversationHistory, { role: 'user', parts: [{ text: content }] }];
 
-    // ── Gemini API 호출 (Function Calling 지원, 스트리밍) ─────────────────
-    const response = await localAi.models.generateContent({
-      model: MODEL.FLASH,
+    // ── Gemini API 호출 (Function Calling 지원) ─────────────────
+    let response;
+
+    response = await localAi.models.generateContent({
+      model: MODEL.PRO,
       contents,
       config: {
         systemInstruction,
@@ -434,8 +663,10 @@ app.post('/api/compute', async (req, res) => {
         { role: 'user',  parts: toolResults },
       ];
 
-      const finalStream = await localAi.models.generateContentStream({
-        model: MODEL.FLASH,
+      let finalStream;
+
+      finalStream = await localAi.models.generateContentStream({
+        model: MODEL.PRO,
         contents: followUpContents,
         config: {
           systemInstruction,
@@ -490,21 +721,17 @@ app.post('/api/compute', async (req, res) => {
     console.log(`[AriDaemon] ✅ 응답 완료 (${finalText.length}자, 히스토리: ${conversationHistory.length}턴)`);
 
   } catch (error) {
-    console.error('[AriDaemon] 에러 발생:', error.message);
-
-    const is429 = error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED') || error.message?.includes('quota');
-    if (is429) {
-      const switched = switchToBackupKey();
-      const msg = switched
-        ? '잠시 API 한도가 초과되어 예비 키로 전환했습니다. 다시 한번 말씀해 주시겠어요?'
-        : '현재 Gemini API 일일 사용 한도를 초과했습니다. 유료 API 키를 등록하시거나 내일 다시 시도해 주세요.';
-      res.write(`data: ${JSON.stringify({ text: msg })}\n\n`);
-      res.write('event: done\ndata: {}\n\n');
-      res.end();
-      return;
+    if (error.status === 429) {
+      if (switchToBackupKey()) {
+        console.log('[AriDaemon] 🔄 예비 키로 재요청 시도 중...');
+        res.write(`event: quota\ndata: {"message": "키를 교체했습니다. 다시 시도해주세요!"}\n\n`);
+      } else {
+        res.write(`event: quota\ndata: {"message": "현재 Gemini API 일일 사용 한도를 초과했습니다."}\n\n`);
+      }
+    } else {
+      console.error('[AriDaemon] 에러 발생:', error.message || error);
+      res.write(`event: error\ndata: {"message": ${JSON.stringify(error.message || 'Unknown Error')}}\n\n`);
     }
-
-    res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
     res.end();
   }
 });
@@ -514,7 +741,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     port: PORT,
-    model: MODEL.FLASH,
+    model: MODEL.PRO,
     historyTurns: conversationHistory.length,
     dbConnected: !!dbManager,
     tools: ['googleSearch', 'createKanbanTask', 'updateKanbanTask', 'deleteKanbanTask', 'getCrewStatus'],
@@ -526,7 +753,7 @@ app.listen(PORT, () => {
 ==================================================
 🤖 [Ari Daemon v2] 지능형 비서 부팅 완료!
 - Port   : ${PORT}
-- Model  : ${MODEL.FLASH}
+- Model  : ${MODEL.PRO}
 - DB     : ${dbManager ? '✅ 연결됨' : '⚠️ 미연결'}
 - Tools  : googleSearch | createKanbanTask | updateKanbanTask | deleteKanbanTask | getCrewStatus
 - Memory : Persistent Context (최근 30턴)

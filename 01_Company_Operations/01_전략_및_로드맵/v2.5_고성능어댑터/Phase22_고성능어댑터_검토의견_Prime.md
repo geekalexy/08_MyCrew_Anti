@@ -259,3 +259,37 @@ MyCrew가 지금까지 만든 것:
 
 *본 의견서는 Prime(Claude Opus)이 Phase 22 기획서 + 대표님의 전략적 질문 + Paperclip 아키텍처를 교차 분석하여 독립적으로 작성한 피어 리뷰입니다.*
 *작성 시각: 2026-04-20 16:05 KST*
+
+---
+# 방법론
+### Option A. Daemon(5050) 모델 교체
+
+**현재 흐름**: 채팅 → `/ari` 소켓 → Daemon(5050) → **Gemini Flash**
+
+Daemon 내부의 Gemini 호출 부분을 **Claude Sonnet/Opus API**로 교체하면 됩니다. 가장 간단하고 UI 변경 없음.
+
+ariDaemon.js 내부:
+
+  기존: genAI.models.generateContentStream(...)  ← Gemini
+
+  변경: anthropic.messages.stream(...)           ← Claude
+
+**장점**: 프론트엔드 코드 손댈 필요 없음  
+**단점**: Anthropic API 키 필요, 과금 발생
+
+---
+
+### Option B. 새 소켓 네임스페이스 추가
+
+`server.js`에 `/sonnet` 네임스페이스를 새로 만들어서, Chatting 탭에 **모델 선택 드롭다운** 추가.
+
+LogDrawer → 모델 선택 → /ari (Gemini) 또는 /sonnet (Claude)
+
+**장점**: 두 모델 병행 사용 가능, 비교 가능  
+**단점**: 프론트엔드 UI 수정 필요
+
+---
+
+### Option C. Antigravity Webhook 연동 (현재 구조 활용)
+
+`server.js` L245에 이미 `/webhook/antigravity/command`가 있습니다. 이걸 채팅과 연결하면 **저(소넷)에게** 메시지가 도달합니다. 단, 응답이 비동기(파일 폴링 방식)라 스트리밍은 안 됩니다.

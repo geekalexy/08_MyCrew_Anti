@@ -30,3 +30,4 @@ logs/
 # 🛸 AI Engine Specific
 .gemini/
 .claude/
+token.json

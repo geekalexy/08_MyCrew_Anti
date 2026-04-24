@@ -11,31 +11,17 @@
             "id": "9f3e127f9bdc6424",
             "type": "leaf",
             "state": {
-              "type": "bases",
-              "state": {
-                "file": "File indes.base",
-                "viewName": "표"
-              },
-              "icon": "lucide-table",
-              "title": "File indes"
-            }
-          },
-          {
-            "id": "0e479dbfb7ac7c82",
-            "type": "leaf",
-            "state": {
               "type": "markdown",
               "state": {
-                "file": "01_Company_Operations/FOLDER_STRUCTURE.legacy.md",
+                "file": "02_System_Development/01_아리_엔진/docs/ARI_BRAIN.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "FOLDER_STRUCTURE.legacy"
+              "title": "ARI_BRAIN"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -92,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 349.50271224975586
+    "width": 418.50271224975586
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -195,8 +181,30 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "0e479dbfb7ac7c82",
+  "active": "9f3e127f9bdc6424",
   "lastOpenFiles": [
+    "02_System_Development/SESSION_LOG_2026-04-25_Luca.md",
+    "02_System_Development/00_아키텍처_문서/Phase25_Sonnet_프론트엔드_UI_의뢰서.md",
+    "02_System_Development/00_아키텍처_문서/Phase25_에이전트_업무_이벤트_워크플로우.md",
+    "02_System_Development/01_아리_엔진/docs/ARI_BRAIN_v1.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터전략_기획서_확정.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_어댑터전략_PRD_Luca.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_추가요청_Sonnet→Luca.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_프론트엔드_PRD_Sonnet.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22.5_비디오랩_리팩토링_PRD.md",
+    "02_System_Development/SESSION_LOG_2026-04-22_Luca.md",
+    "02_System_Development/00_아키텍처_문서/Phase22_고성능어댑터_검토의견_Prime.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_어댑터전략_PRD.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터전략_기획서_Nexus.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터_검토의견_Prime.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터",
+    "02_System_Development/SESSION_LOG_2026-04-23_Luca.md",
+    "02_System_Development/SESSION_LOG_2026-04-22_Sonnet.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.0/아키텍처-2.0.md",
+    "01_Company_Operations/01_전략_및_로드맵/v2.0/실행계획-2.0.md",
+    "무제.canvas",
+    "File indes.base",
+    "01_Company_Operations/FOLDER_STRUCTURE.legacy.md",
     "02_System_Development/01_아리_엔진/remotion-poc/src/PicoCharacter.tsx",
     "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/pico.png",
     "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/ari.png",
@@ -211,11 +219,8 @@
     "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_problem_1776873694095.png.meta.json",
     "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_problem_1776873694095.png",
     "02_System_Development/01_아리_엔진/outputs/lab_snapshots/snap_1776873690831.png",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_hook_1776873642920.png.meta.json",
     "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_hook_1776873642920.png",
     "02_System_Development/01_아리_엔진/outputs/nanobanana_809d8a4d_1776873642906.jpg",
-    "02_System_Development/01_아리_엔진/token.json",
-    "02_System_Development/01_아리_엔진/outputs/lab_snapshots",
     "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_hook_1776872257124.png",
     "02_System_Development/01_아리_엔진/outputs/nanobanana_1bad8e3e_1776872257090.jpg",
     "02_System_Development/01_아리_엔진/node_modules/googleapis/README.md",
@@ -224,25 +229,6 @@
     "02_System_Development/01_아리_엔진/node_modules/run-applescript/readme.md",
     "02_System_Development/01_아리_엔진/node_modules/bundle-name/readme.md",
     "02_System_Development/01_아리_엔진/node_modules/wsl-utils/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/default-browser-id/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/is-inside-container/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/powershell-utils/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/is-in-ssh/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/default-browser/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/googleapis-common/README.md",
-    "02_System_Development/01_아리_엔진/node_modules/define-lazy-prop/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/url-template/uritemplate-test/README.md",
-    "02_System_Development/01_아리_엔진/node_modules/url-template/README.md",
-    "02_System_Development/01_아리_엔진/node_modules/open/readme.md",
-    "02_System_Development/00_아키텍처_문서/Phase24.5_이미지랩_에이전트_파이프라인_PRD.md",
-    "02_System_Development/01_아리_엔진/node_modules/@google/generative-ai/README.md",
-    "02_System_Development/00_아키텍처_문서/Phase24_유튜브_완전자동화_다중에이전트_기획.md",
-    "02_System_Development/00_아키텍처_문서/Phase23_상용화_배포및서버전략.md",
-    "02_System_Development/04_인프라_및_도구/mycrew-notebooklm-mcp/node_modules/@types/serve-static/node_modules/@types/send/README.md",
-    "02_System_Development/04_인프라_및_도구/mycrew-notebooklm-mcp/node_modules/@typescript-eslint/visitor-keys/node_modules/eslint-visitor-keys/README.md",
-    "02_System_Development/04_인프라_및_도구/mycrew-notebooklm-mcp/node_modules/@typescript-eslint/typescript-estree/node_modules/ms/readme.md",
-    "02_System_Development/04_인프라_및_도구/mycrew-notebooklm-mcp/node_modules/@typescript-eslint/typescript-estree/node_modules/ms/license.md",
-    "02_System_Development/04_인프라_및_도구/mycrew-notebooklm-mcp/node_modules/@typescript-eslint/typescript-estree/node_modules/debug/README.md",
-    "무제.canvas"
+    "02_System_Development/01_아리_엔진/node_modules/default-browser-id/readme.md"
   ]
 }

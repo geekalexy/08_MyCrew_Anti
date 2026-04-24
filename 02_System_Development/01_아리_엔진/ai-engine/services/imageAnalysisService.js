@@ -40,14 +40,12 @@ async function _ensureClient() {
  * @returns {{ text: string, model: string }}
  */
 export async function analyzeImageForPrompt(imagePath, systemPrompt, userText = '', mimeType = 'image/jpeg') {
-  // ── 1순위: 구독인증 OAuth 토큰 (순환 참조 방지로 KeyProvider 캐시 사용) ──
-  let oauthToken = await keyProvider.getKey('OAUTH_TOKEN');
-  const expiry = await keyProvider.getKey('OAUTH_TOKEN_EXPIRY');
-  
-  if (oauthToken && Date.now() > expiry) {
-    console.warn('[ImageAnalysisService] OAuth 토큰 만료됨.');
-    oauthToken = null;
-  }
+  // ── 1순위: 구독인증 OAuth 토큰 (동적 임포트로 자동 갱신 지원 적용) ──
+  let oauthToken = null;
+  try {
+    const { getGoogleOAuthToken } = await import('../../server.js');
+    oauthToken = await getGoogleOAuthToken?.();
+  } catch (_) { /* 무시 - 폴백 */ }
 
   if (oauthToken) {
     console.log(`[ImageAnalysisService] 🔐 구독인증 모드 (Model: ${MODEL.FLASH})`);

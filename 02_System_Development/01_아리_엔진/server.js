@@ -103,6 +103,58 @@ setInterval(() => {
   }
 }, 5000);
 
+// ─── [Phase 25] Event-Driven Task Dispatcher (이벤트 기반 Pull 모델) ───
+async function dispatchNextTaskForAgent(agentId) {
+  if (!dbManager || !agentId || agentId === '미할당' || agentId === 'system') return;
+  try {
+    const tasks = await dbManager.getAllTasksLight();
+    
+    // 1. 해당 에이전트가 현재 진행 중인 작업이 있는지 확인 (Busy 체크)
+    const isBusy = tasks.some(t => t.assigned_agent === agentId && (t.status === 'in_progress' || t.status === 'IN_PROGRESS' || t.status === 'REVIEW'));
+    if (isBusy) return; // 바쁘면 대기(To-Do 유지)
+
+    // 2. 대기 중인 PENDING 작업 필터링 (가장 오래된 것 1개)
+    const pendingTask = tasks.filter(t => t.assigned_agent === agentId && (t.status === 'todo' || t.status === 'PENDING'))
+                             .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))[0];
+
+    if (pendingTask) {
+      // 상태 변경 및 소켓 발송
+      await dbManager.updateTaskStatus(pendingTask.id, 'IN_PROGRESS');
+      io.emit('task:moved', { taskId: String(pendingTask.id), toColumn: 'in_progress' });
+      io.emit('task:updated', { taskId: String(pendingTask.id), status: 'IN_PROGRESS', column: 'in_progress' });
+
+      // 백그라운드 엔진 트리거
+      const fullTask = await dbManager.getTaskById(pendingTask.id);
+      if (fullTask) {
+        const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
+        await filePollingAdapter.execute({
+          taskId: fullTask.id,
+          agentId: fullTask.assigned_agent,
+          category: fullTask.category || 'WORKFLOW',
+          content: fullTask.content,
+          systemPrompt: "대기열에서 당신의 작업을 자동으로 가져왔습니다. 착수해 주세요.",
+          modelToUse: fullTask.model || 'gemini-2.5-flash'
+        });
+        broadcastLog('info', `> [${fullTask.assigned_agent}] 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', pendingTask.id);
+      }
+    }
+  } catch (err) {
+    console.error(`[Dispatcher Error for ${agentId}]`, err.message);
+  }
+}
+
+// ariDaemon 등 외부 프로세스에서 할당 이벤트를 트리거할 수 있는 엔드포인트
+app.post('/api/tasks/dispatch', async (req, res) => {
+  const { agentId } = req.body;
+  if (agentId) {
+    // 즉각 응답 후 비동기 처리
+    res.json({ status: 'ok', message: 'Dispatch triggered' });
+    await dispatchNextTaskForAgent(agentId);
+  } else {
+    res.status(400).json({ status: 'error', message: 'agentId required' });
+  }
+});
+
 io.on('connection', (socket) => {
   console.log(`[Socket] 클라이언트 연결됨: ${socket.id}`);
 
@@ -135,6 +187,47 @@ io.on('connection', (socket) => {
       io.emit('task:moved', { taskId, toColumn });
       // 상태 필드 동기화도 함께 송출
       io.emit('task:updated', { taskId, status: newStatus, column: toColumn });
+
+      // [Phase 25] 대표님 기획 반영: 진행열(in_progress)로 이동 시 즉각 착수 및 매뉴얼 오버라이드
+      if (toColumn === 'in_progress' && fromColumn === 'todo') {
+        const task = await dbManager.getTaskById(taskId);
+        if (task) {
+          const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
+          const agentId = task.assigned_agent || 'system';
+
+          // 기존 진행 중인 다른 작업이 있다면 일시정지(todo로 강제 강등)하여 인터럽트 수행
+          const allTasks = await dbManager.getAllTasksLight();
+          const activeTasks = allTasks.filter(t => t.assigned_agent === agentId && (t.status === 'in_progress' || t.status === 'IN_PROGRESS') && String(t.id) !== String(taskId));
+          
+          for (const at of activeTasks) {
+            await filePollingAdapter.abort(at.id);
+            await dbManager.updateTaskStatus(at.id, 'PENDING');
+            io.emit('task:moved', { taskId: String(at.id), toColumn: 'todo' });
+            io.emit('task:updated', { taskId: String(at.id), status: 'PENDING', column: 'todo' });
+            broadcastLog('warn', `새로운 긴급 업무 지시(드래그)로 인해 기존 작업 #${at.id}을(를) 잠시 대기(To-Do) 상태로 내립니다.`, 'system', at.id);
+          }
+
+          // 드래그된 작업 즉시 착수
+          await filePollingAdapter.execute({
+            taskId: task.id,
+            agentId: agentId,
+            category: task.category || 'WORKFLOW',
+            content: task.content,
+            systemPrompt: "이 작업은 칸반 보드에서 대표님이 직접 진행으로 옮겨 즉시 착수를 지시한 태스크입니다. 다른 작업보다 최우선으로 진행하세요.",
+            modelToUse: task.model || 'gemini-2.5-flash'
+          });
+          // 타임라인에 사고과정 시작 시스템 뱃지 렌더링
+          broadcastLog('info', `> 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', taskId);
+        }
+      }
+      
+      // 작업이 완료되거나 대기로 돌아갔을 때 다음 작업 자동 Pull 트리거
+      if (fromColumn === 'in_progress' && (toColumn === 'done' || toColumn === 'review')) {
+        const task = await dbManager.getTaskById(taskId);
+        if (task && task.assigned_agent) {
+          setTimeout(() => dispatchNextTaskForAgent(task.assigned_agent), 1000);
+        }
+      }
     } catch (err) {
       // 실패 시 원래 열로 롤백 신호
       socket.emit('task:moved_failed', { taskId, revertTo: fromColumn, error: err.message });
@@ -155,6 +248,11 @@ io.on('connection', (socket) => {
         agentId: assignee !== '미할당' ? assignee : null,
         priority: priority || 'medium',
       });
+      
+      // 새로 할당된 에이전트가 있으면 Dispatcher 트리거
+      if (assignee && assignee !== '미할당') {
+        setTimeout(() => dispatchNextTaskForAgent(assignee), 500); // DB 갱신 대기 후 트리거
+      }
     } catch (err) {
       console.error('[Socket] task:create 오류:', err.message);
     }
@@ -370,7 +468,10 @@ ariNs.on('connection', (socket) => {
       }
       
       // --- [Phase 22] 독립 구동되는 Ari Daemon (포트 5050)으로 포워딩 ---
-      const postData = JSON.stringify({ content, author, oauthToken: _googleOAuthToken });
+      // [Phase 22.5 버그 픽스] 직접 변수 접근 시 만료된 토큰이 전달되어 401/400 에러 발생.
+      // 반드시 getGoogleOAuthToken()을 호출하여 만료 시 자동 갱신된 토큰을 받아와야 함.
+      const currentToken = await getGoogleOAuthToken();
+      const postData = JSON.stringify({ content, author, oauthToken: currentToken });
       const reqDaemon = http.request({
         hostname: 'localhost',
         port: 5050,
@@ -399,12 +500,13 @@ ariNs.on('connection', (socket) => {
             buffer = buffer.slice(newlineIndex + 1);
             
             if (line.startsWith('event: error')) {
-              console.error('[Socket/ari] 데몬 내부 스트리밍 에러 이벤트 수신');
-              // 스트리밍이 여기서 죽으므로 적절히 텍스트 주입
-              fullText += '\n\n💡 죄송합니다. 내부 엔진과 통신 중 에러가 발생했습니다.';
-              socket.emit('ari:stream_chunk', { text: '\n\n💡 죄송합니다. 내부 엔진과 통신 중 에러가 발생했습니다.' });
-              continue;
+              console.warn('[Socket/ari] 데몬 에러 이벤트 수신 (503 등 일시적 과부하)');
+              const msg = '아리가 잠깐 바빠요 🙏 잠시 후 다시 말 걸어주세요!';
+              socket.emit('ari:stream_chunk', { text: msg });
+              socket.emit('ari:stream_done', { fullText: msg, model: 'Ari Daemon' });
+              return; // 스트림 종료, 중복 end 이벤트 방지
             }
+
             
             if (line.startsWith('data: ')) {
               const dataStr = line.slice(6);

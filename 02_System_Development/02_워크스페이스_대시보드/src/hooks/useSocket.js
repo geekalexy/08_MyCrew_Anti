@@ -142,7 +142,9 @@ export function useSocket() {
             // 30초 타임아웃: 서버가 WORKED를 못 보내도 자동 해제
             setTimeout(() => useAgentStore.getState().clearActiveTask(log.taskId), 30000);
           } else if (isDone) {
-            useAgentStore.getState().clearActiveTask(log.taskId);
+            // [WORKED] 수신: 무지개 애니메이션 4초 표시 후 해제
+            useAgentStore.getState().setActiveTask(log.taskId, 'WORKED');
+            setTimeout(() => useAgentStore.getState().clearActiveTask(log.taskId), 4000);
           }
         }
       });

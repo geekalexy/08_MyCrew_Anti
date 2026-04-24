@@ -205,12 +205,12 @@ class Executor {
 
   async run(taskContent, preEvaluated = null, agentId = 'ari', taskId = null) {
     console.log(`[Executor] 작업 시작: ${taskContent} (Assigned To: ${agentId}, Task: ${taskId})`);
-    this._log('info', `> 작업을 수신했습니다. 방어요소 및 인텐트 파악을 시작합니다...`, agentId, taskId);
+    this._log('info', `> 작업을 수신했습니다. 방어요소 및 인텐트 파악을 시작합니다...`, 'system', taskId);
 
     // 0. 🚨 System Shield (Layer 3 Infra Guard) 발동 여부 검사
     const shieldBlock = systemShieldSkill.applyShield(taskContent, agentId);
     if (shieldBlock) {
-      this._log('warn', `> 🚨 위험 감지: System Shield가 발동되어 작업을 차단했습니다.`, agentId, taskId);
+      this._log('warn', `> 🚨 위험 감지: System Shield가 발동되어 작업을 차단했습니다.`, 'system', taskId);
       return shieldBlock; // 즉시 API 호출 중단 및 차단 메시지 반환
     }
 
@@ -220,7 +220,7 @@ class Executor {
       const pendingTask = await dbManager.getFirstPendingTask();
       if (pendingTask) {
         console.log(`[Executor] ✅ 승인 인텐트 감지 → 보류 Task #${pendingTask.id} RESUME 처리`);
-        this._log('info', `> ✅ 승인 인텐트 감지 완료. 보류 중인 Task #${pendingTask.id}의 실행을 즉각 재개합니다.`, agentId, taskId);
+        this._log('info', `> ✅ 승인 인텐트 감지 완료. 보류 중인 Task #${pendingTask.id}의 실행을 즉각 재개합니다.`, 'system', taskId);
         // 보류 Task를 in_progress로 전환
         await dbManager.updateTaskStatus(pendingTask.id, 'in_progress');
         return {
@@ -347,7 +347,7 @@ class Executor {
 
     // [Phase 18-3] WORKFLOW 오케스트레이션 바이패스
     if (evaluation.category === 'WORKFLOW') {
-      this._log('info', `> [WORKFLOW] 멀티 에이전트 협업 체인을 가동합니다. (Phase 1: 병렬 생성 -> Phase 2: 지능형 합성)`, agentId, taskId);
+      this._log('info', `> [WORKFLOW] 멀티 에이전트 협업 체인을 가동합니다. (Phase 1: 병렬 생성 -> Phase 2: 지능형 합성)`, 'system', taskId);
       
       // 임시: 실험 세팅에서 팀 ID는 보통 team_B(CKS)를 기본으로 함. 
       // (향후 유저 세팅이나 태스크 메타데이터에서 가져오도록 확장 가능)
@@ -375,12 +375,12 @@ class Executor {
 
     try {
       console.log(`[Executor] 투입 모델: ${modelToUse}, 카테고리: ${evaluation.category}`);
-      this._log('info', `> [${evaluation.category}] 카테고리에 해당하는 도구 모듈과 컨텍스트 로드를 완료했습니다.\n> 에이전트의 논리 회로를 가동하여 [${modelToUse}] 엔진을 통해 렌더링 및 생성을 시작합니다...`, agentId, taskId);
+      this._log('info', `> [${evaluation.category}] 카테고리에 해당하는 도구 모듈과 컨텍스트 로드를 완료했습니다.\n> 에이전트의 논리 회로를 가동하여 [${modelToUse}] 엔진을 통해 렌더링 및 생성을 시작합니다...`, 'system', taskId);
 
       // 5. [Phase 22] 비동기 어댑터 라우팅 (비서 대화 외의 무거운 작업은 File Polling 위임)
       const ASYNC_CATEGORIES = ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'MEDIA', 'ANALYSIS'];
       if (ASYNC_CATEGORIES.includes(evaluation.category) && taskId) {
-        this._log('info', `> [비동기 위임] 이 작업은 시간이 소요되므로 고성능 백그라운드 어댑터에게 위임합니다.`, agentId, taskId);
+        this._log('info', `> [비동기 위임] 이 작업은 시간이 소요되므로 고성능 백그라운드 어댑터에게 위임합니다.`, 'system', taskId);
         
         const taskContext = {
           taskId,

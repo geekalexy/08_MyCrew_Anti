@@ -1,5 +1,21 @@
 export const SKILL_REGISTRY = {
   // ─── Layer 1: Engine Skills ───
+  "orchestrator": {
+    id: "orchestrator", layer: 1, layerLabel: "ENGINE",
+    name: "Team Orchestrator", icon: "hub", color: "var(--brand)",
+    description: "다중 에이전트 워크플로우를 조율하고 자원을 최적화합니다.",
+    fullDescription: "에이전트 간의 협업 체인을 구축하고 의견 충돌을 중재하며 최종 산출물을 대표님에게 보고하기 전 전수 검수(QA)하는 오케스트레이션 특화 스킬입니다.",
+    rules: ["충돌 발생 시 중재", "전체 품질 보증(QA)", "자원 효율적 할당"],
+    skillMdPath: "skill-library/08_workflow/SKILL.md",
+  },
+  "assistant": {
+    id: "assistant", layer: 1, layerLabel: "ENGINE",
+    name: "Executive Assistant", icon: "support_agent", color: "#ffb963",
+    description: "대표님의 일상 대화, 일정 관리 및 퀵 서치를 전담합니다.",
+    fullDescription: "대표님의 지시를 가장 먼저 수신하여 의도를 파악하고, 일상적인 대화부터 간단한 검색까지 부드럽고 쾌적하게 보조하는 AI 비서 스킬입니다.",
+    rules: ["친절하고 부드러운 톤앤매너", "의도 선제 파악", "빠른 응답 속도"],
+    skillMdPath: "skill-library/01_routing/SKILL.md",
+  },
   "routing": {
     id: "routing", layer: 1, layerLabel: "ENGINE",
     name: "Task Routing", icon: "account_tree", color: "var(--brand)",

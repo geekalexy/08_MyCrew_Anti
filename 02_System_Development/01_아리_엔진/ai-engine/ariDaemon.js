@@ -213,7 +213,7 @@ function getAriSystemInstruction() {
 
   // ── Layer 1: ARI_BRAIN.md — 핵심 정체성 (정적, 고품질) ──────────────────
   const coreBrain = ARI_BRAIN ||
-    `당신은 MyCrew의 비서실장 아리(Ari)입니다. Gemini 2.5 Flash 기반 자율 행동형 비서입니다.`;
+    `당신은 MyCrew의 비서 아리(Ari)입니다. Gemini 2.5 Flash 기반 자율 행동형 비서입니다.`;
 
   // ── Layer 2: 런타임 컨텍스트 — 매 요청마다 최신화 ──────────────────────
   const runtimeCtx = [
@@ -524,7 +524,7 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`
 ==================================================
-🤖 [Ari Daemon v2] 지능형 비서실장 부팅 완료!
+🤖 [Ari Daemon v2] 지능형 비서 부팅 완료!
 - Port   : ${PORT}
 - Model  : ${MODEL.FLASH}
 - DB     : ${dbManager ? '✅ 연결됨' : '⚠️ 미연결'}

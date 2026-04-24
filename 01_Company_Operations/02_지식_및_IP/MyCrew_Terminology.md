@@ -17,7 +17,7 @@
 
 대표님을 보좌하기 위해 각자 특수한 스킬(Skill)과 모델(Model)을 장착한 가상의 인격체 및 전문가 조직입니다.
 
-*   **아리 (Ari) - 비서실장 (Chief of Staff)**
+*   **아리 (Ari) - 비서 (Chief of Staff)**
     *   **역할**: 대표님의 모든 텔레그램 명령을 가장 먼저 수신(QUICK_CHAT)하고, 과거 지식(KNOWLEDGE)을 즉각 찾아옵니다. 시스템의 최전선(Front-line)을 담당합니다.
     *   **엔진**: 주로 빠르고 민첩한 `gemini-3-flash` 가 배정됩니다.
 *   **개발팀 (Dev Team)**

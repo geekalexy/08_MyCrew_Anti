@@ -1,5 +1,5 @@
 [
-  { "id": "ari", "nameKo": "아리", "role": "비서실장" },
+  { "id": "ari", "nameKo": "아리", "role": "비서" },
   { "id": "luca", "nameKo": "루카", "role": "풀스택 엔지니어" },
   { "id": "sonnet", "nameKo": "소넷", "role": "AI 디벨로퍼" },
   { "id": "opus", "nameKo": "오퍼스", "role": "시스템 아키텍트" },

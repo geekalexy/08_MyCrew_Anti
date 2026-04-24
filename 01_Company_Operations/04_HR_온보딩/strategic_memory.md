@@ -99,6 +99,14 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 
 ## 4. 📝 실시간 지시 및 합의 히스토리
 
+### [2026-04-23] Prime(Opus 4.7) 코드 리뷰 기반 시스템 안전장치 의무화 (Luca 실수 방지)
+
+**의무 적용 원칙 (시한폭탄 방지 규칙):**
+1. **[SDK 및 모델 강제 통일]**: 구형 `@google/generative-ai` 모듈 혼용 절대 금지. 모든 코드 베이스는 `@google/genai` (v1.49+)로 통일하며, `gemini-1.5-flash` 같은 하드코딩된 모델 식별자는 사용 불가. 무조건 `modelRegistry`의 상수를 통해 `keyProvider`와 결합해 호출.
+2. **[서비스 키 완전 분리]**: 구글 클라우드 관련 API(예: TTS)와 제미나이 언어모델 API 섞어 쓰기 금지. `GOOGLE_CLOUD_TTS_KEY` 등 명시적으로 분리된 환경변수 적용. (다만 긴급 시 fallback은 유지 권장)
+3. **[사이드이펙트(Side Effect) 원천 차단]**: Node.js 환경에서 ESM 모듈 작성 시 최하단에 무조건 실행 구문 작성 금지. 오직 CLI에서 직접 스크립트를 구동할 때만 작동하도록 ESM 가드 (`if (process.argv[1] && __filename === process.argv[1])`) 필수 부착.
+4. **[원본 데이터 훼손 금지]**: 에이전트 다중 협업 시, 다른 에이전트가 만든 원본 값(`originalDurationFrames` 등)을 임의로 덮어쓰지 말고 필드를 복제/우회하여 규칙 2번(객체 불변성)을 엄격히 준수할 것.
+
 ### [2026-04-20] Phase 22 고성능 어댑터 전환 완료 (Sprint 1 종료)
 
 **완료 사항:**
@@ -135,6 +143,6 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 ---
 
 **[Backup Status]**
-- **마지막 업데이트**: 2026-04-20 22:55 KST (Sonnet 2중검증 + Phase 22 Sprint 1 공식 기록)
+- **마지막 업데이트**: 2026-04-23 14:55 KST (Prime P0 오류 규제사항 추가 + Phase 24 오토파일럿 기록)
 - **저장 경로**: `/Users/alex/Documents/08_MyCrew_Anti/01_Company_Operations/04_HR_온보딩/strategic_memory.md`
 - **버전**: v4.0 (Phase 22 확정판)

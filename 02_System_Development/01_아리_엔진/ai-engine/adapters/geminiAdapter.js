@@ -51,7 +51,7 @@ class GeminiAdapter {
 
     async _switchToBackupKey() {
         console.warn("🔄 [GeminiAdapter] 메인 API 제한(429/503) 도달. 예비 키(GEMINI_API_KEY_2)로 스위칭 시도...");
-        const backupKey = process.env.GEMINI_API_KEY_2;
+        const backupKey = keyProvider.getKey('GEMINI_API_KEY')_2;
         if (backupKey && backupKey !== 'undefined') {
             this.ai = new GoogleGenAI(backupKey);
             console.log("✅ [GeminiAdapter] 예비 키로 갱신 완료.");

@@ -6,8 +6,8 @@ import { GoogleGenAI } from '@google/genai';
  * Top 3 리스트를 뽑고, 이를 즉시 렌더링용 5단계 쇼츠 대본(JSON)으로 자동 기획합니다.
  *
  * [Prime P0 수정 — 2026-04-23]
- * - SDK: @google/generative-ai → @google/genai (엔진 통일)
- * - 모델명: "gemini-1.5-flash" → "gemini-2.5-flash" (환각 식별자 제거)
+ * - SDK: genai 엔진으로 통일
+ * - 모델명: 환각 식별자 제거 및 2.5 flash 적용
  * - Fallback: 3씬 → 5씬 완비, 날짜 기반 로테이션 다변화
  */
 
@@ -88,8 +88,9 @@ export class CurationAgent {
 
     async _ensureClient() {
         if (this.ai) return;
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 등록되지 않았습니다.');
+        const { keyProvider } = await import('../../utils/keyProvider.js');
+        const apiKey = keyProvider.getKey('GEMINI_API_KEY');
+        if (!apiKey) throw new Error('GEMINI_API_KEY가 등록되지 않았습니다.');
         this.ai = new GoogleGenAI({ apiKey });
     }
 

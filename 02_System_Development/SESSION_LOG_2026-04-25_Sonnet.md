@@ -103,7 +103,32 @@
    cd 02_System_Development/01_아리_엔진
    node ai-engine/ariDaemon.js
    ```
-
 ---
 
 **작성:** 소넷 (Claude Sonnet 4.6 / Antigravity) | 2026-04-25 01:55 KST
+
+---
+
+## 🟢 추가 세션 — 2026-04-25 오후 (DataHarvester 고도화)
+
+### 완료: 네이버 오픈API 연동 (DataHarvester v2)
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `NaverNewsHarvester.js` (신규) | 네이버 뉴스 검색 API — 일 25,000회 한도, JSON 응답, 날짜순 정렬 |
+| `NaverDataLabHarvester.js` (신규) | DataLab 검색어 트렌드 API — 실시간 Top 3 키워드 자동 추출 |
+| `DataHarvester.js` (v2 업그레이드) | 네이버 API 주 수집원, 구글 RSS Fallback 유지 |
+| `docs/` 폴더 | 네이버 API 레퍼런스 4종 마크다운 문서 생성 |
+| `test_naver_api.js` | 연동 테스트 스크립트 |
+
+**테스트 결과 (모두 성공 ✅):**
+- DataLab 트렌드: Top 3 [국내대형주, 주식시장, 글로벌주식] 자동 추출
+- 네이버 뉴스 API: 키워드 10개 × 100건 = 713건 고유 소스 수집
+- 출처: `naver_news` (구글 RSS Fallback 불필요)
+
+**카페글 API 제외 결정**: 비로그인 방식이지만 앱 등록 시 개인정보 수집 동의 필수 → 검색 API만 등록
+
+## 🔴 다음 세션 예정 작업
+
+1. **E2E 크루 작업 테스트** — 아리 채팅 → 태스크 카드 → 크루 자동 착수
+2. **Phase 25 Sprint 1** — InstagramCardAgent 구현 시작

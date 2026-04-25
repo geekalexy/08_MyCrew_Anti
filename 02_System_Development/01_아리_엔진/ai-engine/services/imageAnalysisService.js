@@ -42,9 +42,10 @@ async function _ensureClient() {
 export async function analyzeImageForPrompt(imagePath, systemPrompt, userText = '', mimeType = 'image/jpeg') {
   // ── 1순위: 구독인증 OAuth 토큰 (동적 임포트로 자동 갱신 지원 적용) ──
   let oauthToken = null;
+  let serverAuth = null;
   try {
-    const { getGoogleOAuthToken } = await import('../../server.js');
-    oauthToken = await getGoogleOAuthToken?.();
+    serverAuth = await import('../../server.js');
+    oauthToken = await serverAuth.getGoogleOAuthToken?.();
   } catch (_) { /* 무시 - 폴백 */ }
 
   if (oauthToken) {
@@ -132,6 +133,8 @@ export async function analyzeImageForPrompt(imagePath, systemPrompt, userText = 
 
     throw lastErr ?? new Error('OAuth Vision API: 최대 재시도 횟수 초과');
 
+  } else if (serverAuth && serverAuth.hasOAuthSetup && serverAuth.hasOAuthSetup()) {
+    throw new Error("🔒 [보안 차단] 구독인증 연결이 해제되었습니다. 의도치 않은 API 요금 과금을 막기 위해 시스템이 작업을 멈췄습니다. 대시보드에서 다시 연결해주세요.");
   }
 
   // ── 2순위: API Key 폴백 ───────────────────────────────────────────────────────

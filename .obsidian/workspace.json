@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 418.50271224975586
+    "width": 334.50271224975586
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -183,6 +183,7 @@
   },
   "active": "9f3e127f9bdc6424",
   "lastOpenFiles": [
+    "02_System_Development/SESSION_LOG_2026-04-25_Sonnet.md",
     "02_System_Development/SESSION_LOG_2026-04-25_Luca.md",
     "02_System_Development/00_아키텍처_문서/Phase25_Sonnet_프론트엔드_UI_의뢰서.md",
     "02_System_Development/00_아키텍처_문서/Phase25_에이전트_업무_이벤트_워크플로우.md",
@@ -228,7 +229,6 @@
     "02_System_Development/01_아리_엔진/node_modules/is-docker/readme.md",
     "02_System_Development/01_아리_엔진/node_modules/run-applescript/readme.md",
     "02_System_Development/01_아리_엔진/node_modules/bundle-name/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/wsl-utils/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/default-browser-id/readme.md"
+    "02_System_Development/01_아리_엔진/node_modules/wsl-utils/readme.md"
   ]
 }

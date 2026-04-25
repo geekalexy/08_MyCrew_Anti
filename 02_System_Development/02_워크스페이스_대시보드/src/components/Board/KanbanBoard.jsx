@@ -42,8 +42,20 @@ export default function KanbanBoard() {
       .then((res) => res.json())
       .then(({ status, tasks: remoteTasks }) => {
         if (status !== 'ok' || !Array.isArray(remoteTasks)) return;
-        const addTask = useKanbanStore.getState().addTask;
-        remoteTasks.forEach((task) => addTask(task));
+        
+        const state = useKanbanStore.getState();
+        const localTasks = state.tasks;
+        const remoteIds = new Set(remoteTasks.map(t => String(t.id)));
+        
+        // 🚨 긴급 버그 픽스: 서버 DB에 없는(이미 삭제된) 로컬 잔존 태스크 강제 동기화(제거)
+        Object.keys(localTasks).forEach((id) => {
+          if (!String(id).startsWith('temp-') && !String(id).startsWith('local-') && !remoteIds.has(id)) {
+            state.removeTask(id);
+            console.log(`[KanbanBoard] 🗑️ 동기화: 삭제된 잔존 좀비 카드 제거 (#${id})`);
+          }
+        });
+
+        remoteTasks.forEach((task) => state.addTask(task));
         console.log(`[KanbanBoard] Hydration 완료: ${remoteTasks.length}개 태스크`);
       })
       .catch((err) => console.warn('[KanbanBoard] Hydration 실패:', err.message));

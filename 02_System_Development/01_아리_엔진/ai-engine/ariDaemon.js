@@ -110,8 +110,8 @@ const ARI_TOOLS = [
             content: {
               type: 'string',
               description: `태스크 본문 내용.
-기계적인 템플릿(목적, 배경 등)에 얽매일 필요 없이, 요청의 맥락과 복잡도에 따라 유연하고 스마트하게 작성합니다.
-간단한 지시일 경우 스스로 판단하여 전문적인 형태로 보완합니다.`,
+반드시 마크다운(Markdown) 포맷으로 구체적인 목적, 배경, 그리고 세부 지시사항을 상세하고 풍부하게 작성하세요.
+절대 한두 줄로 짧게 쓰거나 제목만 반복하지 마십시오. 담당자가 읽고 즉시 실행할 수 있는 수준의 구체적인 가이드라인과 컨텍스트가 포함된 완벽한 업무 지시서 형태로 작성해야 합니다.`,
             },
             priority: {
               type: 'string',
@@ -132,9 +132,8 @@ const ARI_TOOLS = [
       {
         name: 'updateKanbanTask',
         description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자, 내용을 변경합니다.
-중요(Crucial): 사용자가 카드 내용을 지적하거나 업무적인 지시/보완 사항을 말할 때, 절대 채팅창에 말로만 대답하지 말고 **즉시 이 도구를 호출하여 카드 내용을 상세하게 업데이트** 해야 합니다.
-사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '내용 업데이트해줘' 등을 말할 때 이 도구를 반드시 사용합니다.
-새 카드를 생성하지 않고 기존 카드를 수정해야 할 때 적합합니다.`,
+중요(CRITICAL): 사용자가 카드 내용에 대한 추가/수정을 지시하거나 피드백을 줄 때, **절대 채팅창에 말(텍스트)로만 "네 추가하겠습니다"라고 대답해서는 안 됩니다.** 반드시 이 도구를 즉시 호출하여 DB의 카드 내용(content)을 실제로 풍부하게 업데이트 하십시오.
+사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '이 내용을 추가해줘' 등을 말할 때 이 도구를 반드시 사용합니다.`,
         parameters: {
           type: 'object',
           properties: {
@@ -175,6 +174,23 @@ const ARI_TOOLS = [
             reason: {
               type: 'string',
               description: '삭제 이유 (선택)',
+            },
+          },
+          required: ['taskId'],
+        },
+      },
+
+      // ── [도구 3.5] 특정 칸반 카드 상세 조회 ──────────────────────────────────
+      {
+        name: 'getTaskDetails',
+        description: `특정 칸반 태스크 카드의 상세 내용, 담당자, 현재 상태를 조회합니다.
+중요: 사용자가 '93번 카드 내용 봐봐', '이 태스크 상태가 어때?' 등 특정 카드를 지칭할 때, "직접 접근이 불가하다"고 대답하지 말고 반드시 이 도구를 호출하여 내용을 확인하십시오. 당신은 전권을 가진 비서입니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            taskId: {
+              type: 'number',
+              description: '조회할 태스크 ID (숫자)',
             },
           },
           required: ['taskId'],
@@ -347,6 +363,22 @@ async function executeTool(toolName, args) {
         }).catch(err => console.warn('[AriDaemon] Dispatch trigger failed:', err.message));
       } catch (e) {}
 
+      // [버그 패치] 실시간 UI 갱신을 위한 socket.io 브로드캐스트 트리거
+      try {
+        fetch(`http://localhost:4000/api/tasks/notify-created`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId,
+            title,
+            content: fullContent,
+            column: 'todo',
+            agentId: assigneeId,
+            priority
+          })
+        }).catch(err => console.warn('[AriDaemon] notify-created trigger failed:', err.message));
+      } catch (e) {}
+
       return {
         success: true,
         taskId,
@@ -407,6 +439,19 @@ async function executeTool(toolName, args) {
         success: true,
         taskId,
         message: `🗑️ #${taskId} 태스크가 삭제되었습니다.${reason ? ` (이유: ${reason})` : ''}`,
+      };
+    }
+
+    // ── getTaskDetails ─────────────────────────────────────────────────────
+    if (toolName === 'getTaskDetails') {
+      const { taskId } = args;
+      const task = await dbManager.getTaskByIdFull(taskId);
+      if (!task) {
+        return { success: false, message: `#${taskId} 태스크를 찾을 수 없습니다.` };
+      }
+      return { 
+        success: true, 
+        message: `📋 **[Task #${task.id}] 상세 내용**\n- 상태: ${task.status}\n- 담당: ${task.assigned_agent || '미할당'}\n- 카테고리: ${task.category || 'N/A'}\n\n**내용**:\n${task.content}`
       };
     }
 
@@ -744,7 +789,7 @@ app.get('/health', (req, res) => {
     model: MODEL.PRO,
     historyTurns: conversationHistory.length,
     dbConnected: !!dbManager,
-    tools: ['googleSearch', 'createKanbanTask', 'updateKanbanTask', 'deleteKanbanTask', 'getCrewStatus'],
+    tools: ['googleSearch', 'createKanbanTask', 'updateKanbanTask', 'deleteKanbanTask', 'getTaskDetails', 'getCrewStatus'],
   });
 });
 
@@ -755,7 +800,7 @@ app.listen(PORT, () => {
 - Port   : ${PORT}
 - Model  : ${MODEL.PRO}
 - DB     : ${dbManager ? '✅ 연결됨' : '⚠️ 미연결'}
-- Tools  : googleSearch | createKanbanTask | updateKanbanTask | deleteKanbanTask | getCrewStatus
+- Tools  : googleSearch | createKanbanTask | updateKanbanTask | deleteKanbanTask | getTaskDetails | getCrewStatus
 - Memory : Persistent Context (최근 30턴)
 ==================================================
 `);

@@ -904,6 +904,24 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+/** POST /api/tasks/notify-created — 시스템/에이전트가 생성한 태스크 소켓 브로드캐스트 */
+app.post('/api/tasks/notify-created', async (req, res) => {
+  try {
+    const { taskId, title, content, column, agentId, priority } = req.body;
+    io.emit('task:created', { 
+      taskId: String(taskId), 
+      title, 
+      content, 
+      column: column || 'todo', 
+      agentId, 
+      priority 
+    });
+    res.sendStatus(200);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // [Phase 14] 멘션 기반 즉시 태스크 생성 API
 app.post('/api/tasks/mention', async (req, res) => {
@@ -1384,12 +1402,22 @@ export async function getGoogleOAuthToken() {
         keyProvider.setVolatileKey('OAUTH_TOKEN', _googleOAuthToken);
         console.log('[Auth] ✅ Access Token 백그라운드 재발급 성공!');
         return _googleOAuthToken;
+      } else {
+        console.error('[Auth] ❌ 구글 API 토큰 갱신 거절 응답:', data);
+        if (data.error === 'invalid_grant') {
+           console.error('[Auth] ⚠️ Refresh Token이 무효화되었습니다 (테스트 앱 수명 만료 또는 권한 회수). 사용자 재로그인이 필요합니다.');
+        }
       }
     } catch (err) {
       console.error('[Auth] 토큰 갱신 에러:', err.message);
     }
   }
   return null;
+}
+
+/** 구독 인증 모드가 한 번이라도 설정되었는지 확인 (Silent API Fallback 차단용) */
+export function hasOAuthSetup() {
+  return !!_googleOAuthToken || !!_googleRefreshToken || fs.existsSync(TOKEN_PATH);
 }
 
 /** POST /api/auth/google-code — Authorization Code 토큰 교환 */
@@ -1402,16 +1430,19 @@ app.post('/api/auth/google-code', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: process.env.VITE_GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        code,
+        client_id: (process.env.VITE_GOOGLE_CLIENT_ID || '').trim(),
+        client_secret: (process.env.GOOGLE_CLIENT_SECRET || '').trim(),
+        code: code.trim(),
         grant_type: 'authorization_code',
-        redirect_uri: redirectUri
-      })
+        redirect_uri: redirectUri.trim()
+      }).toString()
     });
     
     const data = await response.json();
-    if (data.error) throw new Error(data.error_description || data.error);
+    if (data.error) {
+      console.error('[Auth] 구글 토큰 교환 상세 에러:', data);
+      throw new Error(data.error_description || data.error);
+    }
 
     _googleOAuthToken = data.access_token;
     _googleOAuthExpiry = Date.now() + (data.expires_in * 1000);

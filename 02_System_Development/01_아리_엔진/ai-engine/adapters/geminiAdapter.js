@@ -49,17 +49,7 @@ class GeminiAdapter {
         }
     }
 
-    async _switchToBackupKey() {
-        console.warn("🔄 [GeminiAdapter] 메인 API 제한(429/503) 도달. 예비 키(GEMINI_API_KEY_2)로 스위칭 시도...");
-        const backupKey = keyProvider.getKey('GEMINI_API_KEY')_2;
-        if (backupKey && backupKey !== 'undefined') {
-            this.ai = new GoogleGenAI(backupKey);
-            console.log("✅ [GeminiAdapter] 예비 키로 갱신 완료.");
-            return true;
-        }
-        console.warn("❌ [GeminiAdapter] 예비 키가 등록되어 있지 않습니다. 실패.");
-        return false;
-    }
+
 
     /**
      * 제미나이 모델을 사용하여 응답을 생성합니다.
@@ -68,35 +58,35 @@ class GeminiAdapter {
         // ── [구독인증 우선] OAuth 토큰이 유효하면 API Key 없이 직접 호출 ──────────
         try {
             process.env.NO_SERVER = 'true';
-            const { getGoogleOAuthToken } = await import('../../server.js');
-            const oauthToken = await getGoogleOAuthToken?.();
+            const server = await import('../../server.js');
+            const oauthToken = await server.getGoogleOAuthToken?.();
+            
             if (oauthToken) {
                 console.log(`[GeminiAdapter] 🔐 구독인증 모드로 호출 (${initialModelName})`);
                 return await this._generateWithOAuth(oauthToken, initialModelName, userPrompt, systemPrompt);
+            } else if (server.hasOAuthSetup && server.hasOAuthSetup()) {
+                // 토큰 만료 시 몰래 개인 API Key를 사용하는 것을 원천 차단 (과금 방어)
+                throw new Error("🔒 [보안 차단] 구독인증 연결이 해제되었습니다. 의도치 않은 API 요금 과금을 막기 위해 시스템이 작업을 멈췄습니다. 대시보드에서 다시 연결해주세요.");
             }
-        } catch (_) { /* server.js import 실패 시 무시 — API Key 방식으로 폴백 */ }
+        } catch (e) { 
+            if (e.message.includes('[보안 차단]')) throw e;
+            /* 그 외 import 실패 등은 API Key 방식으로 폴백 */ 
+        }
 
         await this._ensureClient();
         if (!this.ai) throw new Error("GEMINI_API_KEY를 찾을 수 없습니다.");
 
 
         return requestQueue.enqueue(async () => {
-            // [Phase 0] 모델 자동 Fallback 체인 (modelRegistry.js의 공식 배열 사용)
-            let fallbackChain;
-            if (initialModelName.includes('pro')) {
-                fallbackChain = PRO_FALLBACK_CHAIN;
-            } else if (initialModelName.includes('flash')) {
-                fallbackChain = FLASH_FALLBACK_CHAIN;
-            } else {
-                fallbackChain = [initialModelName];
-            }
+            // [Phase 26] 단일 모델 / 단일 키 정책 (폴백 폐기)
+            const fallbackChain = [initialModelName];
 
             let lastError;
             let retryCount = 0; // 단일 모델당 재시도(Retry) 횟수
 
             for (let i = 0; i < fallbackChain.length; i++) {
                 const currentModel = fallbackChain[i];
-                console.log(`[Gemini Adapter] 스킬 실행 시도 중... (Model: ${currentModel}, Step: ${i+1}/${fallbackChain.length}, Retry: ${retryCount})`);
+                console.log(`[Gemini Adapter] 스킬 실행 시도 중... (Model: ${currentModel}, Retry: ${retryCount})`);
                 
                 try {
                     const response = await this.ai.models.generateContent({
@@ -112,7 +102,7 @@ class GeminiAdapter {
                         text: response.text,
                         model: currentModel.includes('flash') ? 'Gemini 2.5 Flash' : 'Gemini Pro',
                         tokenUsage: response.usageMetadata?.totalTokenCount || 0,
-                        _meta: { fallback: (i > 0) } // Fallback 발동 여부 기록
+                        _meta: { fallback: false } 
                     };
                 } catch (err) {
                     lastError = err;
@@ -122,39 +112,27 @@ class GeminiAdapter {
                     if (isRateLimit || isServerError) {
                         console.warn(`⚠️ [GeminiAdapter] ${currentModel} 호출 실패 (${err.message})`);
                         
-                        // 1. 503 등 일시적 오류 시, 동일 모델로 1회 재시도 (2초 대기)
+                        // 1. 503/429 등 일시적 오류 시, 1회만 재시도
                         if (retryCount < 1) {
-                            console.log(`⏳ [GeminiAdapter] 일시적 과부하(503/429) 감지. 2초 후 동일 모델(${currentModel}) 재시도...`);
+                            console.log(`⏳ [GeminiAdapter] 일시적 과부하 감지. 2초 후 동일 모델(${currentModel}) 재시도...`);
                             await new Promise(r => setTimeout(r, 2000));
                             retryCount++;
                             i--; // 현재 모델 재시도
                             continue;
                         }
 
-                        // 2. 재시도 실패 및 백업 키 사용 시도
-                        if (i === fallbackChain.length - 1) {
-                            const switched = await this._switchToBackupKey();
-                            if (switched) {
-                                retryCount = 0; // 예비 키로 갱신했으므로 카운트 리셋
-                                i--; // 현재 모델 재시도
-                                continue;
-                            }
-                        }
-                        
-                        // 3. 재시도 실패 시 다음 모델로 Fallback 넘어감
-                        console.log(`🔄 [GeminiAdapter] 다음 하위 모델로 Fallback 시도 예정...`);
-                        retryCount = 0;
-                        continue;
+                        // 2. 재시도 실패 시 예비 키 폴백 없음 -> 즉시 중단 (과금 방지 원칙)
+                        console.error(`❌ [GeminiAdapter] 재시도 실패. 단일 키 정책에 따라 우회(Fallback) 없이 중단합니다.`);
+                        throw err;
                     } else {
-                        // 권한 오류(400)나 파싱 오류는 Fallback 없이 즉시 중단
+                        // 권한 오류(400)나 파싱 오류는 즉시 중단
                         throw err;
                     }
                 }
             }
             
-            // 모든 Fallback 루프가 실패했을 경우
-            console.error('[Gemini Adapter] Fallback 체인 최종 실패:', lastError);
-            throw new Error(`Gemini 오류: 모든 가용 모델 호출 실패. (${lastError?.message})`);
+            // 루프 종료 시 에러
+            throw new Error(`Gemini 오류: (${lastError?.message})`);
         });
     }
 
@@ -172,12 +150,12 @@ class GeminiAdapter {
             let lastError;
             let retryCount = 0; // 단일 모델당 재시도 횟수
             
-            // Vision 분석은 Flash 계열이 적합하므로 FLASH_FALLBACK_CHAIN을 기본 사용
-            const fallbackChain = FLASH_FALLBACK_CHAIN && FLASH_FALLBACK_CHAIN.length > 0 ? FLASH_FALLBACK_CHAIN : [MODEL.FLASH];
+            // [Phase 26] 단일 모델 / 단일 키 정책 (Vision도 폴백 폐기)
+            const fallbackChain = [MODEL.FLASH];
 
             for (let i = 0; i < fallbackChain.length; i++) {
                 const currentModel = fallbackChain[i];
-                console.log(`[Gemini Adapter] 이미지 분석 시도 중... (Model: ${currentModel}, Step: ${i+1}/${fallbackChain.length}, Retry: ${retryCount})`);
+                console.log(`[Gemini Adapter] 이미지 분석 시도 중... (Model: ${currentModel}, Retry: ${retryCount})`);
                 
                 try {
                     const response = await this.ai.models.generateContent({
@@ -210,38 +188,25 @@ class GeminiAdapter {
                     if (isRateLimit || isServerError) {
                         console.warn(`⚠️ [GeminiAdapter] Vision 호출 실패 (${currentModel}): ${err.message}`);
                         
-                        // 1. 503 등 일시적 오류 시, 2초 대기 후 동일 모델 재시도
+                        // 1. 503/429 등 오류 시 1회 재시도
                         if (retryCount < 1) {
                             console.log(`⏳ [GeminiAdapter] Vision 과부하 감지. 2초 후 동일 모델(${currentModel}) 재시도...`);
                             await new Promise(r => setTimeout(r, 2000));
                             retryCount++;
-                            i--; // 현재 모델 다시
+                            i--; // 현재 모델 재시도
                             continue;
                         }
 
-                        // 2. 재시도 실패 및 백업 키 사용 시도
-                        if (i === fallbackChain.length - 1) {
-                            const switched = await this._switchToBackupKey();
-                            if (switched) {
-                                retryCount = 0; // 예비 키로 카운트 리셋
-                                i--; // 현재 모델 다시
-                                continue;
-                            }
-                        }
-                        
-                        // 3. 재시도 실패 시 다음 모델로
-                        console.log(`🔄 [GeminiAdapter] 다음 하위 모델로 Fallback 시도...`);
-                        retryCount = 0;
-                        continue;
+                        // 2. 재시도 실패 시 예비 키 폴백 없음 -> 즉시 중단
+                        console.error(`❌ [GeminiAdapter] Vision 재시도 실패. 단일 키 정책에 따라 우회(Fallback) 없이 중단합니다.`);
+                        throw err;
                     } else {
-                        // 그 외 권한 오류나 기타 오류는 즉시 중단
                         throw new Error(`Vision 오류 (${currentModel}): ${err.message}`);
                     }
                 }
             }
             
-            console.error('[Gemini Adapter] Vision Fallback 체인 최종 실패:', lastError);
-            throw new Error(`Vision 최종 오류: 모든 가용 모델 호출 실패. (${lastError?.message})`);
+            throw new Error(`Vision 최종 오류: (${lastError?.message})`);
         });
     }
 }

@@ -656,7 +656,6 @@ export default function LogDrawer() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={btnMode === 'sending'}
                 style={{
                   position: 'relative', width: '100%', background: 'none', border: 'none', resize: 'none',
                   color: 'transparent', caretColor: 'var(--text-primary)',

@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { execSync } from 'child_process';
-import { keyProvider } from '../../utils/keyProvider.js';
+import keyProvider from '../../tools/keyProvider.js';
 
 /**
  * [TTS Agent]
@@ -46,7 +46,7 @@ export class TTSAgent {
      */
     static async fetchPremiumTTS(text, outputPath, profile = TTS_PROFILES.C) {
         // P1: 서비스별 API 키 분리 (GCP TTS 전용 키 우선, 없으면 Gemini 키 Fallback)
-        const apiKey = process.env.GOOGLE_CLOUD_TTS_KEY || keyProvider.getKey('GEMINI_API_KEY');
+        const apiKey = process.env.GOOGLE_CLOUD_TTS_KEY || await keyProvider.getKey('GEMINI_API_KEY');
         if (!apiKey) throw new Error('GOOGLE_CLOUD_TTS_KEY 또는 GEMINI_API_KEY가 등록되지 않았습니다.');
 
         const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;

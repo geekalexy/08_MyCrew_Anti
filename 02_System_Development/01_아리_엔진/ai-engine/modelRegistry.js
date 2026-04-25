@@ -41,8 +41,9 @@ export const MODEL = {
   FAILOVER: 'gemini-2.5-flash-lite',
 
   /** Anti-Bridge 가상 모델 식별자 (CKS 논문 연구용) */
-  ANTIGRAVITY_PRIME: 'anti-bridge-prime',
-  ANTIGRAVITY_NEXUS: 'anti-bridge-nexus'
+  ANTIGRAVITY_PRIME:  'anti-bridge-prime',
+  ANTIGRAVITY_NEXUS:  'anti-bridge-nexus',
+  ANTIGRAVITY_SONNET: 'anti-bridge-sonnet',  // [2026-04-25] lily/pico 전용 — Claude Sonnet급
 };
 
 /** 유효한 모델명 화이트리스트 (GA 안정판 한정) */
@@ -53,7 +54,8 @@ export const VALID_MODELS = [
   'claude-opus-4-7',
   'claude-sonnet-4-6',
   'anti-bridge-prime',
-  'anti-bridge-nexus'
+  'anti-bridge-nexus',
+  'anti-bridge-sonnet',  // [2026-04-25] lily/pico 전용
 ];
 
 /**

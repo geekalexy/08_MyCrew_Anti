@@ -19,10 +19,12 @@ const PENDING_DIR   = path.resolve(process.cwd(), '.agents/tasks/pending');
 // 구 데표 크 추적 (변가 감지용)
 let prevQueueDepth = -1;
 
-export function initAdapterWatcher(io, dbMgr, broadcastFn) {
+export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
   ioInstance = io;
   dbManagerInstance = dbMgr;
   broadcastLogFn = broadcastFn;
+  // [Case 3 Fix] 작업 완료 후 다음 대기 카드 자동 Pull 트리거용 함수 주입
+  const dispatchNextTaskForAgent = dispatchFn || (() => {});
 
   console.log('[AdapterWatcher] 백그라운드 폴링 감시 데감을 시작합니다...');
   
@@ -99,6 +101,13 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn) {
 
           await dbManagerInstance.updateTaskStatus(taskId, status);
           
+          // ── [Artifact Fix] artifactPath 있으면 has_artifact = 1 업데이트 ──
+          // Antigravity가 completed JSON에 artifactPath 필드를 포함할 때 동작
+          // 예: { taskId, text, agentId, status, artifactPath: '/outputs/task_93_result.png' }
+          if (resultData.artifactPath) {
+            await dbManagerInstance.updateHasArtifact(taskId, resultData.artifactPath).catch(() => {});
+          }
+          
           if (resultData.tokenUsage) {
             await dbManagerInstance.accumulateCksTokens(taskId, resultData.tokenUsage, resultData.agentId || 'system').catch(()=>{});
           }
@@ -122,6 +131,15 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn) {
 
           // 어댑터 즉시 idle 전환 알림
           ioInstance.emit('adapter:status_change', { adapterId: 'antigravity', status: 'idle', queueDepth: 0 });
+
+          // ── [Case 3 Fix] 완료된 에이전트의 다음 대기 카드 자동 Pull ─────
+          // 스펙: "에이전트가 기존 작업을 완료하고 '진행'에서 벗어날 때 → 자동 Pull"
+          // AdapterWatcher는 server.js의 socket 이벤트 루프 밖에 있으므로
+          // dispatchNextTaskForAgent를 직접 주입받아 호출해야 함.
+          const completedAgentId = resultData.agentId;
+          if (completedAgentId && completedAgentId !== 'system') {
+            setTimeout(() => dispatchNextTaskForAgent(completedAgentId), 1000);
+          }
 
           // 처리 완료 후 파일 삭제
           await fs.promises.unlink(filePath);

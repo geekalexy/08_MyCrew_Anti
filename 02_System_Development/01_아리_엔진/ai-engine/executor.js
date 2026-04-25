@@ -19,14 +19,19 @@ import contextInjector from './tools/contextInjector.js';
 
 
 // [v3.2 SMART PARITY] 에이전트별 시능 수준에 따른 시그니처 모델 매핑 (v4.7 최신화)
+// [구독 티어 분기] USER_MODEL_TIER=pro → Gemini Pro, 미설정(디폴트) → Flash
+// 사용자의 Gemini 구독 상태에 따라 nova/lumi 모델이 자동 전환됨
+// API 사용자: Flash 유지 / Gemini Pro·Ultra 구독자: Pro 격상
+const IS_PRO_TIER = process.env.USER_MODEL_TIER === 'pro';
+
 const AGENT_SIGNATURE_MODELS = {
-  'luna':  MODEL.ANTIGRAVITY_NEXUS,   // Anti-Bridge Surrogate
-  'ollie': MODEL.ANTIGRAVITY_PRIME,   // Anti-Bridge Surrogate
-  'pico':  MODEL.SONNET, // 최신 Sonnet (4.6)
-  'lily':  MODEL.SONNET, // 최신 Sonnet (4.6)
-  'nova':  MODEL.FLASH,  // 최신 Flash (3.0)
-  'lumi':  MODEL.FLASH,  // 최신 Flash (3.0)
-  'ari':   MODEL.FLASH   // 최신 Flash (3.0)
+  'luna':  MODEL.ANTIGRAVITY_NEXUS,    // Anti-Bridge → Antigravity 세션
+  'ollie': MODEL.ANTIGRAVITY_PRIME,    // Anti-Bridge → Antigravity 세션
+  'lily':  MODEL.ANTIGRAVITY_SONNET,   // Anti-Bridge → Antigravity Sonnet급
+  'pico':  MODEL.ANTIGRAVITY_SONNET,   // Anti-Bridge → Antigravity Sonnet급
+  'nova':  IS_PRO_TIER ? MODEL.PRO : MODEL.FLASH,  // 구독자: Pro / API: Flash
+  'lumi':  IS_PRO_TIER ? MODEL.PRO : MODEL.FLASH,  // 구독자: Pro / API: Flash
+  'ari':   MODEL.FLASH                 // 항상 Flash (실시간 응답 우선)
 };
 
 // ─── SKILL.md 캐시 (서버 생존 주기 동안 유지) ─────────────────────────
@@ -488,6 +493,62 @@ class Executor {
         score: 0,
       };
     }
+  }
+  /**
+   * runDirect — 파일 큐(FilePollingAdapter) 없이 현재 프로세스에서 AI를 직접 호출.
+   * dispatchNextTaskForAgent가 크루 작업을 실행할 때 사용.
+   * executor.run()과 동일하되 ASYNC_CATEGORIES 우회 없음.
+   */
+  async runDirect(taskContent, agentId = null, taskId = null) {
+    console.log(`[Executor.runDirect] Task #${taskId} 시작 (${agentId})`);
+    this._log('info', `> [${agentId}] 사고 회로 가동 중...`, agentId || 'system', taskId);
+
+    // 0. System Shield
+    const shieldBlock = systemShieldSkill.applyShield(taskContent, agentId);
+    if (shieldBlock) {
+      this._log('warn', `> 🚨 System Shield 발동 — 작업 차단됨`, 'system', taskId);
+      return shieldBlock;
+    }
+
+    // 1. 카테고리 & 모델 결정
+    const evaluation = await modelSelector.selectModel(taskContent);
+    const signatureModel = AGENT_SIGNATURE_MODELS[agentId?.toLowerCase()];
+    const modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
+
+    // 2. 스킬 문서 로드
+    const skill = router.route(taskContent, evaluation.category);
+    let systemPrompt = loadSkillDocument(evaluation.category) || skill.getSystemPrompt();
+    const livingRules = ruleHarvester.getAppliedRules();
+    const finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
+
+    this._log('info', `> [${evaluation.category}] 모듈 로드 완료. ${modelToUse} 엔진으로 생성을 시작합니다...`, agentId || 'system', taskId);
+
+    // 3. 모델 직접 호출 (filePollingAdapter 미경유)
+    // anti-bridge-* 식별자만 antigravityAdapter, 나머지는 Gemini
+    let result;
+    try {
+      if (modelToUse.startsWith('anti-bridge-')) {
+        result = await antigravityAdapter.generateResponse(taskContent, finalSystemPrompt, modelToUse);
+      } else {
+        result = await geminiAdapter.generateResponse(taskContent, finalSystemPrompt, modelToUse);
+      }
+    } catch (err) {
+      throw err; // 호출부에서 처리
+    }
+
+    // 4. 토큰 사용량 기록
+    if (taskId && result.tokenUsage) {
+      await dbManager.accumulateCksTokens(taskId, result.tokenUsage, agentId).catch(() => {});
+    }
+
+    this._log('info', `> [WORKED] Task #${taskId} 생성 완료 (${result.model})`, agentId || 'system', taskId);
+
+    return {
+      text: result.text,
+      model: result.model,
+      category: evaluation.category,
+      score: evaluation.score,
+    };
   }
 }
 

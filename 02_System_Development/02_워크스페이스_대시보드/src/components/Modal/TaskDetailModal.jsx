@@ -372,18 +372,35 @@ export default function TaskDetailModal() {
   const handleSubmitComment = () => {
     if (!commentText.trim() || !task) return;
 
-    const finalAssignee = commentColumn === 'review' ? '대표님 (나)' : commentAssignee;
-    const hasUpdates = (commentPriority !== task.priority) || (finalAssignee !== task.assignee) || (commentColumn !== task.column);
+    let finalColumn = commentColumn;
+    if (commentPriority === 'high' && commentColumn === 'todo') {
+      finalColumn = 'in_progress';
+      setCommentColumn('in_progress');
+    }
+
+    const finalAssignee = finalColumn === 'review' ? '대표님 (나)' : commentAssignee;
+    const hasUpdates = (commentPriority !== task.priority) || (finalAssignee !== task.assignee) || (finalColumn !== task.column);
 
     if (hasUpdates) {
        patchTask(task.id, {
          priority: commentPriority,
          assignee: finalAssignee,
-         column: commentColumn
+         column: finalColumn
        });
-       if (commentColumn && commentColumn !== task.column) {
-         useKanbanStore.getState().moveTask(task.id, commentColumn);
+       if (finalColumn && finalColumn !== task.column) {
+         useKanbanStore.getState().moveTask(task.id, finalColumn);
        }
+       
+       // REST 동기화
+       fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+         method: 'PATCH',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           priority: commentPriority,
+           assignee: finalAssignee,
+           column: finalColumn
+         })
+       }).catch(console.error);
     }
 
     setCommentAssignee(finalAssignee);
@@ -459,22 +476,25 @@ export default function TaskDetailModal() {
 
       <div className="modal__header" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
 
-          {/* ↗ 확장 버튼 — 좌상단 재배치 (루카 기획 반영) */}
-          {(task.column === 'done' || task.column === 'in_progress' || task.latestComment) && (
+          {/* ↗ 결과물 프리뷰 버튼 — 아티팩트가 있을 때만 활성화 */}
+          {task.has_artifact === 1 && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                // artifact_url이 있으면 이미지/파일 뷰어, 없으면 latestComment 텍스트 뷰
+                const artifactContent = task.artifact_url
+                  ? `# ${task.title || 'Task Result'}\n\n![결과물](${task.artifact_url})\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`
+                  : `# ${task.title || 'Task Result'}\n\n${task.latestComment || '결과물이 여기에 표시됩니다.'}\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`;
                 openArtifact({
                   id: task.id,
                   title: task.title || task.content || `Task #${task.id}`,
-                  content: task.latestComment
-                    ? `# ${task.title || 'Task Result'}\n\n${task.latestComment}\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`
-                    : `# ${task.title || 'Task Result'}\n\n이 태스크의 산출물입니다.\n\n**상태:** ${task.column}\n**담당자:** ${task.assignee || '미할당'}`,
-                  type: 'Document',
+                  content: artifactContent,
+                  type: task.artifact_url ? 'Image' : 'Document',
                   agentName: task.assignee || 'AI Agent',
+                  artifactUrl: task.artifact_url || null,
                 });
               }}
-              title="산출물 풀스크린 뷰어 열기"
+              title="결과물 미리보기"
               style={{
                 background: 'rgba(180,197,255,0.07)',
                 border: '1px solid rgba(180,197,255,0.18)',

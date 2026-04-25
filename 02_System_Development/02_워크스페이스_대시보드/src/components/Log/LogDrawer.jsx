@@ -43,15 +43,18 @@ export default function LogDrawer() {
   const [inputText, setInputText]     = useState('');
   const [btnMode, setBtnMode]         = useState('idle'); // idle | stop | send | sending
   const [isDragOver, setIsDragOver]   = useState(false);  // 드래그&드롭 오버레이
+  const [timelineComments, setTimelineComments] = useState([]); // [Fix Bug2] Timeline DB 댓글
 
   // ── Phase 22: Ari 스트리밍 상태 ──────────────────────────────────────────
   const [streamingText, setStreamingText] = useState('');   // 누적 청크
   const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
 
-  const bottomRef   = useRef(null);
-  const textareaRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const asideRef    = useRef(null);
+  const bottomRef       = useRef(null);
+  const textareaRef     = useRef(null);
+  const fileInputRef    = useRef(null);
+  const asideRef        = useRef(null);
+  const prevBtnModeRef  = useRef('idle');
+  const backdropRef     = useRef(null); // [Fix] 하이라이트 백드롭 스크롤 동기화용
 
   const focusedTask = focusedTaskId
     ? Object.values(tasks).find((t) => String(t.id) === String(focusedTaskId))
@@ -62,9 +65,25 @@ export default function LogDrawer() {
     if (activeLogTab === 'time') {
       setBtnMode(focusedTask ? 'stop' : 'idle');
     } else {
-      setBtnMode('send'); // Chatting 탭에서는 항상 바로 보낼 수 있도록 활성화
+      setBtnMode('send');
     }
   }, [focusedTaskId, activeLogTab, focusedTask]);
+
+  // [UX] 전송 후 textarea 자동 포커스 복귀
+  // sending → send/stop/idle 전환 시 (네트워크 응답 완료 후) 포커스 복원
+  useEffect(() => {
+    if (prevBtnModeRef.current === 'sending' && btnMode !== 'sending') {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+    prevBtnModeRef.current = btnMode;
+  }, [btnMode]);
+
+  // [UX] 스트리밍 종료 시에도 포커스 복귀 (Ari 채팅 응답 완료 후)
+  useEffect(() => {
+    if (!isStreaming) {
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    }
+  }, [isStreaming]);
 
   // 팀 상세 페이지, 프로필 페이지에서는 Chatting 탭을 디폴트로 활성화
   useEffect(() => {
@@ -72,6 +91,13 @@ export default function LogDrawer() {
       setActiveLogTab('interaction');
     }
   }, [currentView, setActiveLogTab]);
+
+  // [UX] 카드 포커스 시 → Timeline 탭 자동 전환
+  useEffect(() => {
+    if (focusedTaskId) {
+      setActiveLogTab('time');
+    }
+  }, [focusedTaskId, setActiveLogTab]);
 
   // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
@@ -82,6 +108,43 @@ export default function LogDrawer() {
   const filteredLogs = focusedTaskId
     ? logs.filter((log) => String(log.taskId) === String(focusedTaskId))
     : logs;
+
+  // [Fix Bug2] DB 댓글 + 실시간 로그 병합 (시간순, 중복 제거)
+  const mergedTimeline = activeLogTab === 'time' ? [
+    ...timelineComments.map(c => ({
+      level: 'info', message: c.content, agentId: c.author,
+      taskId: String(focusedTaskId || ''), timestamp: c.created_at, isComment: true,
+    })),
+    ...displayLogs,
+  ].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
+    .filter((item, idx, arr) =>
+      arr.findIndex(x => x.message === item.message && x.agentId === item.agentId) === idx
+    ) : displayLogs;
+
+  // [Fix Bug2] focusedTaskId 변경 시 DB 댓글 로드
+  useEffect(() => {
+    if (!focusedTaskId) { setTimelineComments([]); return; }
+    fetch(`${SERVER_URL}/api/tasks/${focusedTaskId}/comments`)
+      .then(r => r.json())
+      .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
+      .catch(() => setTimelineComments([]));
+  }, [focusedTaskId]);
+
+  // [Fix Bug2] 소켓: 새 댓글 → timelineComments에 실시간 추가
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({ taskId, author, text, createdAt }) => {
+      if (String(taskId) === String(focusedTaskId)) {
+        setTimelineComments(prev => {
+          const exists = prev.some(c => c.content === text && c.author === author);
+          if (exists) return prev;
+          return [...prev, { author, content: text, created_at: createdAt || new Date().toISOString() }];
+        });
+      }
+    };
+    socket.on('task:comment_added', handler);
+    return () => socket.off('task:comment_added', handler);
+  }, [socket, focusedTaskId]);
 
   // 리사이즈
   const startResizing = useCallback((e) => { e.preventDefault(); setIsResizing(true); }, []);
@@ -265,7 +328,7 @@ export default function LogDrawer() {
   }, [inputText, focusedTask, btnMode, activeLogTab]);
 
   const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend(); }
   }, [handleSend]);
 
   // 동적 멘션 키워드 로드 (Phase 22: 아리 1:1 독대 체제로 인해 멘션 기능 제거)
@@ -444,7 +507,7 @@ export default function LogDrawer() {
         <div className="log-drawer__body" style={{ flex: 1, overflowY: 'auto' }}>
           {(activeLogTab === 'time' || activeLogTab === 'interaction') && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '1rem 0.8rem' }}>
-              {displayLogs.length === 0 ? (
+              {mergedTimeline.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', paddingTop: '2rem' }}>
                   {activeLogTab === 'time' 
                     ? (focusedTaskId ? '이 태스크의 대화 내역이 없습니다.' : '테스크 카드를 선택하여 대화를 시작하세요.')
@@ -452,7 +515,7 @@ export default function LogDrawer() {
                 </div>
               ) : (
                 <>
-                  {displayLogs.length >= 15 && (
+                  {mergedTimeline.length >= 15 && (
                     <div style={{ display: 'flex', justifyContent: 'center', margin: '1rem 0' }}>
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
@@ -467,11 +530,11 @@ export default function LogDrawer() {
                       </div>
                     </div>
                   )}
-                  {displayLogs.map((log, i) => {
+                  {mergedTimeline.map((log, i) => {
                   const isUser   = log.agentId === '대표님' || log.agentId === 'user';
                   const isSystem = log.agentId === 'system';
                   const time     = new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-                  const prevLog  = i > 0 ? filteredLogs[i - 1] : null;
+                  const prevLog  = i > 0 ? mergedTimeline[i - 1] : null;
                   const sameAuthor = prevLog && prevLog.agentId === log.agentId;
                   // 메시지 내 '💬 XXX: ' 또는 'XXX: ' 프리픽스 제거 (레거시 형식 대응)
                   const cleanMsg = log.message.replace(/^💬\s*[\w가-힣]+:\s*/, '').replace(/^[\w가-힣]+:\s*/, (m) =>
@@ -564,7 +627,7 @@ export default function LogDrawer() {
                   );
                 })}
 
-                {/* ── Phase 22: Ari 스트리밍 타이핑 버블 ──────────────── */}
+                {/* ── Ari 스트리밍 버블: 생각 중 애니메이션 + 실시간 타이핑 ── */}
                 {isStreaming && activeLogTab === 'interaction' && (
                   <div style={{
                     display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
@@ -580,18 +643,29 @@ export default function LogDrawer() {
                       <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
                         ari <span style={{ opacity: 0.5 }}>· 방금</span>
                       </p>
-                      <p style={{
-                        fontSize: '1rem', lineHeight: 1.6, color: 'var(--text-secondary)',
-                        wordBreak: 'break-word', margin: 0,
-                      }}>
-                        {streamingText}
-                        {/* 타이핑 커서 */}
-                        <span style={{
-                          display: 'inline-block', width: '2px', height: '1em',
-                          background: '#7C6EF8', marginLeft: '2px', verticalAlign: 'text-bottom',
-                          animation: 'blink 0.8s step-end infinite',
-                        }} />
-                      </p>
+                      {streamingText ? (
+                        /* 텍스트 수신 중: 스트리밍 텍스트 + 커서 */
+                        <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--text-secondary)', wordBreak: 'break-word', margin: 0 }}>
+                          {streamingText}
+                          <span style={{
+                            display: 'inline-block', width: '2px', height: '1em',
+                            background: '#7C6EF8', marginLeft: '2px', verticalAlign: 'text-bottom',
+                            animation: 'blink 0.8s step-end infinite',
+                          }} />
+                        </p>
+                      ) : (
+                        /* 대기 중: '생각 중...' 바운싱 닷 */
+                        <p style={{ display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '1.6rem' }}>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '2px' }}>생각 중</span>
+                          {[0, 0.18, 0.36].map((delay, i) => (
+                            <span key={i} style={{
+                              display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
+                              background: '#7C6EF8', opacity: 0.7,
+                              animation: `thinking-glow-pulse 1.2s ease-in-out ${delay}s infinite`,
+                            }} />
+                          ))}
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -619,25 +693,31 @@ export default function LogDrawer() {
             transition: 'all 0.2s',
           }}>
             <div style={{ position: 'relative', width: '100%', minHeight: 30 }}>
-              {/* 하이라이트용 백드롭 (사용자 눈에 보이는 레이어) */}
+              {/* 하이라이트용 백드롭 — textarea와 스크롤 동기화 */}
               <div
+                ref={backdropRef}
                 style={{
                   position: 'absolute', inset: 0, padding: '0.2rem 0.4rem',
                   fontSize: '1.15rem', fontFamily: 'inherit', lineHeight: 1.5,
                   whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                   color: 'var(--text-primary)', pointerEvents: 'none',
-                  overflow: 'hidden'
+                  overflow: 'hidden',   // 스크롤바 숨김, scrollTop은 JS로 동기화
                 }}
               >
                 {activeLogTab === 'interaction' ? (
-                  // [Chatting 탭] 멘션 기능 제거됨 (전역 텍스트 처리)
-                  inputText
+                  // [Chatting 탭] @멘션 하이라이트
+                  inputText.split(/(@[a-zA-Z가-힣]+)/g).map((part, i) =>
+                    part.match(/^@[a-zA-Z가-힣]+$/)
+                      ? <span key={i} style={{ color: '#4ECDC4', fontWeight: 600 }}>{part}</span>
+                      : part
+                  )
                 ) : (
-                  // [Timeline 탭] #번호 하이라이트
-                  inputText.split(/(#\d+)/g).map((part, i) => {
-                    if (part.startsWith('#')) {
+                  // [Timeline 탭] @멘션(초록) + #번호(보라) 동시 하이라이트
+                  inputText.split(/(@[a-zA-Z가-힣]+|#\d+)/g).map((part, i) => {
+                    if (part.match(/^@[a-zA-Z가-힣]+$/))
+                      return <span key={i} style={{ color: '#4ECDC4', fontWeight: 600 }}>{part}</span>;
+                    if (part.match(/^#\d+$/))
                       return <span key={i} style={{ color: 'var(--brand)', fontWeight: 500 }}>{part}</span>;
-                    }
                     return part;
                   })
                 )}
@@ -656,6 +736,10 @@ export default function LogDrawer() {
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
+                onScroll={(e) => {
+                  // [Fix] 백드롭과 스크롤 동기화 → 입력 중 텍스트 잘림 버그 해결
+                  if (backdropRef.current) backdropRef.current.scrollTop = e.target.scrollTop;
+                }}
                 style={{
                   position: 'relative', width: '100%', background: 'none', border: 'none', resize: 'none',
                   color: 'transparent', caretColor: 'var(--text-primary)',

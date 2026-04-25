@@ -77,11 +77,11 @@ let conversationHistory = [];
 const CREW_INFO = {
   luca:  { name: 'Luca',  role: 'CTO / 시스템 아키텍트', model: 'Antigravity(Claude)', specialties: ['시스템 설계', '코드 구현', '아키텍처', '백엔드 개발'] },
   nova:  { name: 'Nova',  role: 'CMO / 마케팅 전략가',   model: MODEL.FLASH,           specialties: ['SNS 전략', '콘텐츠 기획', '바이럴', '릴스/쇼츠'] },
-  pico:  { name: 'Pico',  role: '영상 디렉터',            model: MODEL.SONNET,          specialties: ['영상 제작', '릴스 시나리오', '숏폼 스크립트', '편집'] },
-  lumi:  { name: 'Lumi',  role: '이미지 디렉터',          model: MODEL.FLASH,           specialties: ['이미지 생성', '디자인', '비주얼 기획', '썸네일'] },
-  luna:  { name: 'Luna',  role: '최종 합성자',             model: 'Claude Opus',         specialties: ['종합 분석', '전략 합성', '보고서', '최종 검토'] },
-  ollie: { name: 'Ollie', role: '적대적 판관',             model: 'Claude Opus',         specialties: ['크리티컬 리뷰', '품질 검증', '반론 제시'] },
-  lily:  { name: 'Lily',  role: '영상 담당 (Team A)',      model: MODEL.SONNET,          specialties: ['영상', '시나리오'] },
+  pico:  { name: 'Pico',  role: '영상 디렉터',            model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상 제작', '릴스 시나리오', '숏폼 스크립트', '편집'] },
+  lumi:  { name: 'Lumi',  role: '이미지 디렉터',          model: MODEL.FLASH,              specialties: ['이미지 생성', '디자인', '비주얼 기획', '썸네일'] },
+  luna:  { name: 'Luna',  role: '최종 합성자',             model: MODEL.ANTIGRAVITY_NEXUS,  specialties: ['종합 분석', '전략 합성', '보고서', '최종 검토'] },
+  ollie: { name: 'Ollie', role: '적대적 판관',             model: MODEL.ANTIGRAVITY_PRIME,  specialties: ['크리티컬 리뷰', '품질 검증', '반론 제시'] },
+  lily:  { name: 'Lily',  role: '영상 담당 (Team A)',      model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상', '시나리오'] },
 };
 
 // ─── 도구(Function Calling) 정의 ─────────────────────────────────────────
@@ -105,13 +105,13 @@ const ARI_TOOLS = [
             assigneeId: {
               type: 'string',
               enum: ['luca', 'nova', 'pico', 'lumi', 'luna', 'ollie', 'lily'],
-              description: '담당 크루원 ID. 업무 성격에 따라 최적 담당자를 선택합니다.',
+              description: '담당 크루원 ID. 업무 성격에 따라 최적 담당자를 선택합니다. 절대로 enum 목록에 없는 이름(예: luma)을 임의로 생성하거나 할당하지 마십시오. 오직 명시된 크루원만 사용 가능합니다.',
             },
             content: {
               type: 'string',
               description: `태스크 본문 내용.
 반드시 마크다운(Markdown) 포맷으로 구체적인 목적, 배경, 그리고 세부 지시사항을 상세하고 풍부하게 작성하세요.
-절대 한두 줄로 짧게 쓰거나 제목만 반복하지 마십시오. 담당자가 읽고 즉시 실행할 수 있는 수준의 구체적인 가이드라인과 컨텍스트가 포함된 완벽한 업무 지시서 형태로 작성해야 합니다.`,
+절대 사용자의 짧은 요청을 그대로 복사붙여넣기 하지 마십시오. 당신은 전문 프롬프트 엔지니어입니다. 담당자가 읽고 즉시 실행할 수 있는 수준의 구체적인 가이드라인과 컨텍스트가 포함된 완벽한 업무 지시서 형태로 기획안을 작성해야 합니다.`,
             },
             priority: {
               type: 'string',
@@ -337,6 +337,10 @@ async function executeTool(toolName, args) {
     if (toolName === 'createKanbanTask') {
       const { title, assigneeId, content, priority, category } = args;
 
+      if (!CREW_INFO[assigneeId]) {
+        return { success: false, message: `할당 실패: '${assigneeId}'는 존재하지 않는 크루원입니다. 유효한 담당자 목록: ${Object.keys(CREW_INFO).join(', ')}` };
+      }
+
       // content에 title 헤더 포함하여 저장 (기존 DB 구조 활용)
       const fullContent = `# ${title}\n\n${content}`;
       const taskId = await dbManager.createTask(
@@ -389,6 +393,10 @@ async function executeTool(toolName, args) {
     // ── updateKanbanTask ──────────────────────────────────────────────────
     if (toolName === 'updateKanbanTask') {
       const { taskId, content, assigneeId, status } = args;
+
+      if (assigneeId && !CREW_INFO[assigneeId]) {
+        return { success: false, message: `수정 실패: '${assigneeId}'는 존재하지 않는 크루원입니다. 유효한 담당자 목록: ${Object.keys(CREW_INFO).join(', ')}` };
+      }
 
       // status -> column 매핑 (프론트엔드 API 호환용)
       const statusToColumn = {
@@ -805,3 +813,137 @@ app.listen(PORT, () => {
 ==================================================
 `);
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🌉 ANTI-BRIDGE MONITOR — .bridge/requests/ 폴더 감시자
+// antigravityAdapter.js가 작성한 요청 파일을 읽고
+// Gemini(구독 세션)으로 처리 → .bridge/responses/ 에 응답 저장
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BRIDGE_REQ_DIR  = path.resolve(__dirname, '../.bridge/requests');
+const BRIDGE_RES_DIR  = path.resolve(__dirname, '../.bridge/responses');
+const BRIDGE_LOG_DIR  = path.resolve(__dirname, '../.bridge/logs');
+const BRIDGE_POLL_MS  = 3000;  // 3초마다 폴링
+
+// 디렉토리 보장
+[BRIDGE_REQ_DIR, BRIDGE_RES_DIR, BRIDGE_LOG_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+// agentKey별 크루 특성 시스템 보조 프롬프트
+const BRIDGE_AGENT_HINTS = {
+  prime:  '당신은 MyCrew의 Senior AI입니다. 깊이 있는 분석과 전문적인 판단을 제공하세요.',
+  nexus:  '당신은 MyCrew의 최고 전략 AI입니다. 통합적 시각으로 최종 결론을 도출하세요.',
+  sonnet: '당신은 MyCrew의 창의적 AI입니다. 감각적이고 구체적인 콘텐츠를 생성하세요.',
+};
+
+// 처리 중인 파일 추적 (중복 처리 방지)
+const processingFiles = new Set();
+
+async function processBridgeRequest(reqFile) {
+  const reqPath = path.join(BRIDGE_REQ_DIR, reqFile);
+
+  // 중복 처리 방지
+  if (processingFiles.has(reqFile)) return;
+  processingFiles.add(reqFile);
+
+  let request;
+  try {
+    const raw = fs.readFileSync(reqPath, 'utf-8');
+    request = JSON.parse(raw);
+  } catch (e) {
+    console.warn(`[Bridge] ⚠️ 요청 파일 읽기 실패: ${reqFile} —`, e.message);
+    processingFiles.delete(reqFile);
+    return;
+  }
+
+  const { taskId, agentKey, systemInstruction, taskPayload, requestedModel } = request;
+  const resFile = reqFile.replace('req_', 'res_');
+  const resPath = path.join(BRIDGE_RES_DIR, resFile);
+
+  console.log(`[Bridge] 📨 요청 수신 | agentKey=${agentKey} | taskId=${taskId}`);
+
+  try {
+    // 시스템 프롬프트 조합: 크루 힌트 + 원래 systemInstruction
+    const agentHint = BRIDGE_AGENT_HINTS[agentKey] || BRIDGE_AGENT_HINTS.prime;
+    const fullSystem = `${agentHint}\n\n${systemInstruction || ''}`.trim();
+
+    // Gemini로 처리
+    const result = await ai.models.generateContent({
+      model: MODEL.PRO,
+      config: {
+        systemInstruction: fullSystem,
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+      },
+      contents: [{ role: 'user', parts: [{ text: taskPayload || '' }] }],
+    });
+
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text
+      ?? result.text
+      ?? '';
+
+    if (!responseText) {
+      throw new Error('Gemini로부터 빈 응답 수신');
+    }
+
+    // 응답 파일 작성
+    const resData = {
+      taskId,
+      agentKey,
+      requestedModel,
+      text: responseText,
+      processedBy: `ariDaemon-bridge (${MODEL.PRO})`,
+      timestamp: new Date().toISOString(),
+    };
+    fs.writeFileSync(resPath, JSON.stringify(resData, null, 2), 'utf-8');
+
+    // 요청 파일 삭제
+    fs.unlinkSync(reqPath);
+
+    // 브릿지 로그 기록
+    const logEntry = `[${new Date().toISOString()}] ✅ ${agentKey} | ${taskId} | ${responseText.length}자\n`;
+    fs.appendFileSync(path.join(BRIDGE_LOG_DIR, 'bridge.log'), logEntry);
+
+    console.log(`[Bridge] ✅ 응답 완료 | agentKey=${agentKey} | ${responseText.length}자`);
+
+  } catch (err) {
+    console.error(`[Bridge] ❌ 처리 실패 | ${reqFile}:`, err.message);
+
+    // 실패 응답 작성 (antigravityAdapter가 타임아웃으로 처리하지 않도록 오류 응답 명시)
+    try {
+      const errData = {
+        taskId,
+        agentKey,
+        text: `[Bridge 오류] ${err.message}`,
+        error: true,
+        timestamp: new Date().toISOString(),
+      };
+      fs.writeFileSync(resPath, JSON.stringify(errData, null, 2), 'utf-8');
+      fs.unlinkSync(reqPath);
+    } catch (writeErr) {
+      console.error('[Bridge] ❌ 오류 응답 파일 작성 실패:', writeErr.message);
+    }
+  } finally {
+    processingFiles.delete(reqFile);
+  }
+}
+
+async function runBridgeMonitor() {
+  try {
+    const files = fs.readdirSync(BRIDGE_REQ_DIR).filter(f => f.startsWith('req_') && f.endsWith('.json'));
+    if (files.length > 0) {
+      console.log(`[Bridge] 🔍 ${files.length}개 대기 중`);
+      // 병렬 처리 (순서 무관)
+      await Promise.allSettled(files.map(f => processBridgeRequest(f)));
+    }
+  } catch (err) {
+    console.error('[Bridge] ❌ 모니터 오류:', err.message);
+  }
+  setTimeout(runBridgeMonitor, BRIDGE_POLL_MS);
+}
+
+// 브릿지 모니터 시작
+runBridgeMonitor();
+console.log(`[Bridge] 🌉 Anti-Bridge Monitor 시작 — ${BRIDGE_REQ_DIR} (${BRIDGE_POLL_MS / 1000}초 폴링)`);
+

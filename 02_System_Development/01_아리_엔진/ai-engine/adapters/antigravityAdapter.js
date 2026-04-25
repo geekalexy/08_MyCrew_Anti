@@ -60,7 +60,7 @@ class AntigravityAdapter {
     }
 
     async generateResponse(userPrompt, systemPrompt, modelName = 'anti-bridge-prime') {
-        const agentKey = modelName.replace('anti-bridge-', ''); // 'prime' 또는 'nexus'
+        const agentKey = modelName.replace('anti-bridge-', ''); // 'prime' | 'nexus' | 'sonnet'
         const taskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
         // 1. Lock 획득 (Race Condition 방지)

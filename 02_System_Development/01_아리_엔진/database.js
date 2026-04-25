@@ -164,6 +164,7 @@ db.serialize(() => {
     const names = (cols || []).map(c => c.name);
     if (!names.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
     if (!names.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
+    if (!names.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
   });
 
   // ─── [v2.0] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
@@ -275,7 +276,7 @@ class DatabaseManager {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, content, status, requester, model, assigned_agent, priority,
-                risk_level, execution_mode, has_artifact, created_at, updated_at
+                risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
          FROM Task 
          WHERE deleted_at IS NULL
          ORDER BY id DESC LIMIT 200`,
@@ -400,6 +401,21 @@ class DatabaseManager {
       db.run(
         `UPDATE Task SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  // ─── [Artifact] has_artifact 플래그 + URL 업데이트 ──────────────────────────
+  // AdapterWatcher가 completed JSON에서 artifactPath를 감지했을 때 호출
+  updateHasArtifact(taskId, artifactUrl) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task SET has_artifact = 1, artifact_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [artifactUrl || '', taskId],
         function (err) {
           if (err) reject(err);
           else resolve(this.changes);

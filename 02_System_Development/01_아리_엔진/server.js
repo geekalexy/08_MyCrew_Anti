@@ -126,16 +126,36 @@ async function dispatchNextTaskForAgent(agentId) {
       // 백그라운드 엔진 트리거
       const fullTask = await dbManager.getTaskById(pendingTask.id);
       if (fullTask) {
-        const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
-        await filePollingAdapter.execute({
-          taskId: fullTask.id,
-          agentId: fullTask.assigned_agent,
-          category: fullTask.category || 'WORKFLOW',
-          content: fullTask.content,
-          systemPrompt: "대기열에서 당신의 작업을 자동으로 가져왔습니다. 착수해 주세요.",
-          modelToUse: fullTask.model || 'gemini-2.5-flash'
-        });
         broadcastLog('info', `> [${fullTask.assigned_agent}] 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', pendingTask.id);
+
+        // ── [Fix] filePollingAdapter 대신 executor.runDirect() 직접 호출 ──
+        // fire-and-forget: 서버 블로킹 없이 백그라운드에서 AI API 호출
+        setImmediate(async () => {
+          try {
+            const result = await executor.runDirect(fullTask.content, agentId, fullTask.id);
+
+            const status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED' : 'REVIEW';
+            const column  = status === 'FAILED' ? 'todo' : 'review';
+
+            await dbManager.updateTaskStatus(fullTask.id, status);
+            await dbManager.createComment(fullTask.id, agentId, result.text || '작업이 완료되었습니다.');
+
+            io.emit('task:moved', { taskId: String(fullTask.id), toColumn: column });
+            io.emit('task:comment_added', {
+              taskId: String(fullTask.id), author: agentId,
+              text: result.text, createdAt: new Date().toISOString()
+            });
+
+            broadcastLog('success', `> [${agentId}] Task #${fullTask.id} 완료 — 승인 대기 중`, agentId, fullTask.id);
+
+            // Case 3: 완료 후 다음 대기 카드 자동 Pull
+            setTimeout(() => dispatchNextTaskForAgent(agentId), 1000);
+          } catch (err) {
+            console.error(`[Dispatcher] runDirect 실패 Task #${fullTask.id}:`, err.message);
+            broadcastLog('error', `> [${agentId}] Task #${fullTask.id} 실행 중 오류: ${err.message}`, agentId, fullTask.id);
+            await dbManager.updateTaskStatus(fullTask.id, 'FAILED').catch(() => {});
+          }
+        });
       }
     }
   } catch (err) {
@@ -352,7 +372,8 @@ export function broadcastLog(level, message, agentId = 'system', taskId = null, 
 executor.setBroadcastLog(broadcastLog);
 
 // [Phase 1] 파일 폴링 어댑터 감시 데몬 실행 개시
-initAdapterWatcher(io, dbManager, broadcastLog);
+// [Case 3 Fix] dispatchNextTaskForAgent 주입 — 작업 완료 후 자동 Pull 연결
+initAdapterWatcher(io, dbManager, broadcastLog, dispatchNextTaskForAgent);
 
 // ─── [Phase 25] Review Studio 소켓 네임스페이스 ──────────────────────────────
 // VideoLab/ImageLab 리뷰 스튜디오 전용 실시간 채널
@@ -881,7 +902,7 @@ app.get('/api/tasks', async (req, res) => {
       return {
       id: String(row.id),
       title: titleLine,
-      // content: detailContent, <- [Phase 23 최적화] 무거운 content 필드 제거
+      content: detailContent, // 복구: 프론트엔드 에디터에서 본문 내용을 조회하기 위해 필요함
       column: STATUS_TO_COLUMN[row.status] || 'todo',
       status: row.status,
       riskLevel: row.risk_level || 'SAFE',
@@ -1048,8 +1069,13 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
       // 백그라운드 비동기 실행 (REST 응답 차단 방지)
       (async () => {
         try {
-          agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
-          io.emit('agent:status_change', { agentId: agentToTrigger, status: 'active' }); // active로 유지
+          agentStates.set(agentToTrigger, { status: 'active', lastHeartbeat: Date.now() });
+          io.emit('agent:status_change', { agentId: agentToTrigger, status: 'active' });
+
+          // 태스크 상태를 IN_PROGRESS로 이동하여 UI에서 작업 시작을 명확히 함
+          await dbManager.updateTaskStatus(sid, 'IN_PROGRESS');
+          io.emit('task:moved', { taskId: sid, toColumn: 'in_progress' });
+          broadcastLog('info', `> 댓글 지시를 수신했습니다. 즉시 사고과정 및 분석을 시작합니다...`, agentToTrigger, sid);
 
           // [Living Playbook] 유저 피드백 분석 및 룰 수확
           const harvested = await ruleHarvester.classifyAndHarvest(content, author, sid);
@@ -1059,7 +1085,12 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
           }
 
           const evaluation = await modelSelector.selectModel(aiRequestText);
-          const result = await executor.run(aiRequestText, evaluation, agentToTrigger, sid);
+          // [Fix] 댓글 응답은 즉각적이어야 하므로 runDirect() 사용 (filePollingAdapter 우회)
+          const result = await executor.runDirect(aiRequestText, agentToTrigger, sid);
+
+          // 태스크 상태를 REVIEW로 이동하여 작업 완료 및 검토 대기 상태로 만듦
+          await dbManager.updateTaskStatus(sid, 'REVIEW');
+          io.emit('task:moved', { taskId: sid, toColumn: 'review' });
 
           // [Phase 3.2] 실제 수행된 모델과 카테고리 정보를 DB에 업데이트 (UI 필터링용)
           await dbManager.updateTaskModel(sid, result.model, result.category);
@@ -1175,6 +1206,32 @@ app.patch('/api/tasks/:id', async (req, res) => {
           const prevLabel = statusLabel[prevTask.status?.toUpperCase()] || prevTask.status;
           const nextLabel = statusLabel[colToStatus[column]] || column;
           await logActivity(taskId, `📋 상태 변경: ${prevLabel} → ${nextLabel}`);
+        }
+      }
+
+      // ── [BugFix] in_progress로 변경 시 에이전트 실행 트리거 ──────────────
+      // PATCH는 소켓 드래그(task:move)와 달리 FilePollingAdapter 호출이 없었음.
+      // Ari의 updateKanbanTask 도구가 이 경로를 통해 실행되므로,
+      // 프론트 드래그와 동일하게 에이전트를 실제 실행시켜야 함.
+      if (column === 'in_progress') {
+        const freshTask = await dbManager.getTaskById(taskId);
+        if (freshTask?.assigned_agent) {
+          const agentId = freshTask.assigned_agent;
+          // 소켓으로 프론트엔드 칸반 이동 동기화
+          io.emit('task:moved', { taskId: String(taskId), toColumn: 'in_progress' });
+          io.emit('task:updated', { taskId: String(taskId), status: 'IN_PROGRESS', column: 'in_progress' });
+
+          // FilePollingAdapter로 에이전트 실행 (드래그와 동일한 경로)
+          const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
+          await filePollingAdapter.execute({
+            taskId: freshTask.id,
+            agentId,
+            category: freshTask.category || 'WORKFLOW',
+            content: freshTask.content,
+            systemPrompt: 'Ari 비서가 이 카드를 진행 중으로 이동했습니다. 즉시 착수해 주세요.',
+            modelToUse: freshTask.model || 'gemini-2.5-flash'
+          });
+          broadcastLog('info', `> [${agentId}] Ari 지시로 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', taskId);
         }
       }
     }

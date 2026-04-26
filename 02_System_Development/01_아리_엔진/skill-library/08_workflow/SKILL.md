@@ -1,3 +1,17 @@
+---
+name: workflow
+displayName: CKS 워크플로우 (Multi-Agent Workflow)
+description: |
+  A팀·B팀 멀티에이전트 조율 워크플로우가 필요할 때 사용합니다. 초안 발제-검증-합성-최종 QA 파이프라인을 실행합니다.
+layer: 2
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "/워크플로우"
+  - "팀 워크플로우"
+---
+
 # [WORKFLOW] CKS v3.2 멀티에이전트 조율 스킬
 
 ---

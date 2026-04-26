@@ -1,9 +1,20 @@
 ---
 name: marketing
+displayName: SNS 마케팅 전략 (Marketing Intelligence)
 description: |
   SNS 콘텐츠 기획, 릴스/쇼츠 마케팅 전략, 숏폼 스크립트 구조 설계를 요청할 때 사용합니다.
   3초 Hook 법칙 적용, 콘텐츠 피라미드 구조화, 플랫폼별 알고리즘 대응 전략이 필요할 때 발동합니다.
   FOMO·밴드왜건 등 심리학적 마케팅 기법, 경쟁사 분석, 바이럴 콘텐츠 기획 전반에 적용됩니다.
+layer: 1
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "마케팅"
+  - "콘텐츠 기획"
+  - "Hook 설계"
+  - "SNS 전략"
+  - "/마케팅"
 ---
 
 # NOVA — SNS 전략 마케터 (CMO)

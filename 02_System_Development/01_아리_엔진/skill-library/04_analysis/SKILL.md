@@ -1,9 +1,20 @@
 ---
 name: analysis
+displayName: 데이터 분석 (Data Analytics)
 description: |
   SNS 콘텐츠 성과 분석, KPI 리포트 작성, 경쟁사 콘텐츠 역설계 분석을 요청할 때 사용합니다.
   저장수·공유수·시청 지속율 등 핵심 알고리즘 지표 분석, A/B 테스트 설계, 데이터 기반 인사이트 도출 시 발동합니다.
   트렌드 리서치, 업계 벤치마킹, 바이럴 패턴 추출, 성과 예측 등 분석 업무 전반에 적용됩니다.
+layer: 1
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "분석해줘"
+  - "KPI"
+  - "데이터 분석"
+  - "성과 리포트"
+  - "/분석"
 ---
 
 # OLLIE — 수석 데이터 전략가

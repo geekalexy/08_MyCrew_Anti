@@ -254,11 +254,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 프론트엔드 수동 카드 생성 이벤트
+  // 프론트엔드 수동 카드 생성 이벤트 (대표님이 직접 생성 → 'CEO' 표기)
   socket.on('task:create', async ({ title, content, assignee, priority, column }) => {
     try {
-      const requester = assignee || '대표님';
-      const taskId = await dbManager.createTask(title || content, requester);
+      const requester = 'CEO';
+      const taskId = await dbManager.createTask(title || content, requester, 'gemini-2.5-flash', assignee && assignee !== '미할당' ? assignee : null);
       broadcastLog('info', `태스크 생성됨: ${title || content}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
@@ -427,11 +427,15 @@ ariNs.on('connection', (socket) => {
   console.log(`[Socket/ari] ✅ Ari 비서 세션 연결됨: ${socket.id}`);
 
   socket.on('ari:message', async (data) => {
-    const { content, channel = 'dashboard', author = '대표님' } = data || {};
-    if (!content?.trim()) return;
+    const { content, channel = 'dashboard', author = 'CEO', images = [] } = data || {};
+    if (!content?.trim() && images.length === 0) return;
 
     console.log(`[Socket/ari] 메시지 수신 (${channel}): ${content}`);
-    broadcastLog('info', content, author, null, 'WEB_CHAT');
+    // [ImageAttach] 이미지가 없는 순수 텍스트만 broadcastLog (클라이언트 optimistic과 중복 방지)
+    // 이미지 포함 메시지는 클라이언트가 이미 로컬 로그에 추가했으므로 서버 broadcast 생략
+    if (images.length === 0) {
+      broadcastLog('info', content, author, null, 'WEB_CHAT');
+    }
 
     try {
       // [Phase 22] 실제 AI 실행 (executor → Ari 비서 레이어)
@@ -451,8 +455,9 @@ ariNs.on('connection', (socket) => {
         };
         const targetAgent = categoryAgents[evaluation.category] || 'ari';
         
-        // 1. 태스크 생성 (평가된 추천 모델 스펙 그대로 삽입)
-        const taskId = await dbManager.createTask(content, author, evaluation.recommended_model || 'gemini-2.5-flash', targetAgent);
+        // 1. 태스크 생성 — ARI가 대표님 지시를 위임받아 생성하는 경우 'ARI(위임)' 표기
+        const taskRequester = 'ARI(위임)';
+        const taskId = await dbManager.createTask(content, taskRequester, evaluation.recommended_model || 'gemini-2.5-flash', targetAgent);
         
         // 2. 프론트엔드에 칸반 생성 이벤트 발송
         io.emit('task:created', {
@@ -925,6 +930,46 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+/** GET /api/tasks/archived — 보관소(Archive)용 Task 목록 */
+app.get('/api/tasks/archived', async (req, res) => {
+  try {
+    const rows = await dbManager.getArchivedTasks();
+    const tasks = rows.map((row) => {
+      const fullText = (row.content || '').trim();
+      const breakIdx = fullText.indexOf('\n');
+      let titleLine = fullText;
+      let detailContent = fullText;
+      
+      if (breakIdx !== -1) {
+        titleLine = fullText.substring(0, breakIdx).trim();
+        detailContent = fullText.substring(breakIdx + 1).trim();
+      }
+      if (titleLine.length > 50) titleLine = titleLine.substring(0, 50) + '...';
+
+      return {
+        id: String(row.id),
+        title: titleLine,
+        content: detailContent,
+        column: 'archived',
+        status: row.status,
+        riskLevel: row.risk_level || 'SAFE',
+        executionMode: row.execution_mode || 'ari',
+        assignee: row.assigned_agent || row.requester,
+        author: row.requester,
+        assignedAgent: row.assigned_agent || '미할당',
+        model: row.model,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        projectId: 'proj-1',
+      };
+    });
+    res.json({ status: 'ok', tasks });
+  } catch (err) {
+    console.error('[API] /api/tasks/archived 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
 /** POST /api/tasks/notify-created — 시스템/에이전트가 생성한 태스크 소켓 브로드캐스트 */
 app.post('/api/tasks/notify-created', async (req, res) => {
   try {
@@ -944,14 +989,14 @@ app.post('/api/tasks/notify-created', async (req, res) => {
 });
 
 
-// [Phase 14] 멘션 기반 즉시 태스크 생성 API
+// [Phase 14] 멘션 기반 즉시 태스크 생성 API (대표님 직접 멘션 → 'CEO')
 app.post('/api/tasks/mention', async (req, res) => {
   try {
-    const { agent, content, author = '대표님' } = req.body;
+    const { agent, content } = req.body;
     const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
     
-    // [W1 Fix] model은 기본값 유지, assignedAgent 파라미터로 에이전트 분리
-    const taskId = await dbManager.createTask(content, author, MODEL.FLASH, targetAgent);
+    // [W1 Fix] 대표님 직접 멘션은 항상 'CEO' 작성자로 생성
+    const taskId = await dbManager.createTask(content, 'CEO', MODEL.FLASH, targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
     await dbManager.updateTaskStatus(taskId, 'in_progress');
@@ -1009,13 +1054,17 @@ app.post('/api/chat', async (req, res) => {
 
 // ── Task 상세 REST API (Phase 11: TaskDetailModal 지원) ───────────────────
 
-/** GET /api/tasks/:id/comments — 태스크 댓글 목록 조회 (v2.0 위상 DTO) */
+/** GET /api/tasks/:id/comments — 태스크 댓글 목록 조회 (v2.1 위상 DTO) */
 app.get('/api/tasks/:id/comments', async (req, res) => {
   try {
     const sid = req.params.id;
     const task = await dbManager.getTaskById(sid);
-    // [v2.0] getCommentsWithTopology: source(발신)/target(수신)/action_type 구조화
-    const comments = await dbManager.getCommentsWithTopology(sid, task?.assigned_agent || 'ari');
+    // [v2.1] getCommentsWithTopology: requester(보고 대상)도 전달 → 크루가 CEO/ARI 중 올바른 대상에게 보고
+    const comments = await dbManager.getCommentsWithTopology(
+      sid,
+      task?.assigned_agent || 'ari',
+      task?.requester || 'CEO'
+    );
     res.json({ status: 'ok', comments });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -1025,7 +1074,7 @@ app.get('/api/tasks/:id/comments', async (req, res) => {
 /** POST /api/tasks/:id/comments — 댓글 추가 */
 app.post('/api/tasks/:id/comments', async (req, res) => {
   try {
-    const { author, content, worked } = req.body;
+    const { author, content, worked, assignedAgent } = req.body;
     if (!author || !content) return res.status(400).json({ status: 'error', message: '작성자와 내용 필수' });
     const sid = req.params.id;
     await dbManager.createComment(sid, author, content);
@@ -1041,7 +1090,7 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
           await dbManager.updateTaskStatus(sid, 'PENDING'); // 보드: 재검토 대기
           io.emit('task:moved', { taskId: sid, toColumn: 'todo' });
           io.emit('task:updated', { taskId: sid, assignee: task.requester });
-          broadcastLog('info', `[WORKED] 태스크 #${sid} 작업이 완료됐어요! 🎉 ${task.requester}님께 다시 확인을 드릴게요.`, 'ari', sid);
+          broadcastLog('info', `[WORKED] 태스크 #${sid} 작업이 완료됐어요! 🎉 [${task.requester}]에게 검토 요청을 드릴게요.`, 'ari', sid);
         }
       } catch (pingPongErr) {
         console.error('[PingPong] 담당자 복귀 오류:', pingPongErr.message);
@@ -1052,7 +1101,8 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
     const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna', 'devteam', 'system'];
     if (!KNOWN_AGENTS.includes(author?.toLowerCase())) {
       const task = await dbManager.getTaskById(sid);
-      let agentToTrigger = task?.assigned_agent || 'ari';
+      // [Fix] 모달에서 비동기로 전달된 assignedAgent를 최우선으로 사용하여 Race Condition 방지
+      let agentToTrigger = assignedAgent || task?.assigned_agent || 'ari';
       let aiRequestText = content;
 
       // @멘션 우선권
@@ -1084,21 +1134,115 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
             broadcastLog('success', `💡 새로운 팀 룰 발견! [${harvested.rule}]을 인지했습니다.`, 'system', sid);
           }
 
-          const evaluation = await modelSelector.selectModel(aiRequestText);
-          // [Fix] 댓글 응답은 즉각적이어야 하므로 runDirect() 사용 (filePollingAdapter 우회)
-          const result = await executor.runDirect(aiRequestText, agentToTrigger, sid);
+          // ── [Phase 23] Fast-Track Intent 가로채기 (UX 극대화) ──
+          if (/^(아카이브해|아카이빙해|아카이빙해줘|아카이브|아카이빙|닫아줘)$/i.test(aiRequestText.trim())) {
+             await dbManager.updateTaskStatus(sid, 'ARCHIVED');
+             io.emit('task:archived', { taskId: sid });
+             broadcastLog('success', `[Fast-Track] 지시를 가로채 즉시 아카이빙 처리했습니다.`, 'system', sid);
+             agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
+             io.emit('agent:status_change', { agentId: agentToTrigger, status: 'idle' });
+             return; // AI LLM 실행 건너뜀
+          }
 
-          // 태스크 상태를 REVIEW로 이동하여 작업 완료 및 검토 대기 상태로 만듦
-          await dbManager.updateTaskStatus(sid, 'REVIEW');
-          io.emit('task:moved', { taskId: sid, toColumn: 'review' });
+          const evaluation = await modelSelector.selectModel(aiRequestText);
+          
+          // [Fix] AI가 태스크 전체 내용(초안)과 대화 맥락을 파악할 수 있도록 Context 합치기
+          const recentComments = await dbManager.getCommentsWithTopology(sid, agentToTrigger, task?.requester || 'CEO');
+          // 마지막 명령어 제외한 이전 대화들 (최대 5개)
+          const historyLimit = recentComments.slice(0, -1).slice(-5);
+          const historyText = historyLimit.map(c => `[${c.author}] ${c.content}`).join('\n');
+          
+          // [추가] 아티팩트(파일)가 있을 경우 내용 읽어오기
+          let artifactContent = '';
+          if (task?.has_artifact === 1 && task?.artifact_url) {
+            if (/\.(md|txt|json|csv|html)$/i.test(task.artifact_url)) {
+              try {
+                const fs = await import('fs');
+                const path = await import('path');
+                const filePath = path.resolve(process.cwd(), task.artifact_url);
+                if (fs.existsSync(filePath)) {
+                   artifactContent = fs.readFileSync(filePath, 'utf-8');
+                }
+              } catch (e) {
+                console.warn('[Artifact Read] 파일 읽기 실패:', e.message);
+              }
+            } else {
+              artifactContent = `[미디어 파일 첨부됨: ${task.artifact_url}]`;
+            }
+          }
+
+          let fullContextText = `[Original Task Content]\n${task?.content || '내용 없음'}\n\n`;
+          if (artifactContent) {
+            fullContextText += `[Attached Artifact Document]\n${artifactContent}\n\n`;
+          }
+          if (historyText) {
+            fullContextText += `[Recent Discussion History]\n${historyText}\n\n`;
+          }
+          fullContextText += `[Latest Instruction for you]\n${aiRequestText}\n\n`;
+          
+          // [System UX Directive] 대표님 피드백 반영: 문서를 인지했음을 나타내는 서두 강제
+          fullContextText += `[System UX Action Directive]\n`;
+          fullContextText += `유저가 기존 작업물(초안이나 첨부 문서)의 수정을 지시했거나 참조를 요구한 경우, 당신의 응답 가장 처음에 반드시 "문서를 확인했습니다." 라는 문장으로 시작하여 문서를 성공적으로 읽었음을 사용자에게 알리세요. 그 다음 수정된 작업물 결과를 출력하세요.`;
+
+          // [Fix] 댓글 응답은 즉각적이어야 하므로 runDirect() 사용 (filePollingAdapter 우회)
+          const result = await executor.runDirect(fullContextText, agentToTrigger, sid);
+
+          let cleanText = result.text || '';
+          let nextState = 'REVIEW'; // 기본값
+          let nextColumn = 'review';
+          let reassignTarget = null;
+          let removeCard = false;
+
+          // [Phase 23] MyCrew Operating Protocol JSON 블록 파싱
+          const jsonMatch = cleanText.match(/```json\s*(\{[\s\S]*?"system_action"[\s\S]*?\})\s*```/);
+          if (jsonMatch) {
+            try {
+              const actionData = JSON.parse(jsonMatch[1]);
+              if (actionData.system_action) {
+                const action = actionData.system_action;
+                if (action.action === 'CHANGE_STATUS' && action.target) {
+                  nextState = action.target.toUpperCase();
+                  const colMap = { 'TODO': 'todo', 'IN_PROGRESS': 'in_progress', 'REVIEW': 'review', 'COMPLETED': 'done', 'ARCHIVED': 'archived' };
+                  nextColumn = colMap[nextState] || 'review';
+                  if (nextState === 'ARCHIVED') removeCard = true;
+                }
+                if (action.assignee) {
+                  reassignTarget = action.assignee.toLowerCase();
+                }
+              }
+              // JSON 블록을 응답 텍스트에서 제거 (사용자 노출 방지)
+              cleanText = cleanText.replace(jsonMatch[0], '').trim();
+            } catch (e) {
+              console.error('[Action Protocol] JSON 파싱 실패:', e.message);
+            }
+          }
+
+          // 태스크 상태 업데이트 (AI의 자율 판단에 따른 유연한 전이)
+          await dbManager.updateTaskStatus(sid, nextState);
+          
+          if (removeCard) {
+            io.emit('task:archived', { taskId: sid });
+            broadcastLog('success', `[ARCHIVED] 에이전트 자율 판단으로 카드가 아카이빙되었습니다.`, agentToTrigger, sid);
+          } else {
+            io.emit('task:moved', { taskId: sid, toColumn: nextColumn });
+          }
+
+          if (reassignTarget) {
+            const taskObj = await dbManager.getTaskById(sid);
+            await dbManager.updateTaskDetails(sid, taskObj.content, reassignTarget, result.model);
+            io.emit('task:updated', { taskId: sid, assignee: reassignTarget });
+            broadcastLog('info', `담당자가 [${reassignTarget}]로 변경되었습니다.`, agentToTrigger, sid);
+          }
 
           // [Phase 3.2] 실제 수행된 모델과 카테고리 정보를 DB에 업데이트 (UI 필터링용)
           await dbManager.updateTaskModel(sid, result.model, result.category);
 
           // AI의 응답을 해당 카드에 신규 코멘트로 저장
-          await dbManager.createComment(sid, agentToTrigger, result.text);
-          io.emit('task:comment_added', { taskId: sid, author: agentToTrigger, text: result.text, createdAt: new Date().toISOString() });
-          broadcastLog('info', result.text, agentToTrigger, sid);
+          if (cleanText) {
+            await dbManager.createComment(sid, agentToTrigger, cleanText);
+            io.emit('task:comment_added', { taskId: sid, author: agentToTrigger, text: cleanText, createdAt: new Date().toISOString() });
+            broadcastLog('info', cleanText, agentToTrigger, sid);
+          }
           
           agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
           io.emit('agent:status_change', { agentId: agentToTrigger, status: 'idle' });
@@ -1265,10 +1409,10 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
     io.emit('task:updated', { taskId: sid, status: 'COMPLETED', column: 'done' });
     io.emit('task:moved', { taskId: sid, toColumn: 'done' });
     
-    // 승인 로그 및 코멘트
-    await dbManager.createComment(sid, '대표님', '✅ 승인 완료. 수고했어요!');
-    io.emit('task:comment_added', { taskId: sid, author: '대표님', text: '✅ 승인 완료. 수고했어요!', createdAt: new Date().toISOString() });
-    broadcastLog('success', `[APPROVED] Task #${sid} 대표님 승인 → Done 이동`, '대표님', sid);
+    // 승인 로그 및 코멘트 (CEO 표기)
+    await dbManager.createComment(sid, 'CEO', '✅ 승인 완료. 수고했어요!');
+    io.emit('task:comment_added', { taskId: sid, author: 'CEO', text: '✅ 승인 완료. 수고했어요!', createdAt: new Date().toISOString() });
+    broadcastLog('success', `[APPROVED] Task #${sid} CEO 승인 → Done 이동`, 'CEO', sid);
     
     // Obsidian 아카이브 트리거 (기존 로직 재활용)
     obsidianAdapter.archiveTask({
@@ -1293,6 +1437,112 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
   }
 });
 
+/** PATCH /api/tasks/:id/archive — 즉시 아카이빙 (상태 무관, CEO 직접 또는 ARI 위임) */
+// approve와 다르게 상태 가드 없음: Done, Review, In Progress 어디서든 수동 아카이빙 가능
+app.patch('/api/tasks/:id/archive', async (req, res) => {
+  const sid = String(req.params.id);
+  const { archivedBy = 'CEO' } = req.body; // 'CEO' 또는 'ARI(위임)'
+  try {
+    const task = await dbManager.getTaskById(sid);
+    if (!task) return res.status(404).json({ status: 'error', message: '태스크를 찾을 수 없습니다.' });
+
+    // DB 상태를 ARCHIVED로 변경 (COMPLETED와 구분)
+    await dbManager.updateTaskStatus(sid, 'ARCHIVED');
+
+    // 소켓 브로드캐스트 (UI 실시간 반영)
+    io.emit('task:updated', { taskId: sid, status: 'ARCHIVED', column: 'done' });
+    io.emit('task:archived', { taskId: sid, archivedBy }); // 칸반에서 카드 제거 트리거
+
+    // 아카이빙 댓글 — author: 'SYSTEM' (CEO→SYSTEM 토폴로지)
+    const archiveMsg = archivedBy === 'ARI(위임)'
+      ? `📦 [ARI 위임] 아카이빙 처리 완료. Obsidian에 저장했습니다.`
+      : '📦 아카이빙 완료. 기록을 Obsidian에 저장했습니다.';
+    await dbManager.createComment(sid, 'SYSTEM', archiveMsg);
+    io.emit('task:comment_added', { taskId: sid, author: 'SYSTEM', text: archiveMsg, createdAt: new Date().toISOString() });
+    broadcastLog('success', `[ARCHIVE] Task #${sid} 아카이빙 (by ${archivedBy})`, archivedBy, sid);
+
+    // Obsidian 아카이브 트리거
+    obsidianAdapter.archiveTask({
+      id: task.id,
+      content: task.content,
+      requester: task.requester,
+      execution_mode: task.execution_mode || 'manual',
+      model: task.model || 'unknown',
+    });
+
+    // [B4 System] 자동 회고
+    (async () => {
+      const insight = await b4System.runRetrospective(sid);
+      if (insight) {
+        broadcastLog('success', `🧠 [B4 회고] \"${insight}\" → 팀 지식망에 동기화됩니다.`, 'system', sid);
+      }
+    })();
+
+    res.json({ status: 'ok', message: `아카이빙 완료 (by ${archivedBy}). Obsidian에 저장했습니다.` });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ─── [2주 자동 아카이빙 스케줄러] ──────────────────────────────────────────
+// 원칙: COMPLETED/done 상태이며 완료 후 14일(2주) 이상 경과한 카드를 매일 자정에 자동 아카이빙
+const AUTO_ARCHIVE_DAYS = 14;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+async function runAutoArchive() {
+  if (!dbManager) return;
+  try {
+    const allTasks = await dbManager.getAllTasksLight();
+    const now = Date.now();
+    const threshold = AUTO_ARCHIVE_DAYS * ONE_DAY_MS;
+
+    const targets = allTasks.filter(t => {
+      const isDone = ['COMPLETED', 'done', 'DONE'].includes(t.status);
+      if (!isDone) return false;
+      const updatedAt = new Date(t.updated_at || t.created_at || 0).getTime();
+      return (now - updatedAt) >= threshold;
+    });
+
+    if (targets.length === 0) return;
+
+    console.log(`[AutoArchive] 🗂️ ${targets.length}건 자동 아카이빙 시작 (${AUTO_ARCHIVE_DAYS}일 경과)`);
+
+    for (const task of targets) {
+      await dbManager.updateTaskStatus(String(task.id), 'COMPLETED');
+      io.emit('task:archived', { taskId: String(task.id), archivedBy: 'AUTO(2주)' });
+      obsidianAdapter.archiveTask({
+        id: task.id,
+        content: task.content,
+        requester: task.requester,
+        execution_mode: 'auto_archive',
+        model: task.model || 'unknown',
+      });
+      broadcastLog('info', `[AUTO-ARCHIVE] Task #${task.id} — ${AUTO_ARCHIVE_DAYS}일 경과 자동 아카이빙`, 'system', String(task.id));
+    }
+
+    broadcastLog('success', `🗂️ [2주 자동 아카이빙] ${targets.length}건 Obsidian에 저장 완료`, 'system');
+  } catch (err) {
+    console.error('[AutoArchive] 오류:', err.message);
+  }
+}
+
+// 서버 시작 후 24시간마다 실행 (다음 자정에 맞추는 방식 대신 단순 24h 인터벌)
+function scheduleAutoArchive() {
+  const now = new Date();
+  // 오늘 자정(23:59:59) 까지 남은 밀리초 계산 → 첫 실행 시점 맞춤
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const msUntilMidnight = midnight.getTime() - now.getTime();
+
+  setTimeout(() => {
+    runAutoArchive();                          // 첫 실행 (자정)
+    setInterval(runAutoArchive, ONE_DAY_MS);   // 이후 매 24시간
+  }, msUntilMidnight);
+
+  console.log(`[AutoArchive] 🕛 다음 자동 아카이빙: ${midnight.toLocaleString('ko-KR')} (${Math.round(msUntilMidnight / 60000)}분 후)`);
+}
+scheduleAutoArchive();
+
 /** PATCH /api/tasks/:id/rework — 대표님 재작업 지시: Review → In Progress */
 app.patch('/api/tasks/:id/rework', async (req, res) => {
   const sid = String(req.params.id);
@@ -1313,11 +1563,11 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
     io.emit('task:updated', { taskId: sid, status: 'IN_PROGRESS', column: 'in_progress' });
     io.emit('task:moved', { taskId: sid, toColumn: 'in_progress' });
     
-    // 재작업 사유 코멘트 자동 삽입
+    // 재작업 사유 코멘트 자동 삽입 (CEO 표기)
     const reworkMsg = `🔄 재작업 지시: ${reason}`;
-    await dbManager.createComment(sid, '대표님', reworkMsg);
-    io.emit('task:comment_added', { taskId: sid, author: '대표님', text: reworkMsg, createdAt: new Date().toISOString() });
-    broadcastLog('warn', `[REWORK] Task #${sid} 재작업 지시 → In Progress 이동`, '대표님', sid);
+    await dbManager.createComment(sid, 'CEO', reworkMsg);
+    io.emit('task:comment_added', { taskId: sid, author: 'CEO', text: reworkMsg, createdAt: new Date().toISOString() });
+    broadcastLog('warn', `[REWORK] Task #${sid} 재작업 지시 → In Progress 이동`, 'CEO', sid);
     
     // [Phase 4] CKS 지표 - 반복 수정 횟수(IRC) 증가
     await dbManager.incrementCksIrc(sid).catch(e => console.error('[DB] IRC 증가 실패:', e));
@@ -1753,6 +2003,84 @@ app.post('/api/agents/:agentId/skills', async (req, res) => {
     io.emit('agent:skill_updated', { agentId, skillId, active });
     
     res.json({ status: 'ok', agentId, skillId, active });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ─── [Phase 26] GET /api/skills/library — skill-library/ 자동 스캔 ────────
+// skillRegistry.js 없이도 SKILL.md를 실시간 스캔하여 메타데이터 반환
+// 외부 스킬 추가 시 서버 재시작만으로 자동 반영됨
+const SKILL_LIB_PATH = path.resolve(__dirname, 'skill-library');
+
+function scanSkillLibrary() {
+  const skills = [];
+  try {
+    const folders = fs.readdirSync(SKILL_LIB_PATH).filter(f => {
+      return fs.existsSync(path.join(SKILL_LIB_PATH, f, 'SKILL.md'));
+    });
+
+    for (const folder of folders) {
+      const skillMdPath = path.join(SKILL_LIB_PATH, folder, 'SKILL.md');
+      const raw = fs.readFileSync(skillMdPath, 'utf-8');
+
+      // frontmatter 파싱 (경량 파서)
+      const fmMatch = raw.match(/^---\n([\s\S]*?)\n---/);
+      if (!fmMatch) continue;
+
+      const data = {};
+      const lines = fmMatch[1].split('\n');
+      let i = 0;
+      while (i < lines.length) {
+        const colonIdx = lines[i].indexOf(':');
+        if (colonIdx === -1) { i++; continue; }
+        const key = lines[i].slice(0, colonIdx).trim();
+        const val = lines[i].slice(colonIdx + 1).trim();
+        if (val === '|' || val === '>') {
+          const ml = []; i++;
+          while (i < lines.length && (lines[i].startsWith('  ') || lines[i] === '')) {
+            ml.push(lines[i].trim()); i++;
+          }
+          data[key] = ml.join(' ').trim(); continue;
+        }
+        if (val === '' && i + 1 < lines.length && lines[i + 1].startsWith('  -')) {
+          const arr = []; i++;
+          while (i < lines.length && lines[i].startsWith('  -')) {
+            arr.push(lines[i].replace(/^\s*-\s*/, '').replace(/^["']|["']$/g, '').trim()); i++;
+          }
+          data[key] = arr; continue;
+        }
+        if (val === '[]') { data[key] = []; i++; continue; }
+        if (!isNaN(val) && val !== '') { data[key] = Number(val); i++; continue; }
+        data[key] = val.replace(/^["']|["']$/g, '');
+        i++;
+      }
+
+      skills.push({
+        id: data.name || folder,
+        folder,
+        displayName: data.displayName || data.name || folder,
+        description: data.description || '',
+        layer: typeof data.layer === 'number' ? data.layer : 1,
+        layerLabel: data.layer === 0 ? 'ENGINE' : data.layer === 2 ? 'WORKFLOW' : 'DOMAIN',
+        tools: Array.isArray(data.tools) ? data.tools : [],
+        commands: Array.isArray(data.commands) ? data.commands : [],
+        author: data.author || 'MyCrew',
+        version: data.version || '1.0.0',
+        skillMdPath: `skill-library/${folder}/SKILL.md`,
+      });
+    }
+  } catch (e) {
+    console.warn('[SkillScan] 스캔 실패:', e.message);
+  }
+  return skills;
+}
+
+app.get('/api/skills/library', (req, res) => {
+  try {
+    const skills = scanSkillLibrary();
+    console.log(`[API] /api/skills/library — ${skills.length}개 스킬 스캔 완료`);
+    res.json({ status: 'ok', count: skills.length, skills });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }

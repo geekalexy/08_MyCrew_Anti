@@ -23,6 +23,16 @@ function getAriSocket() {
   return ariSocketInstance;
 }
 
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (ariSocketInstance) {
+      console.log('🔥 [HMR] Disconnecting old Ari socket instance');
+      ariSocketInstance.disconnect();
+      ariSocketInstance = null;
+    }
+  });
+}
+
 // 입력창 우측 버튼 상태 머신
 // 'idle'   → 카드 미선택: dimmed send 버튼
 // 'stop'   → 카드 선택됨: Stop 버튼 (Kill用)
@@ -44,10 +54,30 @@ export default function LogDrawer() {
   const [btnMode, setBtnMode]         = useState('idle'); // idle | stop | send | sending
   const [isDragOver, setIsDragOver]   = useState(false);  // 드래그&드롭 오버레이
   const [timelineComments, setTimelineComments] = useState([]); // [Fix Bug2] Timeline DB 댓글
+  const [attachedImages, setAttachedImages] = useState([]); // [ImageAttach] 첨부 이미지 [{dataUrl, name}]
 
   // ── Phase 22: Ari 스트리밍 상태 ──────────────────────────────────────────
   const [streamingText, setStreamingText] = useState('');   // 누적 청크
   const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
+
+  // ── @멘션 자동완성 ────────────────────────────────────────────────────────
+  const CREW_LIST = [
+    { id: 'ari',   label: 'Ari',   emoji: '🤖' },
+    { id: 'nova',  label: 'Nova',  emoji: '🌟' },
+    { id: 'lumi',  label: 'Lumi',  emoji: '✨' },
+    { id: 'pico',  label: 'Pico',  emoji: '🎬' },
+    { id: 'ollie', label: 'Ollie', emoji: '🔭' },
+    { id: 'lily',  label: 'Lily',  emoji: '🌸' },
+    { id: 'luna',  label: 'Luna',  emoji: '🌙' },
+  ];
+  const [mentionQuery, setMentionQuery]       = useState('');   // @뒤 타이핑 중인 키워드
+  const [showMention, setShowMention]         = useState(false); // 드롭다운 표시 여부
+  const [mentionedAgent, setMentionedAgent]   = useState(null);  // 최종 선택된 에이전트
+  const mentionRef = useRef(null);
+
+  const filteredCrew = CREW_LIST.filter(c =>
+    c.id.startsWith(mentionQuery.toLowerCase()) || c.label.toLowerCase().startsWith(mentionQuery.toLowerCase())
+  );
 
   const bottomRef       = useRef(null);
   const textareaRef     = useRef(null);
@@ -179,18 +209,54 @@ export default function LogDrawer() {
     }
   }, [inputText]);
 
-  // ── 드래그 앤 드롭 ──────────────────────────────────────────
-  const handleDragOver  = useCallback((e) => { e.preventDefault(); if (focusedTask) setIsDragOver(true); }, [focusedTask]);
+  // ── [ImageAttach] Base64 변환 헬퍼 ───────────────────────────────────
+  const readFileAsDataURL = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  // ── 드래그 앤 드롭: 이미지 base64 변환 ──────────────────────────────────
+  const handleDragOver  = useCallback((e) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback((e) => {
     if (!asideRef.current?.contains(e.relatedTarget)) setIsDragOver(false);
   }, []);
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(async (e) => {
     e.preventDefault();
     setIsDragOver(false);
-    if (!focusedTask) return;
-    const file = e.dataTransfer.files?.[0];
-    if (file) setInputText((prev) => prev + `[첨부: ${file.name}]`);
-  }, [focusedTask]);
+    const files = Array.from(e.dataTransfer.files || []);
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    if (imageFiles.length > 0) {
+      const results = await Promise.all(imageFiles.map(async (f) => ({
+        dataUrl: await readFileAsDataURL(f),
+        name: f.name,
+      })));
+      setAttachedImages(prev => [...prev, ...results].slice(0, 4)); // 최대 4장
+    } else if (files.length > 0) {
+      // 비이미지 파일은 텍스트로
+      setInputText(prev => prev + files.map(f => `[첨부: ${f.name}]`).join(' '));
+    }
+  }, []);
+
+  // ── [ImageAttach] 클립보드 블래시 붙여넣기 ────────────────────────────────
+  const handlePaste = useCallback(async (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    if (imageItems.length === 0) return; // 텍스트는 기본 동작
+    e.preventDefault();
+    const results = await Promise.all(
+      imageItems.map(async (item) => {
+        const file = item.getAsFile();
+        if (!file) return null;
+        return { dataUrl: await readFileAsDataURL(file), name: `클립보드_이미지_${Date.now()}.png` };
+      })
+    );
+    const valid = results.filter(Boolean);
+    if (valid.length > 0) {
+      setAttachedImages(prev => [...prev, ...valid].slice(0, 4));
+    }
+  }, []);
 
   // ── Kill 핸들러 ─────────────────────────────────────────────
   const handleKill = useCallback(() => {
@@ -233,49 +299,91 @@ export default function LogDrawer() {
   }, []);
 
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || btnMode === 'sending') return;
+    const hasText = inputText.trim().length > 0;
+    const hasImages = attachedImages.length > 0;
+    if ((!hasText && !hasImages) || btnMode === 'sending') return;
+    
     setBtnMode('sending');
 
-    let fetchPromise;
     const trimmedText = inputText.trim();
+    setShowMention(false); // 전송 시 멘션 드롭다운 닫기
+
+    // 이미지가 있으면 텍스트에 [IMAGE:n]을 놓는 대신 이미지를 직접 소켓에 포함 
+    const imageDataUrls = attachedImages.map(img => img.dataUrl);
+    let fetchPromise;
     // 타임라인 탭이면서 태스크가 선택된 경우에만 해당 태스크의 코멘트로 전송
     if (focusedTask && activeLogTab === 'time') {
-      // 1. 특정 태스크 내부의 코멘트 작성
+      // 1. 특정 태스크 내부의 코멘튨 작성 (CEO 표기)
+      const commentContent = imageDataUrls.length > 0
+        ? [trimmedText, ...imageDataUrls.map(u => `![image](${u})`)].filter(Boolean).join('\n')
+        : trimmedText;
+
+      // @멘션 감지: 텍스트에서 @에이전트 추출 (서버 라우팅용)
+      const mentionInText = trimmedText.match(/^@([a-zA-Z가-힣]+)/);
+      const resolvedAgent = mentionedAgent
+        || (mentionInText ? mentionInText[1].toLowerCase() : null);
+
       fetchPromise = fetch(`${SERVER_URL}/api/tasks/${focusedTask.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ author: '대표님', content: trimmedText }),
+        body: JSON.stringify({
+          author: 'CEO',
+          content: commentContent,
+          ...(resolvedAgent ? { assignedAgent: resolvedAgent } : {}),
+        }),
       });
     } else {
       // 2. 글로벌/채팅/타임라인(카드미선택) 처리
       if (activeLogTab === 'interaction') {
         // ── [Phase 22 Sprint 1] fetch → Socket 스트리밍 교체 ──────────────
         // HTTP REST /api/chat (블로킹, 10초 대기) 완전 폐기
-        // 멘션(@) 파싱 제거: 이제 채팅은 오직 Ari와의 1:1로만 이루어집니다.
-        const finalContent = trimmedText;
 
-        // 서버의 broadcastLog가 소켓(log:append)으로 글로벌 갱신해주므로
-        // 클라이언트 로컬에서 중복으로 appendLog를 쏘지 않도록 제거. (버그 픽스)
+        // [ImageAttach] 이미지가 있는 경우에만 Optimistic append
+        // - 텍스트 전용: 서버 broadcastLog(log:append)가 버블 생성 → 클라이언트 추가 불필요
+        // - 이미지 포함: 서버는 broadcast 스킵(base64 데이터 없음) → 클라이언트가 직접 추가
+        if (imageDataUrls.length > 0) {
+          const imageMarkdown = imageDataUrls.map(u => `![image](${u})`).join('\n');
+          const fullMessage = [trimmedText, imageMarkdown].filter(Boolean).join('\n');
+          useLogStore.getState().appendLog({
+            level: 'info',
+            message: fullMessage,
+            agentId: 'CEO',
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        const ariSocket = getAriSocket();
+        
+        // 소켓이 연결되지 않은 상태(오프라인/에러)라면 전송 차단 및 에러 안내
+        if (!ariSocket.connected) {
+          useLogStore.getState().appendLog({
+            level: 'error',
+            message: '서버 연결이 원활하지 않습니다. (소켓 오프라인) 잠시 후 다시 시도해주세요.',
+            agentId: 'system',
+            timestamp: new Date().toISOString(),
+          });
+          setBtnMode('send');
+          return;
+        }
 
         // Ari Socket으로 메시지 발송 → 스트리밍 응답 수신
         setIsStreaming(true);
         setStreamingText('');
-        getAriSocket().emit('ari:message', {
-          content: finalContent,
+        ariSocket.emit('ari:message', {
+          content: trimmedText || '(이미지 전송)',
           channel: 'dashboard',
-          author: '대표님',
+          author: 'CEO',
+          images: imageDataUrls,
         });
 
         // 입력창 즉시 초기화 및 포커스 유지
         setInputText('');
+        setAttachedImages([]);
+        setMentionedAgent(null); // 전송 후 멘션 초기화
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
-          // 전송 후에도 계속해서 바로 타이핑할 수 있도록 포커스 강제 유지
-          setTimeout(() => {
-            if (textareaRef.current) textareaRef.current.focus();
-          }, 0);
+          setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
         }
-        // btnMode는 ari:stream_done에서 'send'로 복귀
         return;
       } else if (activeLogTab === 'time') {
         // [Phase 14] Timeline 탭: #번호 소환 및 전환 기능
@@ -313,19 +421,21 @@ export default function LogDrawer() {
       }
     }
 
+    fetchPromise = fetchPromise || Promise.resolve(); // fetchPromise 미설정 시 isSendingRef 잠금 방지
+
     fetchPromise
       .then(() => {
         setInputText('');
+        setAttachedImages([]);
+        setMentionedAgent(null); // 전송 후 멘션 초기화
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
-          setTimeout(() => {
-            if (textareaRef.current) textareaRef.current.focus();
-          }, 0);
+          setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
         }
       })
       .catch(console.error)
       .finally(() => setBtnMode(activeLogTab === 'time' ? (focusedTask ? 'stop' : 'idle') : 'send'));
-  }, [inputText, focusedTask, btnMode, activeLogTab]);
+  }, [inputText, attachedImages, focusedTask, btnMode, activeLogTab, mentionedAgent]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend(); }
@@ -531,7 +641,7 @@ export default function LogDrawer() {
                     </div>
                   )}
                   {mergedTimeline.map((log, i) => {
-                  const isUser   = log.agentId === '대표님' || log.agentId === 'user';
+                  const isUser   = log.agentId === 'CEO' || log.agentId === '대표님' || log.agentId === 'user';
                   const isSystem = log.agentId === 'system';
                   const time     = new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                   const prevLog  = i > 0 ? mergedTimeline[i - 1] : null;
@@ -577,7 +687,22 @@ export default function LogDrawer() {
                             fontSize: '1rem', lineHeight: 1.55, wordBreak: 'break-word',
                             border: '1px solid rgba(124,110,248,0.25)',
                           }}>
-                            {cleanMsg}
+                          {/* 이미지 렌더링 (base64 또는 URL) */}
+                          {(() => {
+                            const imgRegex = /!\[image\]\((data:image\/[^)]+|https?:\/\/[^)]+)\)/g;
+                            const imgs = [...cleanMsg.matchAll(imgRegex)].map(m => m[1]);
+                            const textOnly = cleanMsg.replace(imgRegex, '').trim();
+                            return (
+                              <>
+                                {textOnly && <span>{textOnly}</span>}
+                                {imgs.map((src, ii) => (
+                                  <img key={ii} src={src} alt="첨부 이미지"
+                                    style={{ maxWidth: '100%', borderRadius: 8, marginTop: textOnly ? '0.4rem' : 0, display: 'block', border: '1px solid rgba(124,110,248,0.2)' }}
+                                  />
+                                ))}
+                              </>
+                            );
+                          })()}
                           </div>
                         </div>
                       </div>
@@ -730,14 +855,39 @@ export default function LogDrawer() {
                 className="log-drawer__textarea"
                 placeholder={
                   activeLogTab === 'time'
-                    ? (focusedTask ? `Task #${focusedTask.id} 지시사항...` : '번호(#)를 입력하거나 카드를 선택하여 대화를 시작하세요...')
-                    : 'AI Crew와 채팅하기...'
+                    ? (focusedTask ? `Task #${focusedTask.id} 지시사항 (@멘션으로 에이전트 지정)...` : '번호(#)를 입력하거나 카드를 선택하여 대화를 시작하세요...')
+                    : 'AI Crew와 채팅하기... (@에이전트명으로 직접 호출)'
                 }
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInputText(val);
+                  // @멘션 감지: 마지막 @ 이후 텍스트 추출
+                  const atIdx = val.lastIndexOf('@');
+                  if (atIdx !== -1) {
+                    const afterAt = val.slice(atIdx + 1);
+                    // 공백이 없으면 아직 타이핑 중 → 드롭다운 표시
+                    if (!afterAt.includes(' ') && !afterAt.includes('\n')) {
+                      setMentionQuery(afterAt);
+                      setShowMention(true);
+                    } else {
+                      setShowMention(false);
+                    }
+                  } else {
+                    setShowMention(false);
+                    setMentionedAgent(null);
+                  }
+                  // 높이 자동 조절
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px';
+                  if (backdropRef.current) backdropRef.current.scrollTop = e.target.scrollTop;
+                }}
+                onKeyDown={(e) => {
+                  if (showMention && (e.key === 'Escape')) { e.preventDefault(); setShowMention(false); return; }
+                  handleKeyDown(e);
+                }}
+                onBlur={() => setTimeout(() => setShowMention(false), 150)}
                 onScroll={(e) => {
-                  // [Fix] 백드롭과 스크롤 동기화 → 입력 중 텍스트 잘림 버그 해결
                   if (backdropRef.current) backdropRef.current.scrollTop = e.target.scrollTop;
                 }}
                 style={{
@@ -749,51 +899,152 @@ export default function LogDrawer() {
                   display: 'block', zIndex: 1
                 }}
               />
+
+              {/* ── @멘션 자동완성 드롭다운 ────────────────────────────────── */}
+              {showMention && filteredCrew.length > 0 && (
+                <div
+                  ref={mentionRef}
+                  style={{
+                    position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                    background: 'var(--bg-surface-2)', border: '1px solid rgba(124,110,248,0.4)',
+                    borderRadius: 10, overflow: 'hidden', zIndex: 200,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  {filteredCrew.map(crew => (
+                    <button
+                      key={crew.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // blur 방지
+                        // @뒤 입력 부분을 선택한 에이전트로 대체
+                        const atIdx = inputText.lastIndexOf('@');
+                        const newText = inputText.slice(0, atIdx) + `@${crew.id} `;
+                        setInputText(newText);
+                        setMentionedAgent(crew.id);
+                        setShowMention(false);
+                        setTimeout(() => textareaRef.current?.focus(), 0);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.5rem',
+                        width: '100%', padding: '0.45rem 0.8rem',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'left',
+                        transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,110,248,0.15)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span style={{ fontSize: '1rem' }}>{crew.emoji}</span>
+                      <span style={{ fontWeight: 600, color: '#4ECDC4' }}>@{crew.id}</span>
+                      <span style={{ opacity: 0.55 }}>{crew.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* 버튼 행: [📎 clip] ────────────── [우측 액션 버튼] */}
+            {/* ── [ImageAttach] 이미지 미리보기 스트립 ────────────────────────────────── */}
+            {attachedImages.length > 0 && (
+              <div style={{
+                display: 'flex', gap: '0.4rem', flexWrap: 'wrap',
+                padding: '0.3rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                marginBottom: '0.2rem',
+              }}>
+                {attachedImages.map((img, idx) => (
+                  <div key={idx} style={{ position: 'relative', flexShrink: 0 }}>
+                    <img
+                      src={img.dataUrl}
+                      alt={img.name}
+                      style={{
+                        width: 56, height: 56, objectFit: 'cover',
+                        borderRadius: 8, border: '1px solid rgba(124,110,248,0.35)',
+                        display: 'block',
+                      }}
+                    />
+                    <button
+                      onClick={() => setAttachedImages(prev => prev.filter((_, i) => i !== idx))}
+                      title="제거"
+                      style={{
+                        position: 'absolute', top: -6, right: -6,
+                        width: 18, height: 18, borderRadius: '50%',
+                        background: 'rgba(40,40,60,0.92)', border: '1px solid rgba(255,255,255,0.18)',
+                        color: 'rgba(255,255,255,0.8)', fontSize: '0.65rem',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '0.7rem' }}>close</span>
+                    </button>
+                    {idx === 0 && attachedImages.length === 1 && (
+                      <div style={{
+                        position: 'absolute', bottom: 2, left: 2, right: 2,
+                        background: 'rgba(0,0,0,0.55)', borderRadius: '0 0 6px 6px',
+                        fontSize: '0.55rem', color: 'rgba(255,255,255,0.7)',
+                        padding: '0 2px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                      }}>{img.name.length > 12 ? img.name.slice(0, 12) + '…' : img.name}</div>
+                    )}
+                  </div>
+                ))}
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', alignSelf: 'center', marginLeft: '0.2rem' }}>
+                  {attachedImages.length}/4
+                </div>
+              </div>
+            )}
+
+            {/* 버튀 행: [📎 clip] ────────────── [우측 액션 버튀] */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              {/* 좌측: 클립 버튼 */}
+              {/* 좌측: 클립 버튀 */}
               <div style={{ display: 'flex', gap: '0.4rem' }}>
                 <input
                   ref={fileInputRef}
                   type="file"
+                  accept="image/*"
+                  multiple
                   style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) setInputText((prev) => prev + `[첨부: ${file.name}]`);
+                  onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+                    if (imageFiles.length > 0) {
+                      const results = await Promise.all(imageFiles.map(async (f) => ({
+                        dataUrl: await readFileAsDataURL(f),
+                        name: f.name,
+                      })));
+                      setAttachedImages(prev => [...prev, ...results].slice(0, 4));
+                    }
                     e.target.value = '';
                   }}
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  title="파일 첨부 (또는 드래그&드롭)"
+                  title="이미지 첨부 (또는 드래그&드롭 / 붙여넣기)"
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
+                    background: attachedImages.length > 0 ? 'rgba(124,110,248,0.15)' : 'none',
+                    border: attachedImages.length > 0 ? '1px solid rgba(124,110,248,0.3)' : 'none',
+                    borderRadius: 8, cursor: 'pointer',
                     width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: (focusedTask || activeLogTab === 'interaction') ? 'var(--text-secondary)' : 'var(--text-muted)',
-                    opacity: (focusedTask || activeLogTab === 'interaction') ? 1 : 0.4, transition: 'opacity 0.2s',
+                    color: attachedImages.length > 0 ? 'var(--brand)' : 'var(--text-secondary)',
+                    transition: 'all 0.2s',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>attach_file</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>image</span>
                 </button>
-
               </div>
 
-              {/* 우측: 상태 머신 버튼 */}
+              {/* 우측: 상태 머신 버튀 */}
               {activeLogTab === 'interaction' ? (
                 <button
                   onClick={handleSend}
-                  disabled={!inputText.trim() || btnMode === 'sending'}
+                  disabled={(inputText.trim().length === 0 && attachedImages.length === 0) || btnMode === 'sending'}
                   title="전송 (Enter)"
                   style={{
-                    background: inputText.trim()
+                    background: (inputText.trim() || attachedImages.length > 0)
                       ? 'linear-gradient(135deg, #7C6EF8 0%, #9B8BFB 100%)'
                       : 'rgba(124,110,248,0.2)',
                     color: 'white', border: 'none', borderRadius: '50%',
                     width: 30, height: 30, display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', cursor: inputText.trim() ? 'pointer' : 'not-allowed',
-                    boxShadow: inputText.trim() ? '0 2px 12px rgba(124,110,248,0.45)' : 'none',
+                    justifyContent: 'center',
+                    cursor: (inputText.trim() || attachedImages.length > 0) ? 'pointer' : 'not-allowed',
+                    boxShadow: (inputText.trim() || attachedImages.length > 0) ? '0 2px 12px rgba(124,110,248,0.45)' : 'none',
                     transition: 'all 0.2s',
                   }}
                 >

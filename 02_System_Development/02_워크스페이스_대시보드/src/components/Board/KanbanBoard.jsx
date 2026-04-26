@@ -71,6 +71,8 @@ export default function KanbanBoard() {
     const grouped = {};
     COLUMNS.forEach((col) => { grouped[col] = []; });
     Object.values(tasks).forEach((task) => {
+      // ARCHIVED 상태 카드는 칸반에서 숨김 (아카이빙 후 모달 닫히기 전 상태 대비)
+      if (task.status === 'ARCHIVED') return;
       // 프로젝트 필터링: projectId가 일치하거나 없는(호환성) 경우만 추가
       if (!task.projectId || task.projectId === selectedProjectId) {
         if (grouped[task.column]) grouped[task.column].push(task);

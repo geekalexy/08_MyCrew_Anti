@@ -26,6 +26,16 @@ function shouldShowError(msg) {
   return true;
 }
 
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (socketInstance) {
+      console.log('🔥 [HMR] Disconnecting old socket instance');
+      socketInstance.disconnect();
+      socketInstance = null;
+    }
+  });
+}
+
 export function useSocket() {
   const socketRef = useRef(null);
 
@@ -81,6 +91,12 @@ export function useSocket() {
       // Phase 11: Soft Delete 후 UI에서 카드 제거
       socketInstance.on('task:deleted', ({ taskId }) => {
         useKanbanStore.getState().removeTask(String(taskId));
+      });
+
+      // 아카이빙: 스토어에 ARCHIVED 상태로 표시 (removeTask 아님)
+      // 모달이 열려있는 동안 카드 데이터 유지 → 모달 닫힐 때 removeTask 처리
+      socketInstance.on('task:archived', ({ taskId }) => {
+        useKanbanStore.getState().patchTask(String(taskId), { status: 'ARCHIVED' });
       });
 
       // Phase 11: 실시간 댓글 → 카드 미리보기 갱신

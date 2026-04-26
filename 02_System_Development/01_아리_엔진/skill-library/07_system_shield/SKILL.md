@@ -4,6 +4,12 @@ description: |
   인프라 레벨의 레이트 리미터(Rate Limiter) 및 중복 차단(Idempotency Guard) 스킬입니다.
   사용자의 요청 텍스트가 60초 내에 정확히 반복되거나,
   분당 5회를 초과하는 기계적 스팸 요청이 인입될 때 발동하여 방어막을 칩니다.
+displayName: 시스템 쉴드 (System Shield)
+layer: 0
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands: []
 ---
 
 # 시스템 쉴드 (System Shield)

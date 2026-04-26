@@ -1,9 +1,20 @@
 ---
 name: content
+displayName: 콘텐츠 카피라이팅 (Content Generation)
 description: |
   인스타그램 캡션, 릴스 대본, 유튜브 쇼츠 스크립트, 캐러셀 카드 문구 등 실전 SNS 카피라이팅을 요청할 때 사용합니다.
   플랫폼별 포맷에 맞는 카피 작성, 바이럴 트리거 언어 삽입, 긴 기획안을 숏폼 대본으로 변환할 때 발동합니다.
   블로그 포스팅 SEO 최적화, 해시태그 전략, 문장 가독성 개선 작업에도 적용됩니다.
+layer: 1
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "대본 써줘"
+  - "콘텐츠 작성"
+  - "카피"
+  - "SEO"
+  - "/콘텐츠"
 ---
 
 # PICO — 플랫폼 맞춤형 카피라이터

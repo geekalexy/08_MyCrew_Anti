@@ -4,6 +4,13 @@ description: |
   전체 에이전트 팀의 워크플로우를 조율하고, 대표님의 지시를 적절한 에이전트에게 배분할 때 사용합니다.
   콘텐츠 파이프라인(OLLIE→NOVA→PICO→LUMI) 통제, 일정 선제 제안, 발행 전 최종 QA 검수가 필요할 때 발동합니다.
   에이전트 간 충돌 중재, 작업 우선순위 결정, 대표에게 보고할 요약 생성 시에도 적용됩니다.
+displayName: 태스크 라우팅 (Task Routing)
+layer: 0
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "/라우팅"
 ---
 
 # ARI 오케스트레이션 스킬

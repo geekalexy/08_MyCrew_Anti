@@ -6,6 +6,15 @@ description: |
   benchmark skill performance with variance analysis, or optimize a skill's description
   for better triggering accuracy. Also use when an agent is underperforming and needs
   a new skill to be designed and injected into its Configuration.
+displayName: 스킬 제작소 (Skill Creator)
+layer: 1
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "/스킬 만들어줘"
+  - "새 스킬 추가"
+  - "스킬 개선"
 ---
 
 # Skill Creator

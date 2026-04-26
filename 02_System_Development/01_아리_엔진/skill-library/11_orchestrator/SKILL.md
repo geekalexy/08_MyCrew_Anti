@@ -1,10 +1,23 @@
 ---
 name: orchestrator
+displayName: 오케스트레이터 (Orchestrator)
 description: |
   대표님의 지시를 AI 크루에게 전달할 때 발동하는 아리의 오케스트레이터 스킬.
   깊은 사고, 긴 작업, 전문 역량이 필요한 업무는 팀원들에게 칸반 카드로 할당한다.
   2팀(A팀·B팀)에 동시에 업무를 배분하고, 결과를 수집해 대표님에게 보고할 때 사용한다.
   마케팅·콘텐츠·디자인·분석·리서치·영상 등 크루 전문 영역의 프로젝트를 조율할 때 발동한다.
+layer: 0
+author: MyCrew
+version: "1.0.0"
+tools:
+  - manageAgentSkills
+  - writeCEOLog
+commands:
+  - "팀에게 맡겨"
+  - "에이전트 호출"
+  - "스킬 관리"
+  - "스킬 장착"
+  - "/오케스트레이터"
 ---
 
 # 오케스트레이터 스킬 (Orchestrator)

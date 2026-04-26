@@ -97,7 +97,16 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 
 ---
 
-## 4. 📝 실시간 지시 및 합의 히스토리
+## 4. 📂 파일 및 폴더 생성 강제 규칙 (M-FDS)
+**[원칙 3] 문서 작성 및 폴더 생성 시 M-FDS 규정 엄수**
+*   **주의:** 어떤 AI 에이전트든 새로운 세션 로그, 기획서(PRD), 테스트 코드 등을 작성하거나 새 폴더를 생성할 때는 임의로 만들지 마십시오.
+*   **필수 행동:** 반드시 `01_Company_Operations/04_HR_온보딩/rule_document_structure.md` 문서를 먼저 읽고(`view_file`), 해당 규칙(폴더 넘버링, 파일 네이밍, 저장 위치)을 100% 준수한 상태에서만 파일을 생성/저장해야 합니다.
+*   *위반 시 대표님(CEO)의 엄격한 제재가 따릅니다.*
+
+---
+
+## 5. 📝 실시간 지시 및 합의 히스토리
+
 
 ### [2026-04-23] Prime(Opus 4.7) 코드 리뷰 기반 시스템 안전장치 의무화 (Luca 실수 방지)
 
@@ -143,6 +152,6 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 ---
 
 **[Backup Status]**
-- **마지막 업데이트**: 2026-04-23 14:55 KST (Prime P0 오류 규제사항 추가 + Phase 24 오토파일럿 기록)
+- **마지막 업데이트**: 2026-04-26 (문서/폴더 관리 표준 M-FDS 도입 및 참조 규칙 추가)
 - **저장 경로**: `/Users/alex/Documents/08_MyCrew_Anti/01_Company_Operations/04_HR_온보딩/strategic_memory.md`
-- **버전**: v4.0 (Phase 22 확정판)
+- **버전**: v4.1 (Phase 26 진행 중)

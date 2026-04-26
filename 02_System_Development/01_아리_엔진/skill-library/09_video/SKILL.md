@@ -1,3 +1,18 @@
+---
+name: video
+displayName: 비디오 랩 (Video Lab)
+description: |
+  Remotion 영상 렌더링, VideoLab 파이프라인 실행, 숏폼 영상 생성이 필요할 때 사용합니다.
+layer: 2
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "영상 만들어줘"
+  - "--video"
+  - "/비디오"
+---
+
 # Video Lab Skill Data
 
 > Gemini 2.0 Pro가 Remotion 비디오 렌더링에 필요한 JSON Props를 구축할 때 참고해야 할 성공/실패 패턴 아카이브입니다.

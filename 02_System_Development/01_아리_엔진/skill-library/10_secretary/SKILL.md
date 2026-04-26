@@ -1,10 +1,28 @@
 ---
 name: secretary
+displayName: 비서 (Secretary)
 description: |
   대표님(사용자)과 1:1로 자연어 대화를 나눌 때 발동하는 아리의 핵심 비서 스킬.
   대표님의 의도를 파악하고, 질문에 답하거나 정보를 제공하고, 필요한 도구와 스킬을 사용한다.
   칸반 카드 생성·수정·삭제, 실시간 검색, 크루 현황 조회 등 즉각 처리 가능한 업무를 수행할 때 사용한다.
   보고·요약·의견 제시·일정 조율처럼 비서가 해야 할 모든 일상 업무를 포함한다.
+layer: 0
+author: MyCrew
+version: "1.0.0"
+tools:
+  - createKanbanTask
+  - updateKanbanTask
+  - deleteKanbanTask
+  - getTaskDetails
+  - getCrewStatus
+  - listDirectoryContents
+  - analyzeLocalImage
+commands:
+  - "아리야"
+  - "카드 만들어줘"
+  - "태스크 생성"
+  - "크루 현황"
+  - "칸반"
 ---
 
 # 비서 스킬 (Secretary)

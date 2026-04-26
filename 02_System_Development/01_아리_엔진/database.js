@@ -303,6 +303,23 @@ class DatabaseManager {
     });
   }
 
+  // ─── 아카이브 목록 조회 ────────────────────────────────────────────────────
+  getArchivedTasks() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, content, status, requester, model, assigned_agent, priority,
+                risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
+         FROM Task 
+         WHERE status = 'ARCHIVED' AND deleted_at IS NULL
+         ORDER BY id DESC`,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
   // ─── Task 상태 업데이트 (updated_at 갱신 포함) ───────────────────────────
   updateTaskStatus(id, status) {
     return new Promise((resolve, reject) => {
@@ -559,6 +576,7 @@ class DatabaseManager {
                 has_artifact, created_at, updated_at
          FROM Task
          WHERE deleted_at IS NULL
+           AND (status IS NULL OR status != 'ARCHIVED')
          ORDER BY id DESC LIMIT 200`,
         (err, rows) => {
           if (err) reject(err);
@@ -650,25 +668,36 @@ class DatabaseManager {
     });
   }
 
-  // ─── [v2.0] Comment 위상(지시 흐름) 구조 조회 ──────────────────────────
-  getCommentsWithTopology(taskId, assignedAgent) {
+  // ─── [v2.1] Comment 위상(지시 흐름) 구조 조회 ──────────────────────────
+  // [v2.1 개선] requester 파라미터 추가: 크루 보고 대상을 CEO/ARI(위임) 동적 결정
+  getCommentsWithTopology(taskId, assignedAgent, requester = 'CEO') {
     const KNOWN_AGENTS = ['ari','nova','lumi','pico','ollie','lily','luna','devteam','system'];
+    // 알려진 인간 작성자 패턴 (에이전트 아닌 모든 것)
+    const makeNode = (name) => {
+      const lower = name?.toLowerCase() || '';
+      const isA = KNOWN_AGENTS.includes(lower);
+      return isA
+        ? { id: `agent-${lower}`, name }
+        : { id: 'user-1', name: name || 'CEO' };
+    };
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, author, content, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
         [taskId],
         (err, rows) => {
           if (err) return reject(err);
-          const result = (rows || []).map((row, idx) => {
+          const allRows = rows || [];
+          const result = allRows.map((row, idx) => {
             const isAgent = KNOWN_AGENTS.includes(row.author?.toLowerCase());
+            // target 결정 원칙 (v2.2):
+            // - CEO/비에이전트 댓글 → 항상 현재 assignedAgent에게 지시
+            //   (assignee 변경 후 댓글 시 이미 task.assigned_agent가 새 값으로 업데이트됨)
+            // - 에이전트 댓글 → 항상 requester(CEO 또는 ARI(위임))에게 보고
+            const targetName = isAgent ? requester : (assignedAgent || 'ARI');
             return {
               step:        idx + 1,
-              source:      isAgent
-                ? { id: `agent-${row.author.toLowerCase()}`, name: row.author }
-                : { id: 'user-1', name: row.author || '대표님' },
-              target:      isAgent
-                ? { id: 'user-1', name: '대표님' }
-                : { id: `agent-${(assignedAgent||'ari').toLowerCase()}`, name: assignedAgent || 'ARI' },
+              source:      makeNode(row.author),
+              target:      makeNode(targetName),
               action_type: isAgent ? 'RESPONSE' : 'ORDER',
               content:     row.content,
               created_at:  row.created_at,

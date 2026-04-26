@@ -151,8 +151,8 @@ const ARI_TOOLS = [
             },
             status: {
               type: 'string',
-              enum: ['PENDING', 'in_progress', 'done', 'CANCELLED'],
-              description: '변경할 상태 (없으면 상태 유지)',
+              enum: ['PENDING', 'in_progress', 'done', 'CANCELLED', 'archive', 'ARCHIVED'],
+              description: '변경할 상태 (없으면 상태 유지). 아카이빙은 archive를 사용합니다.',
             },
           },
           required: ['taskId'],
@@ -300,8 +300,8 @@ const ARI_TOOLS = [
   },
 ];
 
-// ─── 시스템 프롬프트 생성 (ARI_BRAIN.md 기반 3-Layer) ──────────────────────
-function getAriSystemInstruction() {
+// ─── 시스템 프롬프트 생성 (ARI_BRAIN.md 기반 3-Layer + Phase 26 스킬 주입) ─────
+async function getAriSystemInstruction(agentId = 'ari') {
   const globalContext = contextInjector.getGlobalContext();
   const now = new Date();
   const dateCtx = now.toLocaleString('ko-KR', {
@@ -319,7 +319,46 @@ function getAriSystemInstruction() {
     globalContext ? `[워크스페이스 현황]\n${globalContext}` : '',
   ].filter(Boolean).join('\n\n');
 
-  return `${coreBrain}\n\n${runtimeCtx}`.trim();
+  // ── Layer 3: [Phase 26] 장착된 스킬 컨텍스트 — 동적 주입 ────────────────
+  let skillCtx = '';
+  try {
+    if (dbManager) {
+      const { context } = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
+      skillCtx = context;
+    }
+  } catch (e) {
+    console.warn('[AriDaemon] 스킬 컨텍스트 로드 실패 (폴백):', e.message);
+  }
+
+  return `${coreBrain}\n\n${runtimeCtx}${skillCtx ? '\n\n' + skillCtx : ''}`.trim();
+}
+
+// ─── [Phase 26] 동적 Tools 조립 — 장착된 스킬 기반 Function Calling 필터링 ──
+async function getActiveTools(agentId = 'ari') {
+  // dbManager 없으면 전체 ARI_TOOLS 반환 (안전 폴백)
+  if (!dbManager) return ARI_TOOLS;
+
+  try {
+    const { activeTools: toolNames } = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
+
+    // 활성 tools가 없으면 전체 반환 (Layer 0 스킬들이 tools를 비워둔 경우 대비)
+    if (!toolNames || toolNames.length === 0) return ARI_TOOLS;
+
+    const activeSet = new Set(toolNames);
+    const filtered = ARI_TOOLS[0].functionDeclarations.filter(fd => activeSet.has(fd.name));
+
+    // 최소 1개 보장 (빈 배열 방지 — Gemini API 오류 예방)
+    if (filtered.length === 0) {
+      console.warn('[AriDaemon] getActiveTools: 필터 결과 0개 — 전체 ARI_TOOLS 폴백');
+      return ARI_TOOLS;
+    }
+
+    console.log(`[AriDaemon] 🎛️ 활성 도구 (${filtered.length}개): ${filtered.map(f => f.name).join(', ')}`);
+    return [{ functionDeclarations: filtered }];
+  } catch (e) {
+    console.warn('[AriDaemon] getActiveTools 실패 — 전체 ARI_TOOLS 폴백:', e.message);
+    return ARI_TOOLS;
+  }
 }
 
 // ─── 도구 실행 핸들러 ─────────────────────────────────────────────────────
@@ -345,10 +384,10 @@ async function executeTool(toolName, args) {
       const fullContent = `# ${title}\n\n${content}`;
       const taskId = await dbManager.createTask(
         fullContent,
-        '대표님(아리 위임)',  // requester
-        MODEL.FLASH,           // model
-        assigneeId,            // assigned_agent
-        category               // category
+        'ARI(위임)',   // requester: 대표님 지시를 위임받아 ARI가 생성
+        MODEL.FLASH,       // model
+        assigneeId,        // assigned_agent
+        category           // category
       );
 
       // priority 업데이트 (updateTaskDetails 활용)
@@ -403,7 +442,9 @@ async function executeTool(toolName, args) {
         'PENDING': 'todo',
         'in_progress': 'in_progress',
         'done': 'done',
-        'CANCELLED': 'todo'
+        'CANCELLED': 'todo',
+        'archive': 'archive',
+        'ARCHIVED': 'archive'
       };
       const column = status ? statusToColumn[status] : undefined;
 
@@ -413,6 +454,28 @@ async function executeTool(toolName, args) {
       if (assigneeId) updatePayload.assignee = assigneeId;
       if (column) updatePayload.column = column;
 
+      // [아카이빙] status가 done 또는 archive로 변경되는 경우 /archive API 호출
+      // approve는 Review→Done 전용이며 상태 가드가 있음 → ARI는 항상 /archive 사용
+      if (column === 'done' || column === 'archive') {
+        try {
+          const archiveResp = await fetch(`http://localhost:4000/api/tasks/${taskId}/archive`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ archivedBy: 'ARI(위임)' }),
+          });
+          if (archiveResp.ok) {
+            return {
+              success: true,
+              taskId,
+              message: `✅ #${taskId} 태스크 아카이브 완료!\n- 상태: COMPLETED (Done)\n- Obsidian 아카이브 저장됨\n- 칸반 보드에서 Done 열로 이동됨`,
+            };
+          }
+        } catch (archiveErr) {
+          console.warn('[AriDaemon] archive API 실패, 일반 업데이트로 폴백:', archiveErr.message);
+        }
+      }
+
+      // 일반 수정 (done 아닌 경우)
       try {
         const resp = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
           method: 'PATCH',
@@ -669,7 +732,11 @@ app.post('/api/compute', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    const systemInstruction = getAriSystemInstruction();
+    // [Phase 26] 장착된 스킬 기반 시스템 프롬프트 + 동적 Tools 조립
+    const [systemInstruction, activeTools] = await Promise.all([
+      getAriSystemInstruction('ari'),
+      getActiveTools('ari'),
+    ]);
     const contents = [...conversationHistory, { role: 'user', parts: [{ text: content }] }];
 
     // ── Gemini API 호출 (Function Calling 지원) ─────────────────
@@ -681,7 +748,7 @@ app.post('/api/compute', async (req, res) => {
       config: {
         systemInstruction,
         temperature: 0.7,
-        tools: ARI_TOOLS,
+        tools: activeTools,  // ← [Phase 26] 장착된 스킬의 도구만 전달
       },
     });
 

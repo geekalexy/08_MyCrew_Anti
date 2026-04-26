@@ -4,6 +4,7 @@ import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useLogStore } from '../../store/logStore';
+import { useSocket } from '../../hooks/useSocket';
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -245,6 +246,8 @@ const STATUS_LABEL = {
   in_progress:{ text: '진행 중',   color: 'var(--status-active)' },
   REVIEW:     { text: '승인 대기', color: 'var(--brand)' },
   COMPLETED:  { text: '완료',      color: 'var(--brand)' },
+  done:       { text: '완료',      color: 'var(--brand)' },
+  ARCHIVED:   { text: '아카이브',  color: '#F59E0B' },  // 주황색
   FAILED:     { text: '실패',      color: 'var(--text-muted)' },
   PAUSED:     { text: '중단됨',    color: 'var(--status-active)' },
 };
@@ -258,6 +261,7 @@ export default function TaskDetailModal() {
   const updateTaskStatus = useKanbanStore((s) => s.updateTaskStatus);
   const patchTask = useKanbanStore((s) => s.patchTask);
 
+  const { socket } = useSocket();
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -278,6 +282,7 @@ export default function TaskDetailModal() {
   const [reworkReason, setReworkReason] = useState('');
   const [showReworkInput, setShowReworkInput] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const textareaRef = useRef(null);
   const moreMenuRef = useRef(null);
 
@@ -310,13 +315,47 @@ export default function TaskDetailModal() {
     }
   }, [commentText]);
 
+  // 실시간 소켓: 에이전트 댓글 자동 수신
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+    const KNOWN_AGENTS = ['ari','nova','lumi','pico','ollie','lily','luna','devteam','system'];
+    const handler = ({ taskId, author, text, createdAt }) => {
+      if (String(taskId) !== String(activeDetailTaskId)) return;
+      // CEO가 작성한 댓글은 optimistic update로 이미 추가된 것이멐 중복 방지
+      if (author === 'CEO') return;
+      const isAgent = KNOWN_AGENTS.includes(author?.toLowerCase());
+      setComments((prev) => {
+        const targetName = prev.length > 0
+          ? prev[prev.length - 1].source?.name || prev[prev.length - 1].author
+          : 'CEO';
+        const newC = {
+          author,
+          source: isAgent
+            ? { id: `agent-${author.toLowerCase()}`, name: author }
+            : { id: 'user-1', name: author || 'CEO' },
+          target: { id: 'user-1', name: targetName },
+          content: text,
+          created_at: createdAt || new Date().toISOString(),
+        };
+        return [...prev, newC];
+      });
+    };
+    socket.on('task:comment_added', handler);
+    return () => socket.off('task:comment_added', handler);
+  }, [socket, activeDetailTaskId]);
+
   const handleClose = useCallback(() => {
+    // 아카이빙 완료 후 닫힉 시 카드를 스토어에서 제거
+    if (isArchived && activeDetailTaskId) {
+      removeTask(String(activeDetailTaskId));
+    }
     setActiveDetailTaskId(null);
     setIsConfirmingDelete(false);
     setIsEditing(false);
     setShowReworkInput(false);
     setReworkReason('');
-  }, [setActiveDetailTaskId]);
+    setIsArchived(false);
+  }, [setActiveDetailTaskId, isArchived, activeDetailTaskId, removeTask]);
 
   const handleEditTask = () => {
     setEditTitle(task.title);
@@ -405,7 +444,20 @@ export default function TaskDetailModal() {
 
     setCommentAssignee(finalAssignee);
 
-    const newComment = { author: '대표님', content: commentText.trim(), created_at: new Date().toISOString() };
+    // Optimistic update: target 결정 원칙
+    // CEO 댓글은 항상 현재(또는 새로 지정된) assignedAgent에게 지시
+    // → assignee를 바꾸면 새 담당자, 그대로면 기존 담당자
+    const assigneeChanged = finalAssignee && finalAssignee !== task.assignee && finalAssignee !== '미할당';
+    const targetName = assigneeChanged
+      ? finalAssignee                                    // 담당자 변경 → 새 담당자
+      : (commentAssignee || task.assignee || 'ARI');    // 담당자 유지 → 현재 담당자
+    const newComment = {
+      author: 'CEO',
+      source: { id: 'user-1', name: 'CEO' },
+      target: { id: 'agent', name: targetName },
+      content: commentText.trim(),
+      created_at: new Date().toISOString()
+    };
     // Optimistic update — 즉시 반영
     setComments((prev) => [...prev, newComment]);
     setCommentText('');
@@ -414,7 +466,7 @@ export default function TaskDetailModal() {
     fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: '대표님', content: newComment.content }),
+      body: JSON.stringify({ author: 'CEO', content: newComment.content, assignedAgent: finalAssignee }),
     }).catch(console.error);
   };
 
@@ -757,7 +809,9 @@ export default function TaskDetailModal() {
               Discussion ({comments.length})
               {task.assignee && task.assignee !== '미할당' && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.5rem', opacity: 0.6 }}>
-                  <span style={{ fontSize: '0.72rem' }}>대표님</span>
+                  <span style={{ fontSize: '0.72rem', color: task.author === 'ARI(위임)' ? '#fb923c' : task.author === 'CEO' ? '#4ade80' : 'var(--text-muted)' }}>
+                    {task.author || 'CEO'}
+                  </span>
                   <span className="material-symbols-outlined" style={{ fontSize: '0.78rem' }}>arrow_forward</span>
                   <span style={{ fontSize: '0.72rem', color: 'var(--brand)' }}>{task.assignee}</span>
                 </span>
@@ -771,14 +825,43 @@ export default function TaskDetailModal() {
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                {comments.map((c, i) => (
+                {comments.map((c, i) => {
+                  // source / target 정보 추출 (서버 응답 또는 optimistic update 모두 대응)
+                  const srcName = c.source?.name || c.author || '알 수 없음';
+                  const tgtName = c.target?.name || (
+                    i === 0
+                      ? (task.assignee || 'ARI')
+                      : (comments[i - 1]?.source?.name || comments[i - 1]?.author || '대표님')
+                  );
+                  // author 구분 로직:
+                  // - CEO: 대표님이 직접 작성
+                  // - ARI(위임): ARI가 대표님 지시 위임받아 작성
+                  // - 에이전트(lumi/nova 등): 크루 자체 작성
+                  const isCeo = srcName === 'CEO';
+                  const isAriDelegate = srcName === 'ARI(위임)';
+                  const isAgentComment = !isCeo && !isAriDelegate && c.author !== 'CEO' && c.author !== '대표님';
+                  // CEO: 초록 / ARI(위임): 주황 / 에이전트: 브랜드색
+                  const srcColor = isCeo ? '#4ade80' : isAriDelegate ? '#fb923c' : 'var(--brand)';
+                  const tgtColor = isAgentComment ? 'var(--status-active)' : (isCeo || isAriDelegate) ? 'var(--brand)' : 'var(--text-muted)';
+                  return (
                   <div key={i} style={{
                     background: 'var(--bg-surface-2)', borderRadius: '10px',
                     padding: '0.7rem 0.9rem', border: '1px solid var(--border)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--brand)' }}>{c.author}</span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', alignItems: 'center' }}>
+                      {/* 작성자 흐름: source → target 항상 표시 */}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                        <span style={{
+                          fontSize: '0.82rem', fontWeight: 700,
+                          color: srcColor,
+                        }}>{srcName}</span>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>arrow_forward</span>
+                        <span style={{
+                          fontSize: '0.82rem', fontWeight: 600,
+                          color: tgtColor,
+                        }}>{tgtName}</span>
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
                         {(() => {
                           const d = new Date(c.created_at);
                           const yy = String(d.getFullYear()).slice(2);
@@ -898,7 +981,7 @@ export default function TaskDetailModal() {
                       })()}
                     </div>
                   </div>
-                ))}
+                ); })}
               </div>
             )}
           </div>
@@ -914,13 +997,30 @@ export default function TaskDetailModal() {
                 <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>view_column</span>
                 <select
                   value={commentColumn}
-                  onChange={(e) => setCommentColumn(e.target.value)}
-                  style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem' }}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'archive') {
+                      // 아카이빙: API 즉시 호출 + 모달 유지 (isArchived 상태로 전환)
+                      fetch(`${SERVER_URL}/api/tasks/${task.id}/archive`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ archivedBy: 'CEO' }),
+                      }).catch(console.error);
+                      // 스토어 즉시 반영 (socket 도착 전 빠른 UI 업데이트)
+                      patchTask(task.id, { status: 'ARCHIVED' });
+                      setIsArchived(true);
+                      return; // 모달 유지 (자동 onClose 안 함)
+                    }
+                    setCommentColumn(val);
+                  }}
+                  disabled={isArchived}
+                  style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem', opacity: isArchived ? 0.5 : 1 }}
                 >
                   <option value="todo">진행 전 (To Do)</option>
                   <option value="in_progress">진행 중 (In Progress)</option>
                   <option value="review">승인 대기 (Review)</option>
                   <option value="done">완료 (Done)</option>
+                  <option value="archive" style={{ color: '#F59E0B', fontWeight: 600 }}>📦 아카이빙</option>
                 </select>
               </div>
 
@@ -960,13 +1060,27 @@ export default function TaskDetailModal() {
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="업무 지시나 피드백을 전달하세요..."
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment(); }}
+              disabled={isArchived}
               style={{
                 background: 'var(--bg-surface-1)', border: '1px solid var(--border)', borderRadius: '8px',
                 resize: 'none', outline: 'none',
                 color: 'var(--text-primary)', fontSize: '1.05rem', fontFamily: 'inherit',
-                lineHeight: 1.5, minHeight: '80px', maxHeight: '200px', padding: '0.8rem'
+                lineHeight: 1.5, minHeight: '80px', maxHeight: '200px', padding: '0.8rem',
+                opacity: isArchived ? 0.45 : 1,
               }}
             />
+            {/* 아카이빙 완료 배너 */}
+            {isArchived && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
+                borderRadius: '8px', padding: '0.55rem 0.9rem',
+                color: '#F59E0B', fontSize: '0.85rem', fontWeight: 600,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>inventory_2</span>
+                📦 아카이빙 완료 — Obsidian에 저장됩니다. X 버튼으로 닫으면 칸반에서 제거됩니다.
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
@@ -974,7 +1088,11 @@ export default function TaskDetailModal() {
               </span>
               <button
                 onClick={handleSubmitComment}
-                disabled={!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority}
+                disabled={
+                  isArchived ||           // 아카이빙 완료 시 전송 비활성
+                  commentColumn === 'archive' ||
+                  (!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority)
+                }
                 style={{
                   background: 'var(--brand-dim, #2668ff)',
                   color: '#ffffff',

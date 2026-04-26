@@ -5,6 +5,15 @@ description: |
   인스타그램 DM 자동화, 댓글 DM, 일괄전송 등 소시안 핵심 기능을 기반으로
   블로그, 릴스, 카카오·네이버·구글 키워드 광고 소재를 제작하거나 분석할 때 발동합니다.
   소시안 사용자 피드백 분석, 경쟁사 비교, 전환율 최적화 업무에도 적용됩니다.
+displayName: 소시안 도메인 (Socian Domain)
+layer: 2
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands:
+  - "소시안"
+  - "/소시안"
+  - "소시안 분석"
 ---
 
 # 소시안 도메인 스킬 (Socian Domain Skill)

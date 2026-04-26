@@ -1,11 +1,10 @@
 // src/components/Views/ArchiveView.jsx — 완료 Task 보관소 (DataGrid)
 // 컬럼: #ID / 타이틀 / 프로젝트 / 담당(실행방식) / 결과
-import { useMemo } from 'react';
-import { useKanbanStore } from '../../store/kanbanStore';
+import { useMemo, useState, useEffect } from 'react';
 import { useProjectStore } from '../../store/projectStore';
-import { useAgentStore } from '../../store/agentStore';
-
 import { useUiStore } from '../../store/uiStore';
+
+const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const IcoArchive = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -16,9 +15,10 @@ const IcoArchive = () => (
 );
 
 export default function ArchiveView() {
-  const tasks = useKanbanStore((s) => s.tasks);
   const projects = useProjectStore((s) => s.projects);
   const { setActiveDetailTaskId } = useUiStore();
+  const [archivedTasks, setArchivedTasks] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const projectMap = useMemo(() => {
     const map = {};
@@ -26,25 +26,41 @@ export default function ArchiveView() {
     return map;
   }, [projects]);
 
-  const archivedTasks = useMemo(() =>
-    Object.values(tasks)
-      .filter((t) => t.column === 'done')
-      .sort((a, b) => (b.id > a.id ? 1 : -1)),
-    [tasks]
-  );
+  useEffect(() => {
+    const fetchArchivedTasks = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch(`${SERVER_URL}/api/tasks/archived`);
+        if (!res.ok) throw new Error('Network response was not ok');
+        const data = await res.json();
+        if (data.status === 'ok') {
+          setArchivedTasks(data.tasks || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch archived tasks:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchArchivedTasks();
+  }, []);
 
   return (
     <div className="archive-view">
       <div className="board-header">
         <h2 className="board-header__title">Archive</h2>
-        <p className="board-header__subtitle">완료된 업무 보관소 — {archivedTasks.length}건</p>
+        <p className="board-header__subtitle">아카이빙 처리된 업무 보관소 — {archivedTasks.length}건</p>
       </div>
 
       <div className="archive-table glass-panel" style={{ marginTop: '1rem' }}>
-        {archivedTasks.length === 0 ? (
+        {isLoading ? (
+          <div className="view-empty">
+            <p>데이터를 불러오는 중입니다...</p>
+          </div>
+        ) : archivedTasks.length === 0 ? (
           <div className="view-empty">
             <IcoArchive />
-            <p>아직 완료된 Task가 없습니다.</p>
+            <p>아직 아카이브된 Task가 없습니다.</p>
           </div>
         ) : (
           <table className="data-table">
@@ -79,7 +95,7 @@ export default function ArchiveView() {
                       </span>
                     </td>
                     <td>
-                      <span className="status-badge status-badge--done">✓ DONE</span>
+                      <span className="status-badge" style={{ backgroundColor: '#F59E0B', color: '#fff', border: 'none' }}>📦 ARCHIVED</span>
                     </td>
                   </tr>
                 );

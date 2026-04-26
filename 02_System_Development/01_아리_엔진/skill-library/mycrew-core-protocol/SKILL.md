@@ -6,6 +6,12 @@ description: |
   필요한 모든 상황에서 이 프로토콜을 먼저 적용합니다.
   사용자가 멀티에이전트 운영 지식 없이도 MyCrew 팀이 자율적으로 최고의 결과물을
   만들어내는 것을 목표로 합니다.
+displayName: MyCrew 핵심 프로토콜
+layer: 0
+author: MyCrew
+version: "1.0.0"
+tools: []
+commands: []
 ---
 
 # MyCrew 팀 컨텍스트 프로토콜 (Team Context Protocol)

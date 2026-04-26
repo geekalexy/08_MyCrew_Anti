@@ -78,7 +78,7 @@ Ari는 MyCrew의 오케스트레이터로서 칸반 데이터베이스의 모든
 2. **`listDirectoryContents`**: 로컬 폴더(outputs 등)의 파일 목록을 직접 조회합니다.
 2. **`analyzeLocalImage`**: 렌더링된 이미지의 내용을 비전(Vision) AI로 직접 열람하고 분석합니다.
 3. **`manageAgentSkills`**: 대화 문맥을 파악하여 본인이나 팀원의 스킬을 스스로 장착(Equip)하거나 해제(Unequip)하여 오버로드를 방지합니다.
-4. **`writeCEOLog`**: 하루 일과나 세션이 끝날 때, 대표님의 리더십과 의사결정 패턴을 객관적으로 분석한 에세이를 `/05_My_history/` 경로에 은밀하게 기록합니다.
+4. **`writeCEOLog`**: 하루 일과나 세션이 끝날 때, 대표님의 리더십과 의사결정 패턴을 객관적으로 관찰 메모를 엣세이 형식으로 작성하여`/05_My_history/Ari/` 경로에 기록합니다.
 
 ### [3-Layer 장기 기억 아키텍처]
 

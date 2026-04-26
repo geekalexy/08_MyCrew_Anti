@@ -1,23 +1,23 @@
 export const SKILL_REGISTRY = {
-  // ─── Layer 1: Engine Skills ───
+  // ─── Layer 0: Engine Skills (Phase 26 기준) — 항상 장착, 해제 불가 ───
   "orchestrator": {
-    id: "orchestrator", layer: 1, layerLabel: "ENGINE",
+    id: "orchestrator", layer: 0, layerLabel: "ENGINE",
     name: "Team Orchestrator", icon: "hub", color: "var(--brand)",
     description: "다중 에이전트 워크플로우를 조율하고 자원을 최적화합니다.",
     fullDescription: "에이전트 간의 협업 체인을 구축하고 의견 충돌을 중재하며 최종 산출물을 대표님에게 보고하기 전 전수 검수(QA)하는 오케스트레이션 특화 스킬입니다.",
     rules: ["충돌 발생 시 중재", "전체 품질 보증(QA)", "자원 효율적 할당"],
-    skillMdPath: "skill-library/08_workflow/SKILL.md",
+    skillMdPath: "skill-library/11_orchestrator/SKILL.md",  // [Phase 26] 08_workflow → 11_orchestrator
   },
   "assistant": {
-    id: "assistant", layer: 1, layerLabel: "ENGINE",
+    id: "assistant", layer: 0, layerLabel: "ENGINE",
     name: "Executive Assistant", icon: "support_agent", color: "#ffb963",
     description: "대표님의 일상 대화, 일정 관리 및 퀵 서치를 전담합니다.",
     fullDescription: "대표님의 지시를 가장 먼저 수신하여 의도를 파악하고, 일상적인 대화부터 간단한 검색까지 부드럽고 쾌적하게 보조하는 AI 비서 스킬입니다.",
     rules: ["친절하고 부드러운 톤앤매너", "의도 선제 파악", "빠른 응답 속도"],
-    skillMdPath: "skill-library/01_routing/SKILL.md",
+    skillMdPath: "skill-library/10_secretary/SKILL.md",  // [Phase 26] 01_routing → 10_secretary
   },
   "routing": {
-    id: "routing", layer: 1, layerLabel: "ENGINE",
+    id: "routing", layer: 0, layerLabel: "ENGINE",
     name: "Task Routing", icon: "account_tree", color: "var(--brand)",
     description: "보고된 업무를 분석하고 최적 에이전트에게 자동 라우팅합니다.",
     fullDescription: "워크플로우 통제 및 5단계 최종 QA 아키텍처 담당.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/01_routing/SKILL.md)에서 관리됩니다.",
@@ -71,6 +71,7 @@ export const SKILL_REGISTRY = {
     name: "Socian Domain Analysis", icon: "radar", color: "var(--brand)", 
     description: "소시안 브랜드 특정 가이드라인 및 내부 지식망 분석.",
     fullDescription: "소시안 브랜드만의 시장 특성, 톤앤매너, 컴플라이언스 기준을 데이터베이스화하여 실무에 접목시키는 도메인 역량입니다.",
+    skillMdPath: "skill-library/socian/SKILL.md",  // [Phase 26] 신규 추가
   },
 
   // ─── Layer 4: Workflow Skills (A팀 — 초안·검증 라인) ───

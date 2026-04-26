@@ -315,30 +315,33 @@ class Executor {
       }
     }
 
-    // 3. 🚨 스킬 장착 권한 검증 (Phase B) 🚨
+    // 3. 🚨 [Phase 26] 스킬 장착 권한 검증 — contextInjector 단일 소스
+    // Prime Issue #4: ariDaemon/executor 양쪽 모두 동일한 기준으로 검증
     const BUILTIN_CATEGORIES = ['QUICK_CHAT', 'DEEP_WORK', 'ROUTING', 'MEDIA', 'WORKFLOW'];
     if (!BUILTIN_CATEGORIES.includes(evaluation.category)) {
       try {
-        const activeSkills = await dbManager.getAgentSkills(agentId);
-        
-        // Category -> skillId 매핑 (evaluation.category는 대문자, skillId는 소문자 기반)
-        const categoryMap = {
+        // evaluation.category(대문자) → SKILL.md name(소문자) 매핑
+        const categoryToSkillName = {
           'MARKETING': 'marketing',
-          'CONTENT': 'content',
-          'DESIGN': 'design',
-          'ANALYSIS': 'analysis',
+          'CONTENT':   'content',
+          'DESIGN':    'design',
+          'ANALYSIS':  'analysis',
           'KNOWLEDGE': 'research',
-          'MEDIA': 'design' // 임시 맵핑
         };
-        const requiredSkillId = categoryMap[evaluation.category];
+        const requiredSkillName = categoryToSkillName[evaluation.category];
 
-        if (requiredSkillId) {
-          // 장착 여부 확인
-          const isEquipped = activeSkills.some(s => s.skill_id === requiredSkillId && s.is_active === 1);
+        if (requiredSkillName) {
+          // [Phase 26] contextInjector와 동일한 소스(DB)로 검증
+          // Layer 0 스킬은 항상 허용, Layer 1~2는 DB is_active 확인
+          const agentSkills = await dbManager.getAgentSkills(agentId);
+          const isEquipped = agentSkills.some(
+            s => s.skill_id === requiredSkillName && s.is_active === 1
+          );
+
           if (!isEquipped) {
-            console.warn(`[Executor] 권한 방어벽 발동: ${agentId}는 ${requiredSkillId} 스킬이 없습니다.`);
+            console.warn(`[Executor] 권한 방어벽 [Phase 26]: ${agentId}에게 '${requiredSkillName}' 스킬 미장착`);
             return {
-              text: `🔒 보안 알림: 저(${agentId})는 현재 이 요청을 수행할 수 있는 스킬(\`${requiredSkillId}\`)을 장착하지 않았습니다. 원활한 수행을 위해 대시보드 프로필에서 필요한 스킬 스위치를 **ON(활성화)** 해주세요!`,
+              text: `🔒 보안 알림: 저(${agentId})는 현재 이 요청을 수행할 수 있는 스킬(\`${requiredSkillName}\`)을 장착하지 않았습니다. 대시보드 프로필에서 필요한 스킬 스위치를 **ON(활성화)** 해주세요!`,
               model: 'Guardrail',
               category: 'ACCESS_DENIED',
               score: 0,

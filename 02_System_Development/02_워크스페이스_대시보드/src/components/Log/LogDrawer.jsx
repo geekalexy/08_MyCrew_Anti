@@ -61,21 +61,43 @@ export default function LogDrawer() {
   const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
 
   // ── @멘션 자동완성 ────────────────────────────────────────────────────────
-  const CREW_LIST = [
-    { id: 'ari',   label: 'Ari',   emoji: '🤖' },
-    { id: 'nova',  label: 'Nova',  emoji: '🌟' },
-    { id: 'lumi',  label: 'Lumi',  emoji: '✨' },
-    { id: 'pico',  label: 'Pico',  emoji: '🎬' },
-    { id: 'ollie', label: 'Ollie', emoji: '🔭' },
-    { id: 'lily',  label: 'Lily',  emoji: '🌸' },
-    { id: 'luna',  label: 'Luna',  emoji: '🌙' },
-  ];
+  // /api/agents에서 동적 로드 → role 필드 동기화
+  const [crewList, setCrewList] = useState([
+    { id: 'ari',   label: 'Ari',   role: '비서',               emoji: '🤖' },
+    { id: 'nova',  label: 'Nova',  role: '브랜드 마케터',        emoji: '🌟' },
+    { id: 'lumi',  label: 'Lumi',  role: '비주얼 아트 디렉터',  emoji: '✨' },
+    { id: 'pico',  label: 'Pico',  role: '콘텐츠 카피라이터',  emoji: '🎬' },
+    { id: 'ollie', label: 'Ollie', role: '그로스 데이터 분석가', emoji: '🔭' },
+  ]);
+  const EMOJI_MAP = { ari: '🤖', nova: '🌟', lumi: '✨', pico: '🎬', ollie: '🔭', lily: '🌸', luna: '🌙', luca: '🛠️', sonnet: '💡', opus: '🏛️', devteam: '👨‍💻' };
+
+  useEffect(() => {
+    fetch(`${SERVER_URL}/api/agents`)
+      .then(r => r.json())
+      .then(data => {
+        const agents = data.agents || data;
+        if (!Array.isArray(agents)) return;
+        // 에이전트 목록을 CREW_LIST로 변환 (시스템 에이전트 제외)
+        const SYSTEM_IDS = ['luca', 'sonnet', 'opus', 'devteam'];
+        const list = agents
+          .filter(a => !SYSTEM_IDS.includes(a.id))
+          .map(a => ({
+            id: a.id,
+            label: a.nameKo || a.id,
+            role: a.role || '',
+            emoji: EMOJI_MAP[a.id] || '🤖',
+          }));
+        if (list.length > 0) setCrewList(list);
+      })
+      .catch(() => {}); // 오프라인 시 기본값 유지
+  }, []);
+
   const [mentionQuery, setMentionQuery]       = useState('');   // @뒤 타이핑 중인 키워드
   const [showMention, setShowMention]         = useState(false); // 드롭다운 표시 여부
   const [mentionedAgent, setMentionedAgent]   = useState(null);  // 최종 선택된 에이전트
   const mentionRef = useRef(null);
 
-  const filteredCrew = CREW_LIST.filter(c =>
+  const filteredCrew = crewList.filter(c =>
     c.id.startsWith(mentionQuery.toLowerCase()) || c.label.toLowerCase().startsWith(mentionQuery.toLowerCase())
   );
 
@@ -936,7 +958,7 @@ export default function LogDrawer() {
                     >
                       <span style={{ fontSize: '1rem' }}>{crew.emoji}</span>
                       <span style={{ fontWeight: 600, color: '#4ECDC4' }}>@{crew.id}</span>
-                      <span style={{ opacity: 0.55 }}>{crew.label}</span>
+                      <span style={{ opacity: 0.55, fontSize: '0.8rem' }}>{crew.role}</span>
                     </button>
                   ))}
                 </div>
@@ -1014,6 +1036,28 @@ export default function LogDrawer() {
                     e.target.value = '';
                   }}
                 />
+                {/* @ 멘션 아이콘 버튼 — 클릭 시 드롭다운 토글 (Timeline 탭에서만 표시) */}
+                {activeLogTab === 'time' && (
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setMentionQuery('');
+                      setShowMention(prev => !prev);
+                      setTimeout(() => textareaRef.current?.focus(), 0);
+                    }}
+                    title="@멘션으로 에이전트 지정"
+                    style={{
+                      background: showMention ? 'rgba(78,205,196,0.15)' : 'none',
+                      border: showMention ? '1px solid rgba(78,205,196,0.35)' : 'none',
+                      borderRadius: 8, cursor: 'pointer',
+                      width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: showMention ? '#4ECDC4' : 'var(--text-secondary)',
+                      transition: 'all 0.2s', fontWeight: 700, fontSize: '0.88rem',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'monospace', fontSize: '1rem', lineHeight: 1 }}>@</span>
+                  </button>
+                )}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   title="이미지 첨부 (또는 드래그&드롭 / 붙여넣기)"
@@ -1026,7 +1070,7 @@ export default function LogDrawer() {
                     transition: 'all 0.2s',
                   }}
                 >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>image</span>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>attach_file</span>
                 </button>
               </div>
 

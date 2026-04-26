@@ -1,0 +1,45 @@
+{
+  "startedAt": "2026-04-26T16:30:26.845Z",
+  "totalChecks": 7,
+  "issues": 5,
+  "results": [
+    {
+      "service": "소켓 서버",
+      "severity": "CRITICAL",
+      "errorCode": "SRV_DOWN",
+      "errorMsg": "fetch failed"
+    },
+    {
+      "service": "DB (SQLite)",
+      "severity": "OK"
+    },
+    {
+      "service": "Gemini API",
+      "severity": "CRITICAL",
+      "errorCode": "GEMINI_KEY_MISSING",
+      "errorMsg": "API 키 미등록 또는 유효하지 않음"
+    },
+    {
+      "service": "Anti-Bridge 소켓",
+      "severity": "OK"
+    },
+    {
+      "service": "이미지 렌더링 서버",
+      "severity": "CRITICAL",
+      "errorCode": "RENDERER_DOWN",
+      "errorMsg": "fetch failed"
+    },
+    {
+      "service": "YouTube API",
+      "severity": "WARNING",
+      "errorCode": "YT_KEY_MISSING",
+      "errorMsg": "YouTube API 키 미등록"
+    },
+    {
+      "service": "외부 TTS 엔드포인트",
+      "severity": "WARNING",
+      "errorCode": "TTS_UNREACHABLE",
+      "errorMsg": "fetch failed"
+    }
+  ]
+}

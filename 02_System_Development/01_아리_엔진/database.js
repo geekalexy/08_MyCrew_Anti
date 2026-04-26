@@ -231,6 +231,23 @@ db.serialize(() => {
     is_learned INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // ─── [Phase 27] Bugdog CS 리포트 테이블 ────────────────────────────────
+  db.run(`CREATE TABLE IF NOT EXISTS cs_reports (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_no        TEXT    NOT NULL,
+    severity         TEXT    NOT NULL CHECK(severity IN ('WARNING','CRITICAL')),
+    service          TEXT    NOT NULL,
+    affected_service TEXT,
+    error_code       TEXT,
+    error_msg        TEXT,
+    stack_trace      TEXT,
+    status           TEXT    NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','IN_PROGRESS','RESOLVED')),
+    auto_generated   INTEGER NOT NULL DEFAULT 1,
+    reporter         TEXT    NOT NULL DEFAULT 'bugdog',
+    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+    resolved_at      TEXT
+  )`);
 });
 
 class DatabaseManager {
@@ -839,6 +856,46 @@ class DatabaseManager {
         ],
         err => err ? reject(err) : resolve()
       );
+    });
+  }
+
+  // ─── [Phase 27] Bugdog CS 리포트 CRUD ────────────────────────────────────
+  createCsReport({ reportNo, severity, service, affectedService, errorCode, errorMsg, stackTrace, reporter = 'bugdog' }) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO cs_reports (report_no, severity, service, affected_service, error_code, error_msg, stack_trace, reporter)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [reportNo, severity, service, affectedService || null, errorCode || null, errorMsg || null, stackTrace || null, reporter],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+  }
+
+  getCsReports({ status, limit = 50 } = {}) {
+    return new Promise((resolve, reject) => {
+      const where = status ? `WHERE status = ?` : '';
+      const params = status ? [status] : [];
+      db.all(
+        `SELECT * FROM cs_reports ${where} ORDER BY created_at DESC LIMIT ?`,
+        [...params, limit],
+        (err, rows) => { if (err) reject(err); else resolve(rows); }
+      );
+    });
+  }
+
+  updateCsReportStatus(id, status) {
+    return new Promise((resolve, reject) => {
+      // P1 수정(Prime): SQL 문자열 조합 제거 → 케이스별 명확한 SQL 분리
+      const sql = status === 'RESOLVED'
+        ? `UPDATE cs_reports SET status = ?, resolved_at = datetime('now') WHERE id = ?`
+        : `UPDATE cs_reports SET status = ?, resolved_at = NULL WHERE id = ?`;
+      db.run(sql, [status, id], function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
     });
   }
 }

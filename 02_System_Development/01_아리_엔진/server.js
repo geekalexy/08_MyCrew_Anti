@@ -2011,7 +2011,7 @@ app.post('/api/agents/:agentId/skills', async (req, res) => {
 // ─── [Phase 26] GET /api/skills/library — skill-library/ 자동 스캔 ────────
 // skillRegistry.js 없이도 SKILL.md를 실시간 스캔하여 메타데이터 반환
 // 외부 스킬 추가 시 서버 재시작만으로 자동 반영됨
-const SKILL_LIB_PATH = path.resolve(__dirname, 'skill-library');
+const SKILL_LIB_PATH = path.resolve(process.cwd(), 'skill-library');
 
 function scanSkillLibrary() {
   const skills = [];
@@ -2082,6 +2082,61 @@ app.get('/api/skills/library', (req, res) => {
     console.log(`[API] /api/skills/library — ${skills.length}개 스킬 스캔 완료`);
     res.json({ status: 'ok', count: skills.length, skills });
   } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ─── [Phase 27] Bugdog CS 리포트 API ────────────────────────────────────────
+/** POST /api/cs-reports — Bugdog 또는 Ari가 CS 리포트를 DB에 저장 */
+app.post('/api/cs-reports', async (req, res) => {
+  try {
+    const { reportNo, severity, service, affectedService, errorCode, errorMsg, stackTrace, reporter } = req.body;
+    if (!severity || !service) return res.status(400).json({ status: 'error', message: 'severity, service 필수' });
+    // P6 수정(Prime): severity enum 애플리케이션 레벨 검증 추가
+    if (!['WARNING', 'CRITICAL'].includes(severity)) return res.status(400).json({ status: 'error', message: 'severity는 WARNING 또는 CRITICAL만 허용' });
+    const rno = reportNo || `CS-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+    const id = await dbManager.createCsReport({ reportNo: rno, severity, service, affectedService, errorCode, errorMsg, stackTrace, reporter });
+    console.log(`[Bugdog] CS 리포트 저장 — #${rno} (${severity}) ${service}`);
+    io.emit('bugdog:report_created', { id, reportNo: rno, severity, service, status: 'OPEN' });
+    res.json({ status: 'ok', id, reportNo: rno });
+  } catch (err) {
+    console.error('[API] POST /api/cs-reports 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** GET /api/cs-reports — CS 리포트 목록 조회 (?status=OPEN&limit=20) */
+app.get('/api/cs-reports', async (req, res) => {
+  try {
+    const { status, limit } = req.query;
+    // P3 수정(Prime): status 유효성 검증 + limit 상한선(200) 추가
+    const VALID_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED'];
+    if (status && !VALID_STATUSES.includes(status)) {
+      return res.status(400).json({ status: 'error', message: '유효하지 않은 status 필터' });
+    }
+    const MAX_LIMIT = 200;
+    const parsedLimit = Math.min(parseInt(limit) || 50, MAX_LIMIT);
+    const reports = await dbManager.getCsReports({ status, limit: parsedLimit });
+    res.json({ status: 'ok', count: reports.length, reports });
+  } catch (err) {
+    console.error('[API] GET /api/cs-reports 에러:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** PATCH /api/cs-reports/:id/status — 리포트 상태 변경 (OPEN→IN_PROGRESS→RESOLVED) */
+app.patch('/api/cs-reports/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!['OPEN', 'IN_PROGRESS', 'RESOLVED'].includes(status)) {
+      return res.status(400).json({ status: 'error', message: '유효하지 않은 status 값' });
+    }
+    const changes = await dbManager.updateCsReportStatus(id, status);
+    io.emit('bugdog:report_updated', { id: parseInt(id), status });
+    res.json({ status: 'ok', changes });
+  } catch (err) {
+    console.error('[API] PATCH /api/cs-reports 에러:', err.message);
     res.status(500).json({ status: 'error', message: err.message });
   }
 });

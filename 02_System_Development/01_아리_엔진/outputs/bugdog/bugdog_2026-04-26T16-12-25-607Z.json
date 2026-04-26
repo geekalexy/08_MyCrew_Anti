@@ -1,0 +1,47 @@
+{
+  "startedAt": "2026-04-26T16:12:25.607Z",
+  "totalChecks": 7,
+  "issues": 6,
+  "results": [
+    {
+      "service": "소켓 서버",
+      "severity": "CRITICAL",
+      "errorCode": "SRV_DOWN",
+      "errorMsg": "request to http://localhost:4000/health failed, reason: "
+    },
+    {
+      "service": "checkDatabase",
+      "severity": "CRITICAL",
+      "errorCode": "CHECK_EXCEPTION",
+      "errorMsg": "Class constructors cannot be invoked without 'new'"
+    },
+    {
+      "service": "Gemini API",
+      "severity": "CRITICAL",
+      "errorCode": "GEMINI_KEY_MISSING",
+      "errorMsg": "API 키 미등록 또는 유효하지 않음"
+    },
+    {
+      "service": "Anti-Bridge 소켓",
+      "severity": "OK"
+    },
+    {
+      "service": "이미지 렌더링 서버",
+      "severity": "CRITICAL",
+      "errorCode": "RENDERER_DOWN",
+      "errorMsg": "request to http://localhost:3001/health failed, reason: "
+    },
+    {
+      "service": "YouTube API",
+      "severity": "WARNING",
+      "errorCode": "YT_KEY_MISSING",
+      "errorMsg": "YouTube API 키 미등록"
+    },
+    {
+      "service": "외부 TTS 엔드포인트",
+      "severity": "WARNING",
+      "errorCode": "TTS_UNREACHABLE",
+      "errorMsg": "request to https://texttospeech.googleapis.com/ failed, reason: getaddrinfo ENOTFOUND texttospeech.googleapis.com"
+    }
+  ]
+}

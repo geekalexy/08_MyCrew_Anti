@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DM 일괄전송 썸네일 (CSS/HTML)</title>
+    <style>
+        /* =========================================
+           1. 색상 및 테마 설정 (수정 가능)
+        ========================================= */
+        :root {
+            /* 메인 브랜드 컬러 */
+            --bg-color: #076cf0;
+            
+            /* 부드럽고 넓은 그라데이션 빛 (광원 효과) */
+            --glow-cyan: rgba(0, 186, 255, 0.55);
+            --glow-magenta: rgba(236, 143, 255, 0.5);
+            
+            /* 고해상도 글래스모피즘 효과 (단색이 아닌 그라데이션 적용) */
+            --card-bg-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 100%);
+            --card-border-bright: rgba(255, 255, 255, 0.5);
+            --card-border-dark: rgba(255, 255, 255, 0.05);
+            --card-shadow: rgba(0, 0, 0, 0.2);
+            
+            /* 아이콘 컬러 */
+            --icon-color: #ffffff;
+            --icon-accent: #e0f2fe;
+        }
+
+        /* 썸네일 캔버스 컨테이너 */
+        .thumbnail-canvas {
+            width: 748px;
+            height: 468px;
+            position: relative;
+            background-color: var(--bg-color);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            
+            /* 1. 초대형 그라데이션 광원 + 2. SaaS 스타일의 은은한 배경 격자 패턴 조합 */
+            background-image: 
+                radial-gradient(circle at 0% 0%, var(--glow-cyan) 0%, transparent 75%),
+                radial-gradient(circle at 100% 100%, var(--glow-magenta) 0%, transparent 75%),
+                linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 24px 24px, 24px 24px;
+        }
+
+        /* =========================================
+           2. 프리미엄 글래스모피즘 카드 스타일
+        ========================================= */
+        .glass-card {
+            position: absolute;
+            background: var(--card-bg-gradient);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            
+            /* 빛을 받는 상단과 좌측 테두리를 더 밝게 하여 입체감(유리 두께) 표현 */
+            border-top: 1.5px solid var(--card-border-bright);
+            border-left: 1.5px solid rgba(255,255,255,0.3);
+            border-right: 1px solid var(--card-border-dark);
+            border-bottom: 1px solid var(--card-border-dark);
+            
+            border-radius: 18px;
+            box-shadow: 0 16px 40px var(--card-shadow);
+            z-index: 10;
+        }
+
+        /* 개별 카드 위치 및 크기 */
+        #card-main {
+            width: 340px; height: 210px;
+            top: 129px; left: 204px;
+            z-index: 15;
+        }
+        #card-top-left {
+            width: 180px; height: 120px;
+            top: 40px; left: 90px;
+            z-index: 8;
+        }
+        #card-bottom-right {
+            width: 160px; height: 140px;
+            top: 270px; left: 500px;
+            z-index: 12;
+        }
+        #card-bottom-left {
+            width: 140px; height: 100px;
+            top: 310px; left: 100px;
+            z-index: 9;
+        }
+        #card-top-right {
+            width: 130px; height: 170px;
+            top: 60px; left: 510px;
+            z-index: 7;
+        }
+
+        /* =========================================
+           3. 아이콘 스타일 (빛나는 네온 효과 추가)
+        ========================================= */
+        .icon {
+            position: absolute;
+            fill: none;
+            stroke: var(--icon-color);
+            stroke-width: 2.5; /* 선 굵기 강화 */
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            /* 아이콘 자체에 부드러운 발광 효과(Glow) 추가 */
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.5)) drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+            z-index: 20;
+        }
+
+        /* 비행기 아이콘 */
+        #icon-plane-1 { width: 76px; height: 76px; top: 150px; left: 330px; transform: rotate(-12deg); }
+        #icon-plane-2 { width: 48px; height: 48px; top: 70px; left: 140px; transform: rotate(-25deg); stroke: var(--icon-accent); }
+
+        /* 말풍선 아이콘 */
+        #icon-chat-1 { width: 52px; height: 52px; top: 90px; left: 550px; }
+        #icon-chat-2 { width: 38px; height: 38px; top: 340px; left: 150px; stroke: var(--icon-accent); }
+
+        /* =========================================
+           4. 카드 내부 스켈레톤 UI (디테일 요소)
+        ========================================= */
+        .ui-element {
+            position: absolute;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.3) 100%);
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        /* 메인 카드 내부 요소 */
+        .ui-main-1 { width: 120px; height: 12px; top: 150px; left: 40px; }
+        .ui-main-2 { width: 80px; height: 12px; top: 150px; left: 180px; opacity: 0.6; }
+        .ui-main-3 { width: 160px; height: 12px; top: 175px; left: 40px; opacity: 0.4; }
+        
+        /* 서브 카드 내부 요소 */
+        .ui-dot { width: 14px; height: 14px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 10px rgba(255,255,255,0.8); }
+
+    </style>
+</head>
+<body style="padding: 40px; display: flex; justify-content: center; background-color: #e2e8f0; margin: 0;">
+
+    <div class="thumbnail-canvas">
+        
+        <!-- 메인 카드 -->
+        <div class="glass-card" id="card-main">
+            <!-- 디테일 스켈레톤 UI -->
+            <div class="ui-element ui-main-1"></div>
+            <div class="ui-element ui-main-2"></div>
+            <div class="ui-element ui-main-3"></div>
+        </div>
+        
+        <!-- 주변 서브 카드들 -->
+        <div class="glass-card" id="card-top-left">
+            <div class="ui-element ui-dot" style="top: 24px; left: 24px;"></div>
+            <div class="ui-element" style="width: 60px; height: 8px; top: 27px; left: 50px; opacity: 0.7;"></div>
+        </div>
+        
+        <div class="glass-card" id="card-bottom-right">
+            <div class="ui-element" style="width: 50px; height: 8px; bottom: 30px; left: 20px; opacity: 0.5;"></div>
+            <div class="ui-element" style="width: 80px; height: 8px; bottom: 30px; left: 80px; opacity: 0.3;"></div>
+        </div>
+        
+        <div class="glass-card" id="card-bottom-left"></div>
+        <div class="glass-card" id="card-top-right"></div>
+
+        <!-- SVG 아이콘들 -->
+        
+        <!-- 중앙 종이비행기 -->
+        <svg class="icon" id="icon-plane-1" viewBox="0 0 24 24">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+
+        <!-- 좌측 상단 종이비행기 -->
+        <svg class="icon" id="icon-plane-2" viewBox="0 0 24 24">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+
+        <!-- 우측 상단 말풍선 -->
+        <svg class="icon" id="icon-chat-1" viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <line x1="9" y1="10" x2="15" y2="10"></line>
+            <line x1="9" y1="14" x2="15" y2="14"></line>
+        </svg>
+
+        <!-- 좌측 하단 말풍선 -->
+        <svg class="icon" id="icon-chat-2" viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            <circle cx="9" cy="12" r="1.5" fill="var(--icon-accent)" stroke="none"></circle>
+            <circle cx="12" cy="12" r="1.5" fill="var(--icon-accent)" stroke="none"></circle>
+            <circle cx="15" cy="12" r="1.5" fill="var(--icon-accent)" stroke="none"></circle>
+        </svg>
+
+    </div>
+
+</body>
+</html>

@@ -258,8 +258,8 @@ io.on('connection', (socket) => {
   socket.on('task:create', async ({ title, content, assignee, priority, column }) => {
     try {
       const requester = 'CEO';
-      const taskId = await dbManager.createTask(title || content, requester, 'gemini-2.5-flash', assignee && assignee !== '미할당' ? assignee : null);
-      broadcastLog('info', `태스크 생성됨: ${title || content}`, 'system', taskId);
+      const taskId = await dbManager.createTask(title, content, requester, 'gemini-2.5-flash', assignee && assignee !== '미할당' ? assignee : null);
+      broadcastLog('info', `태스크 생성됨: ${title}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
         title,
@@ -441,57 +441,12 @@ ariNs.on('connection', (socket) => {
       // [Phase 22] 실제 AI 실행 (executor → Ari 비서 레이어)
       const evaluation = await modelSelector.selectModel(content);
 
-      // --- [Phase 22] Ari 비서는 무거운 비동기 태스크를 직접 처리하지 않고 칸반 태스크로 자동 파생시킴 ---
-      const ASYNC_CATEGORIES = ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'MEDIA', 'ANALYSIS', 'WORKFLOW'];
-      if (ASYNC_CATEGORIES.includes(evaluation.category)) {
-        const categoryAgents = {
-          'MARKETING': 'luma',
-          'CONTENT': 'lily',
-          'DESIGN': 'pico',
-          'ANALYSIS': 'aria',
-          'MEDIA': 'nova',
-          'WORKFLOW': 'luca',
-          'DEEP_WORK': 'luca'
-        };
-        const targetAgent = categoryAgents[evaluation.category] || 'ari';
-        
-        // 1. 태스크 생성 — ARI가 대표님 지시를 위임받아 생성하는 경우 'ARI(위임)' 표기
-        const taskRequester = 'ARI(위임)';
-        const taskId = await dbManager.createTask(content, taskRequester, evaluation.recommended_model || 'gemini-2.5-flash', targetAgent);
-        
-        // 2. 프론트엔드에 칸반 생성 이벤트 발송
-        io.emit('task:created', {
-          taskId: String(taskId),
-          title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
-          content,
-          column: 'in_progress', // 실행 상태로 바로 생성
-          agentId: targetAgent,
-          priority: 'medium',
-        });
-        await dbManager.updateTaskStatus(taskId, 'in_progress');
+      // [T-08] ASYNC_CATEGORIES 레거시 강제 위임 블록 제거
+      // 이전: server.js가 카테고리를 판단하여 크루에게 직접 위임 (ariDaemon 우회)
+      // 현재: 모든 요청을 ariDaemon(5050)으로 포워딩 → ariDaemon의 Secretary SKILL.md가 판단
+      // - 명시적 위임 키워드("팀에게 맡겨", "할당해줘")가 있으면 createKanbanTask 호출
+      // - 없으면 직접 처리 (writeFile, writeCEOLog, googleSearch 등)
 
-        // 2.5 실제 백그라운드 어댑터에 큐잉 (File Polling)
-        const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
-        await filePollingAdapter.execute({
-          taskId,
-          agentId: targetAgent,
-          category: evaluation.category,
-          content: content,
-          systemPrompt: "이 작업은 전문가 크루로서 대표님의 지시를 성실히 이행하는 태스크입니다.", 
-          modelToUse: evaluation.recommended_model || 'gemini-2.5-flash'
-        });
-
-        // 3. Ari 응답 스트리밍 (자연스러운 체팅 톤)
-        const replyMsg = `네 알겠어요. 이 일은 담당 크루(${targetAgent})에게 전달해서 진행시키겠습니다. 완료되면 리뷰 요청드릴게요! 😊 (작업번호: #${taskId})`;
-        const words = replyMsg.split(' ');
-        for (let i = 0; i < words.length; i++) {
-          const isLast = i === words.length - 1;
-          socket.emit('ari:stream_chunk', { text: words[i] + (isLast ? '' : ' ') });
-          await new Promise(r => setTimeout(r, 20));
-        }
-        socket.emit('ari:stream_done', { fullText: replyMsg, model: 'Ari (Router)' });
-        return; // 즉각 반환 (executor 직접 돌입 금지)
-      }
       
       // --- [Phase 22] 독립 구동되는 Ari Daemon (포트 5050)으로 포워딩 ---
       // [Phase 22.5 버그 픽스] 직접 변수 접근 시 만료된 토큰이 전달되어 401/400 에러 발생.
@@ -605,7 +560,8 @@ if (token && token.length > 10) {
     console.log(`[Bot] Luca 전달 메시지 관측됨: ${text}`);
     const chatId = msg.chat.id;
     try {
-      const taskId = await dbManager.createTask(`[LUCA] ${text}`, msg.from.username || 'User');
+      const taskTitle = `[LUCA] ${text.slice(0, 30)}`;
+      const taskId = await dbManager.createTask(taskTitle, text, msg.from.username || 'User');
       broadcastLog('info', `[LUCA] ${text}`, 'luca');
       await bot.sendMessage(chatId, `🟢 루카(Antigravity)에게 메시지가 성공적으로 전달되었습니다.\n(루카는 워크스페이스에서 직접 확인 후 처리합니다.)`);
     } catch (error) {
@@ -670,9 +626,10 @@ if (token && token.length > 10) {
         if (isCommand) {
           bot.sendMessage(chatId, `⏳ 지시가 로컬 SQLite Task Queue에 등록됩니다...`);
         }
-        taskId = await dbManager.createTask(text, author, 'Gemini-2.5-Flash', assignedAgent);
+        const taskTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
+        taskId = await dbManager.createTask(taskTitle, text, author, 'Gemini-2.5-Flash', assignedAgent);
         broadcastLog('info', `태스크 생성됨: ${text}`, assignedAgent, taskId, 'TELEGRAM');
-        io.emit('task:created', { taskId: String(taskId), content: text, column: 'todo', agentId: assignedAgent });
+        io.emit('task:created', { taskId: String(taskId), title: taskTitle, content: text, column: 'todo', agentId: assignedAgent });
       } else {
         // 일반 대화는 Interaction 로그로만 기록 (카드 생성 안 됨)
         broadcastLog('info', `[Interaction] ${text}`, 'ari', null, 'TELEGRAM');
@@ -996,14 +953,14 @@ app.post('/api/tasks/mention', async (req, res) => {
     const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
     
     // [W1 Fix] 대표님 직접 멘션은 항상 'CEO' 작성자로 생성
-    const taskId = await dbManager.createTask(content, 'CEO', MODEL.FLASH, targetAgent);
+    const taskId = await dbManager.createTask(content.slice(0,30), content, 'CEO', MODEL.FLASH, targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
     await dbManager.updateTaskStatus(taskId, 'in_progress');
     
     // [W2 Fix] 레이스 컨디션 제거: 처음부터 in_progress 컬럼으로 단일 이벤트 방출
     io.emit('task:created', { 
-      taskId: String(taskId), content, 
+      taskId: String(taskId), title: content.slice(0,30), content, 
       column: 'in_progress',  // ← 바로 in_progress로 생성 (setTimeout 제거)
       agentId: targetAgent 
     });
@@ -1229,7 +1186,7 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
 
           if (reassignTarget) {
             const taskObj = await dbManager.getTaskById(sid);
-            await dbManager.updateTaskDetails(sid, taskObj.content, reassignTarget, result.model);
+            await dbManager.updateTaskDetails(sid, taskObj.title, taskObj.content, reassignTarget, result.model);
             io.emit('task:updated', { taskId: sid, assignee: reassignTarget });
             broadcastLog('info', `담당자가 [${reassignTarget}]로 변경되었습니다.`, agentToTrigger, sid);
           }
@@ -1317,16 +1274,13 @@ app.patch('/api/tasks/:id', async (req, res) => {
   try {
     const taskId = req.params.id;
     const { content, title, assignee, model, column, priority } = req.body;
-    // title/content가 분리되었으므로, DB에는 content로 합쳐서 저장 (기존 아키텍처 호환)
-    const newContent = `${title ? title + '\n' : ''}${content || ''}`.trim() || '내용 없음';
-    
     // 기존 태스크 상태 조회 (변경 전 값과 비교용)
     const prevTask = await dbManager.getTaskById(taskId).catch(() => null);
     
     // 할당자 처리
     const parsedAssignee = (assignee === '미할당' || !assignee) ? null : assignee;
     
-    await dbManager.updateTaskDetails(taskId, newContent, parsedAssignee, model || 'Gemini-3-Flash');
+    await dbManager.updateTaskDetails(taskId, title || prevTask?.title || '', content || prevTask?.content || '', parsedAssignee, model || 'Gemini-3-Flash');
     
     // ── Activity Log: 변경 내역 자동 기록 ──────────────────────────────────
     if (prevTask) {
@@ -2495,9 +2449,8 @@ if (process.env.NO_SERVER !== 'true') {
     try {
       const allTasks = await dbManager.getAllTasks();
       if (allTasks.length === 0) {
-        const onboardingContent = `[필수] 외부에서도 에이전트 팀의 보고를 받을 수 있도록 텔레그램 봇 연결하기
-
-환영합니다 대표님! 저희 MyCrew 팀이 실무에 즉각 투입되기 위해서는 텔레그램 봇 연결이 1회 필요합니다. 아래 가이드를 따라 3분만에 세팅을 완료해 주세요.
+        const onboardingTitle = "[필수] 외부에서도 에이전트 팀의 보고를 받을 수 있도록 텔레그램 봇 연결하기";
+        const onboardingContent = `환영합니다 대표님! 저희 MyCrew 팀이 실무에 즉각 투입되기 위해서는 텔레그램 봇 연결이 1회 필요합니다. 아래 가이드를 따라 3분만에 세팅을 완료해 주세요.
 
 1. 텔레그램 앱에서 **BotFather** 검색하기
 2. \`/newbot\` 입력 후 봇 이름과 Username 생성하기
@@ -2505,7 +2458,7 @@ if (process.env.NO_SERVER !== 'true') {
 4. 서버의 \`.env\` 파일 내 \`TELEGRAM_BOT_TOKEN\` 위치에 붙여넣기 (또는 시스템 설정화면에서 입력)
 
 연결이 완료되면 이 카드를 '완료' 칸으로 옮기거나 "텔레그램 연결 완료했다"고 말씀해 주세요!`;
-        const newTaskId = await dbManager.createTask(onboardingContent, 'system', MODEL.FLASH, 'ari');
+        const newTaskId = await dbManager.createTask(onboardingTitle, onboardingContent, 'system', MODEL.FLASH, 'ari');
         await dbManager.updateTaskStatus(newTaskId, 'PENDING');
       }
     } catch (err) {

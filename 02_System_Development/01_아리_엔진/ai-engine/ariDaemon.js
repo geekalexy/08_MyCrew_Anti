@@ -283,18 +283,89 @@ const ARI_TOOLS = [
       // ── [도구 8] 대표님 관찰 에세이 작성 ───────────────────────
       {
         name: 'writeCEOLog',
-        description: `하루 일과를 마치거나 대표님이 요청할 때, 대표님의 리더십, 심리 상태, 의사결정 패턴 등을 객관적으로 분석한 짧은 에세이를 작성하여 05_My_history 폴더에 저장합니다.`,
+        description: `대표님이 요청할 때 관찰 에세이를 작성하거나 대화 내용을 파일로 저장합니다. 코드 수정 없이 05_My_history 폴더에 저장합니다.`,
         parameters: {
           type: 'object',
           properties: {
             essayContent: {
               type: 'string',
-              description: '작성할 에세이의 본문 (대표님의 객관적 특성 분석 내용)',
+              description: '저장할 내용 (대표님의 관찰 에세이 또는 기록)',
+            },
+            fileName: {
+              type: 'string',
+              description: '(선택) 저장할 파일명. 확장자 포함 (예: ESSAY_Alex_2026-04-28_Ari.md). 지정하지 않으면 CEO_ESSAY_YYYY-MM-DD.md 형식으로 자동 생성.',
+            },
+            targetDir: {
+              type: 'string',
+              description: '(선택) 저장 하위 폴더 이름 (05_My_history 하위). 예: Ari, Luca. 기본값: Ari',
             },
           },
           required: ['essayContent'],
         },
       },
+      // ── [도구 9] 파일 생성 / 수정 ────────────────────────────────────────
+      {
+        name: 'writeFile',
+        description: `대표님이 지정한 경로에 파일을 생성하거나 내용을 수정합니다. MyCrew 프로젝트 폴더 내에서만 동작합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: {
+              type: 'string',
+              description: '08_MyCrew_Anti 프로젝트 루트 기준 상대 경로. 예: 05_My_history/Ari/ESSAY_2026-04-28.md',
+            },
+            content: {
+              type: 'string',
+              description: '파일에 저장할 내용 (마크다운 형식 권장)',
+            },
+            overwrite: {
+              type: 'boolean',
+              description: '이미 존재하는 파일 덮어쓰기 허용 여부. 기본값: false (안전)',
+            },
+          },
+          required: ['filePath', 'content'],
+        },
+      },
+      // ── [도구 10] 파일 이동 ───────────────────────────────────────────────
+      {
+        name: 'moveFile',
+        description: `파일을 한 위치에서 다른 위치로 이동합니다. 대상 폴더가 없으면 자동 생성합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            sourcePath: { type: 'string', description: '이동할 파일의 현재 경로 (프로젝트 루트 기준)' },
+            destPath: { type: 'string', description: '이동할 목적지 경로 (파일명 포함)' },
+          },
+          required: ['sourcePath', 'destPath'],
+        },
+      },
+      // ── [도구 11] 파일 이름 변경 ──────────────────────────────────────────
+      {
+        name: 'renameFile',
+        description: `파일의 이름을 변경합니다 (같은 폴더 내에서).`,
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: { type: 'string', description: '이름을 바꿀 파일의 현재 경로' },
+            newName: { type: 'string', description: '새 파일명 (확장자 포함, 예: ESSAY_Alex_2026-04-28_Ari.md)' },
+          },
+          required: ['filePath', 'newName'],
+        },
+      },
+      // ── [도구 12] 파일 삭제 ───────────────────────────────────────────────
+      {
+        name: 'deleteFile',
+        description: `파일을 영구 삭제합니다. 대상 확인 후 실행 권장.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            filePath: { type: 'string', description: '삭제할 파일의 경로 (프로젝트 루트 기준)' },
+            reason: { type: 'string', description: '삭제 이유 (로그용)' },
+          },
+          required: ['filePath'],
+        },
+      },
+
 
     ],
   },
@@ -319,29 +390,37 @@ async function getAriSystemInstruction(agentId = 'ari') {
     globalContext ? `[워크스페이스 현황]\n${globalContext}` : '',
   ].filter(Boolean).join('\n\n');
 
-  // ── Layer 3: [Phase 26] 장착된 스킬 컨텍스트 — 동적 주입 ────────────────
+  // ── Layer 3: [Phase 26] 장착된 스킬 컨텍스트 — 동적 주입 (스킬 body 포함) ────────────────
   let skillCtx = '';
+  // M-02: 결과를 며모에 저장하여 getActiveTools에서 재사용 (2회 호출 제거)
+  let _cachedSkillResult = null;
   try {
     if (dbManager) {
-      const { context } = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
-      skillCtx = context;
+      _cachedSkillResult = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
+      skillCtx = _cachedSkillResult.context;
     }
   } catch (e) {
     console.warn('[AriDaemon] 스킬 컨텍스트 로드 실패 (폴백):', e.message);
   }
+
+  // 캐시를 클로저로 노출 — getActiveTools가 동일 요청 안에서 재사용
+  getAriSystemInstruction._skillCache = _cachedSkillResult;
 
   return `${coreBrain}\n\n${runtimeCtx}${skillCtx ? '\n\n' + skillCtx : ''}`.trim();
 }
 
 // ─── [Phase 26] 동적 Tools 조립 — 장착된 스킬 기반 Function Calling 필터링 ──
 async function getActiveTools(agentId = 'ari') {
-  // dbManager 없으면 전체 ARI_TOOLS 반환 (안전 폴백)
   if (!dbManager) return ARI_TOOLS;
 
   try {
-    const { activeTools: toolNames } = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
+    // M-02: 동일 요청 주기 내 캡시 재사용 (이중 호출 방지)
+    let skillResult = getAriSystemInstruction._skillCache;
+    if (!skillResult) {
+      skillResult = await contextInjector.getEquippedSkillsContext(agentId, dbManager);
+    }
+    const toolNames = skillResult.activeTools;
 
-    // 활성 tools가 없으면 전체 반환 (Layer 0 스킬들이 tools를 비워둔 경우 대비)
     if (!toolNames || toolNames.length === 0) return ARI_TOOLS;
 
     const activeSet = new Set(toolNames);
@@ -380,10 +459,9 @@ async function executeTool(toolName, args) {
         return { success: false, message: `할당 실패: '${assigneeId}'는 존재하지 않는 크루원입니다. 유효한 담당자 목록: ${Object.keys(CREW_INFO).join(', ')}` };
       }
 
-      // content에 title 헤더 포함하여 저장 (기존 DB 구조 활용)
-      const fullContent = `# ${title}\n\n${content}`;
       const taskId = await dbManager.createTask(
-        fullContent,
+        title,
+        content,
         'ARI(위임)',   // requester: 대표님 지시를 위임받아 ARI가 생성
         MODEL.FLASH,       // model
         assigneeId,        // assigned_agent
@@ -391,7 +469,7 @@ async function executeTool(toolName, args) {
       );
 
       // priority 업데이트 (updateTaskDetails 활용)
-      await dbManager.updateTaskDetails(taskId, fullContent, assigneeId, MODEL.FLASH);
+      await dbManager.updateTaskDetails(taskId, title, content, assigneeId, MODEL.FLASH);
 
       // priority 직접 업데이트 (별도 SQL 필요 — run 직접)
       // priority는 getAllTasksLight에서 쓰이므로 별도 처리
@@ -414,7 +492,7 @@ async function executeTool(toolName, args) {
           body: JSON.stringify({
             taskId,
             title,
-            content: fullContent,
+            content,
             column: 'todo',
             agentId: assigneeId,
             priority
@@ -501,11 +579,17 @@ async function executeTool(toolName, args) {
     // ── deleteKanbanTask ──────────────────────────────────────────────────
     if (toolName === 'deleteKanbanTask') {
       const { taskId, reason } = args;
-      const existing = await dbManager.getTaskByIdFull(taskId);
-      if (!existing) {
-        return { success: false, message: `#${taskId} 태스크를 찾을 수 없습니다.` };
+      try {
+        const resp = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+          method: 'DELETE'
+        });
+        if (!resp.ok) {
+          const errBody = await resp.text();
+          return { success: false, message: `#${taskId} 삭제 실패 (서버 에러): ${errBody}` };
+        }
+      } catch (err) {
+        return { success: false, message: `#${taskId} 서버 통신 오류: ${err.message}` };
       }
-      await dbManager.deleteTask(taskId);
       return {
         success: true,
         taskId,
@@ -560,7 +644,7 @@ async function executeTool(toolName, args) {
         const crewName = CREW_INFO[agent]?.name || agent;
         summary += `**${crewName}** (${tasks.length}건)\n`;
         tasks.slice(0, 3).forEach(t => {
-          const title = t.content?.split('\n')[0]?.replace(/^#\s*/, '') || `Task #${t.id}`;
+          const title = t.title || `Task #${t.id}`;
           summary += `  - #${t.id} [${t.status}] ${title.slice(0, 40)}${title.length > 40 ? '...' : ''}\n`;
         });
         if (tasks.length > 3) summary += `  ...외 ${tasks.length - 3}건\n`;
@@ -628,21 +712,82 @@ async function executeTool(toolName, args) {
 
     // ── writeCEOLog ──────────────────────────────────────────────────────────
     if (toolName === 'writeCEOLog') {
-      const { essayContent } = args;
-      const historyDir = '/Users/alex/Documents/08_MyCrew_Anti/05_My_history';
+      const { essayContent, fileName, targetDir = 'Ari' } = args;
+      const baseHistoryDir = '/Users/alex/Documents/08_MyCrew_Anti/05_My_history';
+      const historyDir = path.join(baseHistoryDir, targetDir);
       if (!fs.existsSync(historyDir)) {
         fs.mkdirSync(historyDir, { recursive: true });
       }
-      const dateStr = new Date().toISOString().slice(0, 10);
-      const filePath = path.join(historyDir, `CEO_ESSAY_${dateStr}.md`);
-      
+      const dateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+      const finalFileName = fileName || `CEO_ESSAY_${dateStr}.md`;
+      const filePath = path.join(historyDir, finalFileName);
       const fileBody = `# CEO Observation Essay (${dateStr})\n\n${essayContent}\n`;
       fs.writeFileSync(filePath, fileBody, 'utf-8');
-      
-      return { success: true, message: `✅ 대표님에 대한 객관적 관찰 에세이가 ${filePath} 에 안전하게 저장되었습니다.` };
+      // M-04: 사후 검증
+      if (!fs.existsSync(filePath)) {
+        return { success: false, message: `파일 저장에 실패했습니다: ${filePath}` };
+      }
+      return { success: true, message: `✅ 저장 완료: ${filePath}` };
     }
 
-    return { success: false, message: `알 수 없는 도구: ${toolName}` };
+    // ── writeFile ────────────────────────────────────────────────────────────
+    if (toolName === 'writeFile') {
+      const { filePath, content, overwrite = false } = args;
+      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const absPath = path.resolve(ROOT, filePath);
+      if (!absPath.startsWith(ROOT)) {
+        return { success: false, message: '접근 불가: MyCrew 프로젝트 외부 경로입니다.' };
+      }
+      if (!overwrite && fs.existsSync(absPath)) {
+        return { success: false, message: `이미 존재하는 파일입니다: ${filePath}. overwrite: true로 덮어쓸 수 있습니다.` };
+      }
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, content, 'utf-8');
+      if (!fs.existsSync(absPath)) return { success: false, message: `파일 저장 실패: ${filePath}` };
+      return { success: true, message: `✅ 파일 저장 완료: ${filePath}` };
+    }
+
+    // ── moveFile ─────────────────────────────────────────────────────────────
+    if (toolName === 'moveFile') {
+      const { sourcePath, destPath } = args;
+      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const absSrc = path.resolve(ROOT, sourcePath);
+      const absDest = path.resolve(ROOT, destPath);
+      if (!absSrc.startsWith(ROOT) || !absDest.startsWith(ROOT)) {
+        return { success: false, message: '접근 불가: MyCrew 프로젝트 외부 경로입니다.' };
+      }
+      if (!fs.existsSync(absSrc)) return { success: false, message: `원본 파일이 없습니다: ${sourcePath}` };
+      fs.mkdirSync(path.dirname(absDest), { recursive: true });
+      fs.renameSync(absSrc, absDest);
+      if (!fs.existsSync(absDest)) return { success: false, message: `이동 실패: ${sourcePath} → ${destPath}` };
+      return { success: true, message: `✅ 파일 이동 완료: ${sourcePath} → ${destPath}` };
+    }
+
+    // ── renameFile ───────────────────────────────────────────────────────────
+    if (toolName === 'renameFile') {
+      const { filePath, newName } = args;
+      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const absSrc = path.resolve(ROOT, filePath);
+      if (!absSrc.startsWith(ROOT)) return { success: false, message: '접근 불가 경로입니다.' };
+      if (!fs.existsSync(absSrc)) return { success: false, message: `파일이 없습니다: ${filePath}` };
+      const absDest = path.join(path.dirname(absSrc), newName);
+      fs.renameSync(absSrc, absDest);
+      if (!fs.existsSync(absDest)) return { success: false, message: `이름 변경 실패` };
+      return { success: true, message: `✅ 이름 변경 완료: ${path.basename(filePath)} → ${newName}` };
+    }
+
+    // ── deleteFile ───────────────────────────────────────────────────────────
+    if (toolName === 'deleteFile') {
+      const { filePath, reason } = args;
+      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const absPath = path.resolve(ROOT, filePath);
+      if (!absPath.startsWith(ROOT)) return { success: false, message: '접근 불가 경로입니다.' };
+      if (!fs.existsSync(absPath)) return { success: false, message: `파일이 없습니다: ${filePath}` };
+      fs.unlinkSync(absPath);
+      if (fs.existsSync(absPath)) return { success: false, message: `삭제 실패: ${filePath}` };
+      return { success: true, message: `🗑️ 삭제 완료: ${filePath}${reason ? ` (${reason})` : ''}` };
+    }
+
 
   } catch (err) {
     console.error(`[AriDaemon] 도구 실행 에러 (${toolName}):`, err.message);

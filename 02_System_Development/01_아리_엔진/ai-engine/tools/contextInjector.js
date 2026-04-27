@@ -137,13 +137,17 @@ class ContextInjector {
       context += `\n### ${displayName} [Layer ${layer === 0 ? 'ENGINE' : layer === 1 ? 'DOMAIN' : 'WORKFLOW'}]\n`;
       context += `발동 조건: ${data.description || ''}\n`;
       if (commands.length > 0) {
-        context += `호출 트리거: ${commands.join(' / ')}\n`;
+        // T-02: "호출 트리거"에서 "호출 예시"로 변경 — 키워드 트리거로 오해 방지
+        context += `호출 예시: ${commands.join(' / ')}\n`;
       }
       if (tools.length > 0) {
         context += `연결 도구: ${tools.join(', ')}\n`;
         activeTools.push(...tools);
       }
-      // SKILL.md body는 별도 systemPrompt에서 주입되므로 여기선 생략
+      // T-03: SKILL.md body를 시스템 프롬프트에 직접 주입
+      if (body && body.trim()) {
+        context += `\n[${displayName} 행동 규칙]\n${body.trim()}\n`;
+      }
     }
 
     context += `\n[ACTIVE TOOLS THIS SESSION]\n${activeTools.length > 0 ? activeTools.join(', ') : '(없음)'}\n`;
@@ -151,26 +155,28 @@ class ContextInjector {
   }
 
   /**
-   * MyCrew의 범용 컨텍스트(영구 기억)를 수집합니다.
-   * @returns {string} 수집된 범용 컨텍스트 문자열
+   * 아리 전용 글로벌 컨텍스트를 수집합니다.
+   * T-05: 본사 폴더(01_Company_Operations) 미접근 원칙에 따라
+   * 아리 전용 필터링 파일(ARI_CONTEXT.md)만 읽습니다.
+   * @returns {string} 수집된 글로벌 컨텍스트 문자열
    */
   getGlobalContext() {
-    const filesToInject = [
-      'MYCREW.md', 
-      'IDENTITY.md', 
-      'AGENTS.md'
-    ];
-    
-    let contextBuffer = '[GLOBAL CONTEXT - MYCREW WORKSPACE]\n';
-    
-    filesToInject.forEach(file => {
-      const content = this._safeReadFile(file);
-      if (content) {
-        contextBuffer += `\n--- [${path.basename(file)}] ---\n${content.slice(0, 3000)}\n`;
-      }
-    });
+    try {
+      const _dirname = path.dirname(fileURLToPath(import.meta.url));
+      // ai-engine/tools/ → ai-engine/ → 01_아리_엔진/ → docs/ARI_CONTEXT.md
+      const contextPath = path.resolve(_dirname, '../../docs/ARI_CONTEXT.md');
 
-    return contextBuffer.trim();
+      if (fs.existsSync(contextPath)) {
+        const content = fs.readFileSync(contextPath, 'utf-8');
+        return `[GLOBAL CONTEXT - ARI WORKSPACE]\n${content.slice(0, 4000)}`;
+      } else {
+        console.warn('[ContextInjector] ARI_CONTEXT.md 없음 — 글로벌 컨텍스트 비어있음');
+        return '';
+      }
+    } catch (e) {
+      console.warn('[ContextInjector] getGlobalContext 실패:', e.message);
+      return '';
+    }
   }
 
   /**

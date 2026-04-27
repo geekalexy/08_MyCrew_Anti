@@ -62,6 +62,10 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN category TEXT DEFAULT 'QUICK_CHAT'`);
       console.log('[DB] v3.2 마이그레이션: category 컬럼 추가 완료');
     }
+    if (!names.includes('title')) {
+      db.run(`ALTER TABLE Task ADD COLUMN title TEXT DEFAULT ''`);
+      console.log('[DB] Phase 27 마이그레이션: title 컬럼 추가 완료');
+    }
   });
 
   // Log 테이블 생성 (Phase 12: 1시간 배치 보고용 데이터 저장)
@@ -253,13 +257,13 @@ db.serialize(() => {
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT') {
-    const riskLevel = classifyRiskLevel(content);
+  createTask(title, content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT') {
+    const riskLevel = classifyRiskLevel(content || '');
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO Task (content, status, requester, model, risk_level, assigned_agent, category) VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
-      stmt.run([content, 'PENDING', requester, model, riskLevel, assignedAgent, category], function (err) {
+      stmt.run([title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -292,7 +296,7 @@ class DatabaseManager {
   getAllTasks() {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, content, status, requester, model, assigned_agent, priority,
+        `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
          FROM Task 
          WHERE deleted_at IS NULL
@@ -309,7 +313,7 @@ class DatabaseManager {
   getTaskById(id) {
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT id, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at
+        `SELECT id, title, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at
          FROM Task WHERE id = ? AND deleted_at IS NULL`,
         [id],
         (err, row) => {
@@ -324,7 +328,7 @@ class DatabaseManager {
   getArchivedTasks() {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, content, status, requester, model, assigned_agent, priority,
+        `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
          FROM Task 
          WHERE status = 'ARCHIVED' AND deleted_at IS NULL
@@ -381,15 +385,14 @@ class DatabaseManager {
   }
 
   // ─── Task 상세 정보 업데이트 (수동 편집용) ──────────────────────────────────
-  updateTaskDetails(id, content, assignedAgent, model) {
-    const riskLevel = classifyRiskLevel(content);
+  updateTaskDetails(id, title, content, assignedAgent, model) {
+    const riskLevel = classifyRiskLevel(content || '');
     return new Promise((resolve, reject) => {
-      // title/content는 합쳐져서 content에 저장되므로 그대로 처리
       db.run(
         `UPDATE Task 
-         SET content = ?, assigned_agent = ?, model = ?, risk_level = ?, updated_at = CURRENT_TIMESTAMP 
+         SET title = ?, content = ?, assigned_agent = ?, model = ?, risk_level = ?, updated_at = CURRENT_TIMESTAMP 
          WHERE id = ?`,
-        [content, assignedAgent, model, riskLevel, id],
+        [title || '', content || '', assignedAgent, model, riskLevel, id],
         function (err) {
           if (err) reject(err);
           else resolve(this.changes);
@@ -589,7 +592,7 @@ class DatabaseManager {
   getAllTasksLight() {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, content, status, assigned_agent, priority, risk_level,
+        `SELECT id, title, content, status, assigned_agent, priority, risk_level,
                 has_artifact, created_at, updated_at
          FROM Task
          WHERE deleted_at IS NULL
@@ -607,7 +610,7 @@ class DatabaseManager {
   getTaskByIdFull(id) {
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT id, content, status, requester, model, assigned_agent, priority,
+        `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, created_at, updated_at
          FROM Task WHERE id = ? AND deleted_at IS NULL`,
         [id],

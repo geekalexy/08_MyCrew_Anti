@@ -61,8 +61,8 @@ export function useSocket() {
       socketInstance.on('task:created', ({ taskId, title, content, column, agentId, priority }) => {
         useKanbanStore.getState().addTask({
           id: String(taskId),
-          content: content || title,
-          title: title || content,
+          content: content || '',
+          title: title || '',
           column: column || 'todo',
           agentId: agentId || null,
           assignee: agentId && agentId !== 'null' ? agentId : null,

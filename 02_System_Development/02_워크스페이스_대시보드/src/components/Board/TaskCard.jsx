@@ -1,4 +1,4 @@
-// src/components/Board/TaskCard.jsx — Phase 15 v2.2: 정밀 좌측 정렬 + 톤다운
+// src/components/Board/TaskCard.jsx — Phase 15 v2.2 + [S2-3/S2-5] 배지 규칙 명확화
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useUiStore } from '../../store/uiStore';
@@ -13,6 +13,16 @@ const PRIORITY_DOT_COLOR = {
 
 const PRIORITY_LABEL = {
   urgent: 'URGENT', high: 'HIGH', medium: 'MED', low: 'LOW',
+};
+
+// [S2-3] 상태 배지 규칙 — 조건이 true일 때만 배지 표시
+// FAILED: 에이전트 실행 실패 → 재시도/재할당 필요 알림
+// PAUSED: 수동/자동 kill로 중단됨 → 중단 중 표시
+// HELP_USER_ACTION: 대표님 결제/승인 대기 → 점멸 dot
+// CRITICAL: 위험 키워드 포함 → 경고 배지
+const STATUS_BADGE = {
+  FAILED: { label: 'FAILED', bg: 'rgba(255,82,82,0.12)', color: '#ff5449', border: 'rgba(255,82,82,0.35)', icon: 'error' },
+  PAUSED: { label: 'PAUSED', bg: 'rgba(251,191,36,0.1)', color: '#fbbf24', border: 'rgba(251,191,36,0.35)', icon: 'pause_circle' },
 };
 
 export default function TaskCard({ task, isDragging }) {
@@ -40,13 +50,16 @@ export default function TaskCard({ task, isDragging }) {
   const hasAssignee = task.assignee && task.assignee !== '미할당';
   const priorityDot = PRIORITY_DOT_COLOR[task.priority] || 'var(--text-muted)';
 
+  // [S2-3] 상태 배지 결정: status 기준 우선, column 보조
+  const statusBadge = STATUS_BADGE[task.status] || null;
+
   // 공통 좌측 기준선 — 모든 행이 동일한 left 시작점 유지
   const rowStyle = {
     display: 'flex',
     alignItems: 'center',
     gap: '0.45rem',
-    width: '100%',        // 전체 너비 사용
-    marginLeft: 0,        // 절대 들쑥날쑥 방지
+    width: '100%',
+    marginLeft: 0,
   };
 
   return (
@@ -54,7 +67,6 @@ export default function TaskCard({ task, isDragging }) {
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       onClick={handleCardClick}
       className={[
         'task-card',
@@ -66,20 +78,30 @@ export default function TaskCard({ task, isDragging }) {
       ].filter(Boolean).join(' ')}
       data-task-id={task.id}
     >
+      {/* ── 드래그 핸들 (listeners 분리 — 클릭 이벤트 충돌 방지) ── */}
+      <div
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, height: '12px',
+          cursor: 'grab', borderRadius: '8px 8px 0 0',
+        }}
+        title="드래그하여 이동"
+      />
 
       {/* ── L1. Metadata ───────────────────────────────────── */}
       <div style={{ ...rowStyle, marginBottom: '0.55rem' }}>
 
-        {/* 포커스 아이콘 + #ID — padding 0으로 기준선 맞춤, 톤다운 */}
+        {/* 포커스 아이콘 + #ID */}
         <button
           onClick={handleFocusClick}
           title={isFocused ? '포커스 해제' : '타임라인 포커스'}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: '0.2rem',
-            padding: 0, margin: 0,                          // ← 기준선 오프셋 제거
+            padding: 0, margin: 0,
             color: isFocused ? 'var(--brand)' : 'var(--text-muted)',
-            opacity: isFocused ? 1 : 0.6,                  // ← 비포커스 시 톤다운
+            opacity: isFocused ? 1 : 0.6,
             transition: 'color 0.15s, opacity 0.15s',
             flexShrink: 0,
           }}
@@ -100,7 +122,7 @@ export default function TaskCard({ task, isDragging }) {
             {isFocused ? 'target' : 'adjust'}
           </span>
           <span style={{
-            fontSize: '0.72rem', fontWeight: 500,           // ← 폰트 웨이트 다운
+            fontSize: '0.72rem', fontWeight: 500,
             fontFamily: 'Space Grotesk, sans-serif',
             letterSpacing: '0.03em',
           }}>
@@ -108,8 +130,8 @@ export default function TaskCard({ task, isDragging }) {
           </span>
         </button>
 
-        {/* 우선순위 Dot + 레이블 */}
-        {task.priority && (
+        {/* 우선순위 Dot + 레이블 — FAILED/PAUSED 시에는 숨기고 상태 배지로 대체 */}
+        {task.priority && !statusBadge && (
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
             fontSize: '0.68rem', fontWeight: 600,
@@ -126,7 +148,40 @@ export default function TaskCard({ task, isDragging }) {
           </span>
         )}
 
-        {/* HELP_USER_ACTION 점멸등 — 우선순위 옆 유지 */}
+        {/* [S2-3] 상태 배지: FAILED / PAUSED — 명확한 텍스트+아이콘으로 노출 */}
+        {statusBadge && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+            fontSize: '0.62rem', fontWeight: 700,
+            fontFamily: 'Space Grotesk, sans-serif',
+            letterSpacing: '0.05em',
+            background: statusBadge.bg,
+            color: statusBadge.color,
+            border: `1px solid ${statusBadge.border}`,
+            borderRadius: '4px',
+            padding: '1px 5px',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '0.7rem' }}>
+              {statusBadge.icon}
+            </span>
+            {statusBadge.label}
+            {/* [S4-3] 실패 이력 카운터 — 2회 이상 실패 시 숫자 표시 */}
+            {task.status === 'FAILED' && task.failureCount > 1 && (
+              <span style={{
+                background: 'rgba(255,82,82,0.25)',
+                borderRadius: '3px',
+                padding: '0 3px',
+                fontSize: '0.58rem',
+                fontWeight: 800,
+                marginLeft: '1px',
+              }}>
+                ×{task.failureCount}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* HELP_USER_ACTION 점멸등 */}
         {task.status === 'HELP_USER_ACTION' && (
           <div className="help-user-action-dot" title="대표님의 결제/권한 승인이 필요합니다" />
         )}
@@ -134,7 +189,7 @@ export default function TaskCard({ task, isDragging }) {
       </div>
 
 
-      {/* ── L2. 제목 (2줄 최대) — margin 0으로 기준선 통일 ── */}
+      {/* ── L2. 제목 (2줄 최대) ── */}
       {task.title && (
         <p
           className="task-card__title line-clamp-2"
@@ -171,18 +226,29 @@ export default function TaskCard({ task, isDragging }) {
           </>
         )}
 
+        {/* [S2-3] CRITICAL 위험 배지 — 점 대신 명확한 경고 텍스트 */}
         {task.riskLevel === 'CRITICAL' && (
           <span
-            title="Critical"
+            title="위험 키워드 포함 — 실행 전 승인 필요"
             style={{
-              width: 5, height: 5, borderRadius: '50%',
-              background: 'var(--text-muted)',
-              display: 'inline-block', flexShrink: 0,
+              display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
+              fontSize: '0.6rem', fontWeight: 700,
+              fontFamily: 'Space Grotesk, sans-serif',
+              color: '#ffb4ab',
+              background: 'rgba(255,82,82,0.08)',
+              border: '1px solid rgba(255,82,82,0.2)',
+              borderRadius: '3px', padding: '0px 4px',
+              letterSpacing: '0.04em', marginLeft: 'auto',
             }}
-          />
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '0.65rem' }}>warning</span>
+            CRITICAL
+          </span>
         )}
 
       </div>
     </div>
   );
 }
+
+

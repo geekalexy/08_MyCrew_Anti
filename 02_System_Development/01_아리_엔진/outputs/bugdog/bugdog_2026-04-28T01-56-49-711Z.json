@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-04-28T01:56:49.711Z",
+  "totalChecks": 8,
+  "issues": 6,
+  "results": [
+    {
+      "service": "소켓 서버",
+      "severity": "CRITICAL",
+      "errorCode": "SRV_DOWN",
+      "errorMsg": "fetch failed"
+    },
+    {
+      "service": "DB (SQLite)",
+      "severity": "OK"
+    },
+    {
+      "service": "Gemini API",
+      "severity": "CRITICAL",
+      "errorCode": "GEMINI_KEY_MISSING",
+      "errorMsg": "API 키 미등록 또는 유효하지 않음"
+    },
+    {
+      "service": "Anti-Bridge 소켓",
+      "severity": "OK"
+    },
+    {
+      "service": "이미지 렌더링 서버",
+      "severity": "CRITICAL",
+      "errorCode": "RENDERER_DOWN",
+      "errorMsg": "fetch failed"
+    },
+    {
+      "service": "YouTube API",
+      "severity": "WARNING",
+      "errorCode": "YT_KEY_MISSING",
+      "errorMsg": "YouTube API 키 미등록"
+    },
+    {
+      "service": "외부 TTS 엔드포인트",
+      "severity": "WARNING",
+      "errorCode": "TTS_UNREACHABLE",
+      "errorMsg": "fetch failed"
+    },
+    {
+      "service": "Google OAuth",
+      "severity": "CRITICAL",
+      "errorCode": "ACCESS_TOKEN_EXPIRED",
+      "errorMsg": "access_token 만료됨 (0시간 전) — 서버 재시작 또는 재로그인 필요"
+    }
+  ]
+}

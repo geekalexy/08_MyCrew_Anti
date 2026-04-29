@@ -67,8 +67,14 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
               if (broadcastLogFn) {
                 broadcastLogFn('error', msg, 'system', taskId);
               }
-              ioInstance?.emit('task:moved_failed', { taskId, revertTo: 'in_progress', error: 'Timeout' });
+              // [Phase 22.6] Timeout 발생 시 카드를 To Do로 원복하고, 에이전트 상태를 초기화
+              ioInstance?.emit('task:moved', { taskId, toColumn: 'todo' });
               ioInstance?.emit('task:comment_added', { taskId, author: 'system', text: msg, createdAt: new Date().toISOString() });
+              
+              const agentId = data.agentId || data.assignedAgent;
+              if (agentId) {
+                ioInstance?.emit('agent:status_change', { agentId, status: 'idle' });
+              }
               
               // Timeout 파일 폐기
               await fs.promises.unlink(filePath);
@@ -112,16 +118,31 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
             await dbManagerInstance.accumulateCksTokens(taskId, resultData.tokenUsage, resultData.agentId || 'system').catch(()=>{});
           }
 
+          let cleanMsg = resultData.text || `✅ 비동기 작업 통보: ${taskId} 완료`;
+          let thoughtProcess = null;
+          
+          const thinkingMatch = cleanMsg.match(/<thinking>([\s\S]*?)<\/thinking>/);
+          const workingMatch = cleanMsg.match(/<working>([\s\S]*?)<\/working>/);
+          
+          if (thinkingMatch || workingMatch) {
+            thoughtProcess = {};
+            if (thinkingMatch) thoughtProcess.thinking = thinkingMatch[1].trim();
+            if (workingMatch) thoughtProcess.working = workingMatch[1].trim();
+            
+            cleanMsg = cleanMsg.replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+                               .replace(/<working>[\s\S]*?<\/working>/g, '').trim();
+          }
+
           // 커멘트 로그 남기기
-          const msg = resultData.text || `✅ 비동기 작업 통보: ${taskId} 완료`;
-          await dbManagerInstance.createComment(taskId, resultData.agentId || 'system', msg);
+          await dbManagerInstance.createComment(taskId, resultData.agentId || 'system', cleanMsg, thoughtProcess);
 
           // 브로드캐스트
           ioInstance.emit('task:moved', { taskId, toColumn: column });
           ioInstance.emit('task:comment_added', { 
             taskId, 
             author: resultData.agentId || 'system', 
-            text: msg, 
+            text: cleanMsg, 
+            thought_process: thoughtProcess,
             createdAt: new Date().toISOString() 
           });
 

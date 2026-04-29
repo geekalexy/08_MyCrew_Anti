@@ -44,6 +44,7 @@ const PORT = 5050;
 
 // ─── API 키 관리 (keyProvider 연동) ───────────────────────────────────────────────────────────
 import keyProvider from './tools/keyProvider.js';
+import { naverSearch } from './tools/naverSearchAdapter.js';
 
 let API_KEYS = [];
 const key1 = await keyProvider.getKey('GEMINI_API_KEY');
@@ -76,16 +77,69 @@ let conversationHistory = [];
 // ─── 크루원 정보 SSOT ────────────────────────────────────────────────────
 const CREW_INFO = {
   luca:  { name: 'Luca',  role: 'CTO / 시스템 아키텍트', model: 'Antigravity(Claude)', specialties: ['시스템 설계', '코드 구현', '아키텍처', '백엔드 개발'] },
-  nova:  { name: 'Nova',  role: 'CMO / 마케팅 전략가',   model: MODEL.FLASH,           specialties: ['SNS 전략', '콘텐츠 기획', '바이럴', '릴스/쇼츠'] },
+  nova:  { name: 'Nova',  role: 'CMO / 마케팅 전략가',   model: MODEL.PRO,           specialties: ['SNS 전략', '콘텐츠 기획', '바이럴', '릴스/쇼츠'] },
   pico:  { name: 'Pico',  role: '영상 디렉터',            model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상 제작', '릴스 시나리오', '숏폼 스크립트', '편집'] },
-  lumi:  { name: 'Lumi',  role: '이미지 디렉터',          model: MODEL.FLASH,              specialties: ['이미지 생성', '디자인', '비주얼 기획', '썸네일'] },
+  lumi:  { name: 'Lumi',  role: '이미지 디렉터',          model: MODEL.PRO,              specialties: ['이미지 생성', '디자인', '비주얼 기획', '썸네일'] },
   luna:  { name: 'Luna',  role: '최종 합성자',             model: MODEL.ANTIGRAVITY_NEXUS,  specialties: ['종합 분석', '전략 합성', '보고서', '최종 검토'] },
   ollie: { name: 'Ollie', role: '적대적 판관',             model: MODEL.ANTIGRAVITY_PRIME,  specialties: ['크리티컬 리뷰', '품질 검증', '반론 제시'] },
   lily:  { name: 'Lily',  role: '영상 담당 (Team A)',      model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상', '시나리오'] },
 };
 
-// ─── 도구(Function Calling) 정의 ─────────────────────────────────────────
-const ARI_TOOLS = [
+// ─── 칸반 칼럼 정의 (DB에서 동적 로딩 — 확장 가능) ─────────────────────────
+// 기본값: 서버 기동 시 DB에서 갱신. 30분마다 재로딩.
+let _kanbanCols = [
+  { status: 'PENDING',     label: 'To Do',      column: 'todo',        aliases: ['TODO', 'todo', 'PENDING', '대기', '할일'] },
+  { status: 'IN_PROGRESS', label: 'In Progress', column: 'in_progress', aliases: ['in_progress', '진행중', '진행'] },
+  { status: 'REVIEW',      label: 'Review',      column: 'review',      aliases: ['검토', '검토대기', '리뷰'] },
+  { status: 'COMPLETED',   label: 'Done',        column: 'done',        aliases: ['DONE', 'done', '완료', '완성'] },
+  { status: 'FAILED',      label: 'Failed',      column: 'failed',      aliases: ['실패', '오류'] },
+  { status: 'ARCHIVED',    label: 'Archived',    column: 'archive',     aliases: ['archive', 'ARCHIVED', '아카이브', '보관'] },
+];
+
+/** DB에서 최신 칸반 칼럼 정의를 로드 */
+async function refreshKanbanCols() {
+  try {
+    if (dbManager) {
+      const cols = await dbManager.getKanbanColumns();
+      if (cols && cols.length > 0) {
+        _kanbanCols = cols;
+        console.log('[AriDaemon] 🗂️ 칸반 칼럼 정의 갱신:', cols.map(c => `${c.status}(${c.label})`).join(', '));
+      }
+    }
+  } catch (e) {
+    console.warn('[AriDaemon] 칼럼 정의 로드 실패, 기존값 유지:', e.message);
+  }
+}
+
+/** 칼럼 정의에서 alias → status 변환 맵 생성 */
+function buildAliasMap(cols) {
+  const map = {};
+  for (const col of cols) {
+    map[col.status] = col.status; // identity
+    for (const alias of (col.aliases || [])) {
+      map[alias] = col.status;
+      map[alias.toUpperCase()] = col.status;
+      map[alias.toLowerCase()] = col.status;
+    }
+  }
+  return map;
+}
+
+/** 칼럼 정의에서 status → column 변환 맵 생성 */
+function buildStatusToColumn(cols) {
+  const map = {};
+  for (const col of cols) {
+    map[col.status] = col.column;
+  }
+  return map;
+}
+
+// ─── 도구(Function Calling) 정의 팩토리 ─────────────────────────────────────
+// 칼럼 정의가 변경되면 buildAriTools()를 재호출하여 Tool 스펙을 즉시 갱신합니다.
+function buildAriTools(cols) {
+  const statusEnums  = cols.map(c => c.status);
+  const statusDesc   = cols.map(c => `${c.status}(${c.label})`).join(', ');
+  return [
   {
     functionDeclarations: [
 
@@ -110,8 +164,22 @@ const ARI_TOOLS = [
             content: {
               type: 'string',
               description: `태스크 본문 내용.
-반드시 마크다운(Markdown) 포맷으로 구체적인 목적, 배경, 그리고 세부 지시사항을 상세하고 풍부하게 작성하세요.
-절대 사용자의 짧은 요청을 그대로 복사붙여넣기 하지 마십시오. 당신은 전문 프롬프트 엔지니어입니다. 담당자가 읽고 즉시 실행할 수 있는 수준의 구체적인 가이드라인과 컨텍스트가 포함된 완벽한 업무 지시서 형태로 기획안을 작성해야 합니다.`,
+
+[Phase 27 — 컨펌 기반 태스크 생성 루프]
+이 도구를 호출하기 전에 반드시 아래 순서를 따르라:
+
+1. 【유추】 지시가 짧거나 맥락이 부족하더라도 즉시 역질문하지 말 것.
+   대화 흐름, 이전 발언, 담당 크루원의 전문성을 바탕으로 목적/타겟/핵심 요건을 스스로 유추한다.
+
+2. 【개요 제시】 유추한 내용을 바탕으로 태스크 개요(제목, 담당자, 핵심 목표 2~3줄)를 먼저 채팅으로 제시한다.
+   예: "이렇게 이해했어요. [제목: xxx / 담당: xxx / 목표: xxx] — 이대로 진행할까요?"
+
+3. 【컨펌】 대표님이 "응", "그래", "맞아", "진행해" 등 확인해주면 그때 이 도구를 호출하여 카드를 생성한다.
+   수정 요청이 오면 반영 후 다시 개요를 제시하고 재확인을 기다린다.
+
+4. 【작성】 컨펌 후 마크다운 포맷으로 목적, 배경, 세부 지시사항을 구체적으로 작성한다.
+   담당자가 읽고 즉시 실행할 수 있는 수준의 업무 지시서 형태로 작성한다.
+   절대 사용자의 짧은 요청을 그대로 복사붙여넣기 하지 말 것.`,
             },
             priority: {
               type: 'string',
@@ -151,8 +219,8 @@ const ARI_TOOLS = [
             },
             status: {
               type: 'string',
-              enum: ['PENDING', 'in_progress', 'done', 'CANCELLED', 'archive', 'ARCHIVED'],
-              description: '변경할 상태 (없으면 상태 유지). 아카이빙은 archive를 사용합니다.',
+              enum: statusEnums,
+              description: `변경할 상태. DB 실제값 기준: ${statusDesc}. 아카이브는 ARCHIVED를 사용하세요.`,
             },
           },
           required: ['taskId'],
@@ -211,8 +279,8 @@ const ARI_TOOLS = [
             },
             statusFilter: {
               type: 'string',
-              enum: ['in_progress', 'PENDING', 'done', 'all'],
-              description: '필터할 상태. 기본값 all.',
+              enum: ['all', ...statusEnums],
+              description: `필터할 상태. DB 실제값 기준: ${statusDesc}. 기본값 all(전체).`,
             },
           },
           required: [],
@@ -366,13 +434,52 @@ const ARI_TOOLS = [
         },
       },
 
+      // ── [도구 13] 네이버 검색 ────────────────────────────────────────────
+      {
+        name: 'naverSearch',
+        description: `네이버 뉴스/블로그/웹문서를 검색합니다. 한국어 콘텐츠와 최신 트렌드 조사에 유리합니다.
+사용자가 '네이버에서 찾아봐', '한국 시장 동향', '최신 뉴스', Google Grounding으로 못 찾는 정보 등을 요청할 때 호출합니다.`,
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: '검색할 한국어 키워드. 구체적일수록 정대제 (2~4단어 권장)',
+            },
+            type: {
+              type: 'string',
+              enum: ['news', 'blog', 'webkr', 'encyc'],
+              description: '검색 유형. news=언론사 기사, blog=블로그(생활형 정보), webkr=웹문서(전문사이트), encyc=백과사전(개념정의). 기본: news',
+            },
+            display: {
+              type: 'number',
+              description: '가져올 결과 수 (1~10, 기본 5). 요약할 때는 3, 상세 조사는 10을 권장.',
+            },
+          },
+          required: ['query'],
+        },
+      },
 
-    ],
-  },
-];
+    ],  // end functionDeclarations
+  }];  // end object + return array
+} // end buildAriTools
+
+// 초기 Tool 정의 빌드 (서버 기동 시 기본값 사용)
+let ARI_TOOLS = buildAriTools(_kanbanCols);
+
+// DB 칼럼 정의 최초 로딩 (비동기 — 완료 후 ARI_TOOLS 갱신)
+refreshKanbanCols().then(() => {
+  ARI_TOOLS = buildAriTools(_kanbanCols);
+});
+
+// 30분마다 칼럼 정의 갱신 (사용자가 컬럼 추가/변경 시 자동 반영)
+setInterval(async () => {
+  await refreshKanbanCols();
+  ARI_TOOLS = buildAriTools(_kanbanCols);
+}, 30 * 60 * 1000);
 
 // ─── 시스템 프롬프트 생성 (ARI_BRAIN.md 기반 3-Layer + Phase 26 스킬 주입) ─────
-async function getAriSystemInstruction(agentId = 'ari') {
+async function getAriSystemInstruction(agentId = 'ari', activeModel = MODEL.FLASH) {
   const globalContext = contextInjector.getGlobalContext();
   const now = new Date();
   const dateCtx = now.toLocaleString('ko-KR', {
@@ -382,11 +489,12 @@ async function getAriSystemInstruction(agentId = 'ari') {
 
   // ── Layer 1: ARI_BRAIN.md — 핵심 정체성 (정적, 고품질) ──────────────────
   const coreBrain = ARI_BRAIN ||
-    `당신은 MyCrew의 비서 아리(Ari)입니다. Gemini 2.5 Pro 기반 자율 행동형 비서입니다.`;
+    `당신은 MyCrew의 비서 아리(Ari)입니다. ${activeModel} 기반 자율 행동형 비서입니다.`;
 
   // ── Layer 2: 런타임 컨텍스트 — 매 요청마다 최신화 ──────────────────────
   const runtimeCtx = [
     `━━━ [런타임 — ${dateCtx} KST] ━━━`,
+    `[현재 장착 LLM 모델] ${activeModel} ← 이 세션에서 실제 사용 중인 모델. 사용자가 모델을 물어보면 이 값으로 답하라.`,
     globalContext ? `[워크스페이스 현황]\n${globalContext}` : '',
   ].filter(Boolean).join('\n\n');
 
@@ -444,7 +552,12 @@ async function getActiveTools(agentId = 'ari') {
 async function executeTool(toolName, args) {
   console.log(`[AriDaemon] 🔧 도구 실행: ${toolName}`, JSON.stringify(args));
 
-
+  // ── naverSearch: DB 불필요 — 샄수 실행 ────────────────────────────
+  if (toolName === 'naverSearch') {
+    const { query, type = 'news', display = 5 } = args;
+    if (!query) return { success: false, message: 'query 파라미터가 없습니다.' };
+    return await naverSearch(query, type, display);
+  }
 
   if (!dbManager) {
     return { success: false, message: 'DB 연결 없음. 칸반 기능 사용 불가.' };
@@ -515,16 +628,11 @@ async function executeTool(toolName, args) {
         return { success: false, message: `수정 실패: '${assigneeId}'는 존재하지 않는 크루원입니다. 유효한 담당자 목록: ${Object.keys(CREW_INFO).join(', ')}` };
       }
 
-      // status -> column 매핑 (프론트엔드 API 호환용)
-      const statusToColumn = {
-        'PENDING': 'todo',
-        'in_progress': 'in_progress',
-        'done': 'done',
-        'CANCELLED': 'todo',
-        'archive': 'archive',
-        'ARCHIVED': 'archive'
-      };
-      const column = status ? statusToColumn[status] : undefined;
+      // status 정규화 + column 매핑 (칼럼 정의에서 동적 생성 — 컨테이너 추가 시 코드 수정 없음)
+      const aliasMap       = buildAliasMap(_kanbanCols);
+      const statusToColumn = buildStatusToColumn(_kanbanCols);
+      const normalizedStatus = aliasMap[status] || aliasMap[status?.toUpperCase()] || status;
+      const column = normalizedStatus ? statusToColumn[normalizedStatus] : undefined;
 
       // server.js의 REST API 호출 (Socket.io 브로드캐스트를 위해)
       const updatePayload = {};
@@ -532,8 +640,7 @@ async function executeTool(toolName, args) {
       if (assigneeId) updatePayload.assignee = assigneeId;
       if (column) updatePayload.column = column;
 
-      // [아카이빙] status가 done 또는 archive로 변경되는 경우 /archive API 호출
-      // approve는 Review→Done 전용이며 상태 가드가 있음 → ARI는 항상 /archive 사용
+      // [아카이빙] COMPLETED 또는 ARCHIVED로 변경되는 경우 /archive API 호출
       if (column === 'done' || column === 'archive') {
         try {
           const archiveResp = await fetch(`http://localhost:4000/api/tasks/${taskId}/archive`, {
@@ -604,9 +711,12 @@ async function executeTool(toolName, args) {
       if (!task) {
         return { success: false, message: `#${taskId} 태스크를 찾을 수 없습니다.` };
       }
-      return { 
-        success: true, 
-        message: `📋 **[Task #${task.id}] 상세 내용**\n- 상태: ${task.status}\n- 담당: ${task.assigned_agent || '미할당'}\n- 카테고리: ${task.category || 'N/A'}\n\n**내용**:\n${task.content}`
+      // status → label 변환 (Ari의 혼동 방지: COMPLETED=Done열, ARCHIVED=보관열)
+      const colDef = _kanbanCols.find(c => c.status === task.status);
+      const statusLabel = colDef ? `${task.status} (${colDef.label} 열)` : task.status;
+      return {
+        success: true,
+        message: `📋 **[Task #${task.id}] 상세 내용**\n- 상태: ${statusLabel}\n- 담당: ${task.assigned_agent || '미할당'}\n- 카테고리: ${task.category || 'N/A'}\n\n**내용**:\n${task.content}`
       };
     }
 
@@ -615,9 +725,15 @@ async function executeTool(toolName, args) {
       const { agentId, statusFilter = 'all' } = args;
       const allTasks = await dbManager.getAllTasksLight();
 
+      // status 정규화 (칼럼 정의에서 동적 생성 — alias 포함)
+      const aliasMap = buildAliasMap(_kanbanCols);
+      const normalizedFilter = aliasMap[statusFilter] || aliasMap[statusFilter?.toUpperCase()] || statusFilter;
+
       let filtered = allTasks.filter(t => {
         const agentMatch = agentId ? t.assigned_agent?.toLowerCase() === agentId.toLowerCase() : true;
-        const statusMatch = statusFilter === 'all' ? true : t.status?.toLowerCase() === statusFilter.toLowerCase();
+        const statusMatch = normalizedFilter === 'all'
+          ? true
+          : t.status?.toUpperCase() === normalizedFilter.toUpperCase();
         return agentMatch && statusMatch;
       });
 
@@ -645,7 +761,10 @@ async function executeTool(toolName, args) {
         summary += `**${crewName}** (${tasks.length}건)\n`;
         tasks.slice(0, 3).forEach(t => {
           const title = t.title || `Task #${t.id}`;
-          summary += `  - #${t.id} [${t.status}] ${title.slice(0, 40)}${title.length > 40 ? '...' : ''}\n`;
+          // status → label 변환 (Ari 혼동 방지)
+          const colDef = _kanbanCols.find(c => c.status === t.status);
+          const statusLabel = colDef ? `${t.status}(${colDef.label})` : t.status;
+          summary += `  - #${t.id} [${statusLabel}] ${title.slice(0, 40)}${title.length > 40 ? '...' : ''}\n`;
         });
         if (tasks.length > 3) summary += `  ...외 ${tasks.length - 3}건\n`;
         summary += '\n';
@@ -847,8 +966,16 @@ app.post('/v1beta/models/:model::action', async (req, res) => {
 
 // ─── 메인 대화 엔드포인트 ─────────────────────────────────────────────────
 app.post('/api/compute', async (req, res) => {
-  const { content, author, oauthToken } = req.body;
+  const { content, author, oauthToken, preferredModel } = req.body;
   if (!content) return res.status(400).send('Content missing');
+
+  // preferredModel 검증 — 아리 엔진은 Gemini API 전용이므로 Gemini 계열만 허용
+  const ARI_ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+  const activeModel = ARI_ALLOWED_MODELS.includes(preferredModel)
+    ? preferredModel
+    : MODEL.PRO; // 기본값: gemini-2.5-pro (2026-04-28 Flash → Pro 격상)
+  console.log(`[AriDaemon] 🎯 사용 모델: ${activeModel}${preferredModel && preferredModel !== activeModel ? ` (요청: ${preferredModel} → 미허용, Pro 폴백)` : ''}`);
+
 
   // 구독 인증 토큰이 있으면 해당 토큰 기반 구독형 클라이언트 사용, 없으면 레거시 글로벌 클라이언트 사용
   let localAi = ai;
@@ -879,16 +1006,38 @@ app.post('/api/compute', async (req, res) => {
 
     // [Phase 26] 장착된 스킬 기반 시스템 프롬프트 + 동적 Tools 조립
     const [systemInstruction, activeTools] = await Promise.all([
-      getAriSystemInstruction('ari'),
+      getAriSystemInstruction('ari', activeModel),
       getActiveTools('ari'),
     ]);
+
+
+    // ── [자동 스킬 주입] URL 또는 리서치 요청 감지 시 research 도구 강제 포함 ──
+    // research 스킬이 미장착이어도 URL/조사 키워드 탐지 시 웹 검색 도구 자동 추가
+    const URL_PATTERN   = /https?:\/\/|www\.|notion\.so|github\.com/i;
+    const RESEARCH_KEYS = /조사해|리서치|검색해|찾아봐|읽어봐|내용.*봐|정보.*알려|웹에서|구글|검색|url|링크/i;
+    const needsWebSearch = URL_PATTERN.test(content) || RESEARCH_KEYS.test(content);
+
+    if (needsWebSearch) {
+      const hasGoogleSearch = activeTools[0]?.functionDeclarations?.some(fd => fd.name === 'googleSearch');
+      if (!hasGoogleSearch) {
+        const googleSearchDef = ARI_TOOLS[0].functionDeclarations.find(fd => fd.name === 'googleSearch');
+        if (googleSearchDef) {
+          // research 스킬 임시 주입 (이번 요청에만)
+          const merged = [...(activeTools[0]?.functionDeclarations || []), googleSearchDef];
+          activeTools[0] = { functionDeclarations: merged };
+          console.log('[AriDaemon] 🔍 URL/리서치 감지 → googleSearch 도구 자동 주입');
+        }
+      }
+    }
+
     const contents = [...conversationHistory, { role: 'user', parts: [{ text: content }] }];
 
     // ── Gemini API 호출 (Function Calling 지원) ─────────────────
     let response;
 
     response = await localAi.models.generateContent({
-      model: MODEL.PRO,
+      model: activeModel,
+
       contents,
       config: {
         systemInstruction,
@@ -931,7 +1080,8 @@ app.post('/api/compute', async (req, res) => {
       let finalStream;
 
       finalStream = await localAi.models.generateContentStream({
-        model: MODEL.PRO,
+        model: activeModel,
+
         contents: followUpContents,
         config: {
           systemInstruction,
@@ -1006,11 +1156,74 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     port: PORT,
-    model: MODEL.PRO,
+    model: MODEL.FLASH,  // 기본 운영 모델 (사용자 선택 시 Pro 전환 가능)
     historyTurns: conversationHistory.length,
     dbConnected: !!dbManager,
     tools: ['googleSearch', 'createKanbanTask', 'updateKanbanTask', 'deleteKanbanTask', 'getTaskDetails', 'getCrewStatus'],
   });
+});
+
+// ─── [Bugdog v1] 경보 수신 및 Ari 컨텍스트 주입 ───────────────────────────
+/**
+ * POST /api/bugdog-alert — server.js가 relay한 Bugdog 경보 수신
+ * → conversationHistory에 시스템 경보 메시지 주입
+ * → Ari가 다음 대화에서 자동으로 경보를 인지하고 대응 판단
+ */
+app.post('/api/bugdog-alert', async (req, res) => {
+  try {
+    const { severity, service, errorCode, errorMsg, detectedAt, reportNo, allResults } = req.body;
+    if (!severity || !service) {
+      return res.status(400).json({ status: 'error', message: 'severity, service 필수' });
+    }
+
+    const severityIcon = severity === 'CRITICAL' ? '🔴' : '🟡';
+    const timestamp    = detectedAt ? new Date(detectedAt).toLocaleString('ko-KR') : new Date().toLocaleString('ko-KR');
+
+    // ── 전체 감시 결과 요약 (allResults가 있는 경우) ─────────────────────────
+    let resultsSummary = '';
+    if (Array.isArray(allResults) && allResults.length > 0) {
+      const criticals = allResults.filter(r => r.severity === 'CRITICAL');
+      const warnings  = allResults.filter(r => r.severity === 'WARNING');
+      if (criticals.length > 0 || warnings.length > 0) {
+        resultsSummary = '\n\n[전체 감시 결과]\n';
+        criticals.forEach(r => { resultsSummary += `🔴 ${r.service}: ${r.errorMsg || r.errorCode}\n`; });
+        warnings.forEach(r  => { resultsSummary += `🟡 ${r.service}: ${r.errorMsg || r.errorCode}\n`; });
+      }
+    }
+
+    // ── Ari conversationHistory에 시스템 경보 주입 ───────────────────────────
+    const alertMessage = [
+      `[BUGDOG SYSTEM ALERT — ${timestamp}]`,
+      `${severityIcon} 심각도: ${severity}`,
+      `📍 감지 서비스: ${service}`,
+      errorCode ? `🔑 에러 코드: ${errorCode}` : '',
+      `💬 내용: ${errorMsg}`,
+      reportNo  ? `📋 CS 리포트: #${reportNo}` : '',
+      resultsSummary,
+      '',
+      severity === 'CRITICAL'
+        ? '⚠️ CRITICAL 경보입니다. 대표님께 즉시 보고하고 조치 방안을 판단해 주세요.'
+        : 'ℹ️ WARNING 경보입니다. 상황을 모니터링하고 필요 시 대표님께 보고하세요.',
+    ].filter(Boolean).join('\n');
+
+    // model 역할의 이전 응답처럼 삽입 (Ari의 다음 응답에 영향)
+    conversationHistory.push({
+      role: 'user',
+      parts: [{ text: `[SYSTEM] Bugdog 자동 경보:\n${alertMessage}` }],
+    });
+
+    // 히스토리 30턴 제한 유지
+    if (conversationHistory.length > 60) {
+      conversationHistory.splice(0, conversationHistory.length - 60);
+    }
+
+    console.log(`[Bugdog v1] ${severityIcon} 경보 → Ari 컨텍스트 주입 완료: [${severity}] ${service}`);
+
+    res.json({ status: 'ok', injected: true, historyLength: conversationHistory.length });
+  } catch (err) {
+    console.error('[Bugdog v1] ariDaemon 경보 처리 오류:', err.message);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
 });
 
 app.listen(PORT, () => {
@@ -1021,6 +1234,7 @@ app.listen(PORT, () => {
 - Model  : ${MODEL.PRO}
 - DB     : ${dbManager ? '✅ 연결됨' : '⚠️ 미연결'}
 - Tools  : googleSearch | createKanbanTask | updateKanbanTask | deleteKanbanTask | getTaskDetails | getCrewStatus
+- Bugdog : ✅ /api/bugdog-alert 수신 대기 중
 - Memory : Persistent Context (최근 30턴)
 ==================================================
 `);

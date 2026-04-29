@@ -93,6 +93,15 @@ export function useSocket() {
         useKanbanStore.getState().removeTask(String(taskId));
       });
 
+      // [S4-3] 실패 이벤트 수신 → failureCount 배지 업데이트
+      socketInstance.on('task:failed', ({ taskId, failureCount, reason }) => {
+        useKanbanStore.getState().patchTask(String(taskId), {
+          status: 'FAILED',
+          failureCount: failureCount || 1,
+          failureReason: reason || null,
+        });
+      });
+
       // 아카이빙: 스토어에 ARCHIVED 상태로 표시 (removeTask 아님)
       // 모달이 열려있는 동안 카드 데이터 유지 → 모달 닫힐 때 removeTask 처리
       socketInstance.on('task:archived', ({ taskId }) => {
@@ -107,6 +116,12 @@ export function useSocket() {
 
       // Phase 12 v2.0: 핑퐁 규칙 — 담당자 복귀 등 태스크 부분 필드 변경
       socketInstance.on('task:updated', ({ taskId, ...fields }) => {
+        useKanbanStore.getState().patchTask(String(taskId), fields);
+      });
+
+      // [P-21 Fix] PATCH /api/tasks/:id 수동 편집 결과 실시간 반영
+      // server.js가 emit하는 task:patched 이벤트를 수신 → content/title/assignee 등 갱신
+      socketInstance.on('task:patched', ({ taskId, ...fields }) => {
         useKanbanStore.getState().patchTask(String(taskId), fields);
       });
 

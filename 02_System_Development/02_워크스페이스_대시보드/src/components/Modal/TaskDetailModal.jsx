@@ -265,6 +265,7 @@ export default function TaskDetailModal() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity'
   
   // 패스 21: 댓글 전송 시 함께 업데이트할 필드 상태
   const [commentColumn, setCommentColumn] = useState('');
@@ -799,33 +800,57 @@ export default function TaskDetailModal() {
 
           {/* 댓글 목록 */}
           <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{
-              fontSize: '0.82rem', color: 'var(--text-muted)',
-              fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase',
-              letterSpacing: '0.1em', marginBottom: '0.75rem',
-              display: 'flex', alignItems: 'center', gap: '0.4rem',
-            }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>forum</span>
-              Discussion ({comments.length})
-              {task.assignee && task.assignee !== '미할당' && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.5rem', opacity: 0.6 }}>
-                  <span style={{ fontSize: '0.72rem', color: task.author === 'ARI(위임)' ? '#fb923c' : task.author === 'CEO' ? '#4ade80' : 'var(--text-muted)' }}>
-                    {task.author || 'CEO'}
-                  </span>
-                  <span className="material-symbols-outlined" style={{ fontSize: '0.78rem' }}>arrow_forward</span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--brand)' }}>{task.assignee}</span>
-                </span>
-              )}
-            </h3>
-            {isLoadingComments ? (
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>댓글 불러오는 중...</p>
-            ) : comments.length === 0 ? (
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                아직 댓글이 없습니다. 지시사항이나 피드백을 남겨보세요.
-              </p>
-            ) : (
+            {/* [S4-2] Discussion / Activity 탭 */}
+            {(() => {
+              const SYSTEM_AUTHORS = new Set(['system', 'SYSTEM']);
+              const discussionComments = comments.filter(c => !SYSTEM_AUTHORS.has(c.author));
+              const activityComments   = comments.filter(c =>  SYSTEM_AUTHORS.has(c.author));
+              const visibleComments    = activeCommentTab === 'discussion' ? discussionComments : activityComments;
+              return (
+                <>
+                  {/* 탭 버튼 */}
+                  <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '0.75rem' }}>
+                    {[
+                      { key: 'discussion', icon: 'forum',    label: 'Discussion', count: discussionComments.length },
+                      { key: 'activity',   icon: 'history',  label: 'Activity',   count: activityComments.length },
+                    ].map(tab => (
+                      <button key={tab.key} onClick={() => setActiveCommentTab(tab.key)} style={{
+                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        padding: '0.35rem 0.8rem',
+                        fontSize: '0.74rem', fontWeight: 600,
+                        fontFamily: 'Space Grotesk, sans-serif',
+                        letterSpacing: '0.04em',
+                        border: 'none',
+                        borderBottom: activeCommentTab === tab.key ? '2px solid var(--brand)' : '2px solid transparent',
+                        borderRadius: 0, background: 'none',
+                        color: activeCommentTab === tab.key ? 'var(--brand)' : 'var(--text-muted)',
+                        cursor: 'pointer', transition: 'color 0.15s',
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>{tab.icon}</span>
+                        {tab.label}
+                        {tab.count > 0 && (
+                          <span style={{
+                            marginLeft: '0.2rem', fontSize: '0.62rem', fontWeight: 700,
+                            background: activeCommentTab === tab.key ? 'rgba(180,197,255,0.15)' : 'rgba(255,255,255,0.07)',
+                            borderRadius: '10px', padding: '1px 5px',
+                          }}>{tab.count}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* 탭 콘텐츠 */}
+                  {isLoadingComments ? (
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>댓글 불러오는 중...</p>
+                  ) : visibleComments.length === 0 ? (
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      {activeCommentTab === 'discussion'
+                        ? '아직 댓글이 없습니다. 지시사항이나 피드백을 남겨보세요.'
+                        : '시스템 활동 기록이 없습니다.'}
+                    </p>
+                  ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                {comments.map((c, i) => {
+                {visibleComments.map((c, i) => {
                   // source / target 정보 추출 (서버 응답 또는 optimistic update 모두 대응)
                   const srcName = c.source?.name || c.author || '알 수 없음';
                   const tgtName = c.target?.name || (
@@ -984,6 +1009,9 @@ export default function TaskDetailModal() {
                 ); })}
               </div>
             )}
+                </>
+              );
+            })()}
           </div>
 
           {/* 댓글 입력 영역과 함께 상태/할당 컨트롤 */}

@@ -502,7 +502,7 @@ html, body, #root {
   border-radius: 14px;
   /* 카드 세로 사이즈업: 패딩 증가 */
   padding: 1.25rem 1rem;
-  cursor: grab; transition: all 0.15s ease; position: relative;
+  cursor: pointer; transition: all 0.15s ease; position: relative;
   overflow: hidden;
 }
 .task-card:hover {
@@ -539,12 +539,21 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* [S3-4] 말줄임 hover 전체 표시: 카드 제목을 hover하면 clamp 해제 */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   line-clamp: 2;
   overflow: hidden;
+  transition: -webkit-line-clamp 0.2s;
+}
+/* 카드 hover 시 제목 전체 표시 */
+.task-card:hover .line-clamp-2 {
+  display: block;          /* -webkit-box 해제 */
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
 }
 .line-clamp-4 {
   display: -webkit-box;
@@ -1882,9 +1891,9 @@ html, body, #root {
 
 /* ── Skill Add Drawer (Local, position: absolute) ── */
 .skill-drawer {
-  position: absolute; top: 0; right: 0; bottom: 0;
+  position: fixed; top: 0; right: 0; bottom: 0;
   width: min(360px, 90%);
-  z-index: var(--z-drawer-local);
+  z-index: 500;
   background: var(--bg-surface-2);
   border-left: 1px solid var(--border);
   border-radius: 16px 0 0 16px;
@@ -1956,11 +1965,12 @@ html, body, #root {
 }
 .skill-drawer__item:hover .skill-drawer__item-add { opacity: 1; }
 .skill-drawer__overlay {
-  position: absolute; inset: 0;
+  position: fixed; inset: 0;
   background: rgba(0,0,0,0.4);
-  z-index: calc(var(--z-drawer-local) - 1);
+  z-index: 499;
   animation: fadeIn 0.2s ease;
 }
+
 
 
 /* ── Phase 22 Sprint 1: Ari 스트리밍 타이핑 커서 애니메이션 ── */
@@ -2014,3 +2024,63 @@ html, body, #root {
   --border:         rgba(255,255,255,0.1);
   --brand:          #b4c5ff;
 }
+
+/* ── [T-07] 마크다운 렌더러 스타일 ─────────────────────────────────────── */
+.md-content { color: inherit; }
+.md-content .md-h1 { font-size: 1.4rem; font-weight: 700; color: var(--text-primary); margin: 1rem 0 0.5rem; font-family: 'Space Grotesk', sans-serif; }
+.md-content .md-h2 { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin: 0.9rem 0 0.4rem; font-family: 'Space Grotesk', sans-serif; border-bottom: 1px solid var(--border); padding-bottom: 0.2rem; }
+.md-content .md-h3 { font-size: 1.05rem; font-weight: 700; color: var(--brand); margin: 0.8rem 0 0.3rem; }
+.md-content .md-h4 { font-size: 0.95rem; font-weight: 600; color: var(--text-secondary); margin: 0.7rem 0 0.25rem; }
+.md-content .md-p  { margin: 0.4rem 0; line-height: 1.75; }
+.md-content .md-bold   { font-weight: 700; color: var(--text-primary); }
+.md-content .md-italic { font-style: italic; }
+.md-content .md-del    { text-decoration: line-through; color: var(--text-muted); }
+.md-content .md-hr     { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+.md-content .md-ul     { padding-left: 1.2rem; margin: 0.4rem 0; list-style: none; }
+.md-content .md-li     { position: relative; padding-left: 0.8rem; margin: 0.2rem 0; line-height: 1.6; }
+.md-content .md-li::before { content: '·'; position: absolute; left: 0; color: var(--brand); font-weight: 700; }
+.md-content .md-li.md-oli { list-style: decimal; }
+.md-content .md-checkbox::before { display: none; }
+.md-content .md-checkbox-icon { font-size: 0.95rem; }
+.md-content .md-checked        { color: var(--text-muted); text-decoration: line-through; }
+.md-content .md-blockquote {
+  border-left: 3px solid var(--brand);
+  padding: 0.3rem 0.8rem;
+  margin: 0.5rem 0;
+  background: rgba(180, 197, 255, 0.05);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.md-content .md-link {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: opacity 0.15s;
+}
+.md-content .md-link:hover { opacity: 0.75; }
+.md-content .md-inline-code {
+  background: rgba(180, 197, 255, 0.1);
+  border: 1px solid rgba(180, 197, 255, 0.2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.88em;
+  color: var(--brand);
+}
+.md-content .md-code-block {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(180, 197, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  margin: 0.7rem 0;
+  overflow-x: auto;
+}
+.md-content .md-code-block .md-code {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #c4c6d5;
+  white-space: pre;
+}
+/* ── [T-07] 끝 ─────────────────────────────────────────────────────────── */

@@ -1,31 +1,56 @@
 export const SKILL_REGISTRY = {
-  // ─── Layer 0: Engine Skills (Phase 26 기준) — 항상 장착, 해제 불가 ───
+  // ─── Layer 0: Ari 전용 코어 스킬 — 아리 프로필에만 표시 ───
   "orchestrator": {
-    id: "orchestrator", layer: 0, layerLabel: "ENGINE",
+    id: "orchestrator", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
     name: "Team Orchestrator", icon: "hub", color: "var(--brand)",
     description: "다중 에이전트 워크플로우를 조율하고 자원을 최적화합니다.",
     fullDescription: "에이전트 간의 협업 체인을 구축하고 의견 충돌을 중재하며 최종 산출물을 대표님에게 보고하기 전 전수 검수(QA)하는 오케스트레이션 특화 스킬입니다.",
     rules: ["충돌 발생 시 중재", "전체 품질 보증(QA)", "자원 효율적 할당"],
-    skillMdPath: "skill-library/11_orchestrator/SKILL.md",  // [Phase 26] 08_workflow → 11_orchestrator
+    skillMdPath: "skill-library/11_orchestrator/SKILL.md",
   },
   "assistant": {
-    id: "assistant", layer: 0, layerLabel: "ENGINE",
+    id: "assistant", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
     name: "Executive Assistant", icon: "support_agent", color: "#ffb963",
     description: "대표님의 일상 대화, 일정 관리 및 퀵 서치를 전담합니다.",
     fullDescription: "대표님의 지시를 가장 먼저 수신하여 의도를 파악하고, 일상적인 대화부터 간단한 검색까지 부드럽고 쾌적하게 보조하는 AI 비서 스킬입니다.",
     rules: ["친절하고 부드러운 톤앤매너", "의도 선제 파악", "빠른 응답 속도"],
-    skillMdPath: "skill-library/10_secretary/SKILL.md",  // [Phase 26] 01_routing → 10_secretary
+    skillMdPath: "skill-library/10_secretary/SKILL.md",
   },
   "routing": {
-    id: "routing", layer: 0, layerLabel: "ENGINE",
+    id: "routing", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
     name: "Task Routing", icon: "account_tree", color: "var(--brand)",
     description: "보고된 업무를 분석하고 최적 에이전트에게 자동 라우팅합니다.",
     fullDescription: "워크플로우 통제 및 5단계 최종 QA 아키텍처 담당.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/01_routing/SKILL.md)에서 관리됩니다.",
     rules: ["최소비용 모델 우선", "실패 시 escalation", "3회 실패 시 사람에게 보고"],
     skillMdPath: "skill-library/01_routing/SKILL.md",
   },
+  "secretary": {
+    id: "secretary", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
+    name: "비서 (Secretary)", icon: "support_agent", color: "#ffb963",
+    description: "대표님과 1:1 대화, 칸반 조작, 즉각 처리 가능한 모든 비서 업무를 수행합니다.",
+    fullDescription: "대표님의 의도를 파악하고 칸반 카드 생성·수정·삭제, 실시간 검색, 크루 현황 조회 등 즉각 처리 가능한 업무를 자율 수행하는 핵심 비서 스킬입니다.",
+    rules: ["친절하고 부드러운 톤앤매너", "칸반 Tool 자율 사용", "불명확한 지시 시 재확인 요청"],
+    skillMdPath: "skill-library/10_secretary/SKILL.md",
+  },
+  "system-shield": {
+    id: "system-shield", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
+    name: "시스템 쉴드 (System Shield)", icon: "security", color: "#4ecb71",
+    description: "Rate Limiter 및 중복 요청 차단으로 엔진을 보호합니다.",
+    fullDescription: "60초 내 정확 반복 요청 또는 분당 5회 초과 스팸 인입 시 방어막을 작동시키는 인프라 레벨 보호 스킬입니다.",
+    rules: ["60초 내 동일 요청 차단", "분당 5회 초과 시 쿨다운", "비정상 패턴 즉시 차단"],
+    skillMdPath: "skill-library/07_system_shield/SKILL.md",
+  },
+  "mycrew-core-protocol": {
+    id: "mycrew-core-protocol", layer: 0, layerLabel: "ENGINE", agentOnly: "ari", isBuiltin: true,
+    name: "MyCrew 핵심 프로토콜", icon: "article", color: "#b4c5ff",
+    description: "멀티에이전트 팀 운영의 핵심 규칙과 협업 프로토콜을 담당합니다.",
+    fullDescription: "새 태스크 수령, 타 에이전트 작업 이어받기, 팀 전체 컨텍스트가 필요한 모든 상황에서 적용되는 MyCrew 운영 표준 프로토콜입니다.",
+    rules: ["태스크 수령 시 컨텍스트 우선 로드", "팀 그라운드룰 항상 참조", "Handoff 시 상태 명세 필수 전달"],
+    skillMdPath: "skill-library/mycrew-core-protocol/SKILL.md",
+  },
   "marketing": {
     id: "marketing", layer: 1, layerLabel: "ENGINE",
+    defaultFor: ["nova", "pico"],
     name: "Marketing Intelligence", icon: "trending_up", color: "#ffb963",
     description: "3초 Hook 설계, 바이럴 콘텐츠 전략, 플랫폼 알고리즘 대응 전문.",
     fullDescription: "3초 Hook 및 마케팅 심리학 기반의 자동 트리거 스크립팅 분석 및 수행 능력입니다.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/02_marketing/SKILL.md)에서 관리됩니다.",
@@ -34,6 +59,7 @@ export const SKILL_REGISTRY = {
   },
   "content": {
     id: "content", layer: 1, layerLabel: "ENGINE",
+    defaultFor: ["pico", "lumi", "lily", "luna"],
     name: "Content Generation", icon: "article", color: "#ff8ab4",
     description: "SEO 최적화 블로그 작성, 릴스 대본, 숏폼 카피라이팅 기획.",
     fullDescription: "에이전트 고유의 전문 실행 스킬입니다. 인간의 언어로 작성된 지시를 SEO에 최적화된 콘텐츠로 직조합니다.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/03_content/SKILL.md)에서 관리됩니다.",
@@ -42,6 +68,7 @@ export const SKILL_REGISTRY = {
   },
   "analysis": {
     id: "analysis", layer: 1, layerLabel: "ENGINE",
+    defaultFor: ["ollie", "luna"],
     name: "Data Analytics", icon: "analytics", color: "#b4c5ff",
     description: "업무 지표 추출, 퍼널 분석, 시각화 대시보드 리포팅.",
     fullDescription: "로그와 지표를 분석하여 패턴을 도출하고 핵심 지표를 요약하여 인간 친화적인 리포트로 변환합니다.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/04_analysis/SKILL.md)에서 관리됩니다.",
@@ -50,6 +77,7 @@ export const SKILL_REGISTRY = {
   },
   "design": {
     id: "design", layer: 1, layerLabel: "ENGINE",
+    defaultFor: ["nova", "lumi", "lily"],
     name: "Visual Design", icon: "palette", color: "#ff8ab4",
     description: "하이엔드 이미지 생성, UI/UX 컨설팅, 미드저니 프롬프트 엔지니어링.",
     fullDescription: "미드저니 및 다양한 이미지 AI를 활용한 비주얼 크리에이티브 가이드 및 프롬프트 정밀 모델링 능력입니다.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/05_design/SKILL.md)에서 관리됩니다.",
@@ -58,6 +86,7 @@ export const SKILL_REGISTRY = {
   },
   "research": {
     id: "research", layer: 1, layerLabel: "ENGINE",
+    defaultFor: ["ollie", "luna"],
     name: "Web Research & Knowledge", icon: "manage_search", color: "#b4c5ff",
     description: "심층 웹 크롤링, 지식 아카이빙, 시장 동향 모니터링.",
     fullDescription: "웹 심층 조사 및 데이터 신뢰도 검증, 출처 기반 요약 전문 리서치 스킬입니다.\n상세 엔진 명세 및 실행 가이드는 본사 Knowledge IP 섹션(/skill-library/06_research/SKILL.md)에서 관리됩니다.",
@@ -66,13 +95,15 @@ export const SKILL_REGISTRY = {
   },
 
   // ─── Layer 2: Domain Skills ───
-  "socian-analysis": { 
-    id: "socian-analysis", layer: 2, layerLabel: "DOMAIN", 
-    name: "Socian Domain Analysis", icon: "radar", color: "var(--brand)", 
+  "socian-analysis": {
+    id: "socian-analysis", layer: 2, layerLabel: "DOMAIN",
+    defaultFor: ["nova", "lumi"],
+    name: "Socian Domain Analysis", icon: "radar", color: "var(--brand)",
     description: "소시안 브랜드 특정 가이드라인 및 내부 지식망 분석.",
     fullDescription: "소시안 브랜드만의 시장 특성, 톤앤매너, 컴플라이언스 기준을 데이터베이스화하여 실무에 접목시키는 도메인 역량입니다.",
-    skillMdPath: "skill-library/socian/SKILL.md",  // [Phase 26] 신규 추가
+    skillMdPath: "skill-library/socian/SKILL.md",
   },
+
 
   // ─── Layer 4: Workflow Skills (A팀 — 초안·검증 라인) ───
   "draft": {
@@ -144,19 +175,4 @@ export const SKILL_REGISTRY = {
     rules: ["규칙은 구체적 행동 금지형으로 작성", "중복 규칙 자동 제거", "스프린트 완료 후 자동 실행"],
   },
 
-  // ─── Layer 3: Infra Skills (Builtin) ───
-  "claude-code-native": {
-    id: "claude-code-native", layer: 3, layerLabel: "INFRA", isBuiltin: true,
-    name: "Claude Code Native", icon: "terminal", color: "var(--brand)",
-    description: "CLI 기반 파일 직접 수정 권한. 고성능 코딩 어시스턴트 메인 엔진으로 작동합니다.",
-    fullDescription: "이 에이전트는 터미널 기반의 @anthropic-ai/claude-code 실행 권한을 보유하고 있습니다. 프로젝트 내의 모든 파일을 직접 읽고 수정하며, 로컬에서 터미널 명령을 실행하여 고도의 개발 작업을 자율적으로 수행합니다.",
-    rules: ["파일 수정 전 백업 확인", "위험 명령어 실행 전 승인 대기", "로컬 프로젝트 전체 검증 권한 보유"],
-  },
-  "paperclip-arxiv": {
-    id: "paperclip-arxiv", layer: 3, layerLabel: "INFRA", isBuiltin: true,
-    name: "Paperclip Arxiv", icon: "attach_file", color: "#ff5449",
-    description: "지식 베이스 상호 연결 모듈. PDF/기획서 등 모든 레퍼런스를 위키링크로 무제한 유지 관리.",
-    fullDescription: "Socian의 통합 지식 베이스 아카이브입니다. 모든 PDF 기획서, 회의록, 리서치 자료를 위키링크([[Link]])로 연결하여 에이전트가 문맥(Context)을 소실하지 않고 작업할 수 있도록 지원합니다.",
-    rules: ["위키링크 [[Link]] 생성 필수", "컨텍스트 소실 방지", "Obsidian Vault 동기화"],
-  },
 };

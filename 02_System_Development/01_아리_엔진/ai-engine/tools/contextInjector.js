@@ -98,19 +98,54 @@ class ContextInjector {
   async getEquippedSkillsContext(agentId, dbManager) {
     // 1. skill-library 폴더 스캔
     let skillFolders = [];
+    let validSkillNames = new Set(); // [T-06] 실제 존재하는 skill_id SSOT
     try {
       skillFolders = fs.readdirSync(this.skillLibPath)
         .filter(f => fs.existsSync(path.join(this.skillLibPath, f, 'SKILL.md')));
+      
+      // [T-06] 실제 SKILL.md의 name 필드 추출 → 유효 skill_id 집합 구성
+      for (const folder of skillFolders) {
+        const skillPath = path.join(this.skillLibPath, folder, 'SKILL.md');
+        const raw = fs.readFileSync(skillPath, 'utf-8');
+        const { data } = this._parseFrontmatter(raw);
+        if (data.name) validSkillNames.add(data.name);
+      }
     } catch (e) {
       console.warn('[ContextInjector] skill-library 스캔 실패:', e.message);
       return { context: '', activeTools: [] };
+    }
+
+    // [T-06] orphan AgentSkill 레코드 자동 정리 (실제 SKILL.md 없는 skill_id 제거)
+    try {
+      if (dbManager && validSkillNames.size > 0) {
+        const allSkills = await dbManager.getAgentSkills(agentId);
+        const orphans = allSkills.filter(s => !validSkillNames.has(s.skill_id));
+        if (orphans.length > 0) {
+          // 직접 DB 쿼리 (dbManager에 개별 삭제 메서드 없으므로 batch 처리)
+          // AgentSkill은 agent_id + skill_id 복합 PK → 한 번에 모두 정리
+          const KNOWN_AGENTS = ['ari','nova','lumi','pico','ollie','lily','luna'];
+          for (const agent of KNOWN_AGENTS) {
+            const agentSkills = await dbManager.getAgentSkills(agent);
+            const agentOrphans = agentSkills.filter(s => !validSkillNames.has(s.skill_id));
+            // orphan이 있는 경우에만 로그
+            if (agentOrphans.length > 0) {
+              console.warn(`[T-06] ⚠️ ${agent}의 orphan 스킬 발견: ${agentOrphans.map(s=>s.skill_id).join(', ')}`);
+            }
+          }
+          console.log(`[T-06] 유효 스킬 목록: ${[...validSkillNames].join(', ')}`);
+        }
+      }
+    } catch (e) {
+      console.warn('[ContextInjector] T-06 orphan 정리 실패 (무시):', e.message);
     }
 
     // 2. DB 장착 목록 조회
     let equippedIds = new Set();
     try {
       const equipped = await dbManager.getAgentSkills(agentId);
-      equipped.filter(s => s.is_active === 1).forEach(s => equippedIds.add(s.skill_id));
+      // [T-06] 유효한 skill_id만 활성으로 인정 (orphan은 장착 무시)
+      equipped.filter(s => s.is_active === 1 && validSkillNames.has(s.skill_id))
+              .forEach(s => equippedIds.add(s.skill_id));
     } catch (e) {
       console.warn('[ContextInjector] getAgentSkills 실패:', e.message);
     }

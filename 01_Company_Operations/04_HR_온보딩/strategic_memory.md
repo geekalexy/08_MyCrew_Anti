@@ -15,7 +15,7 @@
 * **경량 Fallback**: `gemini-2.5-flash-lite` — GA Stable (2.0-flash 대체)
 * **고성능 추론 (Pro)**: `gemini-2.5-pro` — GA Stable
 * **전문 실무 모델 (Sonnet)**: `claude-sonnet-4-6` — GA Stable
-* **최고 지성 모델 (Opus)**: `claude-opus-4-7` — GA Latest (2026-04 출시)
+* **최고 지성 모델 (Opus)**: `claude-opus-4-6` — Antigravity IDE 제공 모델 기준 확정
 
 **금지 사항 (Forbidden)**:
 - ❌ `-preview`, `-exp`, `-experimental` 접미사 모델 사용 절대 금지
@@ -24,7 +24,7 @@
   - 사례: `gemini-3-flash-preview` (루카 환각, 2026-04-20 발견·수정)
   - 사례: `gemini-2.5-pro-preview` (루카 환각, 2026-04-20 발견·수정, 이 식별자는 존재하지 않음)
 - ❌ `gemini-2.0-flash` — **공식 Deprecated** 판정 (2026-04-20 확인), Fallback 체인 사용 금지
-- ❌ `claude-opus-4-6` — 신규 프로젝트에 사용 금지 (`claude-opus-4-7`로 마이그레이션)
+
 
 **Fallback 체인 (확정)**:
 ```
@@ -138,7 +138,7 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 
 ### [2026-04-20] 모델 식별자 이중검증 및 교정 (Sonnet 직접 검증)
 
-- **[claude-opus-4-7 마이그레이션]**: `claude-opus-4-7` (2026-04 최신판) 공식 확인, 기존 `claude-opus-4-6` 대체 완료.
+- **[claude-opus-4-6 기준 확정]**: Antigravity 어댑터 제공 모델(Claude Opus 4.6 (Thinking)) 기준으로 `claude-opus-4-6` 고정 완료.
 - **[gemini-2.5-flash-lite 추가]**: GA Stable 확인, `gemini-2.0-flash` Deprecated 대체용으로 Fallback 체인 최하단 등록.
 - **[gemini-2.0-flash 제거]**: 공식 Deprecated 판정 확인, 전체 Fallback 체인 및 코드베이스에서 제거 완료.
 
@@ -152,6 +152,81 @@ Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 ---
 
 **[Backup Status]**
-- **마지막 업데이트**: 2026-04-26 (문서/폴더 관리 표준 M-FDS 도입 및 참조 규칙 추가)
+- **마지막 업데이트**: 2026-04-28 (ARI 지능 업그레이드 옵션 기록)
 - **저장 경로**: `/Users/alex/Documents/08_MyCrew_Anti/01_Company_Operations/04_HR_온보딩/strategic_memory.md`
-- **버전**: v4.1 (Phase 26 진행 중)
+- **버전**: v4.3 (Phase 27 진행 중)
+
+---
+
+## 7. 🧠 ARI 지능 업그레이드 전략 (2026-04-28 기록, 미결정)
+
+**배경**: ARI(Gemini Flash)가 Sonnet급 경쟁 에이전트(소놀봇-Claude) 대비 지능이 낮아  
+대표님 구상(비서는 Sonnet급)과 간극이 있음. 당장 결정하지 않고 단계적 검토.
+
+**현재 결정**: Gemini 2.5 Pro로 먼저 시도 → 가망 없다 판단되면 아래 대안 검토.
+
+### Option A: Gemini 2.5 Pro (즉시 적용 완료 — 2026-04-28)
+```
+ARI 기본 모델: gemini-2.5-flash → gemini-2.5-pro 변경
+추가 비용: 없음 (AntiGravity 구독 OAuth 인증)
+스트리밍: 유지 (WebSocket 구조 그대로)
+판단 기준: Pro로 운영 후 지능 체감이 여전히 부족하면 → Option B/C 검토
+```
+
+### Option B: ARI 브릿지 전환 (소놀봇 방식)
+```
+ARI가 파일 브릿지를 통해 Sonnet(Claude) 호출
+타이핑 스트리밍 UX 포기 → "ARI가 고민 중..." 대기 애니메이션으로 대체
+응답 지연: 3초~30초
+장점: Sonnet급 지능, 추가 과금 없음 (AntiGravity 구독)
+단점: 실시간 스트리밍 UX 사라짐
+```
+
+### Option C: 하이브리드 — 복잡도별 분기
+```
+단순 질문 (QUICK_CHAT)   → Flash 스트리밍 (즉시 응답)
+복잡 질문 (DEEP_WORK 등) → Sonnet 브릿지 → 완성 응답 일괄 전달
+UI: "💭 깊이 생각하는 중..." 표시 (대기 허용)
+장점: 상황별 최적 모델, UX 균형
+단점: 구현 복잡도 증가
+```
+
+### 판단 기준 (언제 대안으로 넘어가나)
+- [ ] Gemini Pro 운영 2주 후 체감 지능 평가
+- [ ] "ARI가 의도를 못 잡아서 재질문 3회 이상" 사례 누적 시 → 대안 검토
+- [ ] 소놀봇 대비 실무 처리 품질 비교 테스트
+
+
+---
+
+## 6. 🚀 고성능 어댑터 전략 로드맵 (Phase 22 확정, 2026-04-20)
+
+**핵심 인사이트 (대표님 발견):**
+> 크루를 훈련시키는 것보다, **더 강력한 모델을 어댑터로 연결**하는 것이 전 영역에서 압도적 성능 향상을 가져온다.
+> 기존 스킬·워크플로우·룰·템플릿 자산은 그대로 유지 — 실행자(모델)만 업그레이드.
+
+**어댑터 연결 확정 순서:**
+
+```
+Step 1 ✅ AntiGravity 어댑터 (파일 브릿지)    ← 2026-04-28 구축 완료
+           구독 인증으로 추가 API 과금 없이
+           Gemini 3.1 Pro (High), Claude Opus 4.6 (Thinking) 등 고성능 모델 활용
+
+Step 2    Claude Code 어댑터                  ← 다음 목표
+           자율 코딩 에이전트 / File Polling 방식 동일 적용
+
+Step 3    이미지 LoRA 어댑터                   ← Image Winner 200장 수집 후
+Step 4    영상 어댑터 (Kling + 캐릭터 LoRA)    ← Image LoRA 완성 후
+```
+
+**비용 전략:**
+- Gemini Ultra 구독(₩180k~360k/월) → 구독 인증으로 API 과금 대체
+- 추가 비용 없이 고성능 모델 운영
+
+**CLI/IDE 확장 전략 (2026-04-28 합의):**
+> Step 2(Claude Code)는 시류에 따라 가장 인기 있는 CLI/IDE로 확장하는 개념.
+> Claude Code → Codex / Cursor 등 인기 IDE/CLI 에이전트로 File Polling 방식 동일 적용.
+> **MyCrew의 스킬·워크플로우 플러그인 자산이 어떤 CLI/IDE 에이전트에도 재사용된다는 것이 핵심.**
+
+---
+

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import BaseAdapter from './BaseAdapter.js';
 import geminiAdapter from './geminiAdapter.js';
 
 const BRIDGE_DIR = path.resolve(process.cwd(), '.bridge');
@@ -10,8 +11,9 @@ const LOCK_DIR = path.join(BRIDGE_DIR, 'locks');
 const TIMEOUT_MS = 5 * 60 * 1000; // 5분 (폴링 타임아웃)
 const POLL_MS = 3000; // 3초 간격 폴링
 
-class AntigravityAdapter {
+class AntigravityAdapter extends BaseAdapter {
     constructor() {
+        super();
         this.ensureDirectories();
     }
 
@@ -38,7 +40,7 @@ class AntigravityAdapter {
         }
     }
 
-    // [EC-4] 응답 JSON 파싱 방어 레이어
+    // [EC-4] 응답 JSON 파싱 방어 레이어 및 Phase 22.6 사고과정 파서
     parseAndValidate(raw, taskId, agentKey) {
         let parsed;
         try {
@@ -50,18 +52,65 @@ class AntigravityAdapter {
             console.warn(`[Anti-Bridge] ${agentKey} 응답 파싱 실패, 텍스트 래핑 처리 완료.`);
         }
 
+        let finalText = parsed.text || parsed.result || '(응답 내용 없음)';
+        let thoughtProcess = {};
+
+        // [Phase 22.6] 사고 과정 태그 파싱
+        const thinkingMatch = finalText.match(/<thinking>([\s\S]*?)<\/thinking>/);
+        const workingMatch = finalText.match(/<working>([\s\S]*?)<\/working>/);
+
+        if (thinkingMatch) thoughtProcess.thinking = thinkingMatch[1].trim();
+        if (workingMatch) thoughtProcess.working = workingMatch[1].trim();
+
+        // 본문에서 사고 과정 블록 제거
+        finalText = finalText
+            .replace(/<thinking>[\s\S]*?<\/thinking>/g, '')
+            .replace(/<working>[\s\S]*?<\/working>/g, '')
+            .trim();
+
         return {
-            text: parsed.text || parsed.result || '(응답 내용 없음)',
+            text: finalText,
             verdict: parsed.verdict || 'UNKNOWN',
             model: `anti-bridge-${agentKey}`,
             agentId: agentKey,
-            _meta: { ...parsed._meta }
+            _meta: { 
+                ...parsed._meta,
+                thought_process: Object.keys(thoughtProcess).length > 0 ? thoughtProcess : null
+            }
         };
     }
 
-    async generateResponse(userPrompt, systemPrompt, modelName = 'anti-bridge-prime') {
-        const agentKey = modelName.replace('anti-bridge-', ''); // 'prime' | 'nexus' | 'sonnet'
+    async generateResponse(userPrompt, systemPrompt, agentId = 'ollie') {
+        // agentId: 실제 에이전트 ID (ollie, luna, lily, pico)
+        const agentKey = agentId; // 파일 키로 직접 사용 → req_ollie_*.json 등
+
+        // 에이전트 → AntiGravity 브릿지 requestedModel 매핑
+        // 브릿지 세션 운영자가 이 값을 보고 AntiGravity IDE에서 해당 모델 선택
+        const AGENT_MODEL_MAP = {
+            // Gemini 계열 에이전트 (창의/생성 작업)
+            nova:  'anti-gemini-3.1-pro-high',        // Gemini 3.1 Pro (High)
+            lumi:  'anti-gemini-3.1-pro-high',        // Gemini 3.1 Pro (High)
+            // Claude 계열 에이전트 (분석/코드/합성 작업)
+            lily:  'anti-claude-sonnet-4.6-thinking', // Claude Sonnet 4.6 (Thinking)
+            pico:  'anti-claude-sonnet-4.6-thinking', // Claude Sonnet 4.6 (Thinking)
+            ollie: 'anti-claude-opus-4.6-thinking',   // Claude Opus 4.6 (Thinking)
+            luna:  'anti-claude-opus-4.6-thinking',   // Claude Opus 4.6 (Thinking)
+        };
+        // AntiGravity IDE 표시명 매핑 (브릿지 JSON 가독성용)
+        const MODEL_DISPLAY_MAP = {
+            'anti-gemini-3.1-pro-high':       'Gemini 3.1 Pro (High)',
+            'anti-gemini-3.1-pro-low':        'Gemini 3.1 Pro (Low)',
+            'anti-gemini-3-flash':            'Gemini 3 Flash',
+            'anti-claude-sonnet-4.6-thinking':'Claude Sonnet 4.6 (Thinking)',
+            'anti-claude-opus-4.6-thinking':  'Claude Opus 4.6 (Thinking)',
+            'anti-gpt-oss-120b':              'GPT-OSS 120B (Medium)',
+        };
+        const requestedModel = AGENT_MODEL_MAP[agentKey] || 'anti-claude-opus-4.6-thinking';
+        const requestedModelDisplay = MODEL_DISPLAY_MAP[requestedModel] || requestedModel;
+
+
         const taskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
 
         // 1. Lock 획득 (Race Condition 방지)
         const locked = await this.acquireLock(agentKey);
@@ -75,20 +124,31 @@ class AntigravityAdapter {
             const requestJson = {
                 taskId,
                 agentRole: agentKey.toUpperCase(),
+                requestedModel,              // AntiGravity 브릿지 모델 식별자
+                requestedModelDisplay,       // AntiGravity IDE 표시명 (운영자용)
                 protocol: "CKS_ANTI_BRIDGE_v3",
                 systemInstruction: systemPrompt,
                 taskPayload: userPrompt,
                 instructions: `지시사항에 따른 결괏값을 생각한 뒤, JSON 형태로 작성하여 지정 경로에 저장할 것. 리포트를 출력할 때 반드시 CKS 프레임워크 연구를 위한 _meta 지표를 평가하여 포함할 것.
+
+[사고과정 출력 규칙 — Phase 22.6]
+응답의 "text" 필드 안에 다음 태그를 사용하여 사고과정을 반드시 포함하라:
+- 분석·추론·판단 과정이 있다면 → <thinking>...</thinking> 태그로 감싸서 포함
+- 파일 접근, 도구 사용, 데이터 처리 등 물리적 실행 단계가 있다면 → <working>...</working> 태그로 감싸서 포함
+- 태그는 최종 결과물 텍스트 앞에 위치시킬 것. 태그 안 내용은 한국어로 작성.
+- 사고과정이 없는 단순 응답이라면 태그 생략 가능.
+
 포맷 예시:
 {
-  "text": "...최종 리포트 결과...",
+  "text": "<thinking>\\n사용자가 요청한 마케팅 카피의 핵심 타겟은 2030 여성이다. 감성적 언어보다 직관적 CTA가 효과적이다.\\n</thinking>\\n<working>\\n참조 문서를 확인하고 브랜드 톤앤매너를 적용한다.\\n</working>\\n\\n최종 카피 결과물...",
   "_meta": {
-    "ksi_r": 92,     // (0-100) 이전 스프린트 룰이나 가이드라인 반영률
-    "ksi_s": 0.85,   // (0.0-1.0) 텍스트 문맥 동기화 완성도
-    "her": 0,        // 오류 혹은 룰 위반 지적/차단 건수
-    "eii": 4.5       // (1.0-5.0) 단순 명령을 넘어서 발휘된 창의적 파생 점수
+    "ksi_r": 92,
+    "ksi_s": 0.85,
+    "her": 0,
+    "eii": 4.5
   }
 }`
+
             };
             
             const reqPath = path.join(REQ_DIR, `req_${agentKey}_${taskId}.json`);
@@ -105,8 +165,8 @@ class AntigravityAdapter {
                     const raw = fs.readFileSync(resPath, 'utf-8');
                     const finalResult = this.parseAndValidate(raw, taskId, agentKey);
                     
-                    // 파일 정리
-                    fs.unlinkSync(reqPath);
+                    // 파일 정리 (existsSync 방어: 중복 삭제 ENOENT 방지)
+                    if (fs.existsSync(reqPath)) fs.unlinkSync(reqPath);
                     try { 
                         fs.renameSync(resPath, resPath + '.done'); 
                     } catch (e) { 
@@ -122,8 +182,9 @@ class AntigravityAdapter {
 
             // 타임아웃 만료 시 Fallback
             console.warn(`[Anti-Bridge] ⏰ [${agentKey.toUpperCase()}] 응답 대기 시간 초과 (5분). Gemini Fallback 작동.`);
-            fs.unlinkSync(reqPath);
+            if (fs.existsSync(reqPath)) fs.unlinkSync(reqPath); // ENOENT 방어
             return this.fallbackToGemini(userPrompt, systemPrompt, agentKey, taskId, 'TIMEOUT');
+
 
         } finally {
             // 락 해제
@@ -131,11 +192,9 @@ class AntigravityAdapter {
         }
     }
 
-    // 타임아웃/락 점유 시 우회 로직 및 오염 방지 마커 (EC-6)
+    // [EC-6] 타임아웃/락 점유 시 우회 로직 및 오염 방지 마커
     async fallbackToGemini(userPrompt, systemPrompt, agentKey, taskId, reason) {
-        // Fallback 시에는 상용 Flash 모델을 사용하여 워크플로우 단절 방지
         const flashResponse = await geminiAdapter.generateResponse(userPrompt, systemPrompt, 'gemini-2.5-flash');
-        
         return {
             ...flashResponse,
             _meta: {
@@ -145,6 +204,36 @@ class AntigravityAdapter {
                 timestamp: new Date().toISOString()
             }
         };
+    }
+
+    // ── BaseAdapter 인터페이스 구현 ──────────────────────────────────────
+    // executor.js가 전략 패턴으로 호출할 때 사용 (swappable)
+
+    /**
+     * @param {Object} taskContext - { taskId, agentId, content, systemPrompt }
+     */
+    async execute(taskContext) {
+        const { agentId, content, systemPrompt } = taskContext;
+        const result = await this.generateResponse(content, systemPrompt, agentId);
+        return {
+            result: result.text,
+            model: result.model,
+            tokenUsage: result.tokenUsage || null,
+            _meta: result._meta || {},
+        };
+    }
+
+    async healthCheck() {
+        const reqDirOk = fs.existsSync(REQ_DIR);
+        const resDirOk = fs.existsSync(RES_DIR);
+        return {
+            status: reqDirOk && resDirOk ? 'ok' : 'error',
+            details: { reqDir: reqDirOk, resDir: resDirOk }
+        };
+    }
+
+    getCapabilities() {
+        return ['text', 'code', 'image', 'video']; // AntiGravity 구독 모델 풀 전체 지원
     }
 }
 

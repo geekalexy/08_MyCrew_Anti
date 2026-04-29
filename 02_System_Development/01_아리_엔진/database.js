@@ -1,10 +1,26 @@
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 
 const sqlite3Verbose = sqlite3.verbose();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// [S2-1] agents.json 기반 동적 에이전트 ID Set — KNOWN_AGENTS 하드코딩 제거
+const AGENT_IDS = (() => {
+  try {
+    const raw = readFileSync(path.resolve(__dirname, 'agents.json'), 'utf-8');
+    const agents = JSON.parse(raw);
+    return new Set(agents.map(a => (a.id || a.name || '').toLowerCase()).filter(Boolean));
+  } catch (e) {
+    console.warn('[DB] agents.json 로드 실패, 기본값 사용:', e.message);
+    return new Set(['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna']);
+  }
+})();
+// 시스템 주체(system, devteam)는 항상 포함
+AGENT_IDS.add('system');
+AGENT_IDS.add('devteam');
 
 const dbPath = path.resolve(__dirname, 'database.sqlite');
 const db = new sqlite3Verbose.Database(dbPath);
@@ -65,6 +81,20 @@ db.serialize(() => {
     if (!names.includes('title')) {
       db.run(`ALTER TABLE Task ADD COLUMN title TEXT DEFAULT ''`);
       console.log('[DB] Phase 27 마이그레이션: title 컬럼 추가 완료');
+    }
+    // [S4-3] 실패 이력 카운터
+    if (!names.includes('failure_count')) {
+      db.run(`ALTER TABLE Task ADD COLUMN failure_count INTEGER DEFAULT 0`);
+      console.log('[DB] S4-3 마이그레이션: failure_count 컬럼 추가 완료');
+    }
+  });
+
+  db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
+    if (err) return;
+    const names = rows.map((r) => r.name);
+    if (!names.includes('meta_data')) {
+      db.run(`ALTER TABLE TaskComment ADD COLUMN meta_data TEXT DEFAULT NULL`);
+      console.log('[DB] Phase 22.6 마이그레이션: TaskComment meta_data 컬럼 추가 완료');
     }
   });
 
@@ -131,12 +161,12 @@ db.serialize(() => {
     UNIQUE(agent_id, skill_id)
   )`);
 
-  // [Phase 17-4 Opus 보완] MVP 클린업: 브라우저 초기화 시 사라지는 프론트 전용 임시 에이전트들의 고아 레코드 원천 삭제
-  const KNOWN_AGENTS = ['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna'];
-  const placeholders = KNOWN_AGENTS.map(() => '?').join(',');
+  // [S2-1] 동적 AGENT_IDS로 고아 스킬 레코드 클린업
+  const agentList = [...AGENT_IDS].filter(id => id !== 'system' && id !== 'devteam');
+  const placeholders = agentList.map(() => '?').join(',');
   db.run(
     `DELETE FROM AgentSkill WHERE agent_id NOT IN (${placeholders})`,
-    KNOWN_AGENTS,
+    agentList,
     function(err) {
       if (err) console.error('[DB] AgentSkill 클린업 실패:', err.message);
       else if (this.changes > 0) console.log(`[DB] 고아 스킬 레코드 ${this.changes}건 삭제 완료`);
@@ -297,7 +327,8 @@ class DatabaseManager {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, title, content, status, requester, model, assigned_agent, priority,
-                risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
+                risk_level, execution_mode, has_artifact, artifact_url, failure_count,
+                created_at, updated_at
          FROM Task 
          WHERE deleted_at IS NULL
          ORDER BY id DESC LIMIT 200`,
@@ -367,6 +398,24 @@ class DatabaseManager {
         if (err) reject(err);
         else resolve(this.changes);
       });
+    });
+  }
+
+  // ─── [S4-3] 실패 카운터 증가 + FAILED 상태 기록 ────────────────────────────
+  incrementFailureCount(id) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task 
+         SET failure_count = COALESCE(failure_count, 0) + 1,
+             status = 'FAILED',
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
     });
   }
 
@@ -462,12 +511,13 @@ class DatabaseManager {
   }
 
   // ─── Task 댓글 추가 ───────────────────────────────────────────────────────
-  createComment(taskId, author, content) {
+  createComment(taskId, author, content, metaData = null) {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO TaskComment (task_id, author, content) VALUES (?, ?, ?)`
+        `INSERT INTO TaskComment (task_id, author, content, meta_data) VALUES (?, ?, ?, ?)`
       );
-      stmt.run([taskId, author, content], function (err) {
+      const metaString = metaData ? JSON.stringify(metaData) : null;
+      stmt.run([taskId, author, content, metaString], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -505,15 +555,56 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 22.6] meta_data → thought_process 파싱 헬퍼 (DRY) ────────────────
+  // getComments, getCommentsWithTopology, getRecentGlobalComments 공통 사용
+  _parseMetaRow(row) {
+    let thoughtProcess = null;
+    if (row.meta_data) {
+      try { thoughtProcess = JSON.parse(row.meta_data); } catch (e) {}
+    }
+    const createdAt = row.created_at
+      ? (row.created_at.endsWith('Z') ? row.created_at : row.created_at.replace(' ', 'T') + 'Z')
+      : new Date().toISOString();
+    return { ...row, thought_process: thoughtProcess, created_at: createdAt };
+  }
+
+  // ─── Task 글로벌 최근 댓글 조회 (Phase 22.6) ──────────────────────────────────
+  getRecentGlobalComments(limit = 100) {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT task_id, author, content, meta_data, created_at FROM TaskComment ORDER BY created_at DESC LIMIT ?`,
+        [limit],
+        (err, rows) => {
+          if (err) return reject(err);
+          // [S1-1] _parseMetaRow 헬퍼로 통일
+          const result = (rows || []).reverse().map(row => {
+            const parsed = this._parseMetaRow(row);
+            return {
+              taskId: parsed.task_id,
+              author: parsed.author,
+              content: parsed.content,
+              thought_process: parsed.thought_process,
+              created_at: parsed.created_at,
+            };
+          });
+          resolve(result);
+        }
+      );
+    });
+  }
+
   // ─── Task 댓글 조회 ───────────────────────────────────────────────────────
+  // [S1-1 Fix] meta_data → thought_process 파싱 추가 (Phase 22.6)
+  // 기존: rows 원시 반환 → REST 초기 로드 시 thought_process 누락
+  // 수정: _parseMetaRow 헬퍼 적용하여 소켓·REST 일관된 구조 보장
   getComments(taskId) {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, author, content, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
+        `SELECT id, author, content, meta_data, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
         [taskId],
         (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows || []);
+          if (err) return reject(err);
+          resolve((rows || []).map(row => this._parseMetaRow(row)));
         }
       );
     });
@@ -556,6 +647,40 @@ class DatabaseManager {
         }
       );
     });
+  }
+
+  // ─── 칸반 칼럼 정의 조회 (확장 가능한 SSOT) ────────────────────────────────
+  /**
+   * user_settings['kanban_columns']에서 칼럼 정의를 읽어옵니다.
+   * 사용자가 컬럼을 추가/변경하면 이 메서드가 자동으로 최신 정의를 반환합니다.
+   *
+   * @returns {Promise<Array<{status, label, column, aliases}>>}
+   *   - status  : DB 저장값 (e.g. 'COMPLETED')
+   *   - label   : 표시명 (e.g. 'Done')
+   *   - column  : 프론트엔드 칼럼 키 (e.g. 'done')
+   *   - aliases : Ari가 사용할 수 있는 대체 이름 목록
+   */
+  async getKanbanColumns() {
+    // 폴백 기본값 (DB 설정 없거나 파싱 실패 시)
+    const DEFAULT_COLUMNS = [
+      { status: 'PENDING',     label: 'To Do',      column: 'todo',        aliases: ['TODO', 'todo', 'PENDING', '대기', '할일'] },
+      { status: 'IN_PROGRESS', label: 'In Progress', column: 'in_progress', aliases: ['in_progress', '진행중', '진행'] },
+      { status: 'REVIEW',      label: 'Review',      column: 'review',      aliases: ['검토', '검토대기', '리뷰'] },
+      { status: 'COMPLETED',   label: 'Done',        column: 'done',        aliases: ['DONE', 'done', '완료', '완성'] },
+      { status: 'FAILED',      label: 'Failed',      column: 'failed',      aliases: ['실패', '오류'] },
+      { status: 'ARCHIVED',    label: 'Archived',    column: 'archive',     aliases: ['archive', 'ARCHIVED', '아카이브', '보관'] },
+    ];
+
+    try {
+      const raw = await this.getSetting('kanban_columns');
+      if (!raw) return DEFAULT_COLUMNS;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_COLUMNS;
+      return parsed;
+    } catch (e) {
+      console.warn('[DB] getKanbanColumns 파싱 실패, 기본값 사용:', e.message);
+      return DEFAULT_COLUMNS;
+    }
   }
 
   // ─── [Phase 17-4] AgentSkill 관리 ──────────────────────────────────────────
@@ -690,37 +815,42 @@ class DatabaseManager {
 
   // ─── [v2.1] Comment 위상(지시 흐름) 구조 조회 ──────────────────────────
   // [v2.1 개선] requester 파라미터 추가: 크루 보고 대상을 CEO/ARI(위임) 동적 결정
+  // [S2-1] 동적 AGENT_IDS 사용
   getCommentsWithTopology(taskId, assignedAgent, requester = 'CEO') {
-    const KNOWN_AGENTS = ['ari','nova','lumi','pico','ollie','lily','luna','devteam','system'];
     // 알려진 인간 작성자 패턴 (에이전트 아닌 모든 것)
     const makeNode = (name) => {
       const lower = name?.toLowerCase() || '';
-      const isA = KNOWN_AGENTS.includes(lower);
+      const isA = AGENT_IDS.has(lower);
       return isA
         ? { id: `agent-${lower}`, name }
         : { id: 'user-1', name: name || 'CEO' };
     };
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, author, content, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
+        `SELECT id, author, content, meta_data, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
         [taskId],
         (err, rows) => {
           if (err) return reject(err);
           const allRows = rows || [];
           const result = allRows.map((row, idx) => {
-            const isAgent = KNOWN_AGENTS.includes(row.author?.toLowerCase());
+            const isAgent = AGENT_IDS.has(row.author?.toLowerCase());
             // target 결정 원칙 (v2.2):
             // - CEO/비에이전트 댓글 → 항상 현재 assignedAgent에게 지시
             //   (assignee 변경 후 댓글 시 이미 task.assigned_agent가 새 값으로 업데이트됨)
             // - 에이전트 댓글 → 항상 requester(CEO 또는 ARI(위임))에게 보고
             const targetName = isAgent ? requester : (assignedAgent || 'ARI');
+
+            // [S1-1] _parseMetaRow 헬퍼 통일 적용
+            const parsed = this._parseMetaRow(row);
+
             return {
               step:        idx + 1,
               source:      makeNode(row.author),
               target:      makeNode(targetName),
               action_type: isAgent ? 'RESPONSE' : 'ORDER',
               content:     row.content,
-              created_at:  row.created_at,
+              thought_process: parsed.thought_process,
+              created_at: parsed.created_at,
             };
           });
           resolve(result);

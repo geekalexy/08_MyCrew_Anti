@@ -24,15 +24,44 @@ import contextInjector from './tools/contextInjector.js';
 // API 사용자: Flash 유지 / Gemini Pro·Ultra 구독자: Pro 격상
 const IS_PRO_TIER = process.env.USER_MODEL_TIER === 'pro';
 
-const AGENT_SIGNATURE_MODELS = {
-  'luna':  MODEL.ANTIGRAVITY_NEXUS,    // Anti-Bridge → Antigravity 세션
-  'ollie': MODEL.ANTIGRAVITY_PRIME,    // Anti-Bridge → Antigravity 세션
-  'lily':  MODEL.ANTIGRAVITY_SONNET,   // Anti-Bridge → Antigravity Sonnet급
-  'pico':  MODEL.ANTIGRAVITY_SONNET,   // Anti-Bridge → Antigravity Sonnet급
-  'nova':  IS_PRO_TIER ? MODEL.PRO : MODEL.FLASH,  // 구독자: Pro / API: Flash
-  'lumi':  IS_PRO_TIER ? MODEL.PRO : MODEL.FLASH,  // 구독자: Pro / API: Flash
-  'ari':   MODEL.FLASH                 // 항상 Flash (실시간 응답 우선)
-};
+// [Phase 26] agents.json 기반 동적 파생 — 하드코딩 BRIDGE_AGENTS 대체
+// bridge:true 인 에이전트 = AntiGravity 파일 브릿지 대상
+const BRIDGE_AGENTS = new Set();
+
+// [Phase 26] agents.json 기반 동적 파생 — 하드코딩 AGENT_SIGNATURE_MODELS 대체
+// anti-* 식별자를 antiModel 필드에서 읽음 → antigravityAdapter로 라우팅
+const AGENT_SIGNATURE_MODELS = {};
+
+try {
+  const _agentsRaw = fs.readFileSync(path.resolve(process.cwd(), 'agents.json'), 'utf-8');
+  const _agents = JSON.parse(_agentsRaw);
+  _agents.forEach(a => {
+    const id = a.id.toLowerCase();
+    if (a.bridge === true) {
+      BRIDGE_AGENTS.add(id);
+      AGENT_SIGNATURE_MODELS[id] = a.antiModel || MODEL.ANTI_GEMINI_PRO_HIGH;
+    } else {
+      // 브릿지 에이전트 아님: 시그니처 모델 = ARI는 Flash, 그 외 에이전트는 Flash
+      if (id === 'ari') AGENT_SIGNATURE_MODELS[id] = MODEL.PRO; // ARI 기본 Pro
+    }
+  });
+  console.log(`[Executor] 동적 BRIDGE_AGENTS: [${[...BRIDGE_AGENTS].join(', ')}]`);
+} catch (e) {
+  // agents.json 로드 실패 시 폴백 하드코딩 (SLA 보장)
+  console.warn('[Executor] agents.json 로드 실패, 폴백 BRIDGE_AGENTS 사용:', e.message);
+  ['luna', 'ollie', 'lily', 'pico', 'nova', 'lumi'].forEach(id => BRIDGE_AGENTS.add(id));
+  Object.assign(AGENT_SIGNATURE_MODELS, {
+    'luna':  MODEL.OPUS,
+    'ollie': MODEL.OPUS,
+    'lily':  MODEL.SONNET,
+    'pico':  MODEL.SONNET,
+    'nova':  MODEL.PRO,
+    'lumi':  MODEL.PRO,
+    'ari':   MODEL.PRO,
+  });
+}
+
+
 
 // ─── SKILL.md 캐시 (서버 생존 주기 동안 유지) ─────────────────────────
 export const skillCache = new Map();
@@ -412,8 +441,9 @@ class Executor {
       // 6. 비서 레이어 또는 동기 처리 대상 (QUICK_CHAT, KNOWLEDGE 등)
       let result;
       try {
-        if (modelToUse.startsWith('anti-bridge-')) {
-          result = await antigravityAdapter.generateResponse(actualContent, finalSystemPrompt, modelToUse);
+        // 라우팅: BRIDGE_AGENTS → antigravityAdapter(파일 브릿지), 나머지 → Gemini API 직접
+        if (BRIDGE_AGENTS.has(agentId?.toLowerCase())) {
+          result = await antigravityAdapter.generateResponse(actualContent, finalSystemPrompt, agentId.toLowerCase());
         } else {
           result = await geminiAdapter.generateResponse(actualContent, finalSystemPrompt, modelToUse);
         }
@@ -481,11 +511,14 @@ class Executor {
         }
       }
 
+      const parsed = this._extractThoughtProcess(result);
+
       return {
-        text: result.text,
+        text: parsed.finalText,
         model: result.model,
         category: evaluation.category,
         score: evaluation.score,
+        _meta: parsed._meta,
       };
     } catch (error) {
       console.error('[Executor] 에러 발생', error);
@@ -497,6 +530,43 @@ class Executor {
       };
     }
   }
+
+  // [Phase 22.6 / S1-2 Fix] thought_process 파서 이중 실행 제거
+  // AntiGravity 어댑터(antigravityAdapter.js)가 이미 <thinking>/<working> 태그를
+  // 파싱·제거하고 _meta.thought_process에 저장함.
+  // → 어댑터 경로: 텍스트 파싱 완전 바이패스, _meta 기존 필드 보존
+  // → 직접 API 경로(geminiAdapter 등): 텍스트에서 태그 파싱 후 제거
+  _extractThoughtProcess(result) {
+    const _metaIn = result._meta || {};
+    let finalText = result.text || '';
+    let thoughtProcess = _metaIn.thought_process || null;
+
+    // 어댑터가 이미 파싱된 결과를 _meta에 담았으면 재파싱 완전 생략
+    // (antigravityAdapter.js: parseAndValidate에서 태그 제거 + _meta.thought_process 저장)
+    const alreadyParsed = thoughtProcess &&
+      (thoughtProcess.thinking || thoughtProcess.working);
+
+    if (!alreadyParsed) {
+      // 직접 API 경로(geminiAdapter 등) — 텍스트에서 직접 태그 파싱
+      const thinkingMatch = finalText.match(/<thinking>([\s\S]*?)<\/thinking>/);
+      const workingMatch  = finalText.match(/<working>([\s\S]*?)<\/working>/);
+
+      if (thinkingMatch || workingMatch) {
+        thoughtProcess = {};
+        if (thinkingMatch) thoughtProcess.thinking = thinkingMatch[1].trim();
+        if (workingMatch)  thoughtProcess.working  = workingMatch[1].trim();
+      }
+      // 태그를 최종 텍스트에서 제거
+      finalText = finalText.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim();
+      finalText = finalText.replace(/<working>[\s\S]*?<\/working>/g, '').trim();
+    }
+
+    // _meta 기존 필드 보존 (thinking_tokens, bridge_id 등 어댑터 필드 유실 방지)
+    const _metaOut = { ..._metaIn, thought_process: thoughtProcess || null };
+
+    return { finalText, thoughtProcess, _meta: _metaOut };
+  }
+
   /**
    * runDirect — 파일 큐(FilePollingAdapter) 없이 현재 프로세스에서 AI를 직접 호출.
    * dispatchNextTaskForAgent가 크루 작업을 실행할 때 사용.
@@ -513,8 +583,24 @@ class Executor {
       return shieldBlock;
     }
 
+
+
     // 1. 카테고리 & 모델 결정
     const evaluation = await modelSelector.selectModel(taskContent);
+
+    // [S3-2] 카테고리 검증 — 알 수 없는 카테고리는 QUICK_CHAT으로 안전 폴백
+    const VALID_CATEGORIES = new Set([
+      'MARKETING', 'CONTENT', 'DESIGN', 'ANALYSIS', 'ROUTING',
+      'KNOWLEDGE', 'MEDIA', 'DEEP_WORK', 'QUICK_CHAT'
+    ]);
+    if (!VALID_CATEGORIES.has(evaluation.category)) {
+      this._log('warn',
+        `> [S3-2] 알 수 없는 카테고리 "${evaluation.category}" — QUICK_CHAT으로 폴백`,
+        agentId || 'system', taskId
+      );
+      evaluation.category = 'QUICK_CHAT';
+    }
+
     const signatureModel = AGENT_SIGNATURE_MODELS[agentId?.toLowerCase()];
     const modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
 
@@ -527,11 +613,11 @@ class Executor {
     this._log('info', `> [${evaluation.category}] 모듈 로드 완료. ${modelToUse} 엔진으로 생성을 시작합니다...`, agentId || 'system', taskId);
 
     // 3. 모델 직접 호출 (filePollingAdapter 미경유)
-    // anti-bridge-* 식별자만 antigravityAdapter, 나머지는 Gemini
+    // 라우팅: BRIDGE_AGENTS → antigravityAdapter(파일 브릿지), 나머지 → Gemini API 직접
     let result;
     try {
-      if (modelToUse.startsWith('anti-bridge-')) {
-        result = await antigravityAdapter.generateResponse(taskContent, finalSystemPrompt, modelToUse);
+      if (BRIDGE_AGENTS.has(agentId?.toLowerCase())) {
+        result = await antigravityAdapter.generateResponse(taskContent, finalSystemPrompt, agentId.toLowerCase());
       } else {
         result = await geminiAdapter.generateResponse(taskContent, finalSystemPrompt, modelToUse);
       }
@@ -546,11 +632,14 @@ class Executor {
 
     this._log('info', `> [WORKED] Task #${taskId} 생성 완료 (${result.model})`, agentId || 'system', taskId);
 
+    const parsed = this._extractThoughtProcess(result);
+
     return {
-      text: result.text,
+      text: parsed.finalText,
       model: result.model,
       category: evaluation.category,
       score: evaluation.score,
+      _meta: parsed._meta,
     };
   }
 }

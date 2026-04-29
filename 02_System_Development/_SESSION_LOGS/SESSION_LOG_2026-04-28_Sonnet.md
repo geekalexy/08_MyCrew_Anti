@@ -1,72 +1,119 @@
-# SESSION LOG
-**Date**: 2026-04-28
-**Agent**: Sonnet (Claude Sonnet 4.6 — AI 개발자)
-**Focus**: 아리 엔진 구조적 버그 수정 — T-01/T-03/T-04/T-05/T-08 + 긴급 버그 3건 (Phase 27)
+# SESSION LOG — 2026-04-28 (Sonnet)
+
+> 작성자: Sonnet (Claude Sonnet 4.6, Antigravity 기반)
+> 세션 시간: 2026-04-28 약 19:30 ~ 2026-04-29 01:00 KST
+> 세션 성격: 모델 제어 아키텍처 고도화 + 전략 문서 정리 + Phase 22.6 개발 (루카 공동)
 
 ---
 
-## 1. 진행 사항 요약
+## 1. 세션 전반부 — 모델 제어 아키텍처 정비
 
-### T-01 — Secretary SKILL.md `commands` 배열 제거 (P-15 스모킹건 해결)
-* `commands` 배열을 프론트매터에서 완전 제거. "태스크", "아니야" 같은 일상 단어가 도구 트리거로 오인되던 문제 해결.
-* 금지 규칙 추가: 명시적 위임 키워드("팀에게 맡겨", "할당해줘") 없이는 `createKanbanTask` 절대 호출 불가.
-* `도구 사용 기준` 테이블에서 "카드 만들어줘" → 즉시 호출 항목 제거.
+### AntiGravity 구독 모델 풀 통합
+- `modelRegistry.js`: `ANTI_*` 상수 6종 추가
+  - Gemini 3.1 Pro (High/Low), Gemini 3 Flash, Claude Sonnet 4.6 (Thinking), Claude Opus 4.6 (Thinking), GPT-OSS 120B
+- `VALID_MODELS` 화이트리스트에 `anti-*` 식별자 추가
+- `antigravityAdapter.js`: `AGENT_MODEL_MAP` + `MODEL_DISPLAY_MAP` 전면 교체
+  - NOVA/LUMI → `anti-gemini-3.1-pro-high`
+  - LILY/PICO → `anti-claude-sonnet-4.6-thinking`
+  - OLLIE/LUNA → `anti-claude-opus-4.6-thinking`
+  - `requestedModelDisplay` 필드 추가 (운영자 가독성)
+- `agentStore.js`: 크루 기본값 `gemini-*/claude-*` → `anti-*` 전환, migration 로직 재편
+- `AgentDetailView.jsx`: ARI(Gemini 2종) vs 크루(AntiGravity 6종) 드롭다운 완전 분리
 
-### T-03 — SKILL.md body 시스템 프롬프트 직접 주입
-* `contextInjector.js`의 스킬 파싱 루프에서 `body.trim()`을 `[${displayName} 행동 규칙]` 섹션으로 주입.
-* 기존 주석(`// SKILL.md body는 별도 systemPrompt에서 주입되므로 여기선 생략`)이 실제 구현 없이 방치된 것을 해소.
+### BaseAdapter 전략 패턴 완성 (Prime 이슈 3 반영)
+- `BaseAdapter.js`: `getCapabilities()` 추가, `abort()` graceful fallback, 주석 정비
+- `antigravityAdapter.js`: `BaseAdapter` 상속, `execute()` / `healthCheck()` / `getCapabilities()` 구현
+- → 신규 어댑터(Codex, Cursor 등) 추가 시 `BaseAdapter` 상속만으로 swappable 구조 완성
 
-### M-02 — `getEquippedSkillsContext` 이중 호출 제거
-* `ariDaemon.js`에서 `getAriSystemInstruction()`과 `getActiveTools()` 양쪽이 각각 호출하던 것을 캐시 패턴(`_skillCache`)으로 통합.
-
-### T-05 — 아리 전용 글로벌 컨텍스트 파일 생성
-* `docs/ARI_CONTEXT.md` 신규 작성 — 본사 폴더(01_Company_Operations) 미접근 원칙 준수.
-* `getGlobalContext()`를 `MYCREW.md / IDENTITY.md / AGENTS.md` 다중 파일 로드에서 `ARI_CONTEXT.md` 단일 파일로 교체.
-* 경로 버그(`../../../` → `../../`) 수정.
-
-### T-04 — 파일 CRUD 4종 도구 추가
-* `writeCEOLog` — `fileName`, `targetDir` 파라미터 추가, 서브폴더 자동 생성, M-04 사후 검증 추가.
-* `writeFile` — 임의 경로 파일 생성/수정 (프로젝트 ROOT 화이트리스트 보안 포함).
-* `moveFile` — 파일 이동 (대상 폴더 자동 생성).
-* `renameFile` — 파일명 변경.
-* `deleteFile` — 파일 삭제 (사후 검증 포함).
-* Secretary SKILL.md tools 목록 동기화.
-
-### T-08 — 레거시 ASYNC_CATEGORIES 강제 위임 블록 제거
-* `server.js` 444~494번 줄: `DEEP_WORK / CONTENT / MARKETING` 등 카테고리 감지 시 ariDaemon 우회하고 크루에게 강제 위임하던 블록 완전 제거.
-* 모든 요청이 `ariDaemon(5050)`으로 포워딩되고, Secretary SKILL.md 규칙이 위임 여부를 판단하는 구조로 전환.
-
-### 긴급 버그 수정
-* `taskRequester is not defined` (server.js 460번) — 'ARI(위임)' 리터럴로 수정.
-* ARI_CONTEXT.md 경로 버그 (`../../../` → `../../`).
+### ARI 모델 격상
+- `ariDaemon.js`: 기본값 `MODEL.FLASH` → `MODEL.PRO` (gemini-2.5-pro)
+- `agentStore.js`: ARI CORRECT_DEFAULTS + migration fallback 모두 pro로 통일
 
 ---
 
-## 2. 테스트 결과
+## 2. 세션 중반부 — 전략 문서 정리
 
-| 시나리오 | 기대 | 결과 |
-|---------|------|------|
-| "오늘 관찰 메모 작성해줘" | writeCEOLog 직접 실행 | ✅ |
-| "팀에게 맡겨줘" (명시적) | createKanbanTask 호출 | ✅ |
-| "파일 만들어줘" → 경로/이름 지정 | writeFile 실행 | ✅ |
-| "파일 이동해줘" | moveFile 실행 | ✅ |
-| "파일명 바꿔줘" | renameFile 실행 | ✅ |
-| "파일 삭제해줘" | deleteFile 실행 | ✅ |
+### strategic_memory.md v4.1 → v4.3
+
+**섹션 6 신설: 고성능 어댑터 전략 로드맵**
+```
+Step 1 ✅ AntiGravity 어댑터 (2026-04-28 완료)
+Step 2    Claude Code 어댑터 → Codex/Cursor 등 CLI/IDE 확장
+Step 3    이미지 LoRA 어댑터
+Step 4    영상 어댑터
+```
+- CLI/IDE 확장 전략 합의: 소놀봇 참조, 시류에 따라 인기 IDE로 동일 파일 폴링 구조 적용
+
+**섹션 7 신설: ARI 지능 업그레이드 전략 (미결정 보류)**
+- Option A: Gemini Pro ← 즉시 적용 완료
+- Option B: ARI 브릿지 전환 (Sonnet급, 스트리밍 UX 포기)
+- Option C: 하이브리드 (복잡도별 분기)
+- 판단 기준: Pro 운영 2주 후 재질문 3회 이상 시 대안 검토
+
+### 소놀봇 아키텍처 분석
+- 구조: 로컬 백그라운드 서버 + 텔레그램 폴링 + CLI 에이전트(Claude Code/Codex) spawn
+- 핵심: 구독 OAuth 인증 캐시 → 추가 API 과금 없음
+- 샌드박스 = 각 요청이 독립 프로세스에서 실행되는 격리 환경
+- AntiGravity CLI 확인: `/Users/alex/.antigravity/antigravity/bin/antigravity` 존재
+- → CLI non-interactive 모드 검증은 차후 과제
 
 ---
 
-## 3. 잔여 이슈
+## 3. 세션 후반부 — Phase 22.6 (루카 주도, Sonnet 지원)
 
-| ID | 문제 | 우선순위 |
-|----|------|---------|
-| P-18 | 대화 중 간헐적 무응답 (원인 미파악) | 중 |
-| P-19 | 카드 생성 시 ~20초 지연 (M-01 캐시 미구현) | 중 |
-| P-21 | `updateKanbanTask` content 필드 업데이트 미반영 | 높음 |
+> 루카와 대표님이 직접 기획·개발한 내역입니다.
+
+### 사고 과정(Thinking Process) 파이프라인 통합
+- `antigravityAdapter.js`: `<thinking>`, `<working>` 태그 파싱 + 본문 제거
+- `executor.js`: `_extractThoughtProcess()` 헬퍼 추가, 두 실행 경로 모두 적용
+- `database.js`:
+  - `TaskComment.meta_data` 컬럼 마이그레이션 추가
+  - `createComment()` 메서드 `metaData` 파라미터 확장
+  - `getRecentGlobalComments()` API 신설 (글로벌 타임라인)
+- `server.js`:
+  - 포트 4000 → 4005
+  - `thought_process` 소켓 브로드캐스트 전파
+  - 동시성 개입(Interruption) 방어: 에이전트 active 상태 시 LLM 재트리거 생략
+  - `GET /api/comments/recent` 엔드포인트 신설
+
+### UI 업데이트
+- `TaskDetailModal.jsx`:
+  - 사고 과정 `<details>` 아코디언 렌더링
+  - 제목·본문 중복 방지 (`isContentSameAsTitle`)
+  - 작업 중 Skeleton UI (hourglass 애니메이션)
+- `LogDrawer.jsx`:
+  - 글로벌 타임라인 지원 (focusedTaskId 없을 때 전체 로그)
+  - 사고 과정 렌더링
+  - Task# 배지 표시, "상세 확인" 링크
+  - 글로벌 Skeleton 애니메이션 (진행 중 태스크 전체 표시)
+- `markdownRenderer.js`: ul/ol 분리 렌더링 수정
 
 ---
 
-## 4. 다음 세션 인수인계
+## 4. 잔존 과제 (Next Steps)
 
-* **즉시**: P-21 — `updateKanbanTask` 핸들러에서 content 업데이트가 실제 DB에 반영되는지 확인, 댓글 추가와 본문 수정이 혼용되지 않도록 수정.
-* **이후**: T-06 (orphan 카드 삭제), T-07 (마크다운 렌더링), M-01 (SKILL.md 디스크 I/O 캐시).
-* **참고 문서**: `/artifacts/ari_problem_analysis.md` (전체 태스크 현황 SSOT)
+- [ ] AntiGravity CLI non-interactive 모드 확인 → 텔레그램 자율 브릿지 검토
+- [ ] ARI Gemini Pro 운영 2주 후 지능 체감 평가
+- [ ] Phase 22.6 사고 과정 UI 실제 데이터로 검증
+- [ ] 글로벌 타임라인 API 안정성 테스트
+- [ ] 서버 포트 4000→4005 변경에 따른 환경변수 일괄 확인
+
+---
+
+## 5. 핵심 파일 경로
+
+| 파일 | 주요 변경 |
+|---|---|
+| `ai-engine/modelRegistry.js` | AntiGravity 구독 모델 6종 SSOT |
+| `ai-engine/adapters/BaseAdapter.js` | 전략 패턴 인터페이스 완성 |
+| `ai-engine/adapters/antigravityAdapter.js` | BaseAdapter 상속 + 사고 과정 파서 |
+| `ai-engine/executor.js` | `_extractThoughtProcess()` 통합 |
+| `ai-engine/ariDaemon.js` | ARI 기본값 Flash → Pro |
+| `database.js` | meta_data 컬럼, 글로벌 댓글 API |
+| `server.js` | 포트 4005, thought_process 브로드캐스트 |
+| `src/store/agentStore.js` | anti-* 기본값 + migration |
+| `src/components/Views/AgentDetailView.jsx` | AntiGravity 6모델 드롭다운 |
+| `src/components/Modal/TaskDetailModal.jsx` | 사고 과정 렌더링, Skeleton UI |
+| `src/components/Log/LogDrawer.jsx` | 글로벌 타임라인, 사고 과정 렌더링 |
+| `src/utils/markdownRenderer.js` | ul/ol 분리 렌더링 |
+| `strategic_memory.md` | v4.3 — 어댑터 로드맵 + ARI 업그레이드 전략 |

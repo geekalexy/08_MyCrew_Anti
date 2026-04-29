@@ -2,9 +2,13 @@
 import { useLogStore } from '../../store/logStore';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
+import { useAgentStore } from '../../store/agentStore';
 import { useSocket } from '../../hooks/useSocket';
+
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
+import { scrubContent } from '../../utils/scrubContent'; // [S1-4]
+import { renderMarkdown } from '../../utils/markdownRenderer'; // [S1-4] 타임라인 마크다운
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -41,11 +45,14 @@ if (import.meta.hot) {
 
 export default function LogDrawer() {
   const logs = useLogStore((s) => s.logs);
+  const agentMeta = useAgentStore((s) => s.agentMeta);
+
   const {
     isLogPanelOpen, activeLogTab, setLogPanelOpen, setActiveLogTab,
     focusedTaskId, setFocusedTaskId, currentView,
   } = useUiStore();
   const tasks = useKanbanStore((s) => s.tasks);
+  const agentStates = useAgentStore((s) => s.agents); // [S2-2] 소켓 에이전트 상태
   const { socket } = useSocket();
 
   const [panelWidth, setPanelWidth]   = useState(340);
@@ -106,6 +113,7 @@ export default function LogDrawer() {
   const fileInputRef    = useRef(null);
   const asideRef        = useRef(null);
   const prevBtnModeRef  = useRef('idle');
+  const isSendingRef    = useRef(false); // 동기 송신 락 — btnMode 비동기 특성 보완
   const backdropRef     = useRef(null); // [Fix] 하이라이트 백드롭 스크롤 동기화용
 
   const focusedTask = focusedTaskId
@@ -153,7 +161,7 @@ export default function LogDrawer() {
 
   // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
-    ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : [])
+    ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : logs.filter((log) => log.taskId))
     : logs.filter((log) => !log.taskId); // taskId가 있는 타임라인 전용 로그는 채팅방에서 격리
 
   // 타임라인용 필터 (하위 호환성 및 스크롤 감지용)
@@ -165,32 +173,39 @@ export default function LogDrawer() {
   const mergedTimeline = activeLogTab === 'time' ? [
     ...timelineComments.map(c => ({
       level: 'info', message: c.content, agentId: c.author,
-      taskId: String(focusedTaskId || ''), timestamp: c.created_at, isComment: true,
+      taskId: String(c.taskId || focusedTaskId || ''), timestamp: c.created_at, isComment: true,
+      thought_process: c.thought_process,
     })),
     ...displayLogs,
   ].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
     .filter((item, idx, arr) =>
-      arr.findIndex(x => x.message === item.message && x.agentId === item.agentId) === idx
+      arr.findIndex(x => x.message === item.message && x.agentId === item.agentId && x.taskId === item.taskId) === idx
     ) : displayLogs;
 
-  // [Fix Bug2] focusedTaskId 변경 시 DB 댓글 로드
+  // [Phase 22.6] 글로벌 타임라인 지원: focusedTaskId가 없으면 전체 최근 로그 호출
   useEffect(() => {
-    if (!focusedTaskId) { setTimelineComments([]); return; }
-    fetch(`${SERVER_URL}/api/tasks/${focusedTaskId}/comments`)
-      .then(r => r.json())
-      .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
-      .catch(() => setTimelineComments([]));
+    if (focusedTaskId) {
+      fetch(`${SERVER_URL}/api/tasks/${focusedTaskId}/comments`)
+        .then(r => r.json())
+        .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
+        .catch(() => setTimelineComments([]));
+    } else {
+      fetch(`${SERVER_URL}/api/comments/recent`)
+        .then(r => r.json())
+        .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
+        .catch(() => setTimelineComments([]));
+    }
   }, [focusedTaskId]);
 
-  // [Fix Bug2] 소켓: 새 댓글 → timelineComments에 실시간 추가
+  // [Phase 22.6] 소켓: 새 댓글 실시간 추가 (글로벌 타임라인 처리 포함)
   useEffect(() => {
     if (!socket) return;
-    const handler = ({ taskId, author, text, createdAt }) => {
-      if (String(taskId) === String(focusedTaskId)) {
+    const handler = ({ taskId, author, text, thought_process, createdAt }) => {
+      if (!focusedTaskId || String(taskId) === String(focusedTaskId)) {
         setTimelineComments(prev => {
           const exists = prev.some(c => c.content === text && c.author === author);
           if (exists) return prev;
-          return [...prev, { author, content: text, created_at: createdAt || new Date().toISOString() }];
+          return [...prev, { taskId, author, content: text, thought_process, created_at: createdAt || new Date().toISOString() }];
         });
       }
     };
@@ -218,10 +233,10 @@ export default function LogDrawer() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  // 자동 스크롤
+  // 자동 스크롤 — 새 메시지 / 스트리밍 시작 / 청크 수신 시
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [displayLogs.length, activeLogTab]);
+  }, [displayLogs.length, activeLogTab, isStreaming, streamingText]);
 
   // textarea 자동 높이
   useEffect(() => {
@@ -323,7 +338,10 @@ export default function LogDrawer() {
   const handleSend = useCallback(() => {
     const hasText = inputText.trim().length > 0;
     const hasImages = attachedImages.length > 0;
-    if ((!hasText && !hasImages) || btnMode === 'sending') return;
+    // [Bug Fix] isSendingRef: 동기 락으로 연속 클릭/Enter 중복 전송 방지
+    // btnMode 상태 업데이트는 비동기라 가드로 쓸 수 없음
+    if ((!hasText && !hasImages) || isSendingRef.current) return;
+    isSendingRef.current = true; // 즉시 락 점유
     
     setBtnMode('sending');
 
@@ -385,17 +403,21 @@ export default function LogDrawer() {
             timestamp: new Date().toISOString(),
           });
           setBtnMode('send');
+          isSendingRef.current = false; // 락 해제 (오프라인 에러)
           return;
         }
 
         // Ari Socket으로 메시지 발송 → 스트리밍 응답 수신
         setIsStreaming(true);
         setStreamingText('');
+        // agentMeta['ari'].model → 수동 선택된 모델을 preferredModel로 전달
+        const preferredModel = agentMeta?.['ari']?.model || 'gemini-2.5-flash';
         ariSocket.emit('ari:message', {
           content: trimmedText || '(이미지 전송)',
           channel: 'dashboard',
           author: 'CEO',
           images: imageDataUrls,
+          preferredModel,
         });
 
         // 입력창 즉시 초기화 및 포커스 유지
@@ -406,6 +428,7 @@ export default function LogDrawer() {
           textareaRef.current.style.height = 'auto';
           setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
         }
+        isSendingRef.current = false; // 락 해제 (소켓 emit 완료)
         return;
       } else if (activeLogTab === 'time') {
         // [Phase 14] Timeline 탭: #번호 소환 및 전환 기능
@@ -443,20 +466,23 @@ export default function LogDrawer() {
       }
     }
 
-    fetchPromise = fetchPromise || Promise.resolve(); // fetchPromise 미설정 시 isSendingRef 잠금 방지
+    fetchPromise = fetchPromise || Promise.resolve();
 
     fetchPromise
       .then(() => {
         setInputText('');
         setAttachedImages([]);
-        setMentionedAgent(null); // 전송 후 멘션 초기화
+        setMentionedAgent(null);
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
           setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
         }
       })
       .catch(console.error)
-      .finally(() => setBtnMode(activeLogTab === 'time' ? (focusedTask ? 'stop' : 'idle') : 'send'));
+      .finally(() => {
+        isSendingRef.current = false; // 락 해제
+        setBtnMode(activeLogTab === 'time' ? (focusedTask ? 'stop' : 'idle') : 'send');
+      });
   }, [inputText, attachedImages, focusedTask, btnMode, activeLogTab, mentionedAgent]);
 
   const handleKeyDown = useCallback((e) => {
@@ -638,11 +664,11 @@ export default function LogDrawer() {
         {/* ── 타임라인/채팅: 채팅 버블 UI ──────────────────── */}
         <div className="log-drawer__body" style={{ flex: 1, overflowY: 'auto' }}>
           {(activeLogTab === 'time' || activeLogTab === 'interaction') && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '1rem 0.8rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', padding: '1rem 0.8rem', paddingBottom: '2.5rem' }}>
               {mergedTimeline.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', paddingTop: '2rem' }}>
                   {activeLogTab === 'time' 
-                    ? (focusedTaskId ? '이 태스크의 대화 내역이 없습니다.' : '테스크 카드를 선택하여 대화를 시작하세요.')
+                    ? '타임라인 기록이 없습니다.'
                     : 'AI Crew와의 대화가 없습니다.'}
                 </div>
               ) : (
@@ -668,9 +694,11 @@ export default function LogDrawer() {
                   const time     = new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                   const prevLog  = i > 0 ? mergedTimeline[i - 1] : null;
                   const sameAuthor = prevLog && prevLog.agentId === log.agentId;
-                  // 메시지 내 '💬 XXX: ' 또는 'XXX: ' 프리픽스 제거 (레거시 형식 대응)
-                  const cleanMsg = log.message.replace(/^💬\s*[\w가-힣]+:\s*/, '').replace(/^[\w가-힣]+:\s*/, (m) =>
-                    isUser ? '' : m
+                  // [S1-4] 내부 태그 필터 + 레거시 프리픽스 제거
+                  const cleanMsg = scrubContent(
+                    log.message
+                      .replace(/^💬\s*[\w가-힣]+:\s*/, '')
+                      .replace(/^[\w가-힣]+:\s*/, (m) => isUser ? '' : m)
                   );
 
                   // 시스템 이벤트: 중앙 뱃지
@@ -759,20 +787,118 @@ export default function LogDrawer() {
                       <div style={{ flex: 1 }}>
                         {!sameAuthor && (
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
-                            {log.agentId} <span style={{ opacity: 0.5 }}>· {time}</span>
+                            {log.agentId}
+                            {!focusedTaskId && log.taskId && (
+                               <span style={{ marginLeft: '0.4rem', padding: '1px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '0.65rem', color: 'var(--brand)' }}>
+                                 Task #{log.taskId}
+                               </span>
+                            )}
+                            <span style={{ opacity: 0.5, marginLeft: '0.4rem' }}>· {time}</span>
                           </p>
                         )}
+                        
+                        {/* [Phase 22.6] 사고 과정 렌더링 (LogDrawer) */}
+                        {log.thought_process?.thinking && (
+                          <details style={{ margin: '0.5rem 0', borderLeft: '2px solid rgba(255, 255, 255, 0.1)', paddingLeft: '0.8rem' }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', userSelect: 'none', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Thinking Process
+                            </summary>
+                            <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.4rem', whiteSpace: 'pre-wrap' }}>
+                              {log.thought_process.thinking}
+                            </div>
+                          </details>
+                        )}
+                        {log.thought_process?.working && (
+                          <details style={{ margin: '0.5rem 0', borderLeft: '2px solid rgba(255, 255, 255, 0.1)', paddingLeft: '0.8rem' }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', userSelect: 'none', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Working
+                            </summary>
+                            <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.6)', marginTop: '0.4rem', whiteSpace: 'pre-wrap' }}>
+                              {log.thought_process.working}
+                            </div>
+                          </details>
+                        )}
+
                         <p style={{
                           fontSize: '1rem', lineHeight: 1.6,
                           color: 'var(--text-secondary)', wordBreak: 'break-word',
                           margin: 0,
                         }}>
-                          {cleanMsg}
+                        {(!sameAuthor && !isUser && !isSystem && log.taskId && cleanMsg.length > 50) ? (
+                            <>
+                              <span>작성이 완료되었습니다. 📝</span>
+                              <button
+                                onClick={() => setFocusedTaskId(log.taskId)}
+                                style={{
+                                  background: 'none', border: 'none', color: 'var(--brand)',
+                                  textDecoration: 'underline', cursor: 'pointer', padding: 0,
+                                  fontSize: '0.85rem', marginLeft: '0.5rem', fontWeight: 600,
+                                  transition: 'color 0.2s', opacity: 0.9
+                                }}
+                                onMouseEnter={(e) => e.target.style.color = '#fff'}
+                                onMouseLeave={(e) => e.target.style.color = 'var(--brand)'}
+                              >
+                                #{log.taskId} 상세 확인
+                              </button>
+                            </>
+                          ) : (
+                            // [S1-4] 타임라인 에이전트 메시지 마크다운 렌더링 활성화
+                            <span dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanMsg) }} />
+                          )}
                         </p>
                       </div>
                     </div>
                   );
                 })}
+
+                {/* ── [S2-2] 스켈레톤: agentStates 소켓 상태와 연동 ── */}
+                {activeLogTab === 'time' && (
+                  (() => {
+                    const activeTasks = Object.values(tasks).filter(t => {
+                      if (!t.assignee || t.assignee === '미할당' || t.assignee === '대표님') return false;
+                      if (focusedTaskId && String(t.id) !== String(focusedTaskId)) return false;
+                      // [S2-2] 소켓 상태가 'active'이거나 column이 in_progress이면 표시
+                      const agentKey = t.assignee.toLowerCase();
+                      const socketActive = agentStates[agentKey]?.status === 'active';
+                      return t.column === 'in_progress' && socketActive;
+                    });
+
+                    return activeTasks.map(t => {
+                      const agentKey = t.assignee.toLowerCase();
+                      const state = agentStates[agentKey];
+                      return (
+                        <div key={`skel-${t.id}`} style={{
+                          display: 'flex', alignItems: 'center', gap: '0.6rem',
+                          background: 'rgba(180, 197, 255, 0.03)', borderRadius: '10px',
+                          padding: '0.7rem 0.9rem', border: '1px dashed rgba(180, 197, 255, 0.2)',
+                          marginTop: '0.5rem', animation: 'fadeIn 0.2s'
+                        }}>
+                          <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)', animation: 'spin 3s linear infinite' }}>hourglass_empty</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'Space Grotesk, sans-serif' }}>
+                                 [{t.assignee.toUpperCase()}] 작업 중...
+                               </span>
+                               {/* [S2-2] 소켓 상태 뱃지 */}
+                               <span style={{
+                                 fontSize: '0.62rem', padding: '1px 5px',
+                                 background: 'rgba(74,222,128,0.12)',
+                                 border: '1px solid rgba(74,222,128,0.3)',
+                                 borderRadius: '4px', color: '#4ade80',
+                                 fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600,
+                               }}>● ONLINE</span>
+                             </div>
+                             {!focusedTaskId && (
+                               <span style={{ fontSize: '0.65rem', color: 'var(--brand)', opacity: 0.8 }}>Task #{t.id}: {t.title}</span>
+                             )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()
+                )}
+
+                <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
 
                 {/* ── Ari 스트리밍 버블: 생각 중 애니메이션 + 실시간 타이핑 ── */}
                 {isStreaming && activeLogTab === 'interaction' && (

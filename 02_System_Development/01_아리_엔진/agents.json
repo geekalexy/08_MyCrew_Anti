@@ -1,11 +1,90 @@
 [
-  { "id": "ari", "nameKo": "아리", "role": "비서" },
-  { "id": "luca", "nameKo": "루카", "role": "풀스택 엔지니어" },
-  { "id": "sonnet", "nameKo": "소넷", "role": "AI 디벨로퍼" },
-  { "id": "opus", "nameKo": "오퍼스", "role": "시스템 아키텍트" },
-  { "id": "devteam", "nameKo": "개발팀", "role": "개발 조직" },
-  { "id": "nova", "nameKo": "노바", "role": "브랜드 마케터" },
-  { "id": "ollie", "nameKo": "올리", "role": "그로스 데이터 분석가" },
-  { "id": "pico", "nameKo": "피코", "role": "콘텐츠 카피라이터" },
-  { "id": "lumi", "nameKo": "루미", "role": "비주얼 아트 디렉터" }
+  {
+    "id": "ari",
+    "nameKo": "아리",
+    "role": "비서",
+    "bridge": false,
+    "antiModel": null,
+    "defaultCategory": "QUICK_CHAT"
+  },
+  {
+    "id": "nova",
+    "nameKo": "노바",
+    "role": "브랜드 마케터",
+    "bridge": true,
+    "antiModel": "anti-gemini-3.1-pro-high",
+    "defaultCategory": "MARKETING"
+  },
+  {
+    "id": "lumi",
+    "nameKo": "루미",
+    "role": "비주얼 아트 디렉터",
+    "bridge": true,
+    "antiModel": "anti-gemini-3.1-pro-high",
+    "defaultCategory": "DESIGN"
+  },
+  {
+    "id": "pico",
+    "nameKo": "피코",
+    "role": "콘텐츠 카피라이터",
+    "bridge": true,
+    "antiModel": "anti-claude-sonnet-4.6-thinking",
+    "defaultCategory": "CONTENT"
+  },
+  {
+    "id": "lily",
+    "nameKo": "릴리",
+    "role": "리서치 스페셜리스트",
+    "bridge": true,
+    "antiModel": "anti-claude-sonnet-4.6-thinking",
+    "defaultCategory": "KNOWLEDGE"
+  },
+  {
+    "id": "ollie",
+    "nameKo": "올리",
+    "role": "그로스 데이터 분석가",
+    "bridge": true,
+    "antiModel": "anti-claude-opus-4.6-thinking",
+    "defaultCategory": "ANALYSIS"
+  },
+  {
+    "id": "luna",
+    "nameKo": "루나",
+    "role": "전략 어드바이저",
+    "bridge": true,
+    "antiModel": "anti-claude-opus-4.6-thinking",
+    "defaultCategory": "DEEP_WORK"
+  },
+  {
+    "id": "devteam",
+    "nameKo": "개발팀",
+    "role": "개발 조직",
+    "bridge": false,
+    "antiModel": null,
+    "defaultCategory": "DEEP_WORK"
+  },
+  {
+    "id": "luca",
+    "nameKo": "루카",
+    "role": "풀스택 엔지니어",
+    "bridge": false,
+    "antiModel": null,
+    "defaultCategory": null
+  },
+  {
+    "id": "sonnet",
+    "nameKo": "소넷",
+    "role": "AI 디벨로퍼",
+    "bridge": false,
+    "antiModel": null,
+    "defaultCategory": null
+  },
+  {
+    "id": "opus",
+    "nameKo": "오퍼스",
+    "role": "시스템 아키텍트",
+    "bridge": false,
+    "antiModel": null,
+    "defaultCategory": null
+  }
 ]

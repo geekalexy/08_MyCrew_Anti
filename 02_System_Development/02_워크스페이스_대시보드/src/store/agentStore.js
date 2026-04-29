@@ -1,6 +1,8 @@
 // src/store/agentStore.js — Phase 16: 동적 메타데이터(agentMeta) 스토어 전환 & 5인 AI Crew 체제
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { SKILL_REGISTRY } from '../data/skillRegistry';
+
 
 // 활동 타입 → 한글 레이블 맵핑
 export const ACTIVITY_LABEL = {
@@ -17,7 +19,7 @@ const INITIAL_AGENT_META = {
     role: '공유 비서 · 라우터',
     skills: ['태스크 접수', '팀 라우팅', '사용자 대화'],
     avatar: '/avatars/ari.svg',
-    model: 'Gemini Flash',
+    model: 'gemini-2.5-pro',  // 2026-04-28 Flash → Pro 격상 (지능 우선)
     teamGroup: 'independent',
     experimentRole: '사용자 ⇔ 팀 가교 (팀 외부 독립)',
   },
@@ -26,7 +28,7 @@ const INITIAL_AGENT_META = {
     role: '이미지 크리에이터',
     skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', '이미지 벤치마크'],
     avatar: '/avatars/nova.svg',
-    model: 'Gemini Flash',
+    model: 'anti-gemini-3.1-pro-high', // AntiGravity 구독 — Gemini 3.1 Pro (High)
     teamGroup: 'A',
     experimentRole: 'Team A — 이미지 실무',
   },
@@ -35,7 +37,7 @@ const INITIAL_AGENT_META = {
     role: '영상 프로듀서',
     skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
     avatar: '/avatars/lily.png',
-    model: 'Claude Sonnet 4.6',
+    model: 'anti-claude-sonnet-4.6-thinking', // AntiGravity 구독 — Claude Sonnet 4.6 (Thinking)
     teamGroup: 'A',
     experimentRole: 'Team A — 영상/코드 실무',
   },
@@ -44,16 +46,17 @@ const INITIAL_AGENT_META = {
     role: '적대적 판관',
     skills: ['비판적 검토', '오류 탐지', '품질 심사'],
     avatar: '/avatars/ollie.svg',
-    model: 'Claude Opus',
+    model: 'anti-claude-opus-4.6-thinking', // AntiGravity 구독 — Claude Opus 4.6 (Thinking)
     teamGroup: 'A',
     experimentRole: 'Team A — 적대적 판관 (Phase 2·4)',
   },
+
   lumi: {
     name: 'LUMI',
     role: '이미지 크리에이터',
     skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', 'SKILL.md 학습'],
     avatar: '/avatars/lumi.svg',
-    model: 'Gemini Flash',
+    model: 'anti-gemini-3.1-pro-high', // AntiGravity 구독 — Gemini 3.1 Pro (High)
     teamGroup: 'B',
     experimentRole: 'Team B — 이미지 실무',
   },
@@ -62,7 +65,7 @@ const INITIAL_AGENT_META = {
     role: '영상 프로듀서',
     skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
     avatar: '/avatars/pico.svg',
-    model: 'Claude Sonnet 4.6',
+    model: 'anti-claude-sonnet-4.6-thinking', // AntiGravity 구독 — Claude Sonnet 4.6 (Thinking)
     teamGroup: 'B',
     experimentRole: 'Team B — 영상/코드 실무',
   },
@@ -71,11 +74,13 @@ const INITIAL_AGENT_META = {
     role: '협력 합성자',
     skills: ['결과물 통합', '지식 동기화', 'CKS 프로토콜'],
     avatar: '/avatars/luna.png',
-    model: 'Claude Opus',
+    model: 'anti-claude-opus-4.6-thinking', // AntiGravity 구독 — Claude Opus 4.6 (Thinking)
     teamGroup: 'B',
     experimentRole: 'Team B — 협력적 합성자 (Phase 2·4)',
   },
+
 };
+
 
 // [v2.0] 팀 레지스트리 — OrgView 그룹핑 기준
 export const TEAMS_REGISTRY = {
@@ -93,7 +98,10 @@ export const TEAMS_REGISTRY = {
   },
 };
 
-export const useAgentStore = create((set) => ({
+export const useAgentStore = create(
+  persist(
+    (set) => ({
+
   // 팀 그룹 메타데이터 (수정 가능하도록 상태화)
   teamsRegistry: {
     A: { id: 'A', name: 'Team A', type: '적대적 대조군', icon: '⛔', color: '#ff6b6b', projectBadge: 'CKS 실험 — 적대적 시나리오' },
@@ -169,10 +177,12 @@ export const useAgentStore = create((set) => ({
       const res = await fetch(`http://localhost:4000/api/agents/${agentId}/skills`);
       const data = await res.json();
 
-      // 레지스트리 기반 기본 skillConfig 생성 (DB에 없는 스킬 = 기본 inactive)
+      // 레지스트리 기반 기본 skillConfig 생성
+      // defaultFor에 agentId가 포함되면 기본 active:true, 아니면 false
       const defaultConfig = {};
       Object.values(SKILL_REGISTRY).forEach((skill) => {
-        defaultConfig[skill.id] = { active: false }; // 기본: 비활성화하여 유저가 직접 추가하게 유도
+        const isDefault = skill.defaultFor?.includes(agentId) || skill.isBuiltin || skill.agentOnly === agentId;
+        defaultConfig[skill.id] = { active: isDefault };
       });
 
       // DB에서 가져온 설정으로 덮어쓰기
@@ -265,4 +275,61 @@ export const useAgentStore = create((set) => ({
 
   selectAgent: (agentId) => set({ selectedAgentId: agentId }),
   clearAgentSelection: () => set({ selectedAgentId: null }),
-}));
+    }),
+    {
+      name: 'mycrew-agent-store', // localStorage key
+      partialize: (state) => ({
+        agentMeta: state.agentMeta,
+        teamsRegistry: state.teamsRegistry,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+
+        // ── 에이전트 API 그룹 정의 ──────────────────────────────────────
+        const GEMINI_GROUP    = ['ari', 'nova', 'lumi'];
+        // ── ARI만 Gemini 직접 모델 / 나머지 크루는 AntiGravity 브릿지 모델 ──
+        const ARI_MODELS    = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
+        const ANTI_MODELS   = [
+          'anti-gemini-3.1-pro-high', 'anti-gemini-3.1-pro-low', 'anti-gemini-3-flash',
+          'anti-claude-sonnet-4.6-thinking', 'anti-claude-opus-4.6-thinking', 'anti-gpt-oss-120b',
+        ];
+        const CREW_AGENTS   = ['nova', 'lumi', 'lily', 'pico', 'ollie', 'luna'];
+
+        // 에이전트별 올바른 기본값 (AntiGravity 구독 모델 기준)
+        const CORRECT_DEFAULTS = {
+          ari:   'gemini-2.5-pro',                 // ARI: Gemini Pro (2026-04-28 격상)
+          nova:  'anti-gemini-3.1-pro-high',        // AntiGravity: Gemini 3.1 Pro (High)
+          lumi:  'anti-gemini-3.1-pro-high',        // AntiGravity: Gemini 3.1 Pro (High)
+          lily:  'anti-claude-sonnet-4.6-thinking', // AntiGravity: Claude Sonnet 4.6 (Thinking)
+          pico:  'anti-claude-sonnet-4.6-thinking', // AntiGravity: Claude Sonnet 4.6 (Thinking)
+          ollie: 'anti-claude-opus-4.6-thinking',   // AntiGravity: Claude Opus 4.6 (Thinking)
+          luna:  'anti-claude-opus-4.6-thinking',   // AntiGravity: Claude Opus 4.6 (Thinking)
+        };
+
+        Object.keys(state.agentMeta || {}).forEach((agentId) => {
+          const model = state.agentMeta[agentId]?.model;
+          if (!model) return;
+
+          const isCrew = CREW_AGENTS.includes(agentId);
+
+          // 크루 에이전트에 구 식별자(gemini-2.5-* 또는 claude-*) 저장된 경우 → anti-* 교정
+          if (isCrew && (ARI_MODELS.includes(model) || ['claude-opus-4-6','claude-sonnet-4-6'].includes(model))) {
+            console.warn(`[AgentStore] 브릿지 모델 교정: ${agentId} (${model} → ${CORRECT_DEFAULTS[agentId]})`);
+            state.agentMeta[agentId].model = CORRECT_DEFAULTS[agentId];
+          }
+          // ARI에 anti-* 모델 저장된 경우 → flash로 교정
+          else if (agentId === 'ari' && ANTI_MODELS.includes(model)) {
+            console.warn(`[AgentStore] ARI 모델 교정: ${model} → gemini-2.5-pro`);
+            state.agentMeta[agentId].model = 'gemini-2.5-pro';
+          }
+          // 완전히 알 수 없는 값 → 기본값으로 교정
+          else if (!ARI_MODELS.includes(model) && !ANTI_MODELS.includes(model)) {
+            state.agentMeta[agentId].model = CORRECT_DEFAULTS[agentId] || 'gemini-2.5-pro';
+          }
+        });
+      },
+
+    }
+  )
+);
+

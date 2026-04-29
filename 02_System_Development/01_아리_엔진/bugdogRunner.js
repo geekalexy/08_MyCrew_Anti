@@ -1,5 +1,5 @@
 /**
- * 🐕 bugdogRunner.js — Phase 27 Bugdog v0 (감시만 하는 파수견)
+ * 🐕 bugdogRunner.js — Phase 27 Bugdog v0.1 (감시만 하는 파수견)
  *
  * 독립 프로세스로 실행 (PM2 또는 node 직접 실행)
  * ariDaemon과 분리되어 감시 대상이 죽어도 감시자는 살아있음
@@ -16,8 +16,9 @@ import sqlite3 from 'sqlite3';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:4000';
-const OUTPUT_DIR = path.resolve(__dirname, 'outputs/bugdog');
-const DB_PATH    = path.resolve(__dirname, 'database.sqlite');
+const OUTPUT_DIR  = path.resolve(__dirname, 'outputs/bugdog');
+const DB_PATH     = path.resolve(__dirname, 'database.sqlite');
+const TOKEN_PATH  = path.resolve(__dirname, 'token.json');
 
 // ── 출력 디렉토리 보장 ────────────────────────────────────────────────────
 if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -142,6 +143,123 @@ async function checkTtsEndpoint() {
   }
 }
 
+/** [8] Google OAuth 토큰 유효성 — token.json 존재 + refresh_token + 만료 갱신 시도 */
+async function checkGoogleOAuth() {
+  // Step 1. token.json 파일 존재 여부
+  if (!fs.existsSync(TOKEN_PATH)) {
+    return {
+      service: 'Google OAuth',
+      severity: 'CRITICAL',
+      errorCode: 'OAUTH_TOKEN_MISSING',
+      errorMsg: 'token.json 없음 — Google 재로그인 필요',
+    };
+  }
+
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf8'));
+  } catch (e) {
+    return {
+      service: 'Google OAuth',
+      severity: 'CRITICAL',
+      errorCode: 'OAUTH_TOKEN_CORRUPT',
+      errorMsg: `token.json 파싱 실패: ${e.message}`,
+    };
+  }
+
+  // Step 2. refresh_token 존재 여부 (없으면 갱신 자체가 불가)
+  if (!data.refresh_token) {
+    return {
+      service: 'Google OAuth',
+      severity: 'CRITICAL',
+      errorCode: 'REFRESH_TOKEN_MISSING',
+      errorMsg: 'refresh_token 없음 — 재인증 필요',
+    };
+  }
+
+  // Step 3. access_token 만료 확인 (1시간 이내면 갱신 시도)
+  const expiresIn = (data.expiry_date || 0) - Date.now();
+  const hoursLeft = Math.round(expiresIn / 3_600_000);
+
+  if (expiresIn < 3_600_000) {
+    // access_token이 이미 완전 만료된 경우 (음수)
+    if (expiresIn < 0) {
+      return {
+        service: 'Google OAuth',
+        severity: 'CRITICAL',
+        errorCode: 'ACCESS_TOKEN_EXPIRED',
+        errorMsg: `access_token 만료됨 (${Math.abs(Math.round(expiresIn / 3_600_000))}시간 전) — 서버 재시작 또는 재로그인 필요`,
+      };
+    }
+
+    // 갱신 시도 — client_id / client_secret 환경변수 필요
+    const clientId     = process.env.VITE_GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      // 환경변수 없음 = 독립 실행 환경 (server.js가 갱신 담당)
+      // token은 아직 유효하므로 WARNING으로 처리 (CRITICAL 오탐 방지)
+      return {
+        service: 'Google OAuth',
+        severity: 'WARNING',
+        errorCode: 'OAUTH_EXPIRING_SOON',
+        errorMsg: `access_token 만료 임박 (${Math.round(expiresIn / 60000)}분 남음) — server.js가 자동 갱신 담당`,
+      };
+    }
+
+    try {
+      const resp = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id:     clientId,
+          client_secret: clientSecret,
+          refresh_token: data.refresh_token,
+          grant_type:    'refresh_token',
+        }),
+      });
+      const json = await resp.json();
+
+      if (json.access_token) {
+        // 갱신 성공 → token.json 덮어쓰기 (server.js와 동기화)
+        const updated = {
+          access_token:  json.access_token,
+          refresh_token: data.refresh_token,
+          expiry_date:   Date.now() + json.expires_in * 1000,
+        };
+        fs.writeFileSync(TOKEN_PATH, JSON.stringify(updated, null, 2));
+        return {
+          service: 'Google OAuth',
+          severity: 'OK',
+          detail: `만료 임박 → 자동 갱신 성공 (${json.expires_in}초 유효)`,
+        };
+      }
+
+      // invalid_grant = Refresh Token 자체가 무효화됨
+      const errCode = json.error === 'invalid_grant' ? 'INVALID_GRANT' : 'OAUTH_REFRESH_FAILED';
+      const errMsg  = json.error === 'invalid_grant'
+        ? 'Refresh Token 무효화 — 테스트 앱 만료 또는 권한 회수. 재로그인 필요'
+        : `Token 갱신 거절: ${json.error} — ${json.error_description || ''}`;
+      return { service: 'Google OAuth', severity: 'CRITICAL', errorCode: errCode, errorMsg: errMsg };
+
+    } catch (e) {
+      return {
+        service: 'Google OAuth',
+        severity: 'CRITICAL',
+        errorCode: 'OAUTH_REFRESH_NET_ERR',
+        errorMsg: `갱신 요청 네트워크 오류: ${e.message}`,
+      };
+    }
+  }
+
+  // 만료 여유 충분
+  return {
+    service: 'Google OAuth',
+    severity: 'OK',
+    detail: `access_token 유효 (만료까지 약 ${hoursLeft}시간)`,
+  };
+}
+
 // ── 메인 실행 ─────────────────────────────────────────────────────────────
 async function runBugdog() {
   const startedAt = new Date().toISOString();
@@ -156,6 +274,7 @@ async function runBugdog() {
     checkImageRenderer,
     checkYoutubeApi,
     checkTtsEndpoint,
+    checkGoogleOAuth,    // [8] v0.1 추가
   ];
 
   const checkResults = [];
@@ -170,40 +289,47 @@ async function runBugdog() {
     }
   }
 
+  // ── 집계 ────────────────────────────────────────────────────────────────
+  const criticals = checkResults.filter(r => r.severity === 'CRITICAL');
+  const warnings  = checkResults.filter(r => r.severity === 'WARNING');
+  const issues    = [...criticals, ...warnings];
+
   // ── ErrorLog JSON 저장 ──────────────────────────────────────────────────
-  const issues = checkResults.filter(r => r.severity !== 'OK');
   const logFile = path.join(OUTPUT_DIR, `bugdog_${startedAt.replace(/[:.]/g, '-')}.json`);
   const logData = { startedAt, totalChecks: checkResults.length, issues: issues.length, results: checkResults };
   fs.writeFileSync(logFile, JSON.stringify(logData, null, 2));
   console.log(`\n📄 ErrorLog 저장: ${logFile}`);
 
-  // ── Critical 항목은 /api/cs-reports에 직접 POST ─────────────────────────
-  const criticals = checkResults.filter(r => r.severity === 'CRITICAL');
-  if (criticals.length > 0) {
-    console.log(`\n🚨 Critical ${criticals.length}건 발견 — CS 리포트 자동 접수 중...`);
-    for (const c of criticals) {
+  // ── [Bugdog v1] CRITICAL/WARNING → /api/bugdog-alert 통합 전송 ───────────
+  // 단일 엔드포인트로: (1) 소켓 브로드캐스트 (2) CS 리포트 저장 (3) ariDaemon 주입
+
+  if (issues.length > 0) {
+    console.log(`\n🚨 이슈 ${issues.length}건 (Critical: ${criticals.length} / Warning: ${warnings.length}) — 서버 경보 전송 중...`);
+    for (const item of issues) {
       try {
-        const res = await fetch(`${SERVER_URL}/api/cs-reports`, {
+        const res = await fetch(`${SERVER_URL}/api/bugdog-alert`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            severity: 'CRITICAL',
-            service: c.service,
-            errorCode: c.errorCode,
-            errorMsg: c.errorMsg,
-            reporter: 'bugdog',
+            severity:  item.severity,
+            service:   item.service,
+            errorCode: item.errorCode,
+            errorMsg:  item.errorMsg,
+            startedAt,
+            results:   checkResults, // 전체 감시 결과 포함
           }),
         });
         const json = await res.json();
-        console.log(`  ✅ CS 리포트 접수: #${json.reportNo} (${c.service})`);
+        const icon = item.severity === 'CRITICAL' ? '🔴' : '🟡';
+        const report = json.reportNo ? ` → CS #${json.reportNo}` : '';
+        console.log(`  ${icon} 경보 전송 완료: ${item.service}${report}`);
       } catch (e) {
-        // 서버 자체가 죽었을 경우 — JSON 파일만 남김 (폴백)
-        console.warn(`  ⚠️  서버 미응답 — 로컬 JSON 파일에만 기록됨 (${c.service})`);
+        // 서버 자체가 죽었을 경우 — JSON 파일에만 기록 (폴백 유지)
+        console.warn(`  ⚠️  서버 미응답 — 로컬 JSON 파일에만 기록됨 (${item.service})`);
       }
     }
   }
 
-  const warnings = checkResults.filter(r => r.severity === 'WARNING');
   console.log(`\n✅ 완료 — Critical: ${criticals.length}건 / Warning: ${warnings.length}건 / OK: ${checkResults.length - criticals.length - warnings.length}건`);
   return logData;
 }

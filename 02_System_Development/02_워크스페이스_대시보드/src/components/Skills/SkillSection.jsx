@@ -8,7 +8,7 @@ import SkillAddDrawer from './SkillAddDrawer';
 
 // 레이어 렌더 순서 및 레이블
 const LAYER_ORDER = [
-  { layer: 3, label: 'Layer 3 · INFRA (코어 시스템)' },
+  { layer: 0, label: 'Layer 0 · CORE (기본 내장 엔진)' },
   { layer: 1, label: 'Layer 1 · ENGINE (전문 실행)' },
   { layer: 2, label: 'Layer 2 · DOMAIN (도메인 특화)' },
   { layer: 4, label: 'Layer 4 · WORKFLOW (멀티에이전트 워크플로우)' },
@@ -32,11 +32,14 @@ export default function SkillSection({ agentId, onOpenDrawer }) {
     return skillConfig[skill.id]?.active !== false; // undefined → true (기본 활성)
   };
 
-  // 레이어별 스킬 그룹핑
+  // 레이어별 스킬 그룹핑 (agentOnly 필터 적용)
   const skillsByLayer = LAYER_ORDER.map(({ layer, label }) => ({
     layer,
     label,
-    skills: Object.values(SKILL_REGISTRY).filter((s) => s.layer === layer),
+    skills: Object.values(SKILL_REGISTRY).filter((s) =>
+      s.layer === layer &&
+      (!s.agentOnly || s.agentOnly === agentId)  // agentOnly 필드 없으면 전체 공개
+    ),
   })).filter((group) => group.skills.length > 0);
 
   // 이미 장착된 스킬 ID 목록 — 삭제됨 (Drawer가 상위에서 관리)

@@ -25,9 +25,9 @@ export default function SkillAddDrawer({ isOpen, onClose, agentId }) {
   }, [isOpen]);
   const skillConfig = agentMeta[agentId]?.skillConfig || {};
 
-  // non-Builtin 스킬 전체 + 활성 여부 판단
+  // non-Builtin 스킬 전체 + 활성 여부 판단 (agentOnly 필터 적용)
   const allSkills = Object.values(SKILL_REGISTRY)
-    .filter((s) => !s.isBuiltin)
+    .filter((s) => !s.isBuiltin && (!s.agentOnly || s.agentOnly === agentId))
     .map((skill) => ({
       ...skill,
       isActive: skill.isRequired ? true : skillConfig[skill.id]?.active !== false,
@@ -41,6 +41,10 @@ export default function SkillAddDrawer({ isOpen, onClose, agentId }) {
 
   const handleToggle = (skill) => {
     toggleAgentSkill(agentId, skill.id, !skill.isActive);
+    // 스킬 추가/해제 후 목록 최상단으로 스크롤 (장착됨 섹션 즉시 확인)
+    setTimeout(() => {
+      if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    }, 50);
   };
 
   /* ── 스킬 행 렌더 ── */

@@ -295,13 +295,30 @@ export default function AgentDetailView() {
                     onChange={(e) => updateAgentMeta(agentId, { model: e.target.value })}
                     style={{ background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '0.6rem', borderRadius: '6px', width: '100%', outline: 'none' }}
                   >
-                    <option value="Gemini 3.1 Pro">Gemini 3.1 Pro — 수석 에이전트 용</option>
-                    <option value="Claude Opus 4.6">Claude Opus 4.6 — 논리 심층 분석</option>
-                    <option value="Claude Sonnet 4.6">Claude Sonnet 4.6 — 속도/지능 밸런스</option>
-                    <option value="Gemini 3 Flash">Gemini 3 Flash — 경량 고속 처리</option>
-                    <option value="GPT-OSS 120B">GPT-OSS 120B — 오픈소스 호환</option>
+                    {/* ── ARI 전용: Gemini API 직접 호출 (소켓 + OAuth 스트리밍) ── */}
+                    {agentId === 'ari' && (<>
+                      <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash — 실시간 스트리밍 기본</option>
+                      <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro — 고성능 추론</option>
+                    </>)}
+                    {/* ── 브릿지 크루: AntiGravity 구독 모델 풀 (nova, lumi, lily, pico, ollie, luna) ── */}
+                    {agentId !== 'ari' && (<>
+                      <optgroup label="✦ Gemini (AntiGravity 구독)">
+                        <option value="anti-gemini-3.1-pro-high">🚀 Gemini 3.1 Pro (High) — 최고성능</option>
+                        <option value="anti-gemini-3.1-pro-low">⚖️ Gemini 3.1 Pro (Low) — 균형</option>
+                        <option value="anti-gemini-3-flash">⚡ Gemini 3 Flash — 고속</option>
+                      </optgroup>
+                      <optgroup label="✦ Claude (AntiGravity 구독)">
+                        <option value="anti-claude-sonnet-4.6-thinking">💡 Claude Sonnet 4.6 (Thinking)</option>
+                        <option value="anti-claude-opus-4.6-thinking">🏛️ Claude Opus 4.6 (Thinking)</option>
+                      </optgroup>
+                      <optgroup label="✦ 기타 (AntiGravity 구독)">
+                        <option value="anti-gpt-oss-120b">🌐 GPT-OSS 120B (Medium)</option>
+                      </optgroup>
+                    </>)}
                   </select>
-                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: 1.4 }}>* 엔진 변경 시 즉시 추론 로직과 응답 품질이 달라집니다.</p>
+                  <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem', lineHeight: 1.4 }}>
+                    {agentId === 'ari' ? 'ARI는 소켓 스트리밍 전용 — Gemini API 직접 호출' : 'AntiGravity 구독 모델 풀 — 파일 브릿지 경유'}
+                  </p>
                 </div>
 
                 <div>

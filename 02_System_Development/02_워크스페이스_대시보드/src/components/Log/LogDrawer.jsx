@@ -3,6 +3,7 @@ import { useLogStore } from '../../store/logStore';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useSocket } from '../../hooks/useSocket';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -53,6 +54,9 @@ export default function LogDrawer() {
   } = useUiStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const agentStates = useAgentStore((s) => s.agents); // [S2-2] 소켓 에이전트 상태
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+  const projects = useProjectStore((s) => s.projects);
+  const activeProject = projects.find(p => p.id === selectedProjectId);
   const { socket } = useSocket();
 
   const [panelWidth, setPanelWidth]   = useState(340);
@@ -190,12 +194,13 @@ export default function LogDrawer() {
         .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
         .catch(() => setTimelineComments([]));
     } else {
-      fetch(`${SERVER_URL}/api/comments/recent`)
+      const pid = selectedProjectId || 'proj_default';
+      fetch(`${SERVER_URL}/api/comments/recent?projectId=${pid}`)
         .then(r => r.json())
         .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
         .catch(() => setTimelineComments([]));
     }
-  }, [focusedTaskId]);
+  }, [focusedTaskId, selectedProjectId]);
 
   // [Phase 22.6] 소켓: 새 댓글 실시간 추가 (글로벌 타임라인 처리 포함)
   useEffect(() => {
@@ -246,13 +251,35 @@ export default function LogDrawer() {
     }
   }, [inputText]);
 
-  // ── [ImageAttach] Base64 변환 헬퍼 ───────────────────────────────────
+  // ── [ImageAttach] Base64 변환 헬퍼 (미리보기 전용) ────────────────────
   const readFileAsDataURL = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(e.target.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+
+  // ── [Phase 28] 파일 → 서버 업로드 헬퍼 ─────────────────────────────────
+  // taskId: focusedTask?.id || 'global'
+  // 반환: { filePath } or null
+  const uploadFileToServer = useCallback(async (file) => {
+    const taskId = focusedTask?.id || 'global';
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`${SERVER_URL}/api/input/${taskId}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) return { filePath: data.filePath, fileName: data.fileName };
+      console.warn('[LogDrawer] 업로드 실패:', data.message);
+      return null;
+    } catch (err) {
+      console.error('[LogDrawer] 업로드 오류:', err.message);
+      return null;
+    }
+  }, [focusedTask]);
 
   // ── 드래그 앤 드롭: 이미지 base64 변환 ──────────────────────────────────
   const handleDragOver  = useCallback((e) => { e.preventDefault(); setIsDragOver(true); }, []);
@@ -265,18 +292,25 @@ export default function LogDrawer() {
     const files = Array.from(e.dataTransfer.files || []);
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
     if (imageFiles.length > 0) {
-      const results = await Promise.all(imageFiles.map(async (f) => ({
-        dataUrl: await readFileAsDataURL(f),
-        name: f.name,
-      })));
-      setAttachedImages(prev => [...prev, ...results].slice(0, 4)); // 최대 4장
+      const results = await Promise.all(imageFiles.map(async (f) => {
+        const [dataUrl, uploaded] = await Promise.all([
+          readFileAsDataURL(f),
+          uploadFileToServer(f),
+        ]);
+        return { dataUrl, name: f.name, filePath: uploaded?.filePath || null };
+      }));
+      setAttachedImages(prev => [...prev, ...results].slice(0, 4));
     } else if (files.length > 0) {
-      // 비이미지 파일은 텍스트로
-      setInputText(prev => prev + files.map(f => `[첨부: ${f.name}]`).join(' '));
+      // 비이미지 파일: 서버에 업로드 후 경로 삽입
+      const uploaded = await Promise.all(files.map(f => uploadFileToServer(f)));
+      const tags = uploaded.map((u, i) =>
+        u ? `[첨부: ${u.filePath}]` : `[첨부: ${files[i].name}]`
+      ).join(' ');
+      setInputText(prev => prev ? `${prev}\n${tags}` : tags);
     }
-  }, []);
+  }, [uploadFileToServer]);
 
-  // ── [ImageAttach] 클립보드 블래시 붙여넣기 ────────────────────────────────
+  // ── [ImageAttach] 클립보드 붙여넣기 → 서버 저장 ─────────────────────────
   const handlePaste = useCallback(async (e) => {
     const items = Array.from(e.clipboardData?.items || []);
     const imageItems = items.filter(item => item.type.startsWith('image/'));
@@ -286,14 +320,19 @@ export default function LogDrawer() {
       imageItems.map(async (item) => {
         const file = item.getAsFile();
         if (!file) return null;
-        return { dataUrl: await readFileAsDataURL(file), name: `클립보드_이미지_${Date.now()}.png` };
+        const namedFile = new File([file], `클립보드_이미지_${Date.now()}.png`, { type: file.type });
+        const [dataUrl, uploaded] = await Promise.all([
+          readFileAsDataURL(namedFile),
+          uploadFileToServer(namedFile),
+        ]);
+        return { dataUrl, name: namedFile.name, filePath: uploaded?.filePath || null };
       })
     );
     const valid = results.filter(Boolean);
     if (valid.length > 0) {
       setAttachedImages(prev => [...prev, ...valid].slice(0, 4));
     }
-  }, []);
+  }, [uploadFileToServer]);
 
   // ── Kill 핸들러 ─────────────────────────────────────────────
   const handleKill = useCallback(() => {
@@ -348,14 +387,19 @@ export default function LogDrawer() {
     const trimmedText = inputText.trim();
     setShowMention(false); // 전송 시 멘션 드롭다운 닫기
 
-    // 이미지가 있으면 텍스트에 [IMAGE:n]을 놓는 대신 이미지를 직접 소켓에 포함 
+    // [Phase 28] 이미지: 서버 저장된 filePath를 [첨부:] 태그로 삽입 + 미리보기용 dataUrl 유지
     const imageDataUrls = attachedImages.map(img => img.dataUrl);
+    const imagePathTags = attachedImages
+      .filter(img => img.filePath)
+      .map(img => `[첨부: ${img.filePath}]`)
+      .join('\n');
     let fetchPromise;
     // 타임라인 탭이면서 태스크가 선택된 경우에만 해당 태스크의 코멘트로 전송
     if (focusedTask && activeLogTab === 'time') {
       // 1. 특정 태스크 내부의 코멘튨 작성 (CEO 표기)
+      // 서버 저장 경로 태그 + 미리보기 마크다운 모두 포함 → 아리가 경로 인식해 analyzeLocalImage 호출
       const commentContent = imageDataUrls.length > 0
-        ? [trimmedText, ...imageDataUrls.map(u => `![image](${u})`)].filter(Boolean).join('\n')
+        ? [trimmedText, imagePathTags, ...imageDataUrls.map(u => `![image](${u})`)].filter(Boolean).join('\n')
         : trimmedText;
 
       // @멘션 감지: 텍스트에서 @에이전트 추출 (서버 라우팅용)
@@ -641,6 +685,18 @@ export default function LogDrawer() {
             >
               <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>close</span>
             </button>
+          </div>
+        )}
+
+        {/* ── 프로젝트 정보 헤더 (Phase 29) ───────────────────────────────────────── */}
+        {activeProject && (
+          <div style={{
+            background: 'var(--bg-surface-1)', padding: '0.4rem 1rem',
+            borderBottom: '1px solid var(--border)', display: 'flex',
+            alignItems: 'center', gap: '0.5rem',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: activeProject.color || 'var(--brand)' }}>folder</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{activeProject.name}</span>
           </div>
         )}
 

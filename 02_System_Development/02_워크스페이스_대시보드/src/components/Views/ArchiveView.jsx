@@ -16,6 +16,7 @@ const IcoArchive = () => (
 
 export default function ArchiveView() {
   const projects = useProjectStore((s) => s.projects);
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
   const { setActiveDetailTaskId } = useUiStore();
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +31,8 @@ export default function ArchiveView() {
     const fetchArchivedTasks = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`${SERVER_URL}/api/tasks/archived`);
+        const pid = selectedProjectId || 'all';
+        const res = await fetch(`${SERVER_URL}/api/tasks/archived?projectId=${pid}`);
         if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
         if (data.status === 'ok') {
@@ -43,7 +45,7 @@ export default function ArchiveView() {
       }
     };
     fetchArchivedTasks();
-  }, []);
+  }, [selectedProjectId]);
 
   return (
     <div className="archive-view">

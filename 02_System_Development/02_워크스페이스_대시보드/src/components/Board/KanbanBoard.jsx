@@ -26,7 +26,7 @@ export default function KanbanBoard() {
   const { emitTaskMove } = useSocket();
   const [activeTask, setActiveTask] = useState(null);
 
-  // ── 초기 Hydration: 서버 DB 기준으로 스토어 완전 동기화 ─────────────────
+  // ── 초기 Hydration 및 프로젝트 전환 시: 서버 DB 기준으로 스토어 완전 동기화 ─────────────────
   useEffect(() => {
     // Step 1: localStorage에 남은 temp-/local- 카드 즉시 정리
     const { tasks, removeTask } = useKanbanStore.getState();
@@ -38,7 +38,8 @@ export default function KanbanBoard() {
     });
 
     // Step 2: 서버 DB에서 실제 태스크 불러오기
-    fetch(`${SERVER_URL}/api/tasks`)
+    const pid = useProjectStore.getState().selectedProjectId || 'proj_default';
+    fetch(`${SERVER_URL}/api/tasks?projectId=${pid}`)
       .then((res) => res.json())
       .then(({ status, tasks: remoteTasks }) => {
         if (status !== 'ok' || !Array.isArray(remoteTasks)) return;
@@ -59,7 +60,7 @@ export default function KanbanBoard() {
         console.log(`[KanbanBoard] Hydration 완료: ${remoteTasks.length}개 태스크`);
       })
       .catch((err) => console.warn('[KanbanBoard] Hydration 실패:', err.message));
-  }, []);
+  }, [selectedProjectId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -112,7 +113,16 @@ export default function KanbanBoard() {
       onDragCancel={handleDragCancel}
     >
       <div className={`kanban-board${isBoardReadOnly ? ' kanban-board--readonly' : ''}`}>
-        {COLUMNS.map((columnId) => (
+        {!selectedProjectId ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.5, marginBottom: '1rem' }}>folder_off</span>
+              <h3>프로젝트를 선택해주세요</h3>
+              <p style={{ marginTop: '0.5rem', fontSize: '0.9rem', opacity: 0.8 }}>좌측 사이드바에서 프로젝트를 선택하거나 새로 생성할 수 있습니다.</p>
+            </div>
+          </div>
+        ) : (
+          COLUMNS.map((columnId) => (
           <SortableContext
             key={columnId}
             id={columnId}
@@ -125,7 +135,7 @@ export default function KanbanBoard() {
               disableDnD={isBoardReadOnly}
             />
           </SortableContext>
-        ))}
+        )))}
       </div>
       <DragOverlay>
         {activeTask ? <TaskCard task={activeTask} isDragging /> : null}

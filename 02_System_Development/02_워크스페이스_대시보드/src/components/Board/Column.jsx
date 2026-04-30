@@ -4,6 +4,7 @@ import TaskCard from './TaskCard';
 import { useDroppable } from '@dnd-kit/core';
 import { useSocket } from '../../hooks/useSocket';
 import { useAgentStore } from '../../store/agentStore';
+import TaskCreateModal from '../Modal/TaskCreateModal';
 
 const COLUMN_LABELS = {
   todo:        'To Do',
@@ -21,6 +22,7 @@ export default function Column({ columnId, tasks, disableDnD }) {
 
   // ── 태스크 생성 폼 상태
   const [isAdding, setIsAdding] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); // ↗ 상세 입력 모달
   const [form, setForm] = useState({
     title: '', content: '', assignee: '미할당', priority: 'medium',
   });
@@ -158,6 +160,26 @@ export default function Column({ columnId, tasks, disableDnD }) {
 
         {isAdding && (
           <form className="inline-task-form" onSubmit={handleSubmit}>
+            {/* 인라인 폼 헤더: 상세 입력 버튼 */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.3rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                title="모달에서 상세 입력"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '0.2rem',
+                  color: 'var(--text-muted)', fontSize: '0.72rem',
+                  padding: '0.15rem 0.3rem', borderRadius: '4px',
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--brand)'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>open_in_full</span>
+                상세 입력
+              </button>
+            </div>
             <input
               ref={titleRef}
               className="inline-task-form__input"
@@ -180,6 +202,7 @@ export default function Column({ columnId, tasks, disableDnD }) {
                 onChange={(e) => setForm({ ...form, assignee: e.target.value })}
               >
                 <option value="미할당">미할당</option>
+                <option value="CEO(나)">👤 CEO (나)</option>
                 {Object.values(agentMeta).map((m) => (
                   <option key={m.name} value={m.name}>{m.name.toLowerCase()}</option>
                 ))}
@@ -211,6 +234,14 @@ export default function Column({ columnId, tasks, disableDnD }) {
           만들기
         </button>
       )}
+
+      {/* ↗ 상세 입력 모달 — position:fixed라 DOM 위치 무관, 커럼 div 내부 안전 */}
+      <TaskCreateModal
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); cancelForm(); }}
+        initialColumn={columnId}
+        initialForm={{ ...form, column: columnId }}
+      />
     </div>
   );
 }

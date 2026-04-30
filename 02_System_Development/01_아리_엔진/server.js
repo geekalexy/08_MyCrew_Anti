@@ -8,6 +8,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import TelegramBot from 'node-telegram-bot-api';
 import { execFile, spawn } from 'child_process';
+import multer from 'multer';
 import { promisify } from 'util';
 
 const execFilePromise = promisify(execFile);
@@ -51,6 +52,64 @@ app.use('/outputs', express.static(outputsDir));
 app.use('/api/imagelab', imageLabRouter);
 app.use('/api/videolab', videoLabRouter);
 app.use('/lab-assets', express.static(path.join(process.cwd(), 'skill-library/05_design/lab-assets')));
+
+// ─── [Phase 28] 07_OUTPUT IO Hub 디렉토리 초기화 ────────────────────────────
+const IO_BASE = path.resolve(process.cwd(), '../../07_OUTPUT');
+const INPUTS_BASE  = path.join(IO_BASE, 'inputs');
+const OUTPUTS_BASE = path.join(IO_BASE, 'outputs');
+[IO_BASE, INPUTS_BASE, OUTPUTS_BASE].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+
+// 정적 서빙: /io/inputs, /io/outputs 경로로 파일 접근 가능
+app.use('/io/inputs',  express.static(INPUTS_BASE));
+app.use('/io/outputs', express.static(OUTPUTS_BASE));
+
+// multer 설정 — taskId 기반 동적 저장 경로
+const ALLOWED_EXTS = new Set(['.png','.jpg','.jpeg','.gif','.webp','.pdf','.txt','.csv','.md','.json']);
+
+function makeIoUploader(baseDir) {
+  return multer({
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ALLOWED_EXTS.has(ext)) cb(null, true);
+      else cb(new Error(`허용되지 않는 확장자입니다: ${ext}`));
+    },
+    storage: multer.diskStorage({
+      destination: (req, _file, cb) => {
+        const dir = path.join(baseDir, String(req.params.taskId));
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: (_req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname}`);
+      },
+    }),
+  });
+}
+
+// POST /api/input/:taskId  — 유저 첨부 인풋
+app.post('/api/input/:taskId', makeIoUploader(INPUTS_BASE).single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: '파일이 없습니다.' });
+  const filePath = `07_OUTPUT/inputs/${req.params.taskId}/${req.file.filename}`;
+  res.json({ success: true, taskId: req.params.taskId, fileName: req.file.filename, filePath });
+});
+
+// POST /api/output/:taskId — 에이전트 결과물 아웃풋
+app.post('/api/output/:taskId', makeIoUploader(OUTPUTS_BASE).single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: '파일이 없습니다.' });
+  const filePath = `07_OUTPUT/outputs/${req.params.taskId}/${req.file.filename}`;
+  // 소켓 이벤트: 프론트엔드 카드 모달에 결과물 도착 알림
+  io.emit('output:created', { taskId: req.params.taskId, fileName: req.file.filename, filePath });
+  res.json({ success: true, taskId: req.params.taskId, fileName: req.file.filename, filePath });
+});
+
+// multer 에러 핸들러
+app.use((err, _req, res, _next) => {
+  if (err instanceof multer.MulterError || err.message?.includes('확장자')) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+  _next(err);
+});
 
 // ─── Socket.io 서버 (Opus 지적: Express CORS와 별도로 옵션 지정 필수) ────────
 export const io = new Server(httpServer, {
@@ -284,6 +343,18 @@ io.on('connection', (socket) => {
   // 현재 에이전트 상태 즉시 동기화
   socket.emit('agent:state_sync', Object.fromEntries(agentStates));
 
+  // [Phase 29] 프로젝트 룸 조인 핸들러
+  socket.on('project:join', ({ projectId }) => {
+    if (!projectId) return;
+    // 기존 project_ 룸에서 이탈
+    socket.rooms.forEach(room => {
+      if (room.startsWith('project_')) socket.leave(room);
+    });
+    // 새 프로젝트 룸 입장
+    socket.join(`project_${projectId}`);
+    console.log(`[Socket] ${socket.id} joined room: project_${projectId}`);
+  });
+
   // 에이전트 Heartbeat 수신
   socket.on('agent:heartbeat', ({ agentId }) => {
     if (!agentId) return;
@@ -476,7 +547,8 @@ executor.setBroadcastLog(broadcastLog);
 
 // [Phase 1] 파일 폴링 어댑터 감시 데몬 실행 개시
 // [Case 3 Fix] dispatchNextTaskForAgent 주입 — 작업 완료 후 자동 Pull 연결
-initAdapterWatcher(io, dbManager, broadcastLog, dispatchNextTaskForAgent);
+// [isFinal:false Fix] forceRedispatchTask 주입 — 중간 보고 후 본작업 자동 재착수
+initAdapterWatcher(io, dbManager, broadcastLog, dispatchNextTaskForAgent, forceRedispatchTask);
 
 // ─── [Phase 25] Review Studio 소켓 네임스페이스 ──────────────────────────────
 // VideoLab/ImageLab 리뷰 스튜디오 전용 실시간 채널
@@ -711,7 +783,8 @@ if (token && token.length > 10) {
 
     try {
       // 1. 카테고리 자율 판별 (기존 무지성 단어 매칭 대신 AI의 의도 파악을 먼저 수행)
-      const evaluation = await modelSelector.selectModel(text);
+      const projects = await dbManager.getProjects();
+      const evaluation = await modelSelector.selectModel(text, projects);
 
       // Phase 11: 지능형 트리거 - QUICK_CHAT(일반적인 질문, 잡담, 승인)이 아닐 때만 카드로 만듭니다.
       // (단, 사용자가 명시적으로 /cmd 명령어를 쓴 경우는 항상 카드로 만듭니다)
@@ -727,9 +800,20 @@ if (token && token.length > 10) {
           bot.sendMessage(chatId, `⏳ 지시가 로컬 SQLite Task Queue에 등록됩니다...`);
         }
         const taskTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-        taskId = await dbManager.createTask(taskTitle, text, author, 'Gemini-2.5-Flash', assignedAgent);
-        broadcastLog('info', `태스크 생성됨: ${text}`, assignedAgent, taskId, 'TELEGRAM');
-        io.emit('task:created', { taskId: String(taskId), title: taskTitle, content: text, column: 'todo', agentId: assignedAgent });
+        taskId = await dbManager.createTask(
+          taskTitle, 
+          text, 
+          author, 
+          'Gemini-2.5-Flash', 
+          assignedAgent, 
+          evaluation.category, 
+          evaluation.target_project
+        );
+        broadcastLog('info', `태스크 생성됨: ${text} [Project: ${evaluation.target_project}]`, assignedAgent, taskId, 'TELEGRAM');
+        // project 단위 격리: io.emit 대신 해당 룸에 브로드캐스트
+        io.to(`project_${evaluation.target_project}`).emit('task:created', { 
+          taskId: String(taskId), title: taskTitle, content: text, column: 'todo', agentId: assignedAgent 
+        });
       } else {
         // 일반 대화는 Interaction 로그로만 기록 (카드 생성 안 됨)
         broadcastLog('info', `[Interaction] ${text}`, 'ari', null, 'TELEGRAM');
@@ -745,7 +829,7 @@ if (token && token.length > 10) {
           agentStates.set('devteam', { status: 'active', lastHeartbeat: Date.now() });
           io.emit('agent:status_change', { agentId: 'devteam', status: 'active' });
           const sid = String(taskId);
-          io.emit('task:moved', { taskId: sid, toColumn: 'in_progress', agentId: 'devteam' });
+          io.to(`project_${evaluation.target_project}`).emit('task:moved', { taskId: sid, toColumn: 'in_progress', agentId: 'devteam' });
 
           // 딥워크 시작 알림 (텔레그램)
           statusReporter.reportAgentRunning(taskId, 'devteam (omo)', text, 'TELEGRAM');
@@ -755,7 +839,7 @@ if (token && token.length > 10) {
             async (code) => {
               const finalStatus = code === 0 ? 'REVIEW' : 'FAILED';
               await dbManager.updateTaskStatus(taskId, finalStatus);
-              io.emit('task:moved', { taskId: sid, toColumn: code === 0 ? 'review' : 'todo' });
+              io.to(`project_${evaluation.target_project}`).emit('task:moved', { taskId: sid, toColumn: code === 0 ? 'review' : 'todo' });
               
               agentStates.set('devteam', { status: 'idle', lastHeartbeat: Date.now() });
               io.emit('agent:status_change', { agentId: 'devteam', status: 'idle' });
@@ -932,7 +1016,8 @@ app.get('/api/search', async (req, res) => {
  */
 app.get('/api/tasks', async (req, res) => {
   try {
-    const rows = await dbManager.getAllTasks();
+    const projectId = req.query.projectId || 'proj_default';
+    const rows = await dbManager.getAllTasks(projectId);
     // DB status → 칸반 column 매핑
     const STATUS_TO_COLUMN = {
       PENDING:     'todo',
@@ -967,7 +1052,7 @@ app.get('/api/tasks', async (req, res) => {
       model: row.model,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      projectId: 'proj-1',
+      projectId: row.project_id || 'proj_default',
     };
     });
     res.json({ status: 'ok', tasks });
@@ -981,7 +1066,8 @@ app.get('/api/tasks', async (req, res) => {
 /** GET /api/tasks/archived — 보관소(Archive)용 Task 목록 */
 app.get('/api/tasks/archived', async (req, res) => {
   try {
-    const rows = await dbManager.getArchivedTasks();
+    const projectId = req.query.projectId || 'proj_default';
+    const rows = await dbManager.getArchivedTasks(projectId);
     const tasks = rows.map((row) => {
       // [Phase27 Step3] title/content 분리 — DB title 컬럼 직접 사용
       const rawTitle   = (row.title || '').trim();
@@ -1003,7 +1089,7 @@ app.get('/api/tasks/archived', async (req, res) => {
         model: row.model,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-        projectId: 'proj-1',
+        projectId: row.project_id || 'proj_default',
       };
     });
     res.json({ status: 'ok', tasks });
@@ -1101,7 +1187,8 @@ app.post('/api/chat', async (req, res) => {
 app.get('/api/comments/recent', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 100;
-    const comments = await dbManager.getRecentGlobalComments(limit);
+    const projectId = req.query.projectId || 'proj_default';
+    const comments = await dbManager.getRecentGlobalComments(limit, projectId);
     res.json({ status: 'ok', comments });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });

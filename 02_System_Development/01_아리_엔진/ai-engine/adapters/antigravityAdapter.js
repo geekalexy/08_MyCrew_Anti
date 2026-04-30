@@ -129,7 +129,10 @@ class AntigravityAdapter extends BaseAdapter {
                 protocol: "CKS_ANTI_BRIDGE_v3",
                 systemInstruction: systemPrompt,
                 taskPayload: userPrompt,
-                instructions: `지시사항에 따른 결괏값을 생각한 뒤, JSON 형태로 작성하여 지정 경로에 저장할 것. 리포트를 출력할 때 반드시 CKS 프레임워크 연구를 위한 _meta 지표를 평가하여 포함할 것.
+                instructions: `지시사항에 따른 결괏값을 생각한 뒤, JSON 형태로 작성하여 지정 경로에 저장할 것. 
+[에이전트 공통 지시사항]
+- 결과물(코드, 이미지, 문서 등)을 저장해야 할 경우, 기본 저장 경로는 '/Users/alex/Documents/08_MyCrew_Anti/07_OUTPUT' 폴더를 사용하라.
+- 리포트를 출력할 때 반드시 CKS 프레임워크 연구를 위한 _meta 지표를 평가하여 포함할 것.
 
 [사고과정 출력 규칙 — Phase 22.6]
 응답의 "text" 필드 안에 다음 태그를 사용하여 사고과정을 반드시 포함하라:

@@ -266,6 +266,7 @@ export default function TaskDetailModal() {
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity'
+  const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
   
   // 패스 21: 댓글 전송 시 함께 업데이트할 필드 상태
   const [commentColumn, setCommentColumn] = useState('');
@@ -343,6 +344,33 @@ export default function TaskDetailModal() {
     };
     socket.on('task:comment_added', handler);
     return () => socket.off('task:comment_added', handler);
+  }, [socket, activeDetailTaskId]);
+
+  // [Sprint4+] 이벤트 드리븐: task:updated 수신 → IN_PROGRESS 시 Activity 자동 기록
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+    const onTaskUpdated = ({ taskId, status, column }) => {
+      if (String(taskId) !== String(activeDetailTaskId)) return;
+      if (status !== 'IN_PROGRESS' && column !== 'in_progress') return;
+
+      const currentTask = useKanbanStore.getState().tasks[String(activeDetailTaskId)];
+      const assignee = currentTask?.assignee || '담당자';
+
+      setComments((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.author === 'system' && last?.content?.includes('시작')) return prev; // 중복 방지
+        return [...prev, {
+          author: 'system',
+          source: { id: 'system', name: 'system' },
+          target: { id: 'user-1', name: 'CEO' },
+          content: `▶️ ${assignee}이(가) 작업을 시작했습니다.`,
+          created_at: new Date().toISOString(),
+        }];
+      });
+      setActiveCommentTab('activity'); // Activity 탭 자동 전환
+    };
+    socket.on('task:updated', onTaskUpdated);
+    return () => socket.off('task:updated', onTaskUpdated);
   }, [socket, activeDetailTaskId]);
 
   const handleClose = useCallback(() => {
@@ -477,6 +505,25 @@ export default function TaskDetailModal() {
       .then((r) => r.json())
       .then(() => updateTaskStatus(task.id, 'PAUSED'))
       .catch(console.error);
+  };
+
+  // [Sprint4+] Todo → In Progress 즉시 실행 핸들러
+  const handleStartTask = () => {
+    if (!task.assignee || task.assignee === '미할당') {
+      alert('담당자를 먼저 지정해주세요.');
+      return;
+    }
+    setIsStarting(true);
+    // PATCH → server가 task:updated 소켓 emit → 모달의 onTaskUpdated에서 Activity 자동 추가
+    fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ column: 'in_progress' }),
+    })
+      .then((r) => r.json())
+      .then(() => patchTask(task.id, { column: 'in_progress', status: 'IN_PROGRESS' }))
+      .catch(console.error)
+      .finally(() => setIsStarting(false));
   };
 
   // [Phase 14 S2] 승인 핸들러 (Review → Done)
@@ -769,6 +816,57 @@ export default function TaskDetailModal() {
             <WorkflowTimeline taskId={task.id} />
           )}
 
+          {/* todo: 실행 시작 CTA */}
+          {(task.column === 'todo' || task.status === 'PENDING') && (
+            <div style={{
+              background: isStarting ? 'rgba(180,197,255,0.1)' : 'rgba(180,197,255,0.06)',
+              border: `1px solid ${isStarting ? 'rgba(180,197,255,0.4)' : 'rgba(180,197,255,0.18)'}`,
+              borderRadius: '12px', padding: '0.8rem 1rem', marginBottom: '1.25rem',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: '1rem', transition: 'all 0.3s',
+            }}>
+              <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '1.1rem', color: 'var(--brand)', opacity: 0.85,
+                  animation: isStarting ? 'spin 1s linear infinite' : 'none',
+                }}>
+                  {isStarting ? 'sync' : 'pending_actions'}
+                </span>
+                {isStarting
+                  ? <span style={{ color: 'var(--brand)' }}><strong>{task.assignee}</strong>에게 태스크를 전달하는 중...</span>
+                  : task.assignee && task.assignee !== '미할당'
+                    ? <><strong style={{ color: 'var(--text-primary)' }}>{task.assignee.toUpperCase()}</strong>에게 즉시 실행을 시작할 수 있습니다.</>
+                    : <span style={{ color: 'var(--text-muted)' }}>담당자를 지정하면 실행시킬 수 있습니다.</span>
+                }
+              </div>
+              <button
+                onClick={handleStartTask}
+                disabled={!task.assignee || task.assignee === '미할당' || isStarting}
+                style={{
+                  background: isStarting
+                    ? 'rgba(180,197,255,0.15)'
+                    : (!task.assignee || task.assignee === '미할당')
+                      ? 'var(--bg-surface-3)'
+                      : 'linear-gradient(135deg, rgba(180,197,255,0.25), rgba(120,140,255,0.35))',
+                  color: (!task.assignee || task.assignee === '미할당') ? 'var(--text-muted)' : 'var(--brand)',
+                  border: '1px solid rgba(180,197,255,0.3)', borderRadius: '8px',
+                  padding: '0.45rem 1rem',
+                  cursor: (!task.assignee || task.assignee === '미할당' || isStarting) ? 'not-allowed' : 'pointer',
+                  fontWeight: 700, fontSize: '0.85rem',
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap', transition: 'all 0.2s', flexShrink: 0,
+                  opacity: isStarting ? 0.7 : 1,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                  {isStarting ? 'hourglass_empty' : 'play_arrow'}
+                </span>
+                {isStarting ? '전달 중...' : '실행 시작'}
+              </button>
+            </div>
+          )}
+
           {/* in_progress: KILL 컨트롤 */}
           {task.status === 'in_progress' && (
             <div style={{ 
@@ -802,9 +900,13 @@ export default function TaskDetailModal() {
           <div style={{ marginBottom: '1rem' }}>
             {/* [S4-2] Discussion / Activity 탭 */}
             {(() => {
-              const SYSTEM_AUTHORS = new Set(['system', 'SYSTEM']);
-              const discussionComments = comments.filter(c => !SYSTEM_AUTHORS.has(c.author));
-              const activityComments   = comments.filter(c =>  SYSTEM_AUTHORS.has(c.author));
+              const isSystemComment = (c) => {
+                const a = (c.author || '').toLowerCase();
+                const s = (c.source?.name || '').toLowerCase();
+                return a === 'system' || s === 'system';
+              };
+              const discussionComments = comments.filter(c => !isSystemComment(c));
+              const activityComments   = comments.filter(c =>  isSystemComment(c));
               const visibleComments    = activeCommentTab === 'discussion' ? discussionComments : activityComments;
               return (
                 <>
@@ -873,19 +975,19 @@ export default function TaskDetailModal() {
                     background: 'var(--bg-surface-2)', borderRadius: '10px',
                     padding: '0.7rem 0.9rem', border: '1px solid var(--border)'
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', alignItems: 'center' }}>
-                      {/* 작성자 흐름: source → target 항상 표시 */}
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <span style={{
-                          fontSize: '0.82rem', fontWeight: 700,
-                          color: srcColor,
-                        }}>{srcName}</span>
-                        <span className="material-symbols-outlined" style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>arrow_forward</span>
-                        <span style={{
-                          fontSize: '0.82rem', fontWeight: 600,
-                          color: tgtColor,
-                        }}>{tgtName}</span>
-                      </span>
+                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', alignItems: 'center' }}>
+                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                         {activeCommentTab === 'activity' ? (
+                           <span style={{
+                             fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)',
+                             fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase',
+                             letterSpacing: '0.07em', background: 'rgba(255,255,255,0.06)',
+                             border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '1px 6px',
+                           }}>System Log</span>
+                         ) : (
+                           <span style={{ fontSize: '0.82rem', fontWeight: 700, color: srcColor }}>{srcName}</span>
+                         )}
+                       </span>
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
                         {(() => {
                           const d = new Date(c.created_at);

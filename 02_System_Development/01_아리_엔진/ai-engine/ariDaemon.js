@@ -74,6 +74,27 @@ function switchToBackupKey() {
 // ─── 대화 히스토리 (in-memory) ───────────────────────────────────────────
 let conversationHistory = [];
 
+if (dbManager) {
+  (async () => {
+    try {
+      const logs = await dbManager.getDailyActivities();
+      const chatLogs = logs.filter(l => l.source === 'WEB_CHAT' || l.source === 'WEB_CHAT_REPLY');
+      // 최근 60개 대화 내용 복원
+      const recentChats = chatLogs.slice(-60);
+      for (const log of recentChats) {
+        if (log.source === 'WEB_CHAT') {
+          conversationHistory.push({ role: 'user', parts: [{ text: log.message }] });
+        } else if (log.source === 'WEB_CHAT_REPLY') {
+          conversationHistory.push({ role: 'model', parts: [{ text: log.message }] });
+        }
+      }
+      console.log(`[AriDaemon] 📥 이전 대화 히스토리 복원 완료: ${conversationHistory.length} 턴`);
+    } catch (e) {
+      console.warn(`[AriDaemon] ⚠️ 대화 히스토리 복원 실패:`, e.message);
+    }
+  })();
+}
+
 // ─── 크루원 정보 SSOT ────────────────────────────────────────────────────
 const CREW_INFO = {
   luca:  { name: 'Luca',  role: 'CTO / 시스템 아키텍트', model: 'Antigravity(Claude)', specialties: ['시스템 설계', '코드 구현', '아키텍처', '백엔드 개발'] },
@@ -201,7 +222,14 @@ function buildAriTools(cols) {
         name: 'updateKanbanTask',
         description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자, 내용을 변경합니다.
 중요(CRITICAL): 사용자가 카드 내용에 대한 추가/수정을 지시하거나 피드백을 줄 때, **절대 채팅창에 말(텍스트)로만 "네 추가하겠습니다"라고 대답해서는 안 됩니다.** 반드시 이 도구를 즉시 호출하여 DB의 카드 내용(content)을 실제로 풍부하게 업데이트 하십시오.
-사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '이 내용을 추가해줘' 등을 말할 때 이 도구를 반드시 사용합니다.`,
+사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '이 내용을 추가해줘' 등을 말할 때 이 도구를 반드시 사용합니다.
+
+[실행 시작 트리거 규칙]
+- 사용자가 "진행해줘", "시작해줘", "실행해줘" 등을 말하고 해당 태스크에 담당자(assigneeId)가 이미 있다면:
+  → status: 'IN_PROGRESS' 로 변경하면 서버가 즉시 해당 에이전트 실행을 트리거합니다.
+  → 이것이 UI의 "실행 시작" 버튼과 동일한 동작입니다. 별도 API 없이 이 도구 하나로 처리됩니다.
+- 담당자가 없는 경우: assigneeId도 함께 지정하면 담당자 배정 + 실행 시작이 동시에 처리됩니다.
+- 예시: updateKanbanTask({ taskId: 117, assigneeId: 'nova', status: 'IN_PROGRESS' })`,
         parameters: {
           type: 'object',
           properties: {
@@ -290,14 +318,14 @@ function buildAriTools(cols) {
       // ── [도구 5] 로컬 폴더 조회 ───────────────────────────────────────
       {
         name: 'listDirectoryContents',
-        description: `로컬 시스템의 폴더 내용을 조회합니다.
-사용자가 'outputs 폴더 확인해봐', '어떤 파일들이 있어?' 등을 말할 때 호출합니다.`,
+        description: `워크스페이스 전체 파일 시스템 구조를 탐색합니다.
+기본 워크스페이스 루트를 기준으로 탐색하며, 절대 경로 입력도 가능합니다.`,
         parameters: {
           type: 'object',
           properties: {
             dirPath: {
               type: 'string',
-              description: '조회할 폴더 경로 (예: "outputs", "skill-library/05_design/lab-assets")',
+              description: '조회할 폴더 경로 (예: "01_아리_엔진/outputs", "/Users/alex/.../outputs")',
             },
           },
           required: ['dirPath'],
@@ -307,13 +335,13 @@ function buildAriTools(cols) {
       {
         name: 'analyzeLocalImage',
         description: `로컬에 저장된 이미지 파일(.png, .jpg 등)을 시각적으로 분석(Vision)합니다.
-사용자가 '저장된 결과물 파일 확인해봐', '이미지 어떤지 봐줘' 등을 말할 때 파일 경로를 넣어 호출합니다.`,
+사용자가 워크스페이스 전체에서 첨부한 파일 경로나 특정 이미지를 분석해달라고 할 때 호출합니다. 상대경로(워크스페이스 루트 기준) 및 절대경로를 모두 지원합니다.`,
         parameters: {
           type: 'object',
           properties: {
             filePath: {
               type: 'string',
-              description: '분석할 이미지 파일 경로 (예: "outputs/result.png")',
+              description: '분석할 이미지 파일 경로 (예: "01_아리_엔진/outputs/result.png", "/Users/alex/.../image.png")',
             },
             prompt: {
               type: 'string',
@@ -590,7 +618,7 @@ async function executeTool(toolName, args) {
 
       // [Phase 25] 할당 이벤트 발생 (서버의 Dispatcher 트리거)
       try {
-        fetch(`http://localhost:4000/api/tasks/dispatch`, {
+        fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/dispatch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId: assigneeId })
@@ -599,7 +627,7 @@ async function executeTool(toolName, args) {
 
       // [버그 패치] 실시간 UI 갱신을 위한 socket.io 브로드캐스트 트리거
       try {
-        fetch(`http://localhost:4000/api/tasks/notify-created`, {
+        fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/notify-created`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -643,7 +671,7 @@ async function executeTool(toolName, args) {
       // [아카이빙] COMPLETED 또는 ARCHIVED로 변경되는 경우 /archive API 호출
       if (column === 'done' || column === 'archive') {
         try {
-          const archiveResp = await fetch(`http://localhost:4000/api/tasks/${taskId}/archive`, {
+          const archiveResp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}/archive`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ archivedBy: 'ARI(위임)' }),
@@ -662,7 +690,7 @@ async function executeTool(toolName, args) {
 
       // 일반 수정 (done 아닌 경우)
       try {
-        const resp = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatePayload)
@@ -670,10 +698,10 @@ async function executeTool(toolName, args) {
         
         if (!resp.ok) {
           const errBody = await resp.text();
-          return { success: false, message: `#${taskId} 수정 실패 (서버 에러): ${errBody}` };
+          return { success: false, message: `#${taskId} 수정 실패 (서버 응답코드: ${resp.status}): ${errBody}` };
         }
       } catch (err) {
-        return { success: false, message: `#${taskId} 서버 통신 오류: ${err.message}` };
+        return { success: false, message: `#${taskId} 서버 연결 실패: 서버가 꺼져있거나 통신에 문제가 있습니다. (원인: ${err.message})` };
       }
 
       return {
@@ -687,15 +715,15 @@ async function executeTool(toolName, args) {
     if (toolName === 'deleteKanbanTask') {
       const { taskId, reason } = args;
       try {
-        const resp = await fetch(`http://localhost:4000/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}`, {
           method: 'DELETE'
         });
         if (!resp.ok) {
           const errBody = await resp.text();
-          return { success: false, message: `#${taskId} 삭제 실패 (서버 에러): ${errBody}` };
+          return { success: false, message: `#${taskId} 삭제 실패 (서버 응답코드: ${resp.status}): ${errBody}` };
         }
       } catch (err) {
-        return { success: false, message: `#${taskId} 서버 통신 오류: ${err.message}` };
+        return { success: false, message: `#${taskId} 서버 연결 실패: 서버가 꺼져있거나 통신에 문제가 있습니다. (원인: ${err.message})` };
       }
       return {
         success: true,
@@ -776,8 +804,20 @@ async function executeTool(toolName, args) {
     // ── listDirectoryContents ────────────────────────────────────────────────
     if (toolName === 'listDirectoryContents') {
       const { dirPath } = args;
-      const targetPath = path.resolve(process.cwd(), dirPath);
-      if (!fs.existsSync(targetPath)) return { success: false, message: `경로를 찾을 수 없습니다: ${dirPath}` };
+      const workspaceRoot = path.resolve(process.cwd(), '../../');
+      const targetPath = path.isAbsolute(dirPath) ? dirPath : path.resolve(workspaceRoot, dirPath);
+      
+      const allowedPaths = [
+        path.resolve(workspaceRoot, '05_My_history'),
+        path.resolve(workspaceRoot, '06_소시안자료'),
+        path.resolve(workspaceRoot, '07_OUTPUT')
+      ];
+      const isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      if (!isAllowed) {
+        return { success: false, message: `보안 제한: 시스템 폴더에는 접근할 수 없습니다. (허용: 05_My_history, 06_소시안자료, 07_OUTPUT)` };
+      }
+
+      if (!fs.existsSync(targetPath)) return { success: false, message: `경로를 찾을 수 없습니다: ${targetPath}` };
       
       const files = fs.readdirSync(targetPath);
       return { success: true, message: `📂 ${dirPath} 폴더 내용:\n${files.join('\n')}` };
@@ -786,8 +826,20 @@ async function executeTool(toolName, args) {
     // ── analyzeLocalImage ────────────────────────────────────────────────────
     if (toolName === 'analyzeLocalImage') {
       const { filePath, prompt } = args;
-      const targetPath = path.resolve(process.cwd(), filePath);
-      if (!fs.existsSync(targetPath)) return { success: false, message: `파일을 찾을 수 없습니다: ${filePath}` };
+      const workspaceRoot = path.resolve(process.cwd(), '../../');
+      const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
+
+      const allowedPaths = [
+        path.resolve(workspaceRoot, '05_My_history'),
+        path.resolve(workspaceRoot, '06_소시안자료'),
+        path.resolve(workspaceRoot, '07_OUTPUT')
+      ];
+      const isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      if (!isAllowed) {
+        return { success: false, message: `보안 제한: 시스템 폴더에는 접근할 수 없습니다. (허용: 05_My_history, 06_소시안자료, 07_OUTPUT)` };
+      }
+
+      if (!fs.existsSync(targetPath)) return { success: false, message: `파일을 찾을 수 없습니다: ${targetPath}` };
       
       try {
         const mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -820,7 +872,7 @@ async function executeTool(toolName, args) {
       await dbManager.toggleAgentSkill(agentId, skillId, isActive);
       
       // REST API로도 변경 사실을 알리기 (프론트 실시간 동기화를 위해)
-      fetch(`http://localhost:4000/api/agents/${agentId}/skills`, {
+      fetch(`http://localhost:${process.env.PORT || 4005}/api/agents/${agentId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skillId, active: isActive })

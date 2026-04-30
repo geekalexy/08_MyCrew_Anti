@@ -213,6 +213,59 @@ async function dispatchNextTaskForAgent(agentId) {
   }
 }
 
+// ── [isFinal: false 재착수] 중간 보고 수신 후 동일 태스크 즉시 재투입 ──────
+// dispatchNextTaskForAgent와 달리 busy 체크를 우회하고 특정 taskId를 강제 재실행
+async function forceRedispatchTask(taskId, agentId, interimReport = '') {
+  if (!dbManager || !executor) return;
+  try {
+    const fullTask = await dbManager.getTaskById(taskId);
+    if (!fullTask) {
+      console.warn(`[ForceRedispatch] Task #${taskId} 없음 — 재착수 취소`);
+      return;
+    }
+    // 중간 보고를 컨텍스트로 주입: NOVA가 자신이 이미 착수 보고를 했음을 인지
+    const enrichedContent = interimReport
+      ? `${fullTask.content}\n\n---\n[이전 착수 보고]\n${interimReport}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`
+      : fullTask.content;
+
+    broadcastLog('info',
+      `> [${agentId}] isFinal:false 수신 → 본작업 재착수 트리거 (Task #${taskId})`,
+      'system', taskId
+    );
+
+    setImmediate(async () => {
+      try {
+        const result = await executor.runDirect(enrichedContent, agentId, taskId);
+        const status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED' : 'REVIEW';
+        const column  = status === 'FAILED' ? 'todo' : 'review';
+
+        await dbManager.updateTaskStatus(taskId, status);
+        const thoughtProcess = result._meta?.thought_process || null;
+        await dbManager.createComment(taskId, agentId, result.text || '작업이 완료되었습니다.', thoughtProcess);
+
+        io.emit('task:moved', { taskId: String(taskId), toColumn: column });
+        io.emit('task:comment_added', {
+          taskId: String(taskId), author: agentId,
+          text: result.text, thought_process: thoughtProcess, createdAt: new Date().toISOString()
+        });
+
+        if (status === 'FAILED') {
+          broadcastLog('error', `> [${agentId}] Task #${taskId} 재착수 실패`, agentId, taskId);
+          io.emit('task:failed', { taskId: String(taskId), agentId, reason: result.text, failedAt: new Date().toISOString() });
+        } else {
+          broadcastLog('success', `> [${agentId}] Task #${taskId} 재착수 완료 — 승인 대기 중`, agentId, taskId);
+        }
+      } catch (err) {
+        console.error(`[ForceRedispatch] runDirect 오류 Task #${taskId}:`, err.message);
+        broadcastLog('error', `> [${agentId}] Task #${taskId} 재착수 오류: ${err.message}`, agentId, taskId);
+        await dbManager.updateTaskStatus(taskId, 'FAILED').catch(() => {});
+      }
+    });
+  } catch (err) {
+    console.error(`[ForceRedispatch Error]`, err.message);
+  }
+}
+
 // ariDaemon 등 외부 프로세스에서 할당 이벤트를 트리거할 수 있는 엔드포인트
 app.post('/api/tasks/dispatch', async (req, res) => {
   const { agentId } = req.body;
@@ -2567,53 +2620,9 @@ if (process.env.NO_SERVER !== 'true') {
   process.on('SIGTERM', () => { daemonProcess?.kill('SIGTERM'); process.exit(0); });
   process.on('SIGINT',  () => { daemonProcess?.kill('SIGTERM'); process.exit(0); });
 
-  // ─── [S3-5] Hard Timeout 감지기 ─────────────────────────────────
-  // 런타임 중 30분 이상 IN_PROGRESS 상태에 머문 Task를 10분 주기로 감지
-  // 감지 시 task:timeout 소켓 이벤트 + 텔레그램 알림 → 프론트 CTA 트리거
-  const HARD_TIMEOUT_MS = 30 * 60 * 1000;   // 30분
-  const TIMEOUT_CHECK_INTERVAL = 10 * 60 * 1000; // 10분 주기
-  const _notifiedTimeouts = new Set(); // 중복 알림 방지
-
-  setInterval(async () => {
-    try {
-      const staleTasks = await dbManager.getStaleTasks(HARD_TIMEOUT_MS / 1000 / 60); // 분 단위
-      if (!staleTasks || staleTasks.length === 0) return;
-
-      const stuck = staleTasks.filter(t =>
-        (t.status === 'in_progress' || t.status === 'IN_PROGRESS') &&
-        !_notifiedTimeouts.has(t.id)
-      );
-
-      for (const t of stuck) {
-        _notifiedTimeouts.add(t.id);
-        const agentId = t.assigned_agent || 'system';
-        const elapsed = Math.round((Date.now() - new Date(t.updated_at).getTime()) / 60000);
-
-        broadcastLog('warn',
-          `> [TIMEOUT] Task #${t.id} — ${elapsed}분 이상 응답 없음. 재시도 또는 재할당이 필요합니다.`,
-          agentId, t.id
-        );
-
-        // 프론트 CTA 트리거 — task:failed 이벤트 재사용 (이미 모달 CTA 연결됨)
-        io.emit('task:failed', {
-          taskId: String(t.id),
-          agentId,
-          reason: `Hard Timeout — ${elapsed}분 이상 응답 없음. 네트워크 또는 API 지연일 수 있습니다.`,
-          failedAt: new Date().toISOString(),
-          isTimeout: true,
-        });
-
-        if (bot && process.env.TELEGRAM_CHAT_ID) {
-          bot.sendMessage(
-            process.env.TELEGRAM_CHAT_ID,
-            `⏰ [Hard Timeout]\nTask #${t.id}: ${t.title}\n담당: ${agentId.toUpperCase()}\n${elapsed}분 이상 응답이 없습니다.\n워크스페이스에서 재시도/재할당해 주세요.`
-          ).catch(() => {});
-        }
-      }
-    } catch (err) {
-      console.error('[HardTimeout] 감지 중 오류:', err.message);
-    }
-  }, TIMEOUT_CHECK_INTERVAL);
+  // ─── [S3-5] Hard Timeout 감지기 비활성화 ──────────────────────────
+  // AdapterWatcher에서도 제거됨. review 대기 중 태스크 강제 중단 UX 버그 방지.
+  // 재활성화 필요 시: PENDING 파일 기준 queuedAt 타임스탬프로 executor 레벨에서 처리할 것.
 
   // ─── [Week 1] Boot Recovery Sequence ─────────────────────────────
   // 크래시 등 예기치 않은 종료로 인해 IN_PROGRESS 상태에 갇힌 미응답 Task 복구

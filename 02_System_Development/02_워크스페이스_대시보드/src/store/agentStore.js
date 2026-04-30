@@ -174,7 +174,8 @@ export const useAgentStore = create(
   // ─── [Phase 17-4] 스킬 관리 (DB 연동) ───
   fetchAgentSkills: async (agentId) => {
     try {
-      const res = await fetch(`http://localhost:4000/api/agents/${agentId}/skills`);
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+      const res = await fetch(`${SERVER_URL}/api/agents/${agentId}/skills`);
       const data = await res.json();
 
       // 레지스트리 기반 기본 skillConfig 생성
@@ -240,7 +241,8 @@ export const useAgentStore = create(
       });
 
       // API 호출
-      const res = await fetch(`http://localhost:4000/api/agents/${agentId}/skills`, {
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+      const res = await fetch(`${SERVER_URL}/api/agents/${agentId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skillId, active: isActive })

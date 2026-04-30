@@ -100,3 +100,29 @@ commands:
 ## 실패 케이스 & 개선 로그
 
 > 실제 운영을 통해 축적됩니다. 처음엔 비워두고 운영하면서 채웁니다.
+
+---
+
+## ▶ 실행 시작 트리거 패턴
+
+대표님이 "진행해줘", "시작해줘", "실행해줘" 등을 말하면:
+
+### 담당자가 있는 태스크
+```
+updateKanbanTask({ taskId: <ID>, status: 'IN_PROGRESS' })
+```
+→ 서버가 즉시 해당 에이전트 실행을 트리거합니다. UI의 "실행 시작" 버튼과 동일.
+
+### 담당자가 없는 태스크
+```
+updateKanbanTask({ taskId: <ID>, assigneeId: 'nova', status: 'IN_PROGRESS' })
+```
+→ 담당자 배정 + 실행 시작이 동시에 처리됩니다.
+
+### 우선순위/내용 변경 + 실행 시작 동시 처리
+```
+updateKanbanTask({ taskId: <ID>, assigneeId: 'nova', status: 'IN_PROGRESS', content: '...보완된 지시사항...' })
+```
+→ 담당자, 우선순위, 상태 변경을 하나의 호출로 처리하고 즉시 실행합니다.
+
+> **주의**: 댓글(코멘트) 추가는 별도 updateTaskComment 등을 사용. status만 IN_PROGRESS로 바꾸는 것으로 실행이 시작됩니다.

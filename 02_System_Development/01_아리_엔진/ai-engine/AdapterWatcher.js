@@ -31,8 +31,7 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
   // 3초마다 completed 디렉토리를 감시하여 완료된 JSON을 처리 (빠르고 가벼운 폴링)
   setInterval(async () => {
     try {
-      // ── [Phase 22] Pending 큐 값이 었는지 확인 → adapter:status_change 송신 ──
-      // ── [Phase 22] Pending 큐 모니터링: 10분 Hard Timeout 방어 및 상태 송신 ──
+      // ── [Phase 22] Pending 큐 모니터링: adapter:status_change 송신 ──
       try {
         const pendingFiles = (await fs.promises.readdir(PENDING_DIR)).filter(f => f.endsWith('.json'));
         const queueDepth = pendingFiles.length;
@@ -46,43 +45,9 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
             queueDepth,
           });
         }
-
-        // Hard Timeout (10분) 스캐닝
-        const TIMEOUT_MS = 10 * 60 * 1000;
-        const now = Date.now();
-        
-        for (const file of pendingFiles) {
-          const filePath = path.join(PENDING_DIR, file);
-          try {
-            const raw = await fs.promises.readFile(filePath, 'utf-8');
-            const data = JSON.parse(raw);
-            if (data.queuedAt && (now - new Date(data.queuedAt).getTime() > TIMEOUT_MS)) {
-              console.warn(`[AdapterWatcher] 🚨 10분 Timeout 발생: Task #${data.taskId}. 무한 루프 방어 발동!`);
-              
-              const taskId = data.taskId;
-              await dbManagerInstance.updateTaskStatus(taskId, 'FAILED');
-              const msg = `🚨 작업 시간이 10분을 초과하여 시스템 쉴드(Hard Timeout)가 발동했습니다. 백그라운드 에이전트 실행을 강제 중단했습니다. 수동 복구를 진행해주세요.`;
-              await dbManagerInstance.createComment(taskId, 'system', msg);
-              
-              if (broadcastLogFn) {
-                broadcastLogFn('error', msg, 'system', taskId);
-              }
-              // [Phase 22.6] Timeout 발생 시 카드를 To Do로 원복하고, 에이전트 상태를 초기화
-              ioInstance?.emit('task:moved', { taskId, toColumn: 'todo' });
-              ioInstance?.emit('task:comment_added', { taskId, author: 'system', text: msg, createdAt: new Date().toISOString() });
-              
-              const agentId = data.agentId || data.assignedAgent;
-              if (agentId) {
-                ioInstance?.emit('agent:status_change', { agentId, status: 'idle' });
-              }
-              
-              // Timeout 파일 폐기
-              await fs.promises.unlink(filePath);
-            }
-          } catch (e) {
-            // Read/Parse 에러 무시
-          }
-        }
+        // [Phase 22 개선] Hard Timeout 10분 스캐닝 제거:
+        // - 리뷰(review) 대기 중인 태스크까지 강제 중단되는 UX 버그 방지
+        // - 무한루프 방어는 executor.js 레벨에서 abort signal로 처리
       } catch (_) { /* pending 폴더 연산 실패 시 조용히 패스 */ }
 
       // ── Completed 클리너 ──
@@ -101,9 +66,20 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
 
           console.log(`[AdapterWatcher] 에이전트 작업 완료 감지: Task #${taskId}`);
 
+          // ── isFinal 플래그 분기 ──────────────────────────────────────
+          // isFinal: true  (기본값) → 최종 결과물 제출 → review 이동
+          // isFinal: false          → 중간 보고 댓글  → in_progress 유지
+          const isFinal = resultData.isFinal !== false; // undefined/true → 최종, false → 중간
+
           // DB 업데이트 및 소켓 전송
-          const status = resultData.status === 'failed' ? 'FAILED' : 'REVIEW';
-          const column = status === 'FAILED' ? 'todo' : 'review';
+          let status, column;
+          if (resultData.status === 'failed') {
+            status = 'FAILED'; column = 'todo';
+          } else if (isFinal) {
+            status = 'REVIEW'; column = 'review';
+          } else {
+            status = 'IN_PROGRESS'; column = 'in_progress'; // 중간 보고: 진행 유지
+          }
 
           await dbManagerInstance.updateTaskStatus(taskId, status);
           

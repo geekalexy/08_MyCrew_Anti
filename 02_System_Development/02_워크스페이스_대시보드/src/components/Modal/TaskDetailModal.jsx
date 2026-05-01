@@ -265,9 +265,8 @@ export default function TaskDetailModal() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
-  const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity' | 'output'
+  const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity'
   const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
-  const [outputFiles, setOutputFiles] = useState([]); // [Phase 28] 에이전트 결과물 파일 목록
   
   // 패스 21: 댓글 전송 시 함께 업데이트할 필드 상태
   const [commentColumn, setCommentColumn] = useState('');
@@ -288,8 +287,6 @@ export default function TaskDetailModal() {
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const textareaRef = useRef(null);
   const moreMenuRef = useRef(null);
-  const fileInputRef = useRef(null); // [Phase 28] 파일 첨부
-  const [isUploading, setIsUploading] = useState(false); // [Phase 28] 파일 업로드 상태
 
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
@@ -347,22 +344,6 @@ export default function TaskDetailModal() {
     };
     socket.on('task:comment_added', handler);
     return () => socket.off('task:comment_added', handler);
-  }, [socket, activeDetailTaskId]);
-
-  // [Phase 28] output:created 소켓 — 에이전트 결과물 파일 도착 감지
-  useEffect(() => {
-    if (!socket || !activeDetailTaskId) return;
-    const handler = ({ taskId, fileName, filePath }) => {
-      if (String(taskId) !== String(activeDetailTaskId)) return;
-      setOutputFiles(prev => {
-        // 중복 방지
-        if (prev.some(f => f.filePath === filePath)) return prev;
-        return [{ fileName, filePath, arrivedAt: new Date().toISOString() }, ...prev];
-      });
-      setActiveCommentTab('output'); // 결과물 도착 시 Output 탭 자동 전환
-    };
-    socket.on('output:created', handler);
-    return () => socket.off('output:created', handler);
   }, [socket, activeDetailTaskId]);
 
   // [Sprint4+] 이벤트 드리븐: task:updated 수신 → IN_PROGRESS 시 Activity 자동 기록
@@ -435,30 +416,6 @@ export default function TaskDetailModal() {
 
     setIsEditing(false);
   };
-
-  // [Phase 28] 첨부파일 업로드 핸들러
-  const handleAttach = useCallback(async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !task) return;
-    e.target.value = ''; // reset for re-select same file
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch(`${SERVER_URL}/api/input/${task.id}`, { method: 'POST', body: formData });
-      const data = await res.json();
-      if (data.success) {
-        const tag = `[\ucca8\ubd80: ${data.filePath}]`;
-        setCommentText(prev => prev ? `${prev}\n${tag}` : tag);
-      } else {
-        alert(data.message || '\uc5c5\ub85c\ub4dc \uc2e4\ud328');
-      }
-    } catch (err) {
-      console.error('[Attach] \uc5c1\ub85c\ub4dc \uc624\ub958:', err.message);
-    } finally {
-      setIsUploading(false);
-    }
-  }, [task, SERVER_URL]);
 
   // ESC 키로 모달 닫기
   useEffect(() => {
@@ -950,16 +907,14 @@ export default function TaskDetailModal() {
               };
               const discussionComments = comments.filter(c => !isSystemComment(c));
               const activityComments   = comments.filter(c =>  isSystemComment(c));
-              // output 탭은 visibleComments와 무관하게 별도 렌더링
               const visibleComments    = activeCommentTab === 'discussion' ? discussionComments : activityComments;
               return (
                 <>
                   {/* 탭 버튼 */}
                   <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '0.75rem' }}>
                     {[
-                     { key: 'discussion', icon: 'forum',    label: 'Discussion', count: discussionComments.length },
+                      { key: 'discussion', icon: 'forum',    label: 'Discussion', count: discussionComments.length },
                       { key: 'activity',   icon: 'history',  label: 'Activity',   count: activityComments.length },
-                      { key: 'output',     icon: 'folder_open', label: 'Output',  count: outputFiles.length },
                     ].map(tab => (
                       <button key={tab.key} onClick={() => setActiveCommentTab(tab.key)} style={{
                         display: 'flex', alignItems: 'center', gap: '0.3rem',
@@ -1159,79 +1114,6 @@ export default function TaskDetailModal() {
                 </>
               );
             })()}
-
-            {/* [Phase 28] Output 탭 콘텐츠 — 에이전트 결과물 파일 뷰어 */}
-            {activeCommentTab === 'output' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', minHeight: '80px' }}>
-                {outputFiles.length === 0 ? (
-                  <div style={{
-                    display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    justifyContent: 'center', padding: '2rem',
-                    color: 'var(--text-muted)', fontSize: '0.85rem', gap: '0.5rem',
-                  }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '2rem', opacity: 0.4 }}>folder_open</span>
-                    <span>아직 에이전트 결과물이 없습니다.</span>
-                    <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>에이전트가 작업을 완료하면 여기에 파일이 표시됩니다.</span>
-                  </div>
-                ) : outputFiles.map((f, idx) => {
-                  const ext = f.fileName.split('.').pop().toLowerCase();
-                  const isImage = ['png','jpg','jpeg','gif','webp'].includes(ext);
-                  // /io/outputs/{taskId}/{filename} 정적 서빙 경로
-                  const parts = f.filePath.replace('07_OUTPUT/outputs/', '').split('/');
-                  const serveUrl = `${SERVER_URL}/io/outputs/${parts.join('/')}`;
-                  return (
-                    <div key={idx} style={{
-                      background: 'var(--bg-surface-2)', border: '1px solid var(--border)',
-                      borderRadius: '10px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem',
-                    }}>
-                      {/* 파일 헤더 */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--brand)' }}>
-                            {isImage ? 'image' : 'description'}
-                          </span>
-                          {f.fileName}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            {new Date(f.arrivedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <a
-                            href={serveUrl}
-                            download={f.fileName}
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.75rem', color: 'var(--brand)', textDecoration: 'none' }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>download</span>
-                          </a>
-                        </div>
-                      </div>
-                      {/* 이미지 미리보기 */}
-                      {isImage && (
-                        <img
-                          src={serveUrl}
-                          alt={f.fileName}
-                          style={{
-                            maxWidth: '100%', maxHeight: '320px', borderRadius: '6px',
-                            objectFit: 'contain', border: '1px solid var(--border)',
-                          }}
-                        />
-                      )}
-                      {/* 비이미지 파일: 경로 + 열기 링크 */}
-                      {!isImage && (
-                        <a
-                          href={serveUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ fontSize: '0.78rem', color: 'var(--text-muted)', wordBreak: 'break-all', textDecoration: 'underline' }}
-                        >
-                          {f.filePath}
-                        </a>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
 
           {/* 댓글 입력 영역과 함께 상태/할당 컨트롤 */}
@@ -1329,39 +1211,7 @@ export default function TaskDetailModal() {
                 📦 아카이빙 완료 — Obsidian에 저장됩니다. X 버튼으로 닫으면 칸반에서 제거됩니다.
               </div>
             )}
-            {/* [Phase 28] 첨부 아이콘 + 전송 버튼 행 */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-              {/* 첨부 아이콘 */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".png,.jpg,.jpeg,.gif,.webp,.pdf,.txt,.csv,.md,.json"
-                  style={{ display: 'none' }}
-                  onChange={handleAttach}
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isArchived || isUploading}
-                  title="파일 첨부 (이미지, PDF, 문서)"
-                  style={{
-                    background: 'none', border: '1px solid var(--border)', borderRadius: '6px',
-                    padding: '0.3rem 0.5rem', cursor: isUploading ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '0.25rem',
-                    color: 'var(--text-muted)', fontSize: '0.78rem',
-                    opacity: isUploading ? 0.6 : 1, transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={(e) => { if (!isUploading) e.currentTarget.style.color = 'var(--brand)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                >
-                  {isUploading
-                    ? <span className="material-symbols-outlined" style={{ fontSize: '1rem', animation: 'spin 1s linear infinite' }}>sync</span>
-                    : <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>attach_file</span>
-                  }
-                  {isUploading ? '업로드 중...' : '첨부'}
-                </button>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
               <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
                 +Enter 업데이트 전송

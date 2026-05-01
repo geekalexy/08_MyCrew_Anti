@@ -38,7 +38,6 @@ if (import.meta.hot) {
 
 export function useSocket() {
   const socketRef = useRef(null);
-  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
 
   useEffect(() => {
     if (!socketInstance) {
@@ -196,14 +195,6 @@ export function useSocket() {
 
     return () => {};
   }, []);
-
-  // selectedProjectId 가 변경되면 소켓에 프로젝트 조인 이벤트 방출 (Phase 29)
-  useEffect(() => {
-    if (socketRef.current && selectedProjectId) {
-      socketRef.current.emit('project:join', { projectId: selectedProjectId });
-      console.log(`[useSocket] 🔄 project:join -> ${selectedProjectId}`);
-    }
-  }, [selectedProjectId]);
 
   const emitTaskMove = useCallback((taskId, fromColumn, toColumn) => {
     const sid = String(taskId);

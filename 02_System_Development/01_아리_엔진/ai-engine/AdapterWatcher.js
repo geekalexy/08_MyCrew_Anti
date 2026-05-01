@@ -19,14 +19,12 @@ const PENDING_DIR   = path.resolve(process.cwd(), '.agents/tasks/pending');
 // 구 데표 크 추적 (변가 감지용)
 let prevQueueDepth = -1;
 
-export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn, forceRedispatchFn) {
+export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
   ioInstance = io;
   dbManagerInstance = dbMgr;
   broadcastLogFn = broadcastFn;
   // [Case 3 Fix] 작업 완료 후 다음 대기 카드 자동 Pull 트리거용 함수 주입
   const dispatchNextTaskForAgent = dispatchFn || (() => {});
-  // [isFinal:false Fix] 중간 보고 수신 후 본작업 자동 재착수 함수 주입
-  const forceRedispatchTask = forceRedispatchFn || (() => {});
 
   console.log('[AdapterWatcher] 백그라운드 폴링 감시 데감을 시작합니다...');
   
@@ -70,7 +68,7 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn, forceRedi
 
           // ── isFinal 플래그 분기 ──────────────────────────────────────
           // isFinal: true  (기본값) → 최종 결과물 제출 → review 이동
-          // isFinal: false          → 중간 보고 댓글  → in_progress 유지 + 재착수 트리거
+          // isFinal: false          → 중간 보고 댓글  → in_progress 유지
           const isFinal = resultData.isFinal !== false; // undefined/true → 최종, false → 중간
 
           // DB 업데이트 및 소켓 전송

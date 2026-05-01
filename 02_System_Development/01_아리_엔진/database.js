@@ -87,11 +87,6 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN failure_count INTEGER DEFAULT 0`);
       console.log('[DB] S4-3 마이그레이션: failure_count 컬럼 추가 완료');
     }
-    // [Phase 29] 프로젝트 격리용 식별자
-    if (!names.includes('project_id')) {
-      db.run(`ALTER TABLE Task ADD COLUMN project_id TEXT DEFAULT 'proj_default'`);
-      console.log('[DB] Phase 29 마이그레이션: Task.project_id 컬럼 추가 완료');
-    }
   });
 
   db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
@@ -100,11 +95,6 @@ db.serialize(() => {
     if (!names.includes('meta_data')) {
       db.run(`ALTER TABLE TaskComment ADD COLUMN meta_data TEXT DEFAULT NULL`);
       console.log('[DB] Phase 22.6 마이그레이션: TaskComment meta_data 컬럼 추가 완료');
-    }
-    // [Phase 29] 프로젝트 격리용 식별자
-    if (!names.includes('project_id')) {
-      db.run(`ALTER TABLE TaskComment ADD COLUMN project_id TEXT DEFAULT 'proj_default'`);
-      console.log('[DB] Phase 29 마이그레이션: TaskComment.project_id 컬럼 추가 완료');
     }
   });
 
@@ -118,16 +108,6 @@ db.serialize(() => {
     source     TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
-
-  // [Phase 29] Log 테이블 프로젝트 격리 마이그레이션
-  db.all(`PRAGMA table_info(Log)`, (err, cols) => {
-    if (err) return;
-    const names = (cols || []).map(c => c.name);
-    if (!names.includes('project_id')) {
-      db.run(`ALTER TABLE Log ADD COLUMN project_id TEXT DEFAULT 'proj_default'`);
-      console.log('[DB] Phase 29 마이그레이션: Log.project_id 컬럼 추가 완료');
-    }
-  });
 
   // TaskComment 테이블 생성 (Prime W2 반영: 별도 테이블 설계)
   db.run(`CREATE TABLE IF NOT EXISTS TaskComment (
@@ -221,25 +201,13 @@ db.serialize(() => {
     if (!names.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
   });
 
-  // ─── [v2.0 & Phase 29] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
+  // ─── [v2.0] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
   db.run(`CREATE TABLE IF NOT EXISTS projects (
-    id              TEXT PRIMARY KEY,
-    name            TEXT NOT NULL,
-    description     TEXT DEFAULT '',
-    isolation_level TEXT DEFAULT 'GLOBAL',
-    status          TEXT DEFAULT 'active',
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    status     TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
-
-  // [Phase 29] 기존 projects 테이블 마이그레이션
-  db.all(`PRAGMA table_info(projects)`, (err, cols) => {
-    if (err) return;
-    const names = (cols || []).map(c => c.name);
-    if (!names.includes('description'))     db.run(`ALTER TABLE projects ADD COLUMN description TEXT DEFAULT ''`);
-    if (!names.includes('isolation_level')) db.run(`ALTER TABLE projects ADD COLUMN isolation_level TEXT DEFAULT 'GLOBAL'`);
-    if (!names.includes('updated_at'))      db.run(`ALTER TABLE projects ADD COLUMN updated_at DATETIME`);
-  });
 
   db.run(`CREATE TABLE IF NOT EXISTS teams (
     id          TEXT PRIMARY KEY,
@@ -259,7 +227,6 @@ db.serialize(() => {
   )`);
 
   // ─── [v2.0] 시더(종자) 데이터 ──────────────────────────────────────────
-  db.run(`INSERT OR IGNORE INTO projects (id, name, description, isolation_level) VALUES ('proj_default', '기본 워크스페이스', '마이크루 기본 전역 워크스페이스입니다.', 'GLOBAL')`);
   db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_cks',   '소시안 CKS 실험')`);
   db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_planC', '소시안 Plan C 캠페인')`);
 
@@ -320,13 +287,13 @@ db.serialize(() => {
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(title, content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj_default') {
+  createTask(title, content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT') {
     const riskLevel = classifyRiskLevel(content || '');
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       );
-      stmt.run([title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category, projectId], function (err) {
+      stmt.run([title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -356,16 +323,15 @@ class DatabaseManager {
   }
 
   // ─── 프론트엔드 Hydration용: 전체 Task 목록 조회 (경량 DTO, latest_comment JOIN 제거) ───
-  getAllTasks(projectId = 'proj_default') {
+  getAllTasks() {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, artifact_url, failure_count,
-                created_at, updated_at, project_id
+                created_at, updated_at
          FROM Task 
-         WHERE deleted_at IS NULL AND project_id = ?
+         WHERE deleted_at IS NULL
          ORDER BY id DESC LIMIT 200`,
-        [projectId],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
@@ -390,15 +356,14 @@ class DatabaseManager {
   }
 
   // ─── 아카이브 목록 조회 ────────────────────────────────────────────────────
-  getArchivedTasks(projectId = 'proj_default') {
+  getArchivedTasks() {
     return new Promise((resolve, reject) => {
       db.all(
         `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at
          FROM Task 
-         WHERE status = 'ARCHIVED' AND deleted_at IS NULL AND project_id = ?
+         WHERE status = 'ARCHIVED' AND deleted_at IS NULL
          ORDER BY id DESC`,
-        [projectId],
         (err, rows) => {
           if (err) reject(err);
           else resolve(rows || []);
@@ -465,16 +430,6 @@ class DatabaseManager {
           else resolve(this.changes);
         }
       );
-    });
-  }
-
-  // ─── [Phase 29] 모든 프로젝트 목록 조회 ──────────────────────────────
-  getProjects() {
-    return new Promise((resolve, reject) => {
-      db.all(`SELECT id, name, description, isolation_level FROM projects`, (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows || []);
-      });
     });
   }
 
@@ -614,11 +569,11 @@ class DatabaseManager {
   }
 
   // ─── Task 글로벌 최근 댓글 조회 (Phase 22.6) ──────────────────────────────────
-  getRecentGlobalComments(limit = 100, projectId = 'proj_default') {
+  getRecentGlobalComments(limit = 100) {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT task_id, author, content, meta_data, created_at FROM TaskComment WHERE project_id = ? ORDER BY created_at DESC LIMIT ?`,
-        [projectId, limit],
+        `SELECT task_id, author, content, meta_data, created_at FROM TaskComment ORDER BY created_at DESC LIMIT ?`,
+        [limit],
         (err, rows) => {
           if (err) return reject(err);
           // [S1-1] _parseMetaRow 헬퍼로 통일

@@ -17,7 +17,7 @@ import dbManager from './database.js';
 import keyProvider from './ai-engine/tools/keyProvider.js';
 import teamActivator from './ai-engine/teamActivator.js';
 import tutorialManager from './ai-engine/tutorialManager.js';
-import executor from './ai-engine/executor.js';
+import executor, { updateAgentSignatureModel, getAgentSignatureModel } from './ai-engine/executor.js';
 
 import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
@@ -215,7 +215,7 @@ async function dispatchNextTaskForAgent(agentId) {
 
 // ── [isFinal: false 재착수] 중간 보고 수신 후 동일 태스크 즉시 재투입 ──────
 // dispatchNextTaskForAgent와 달리 busy 체크를 우회하고 특정 taskId를 강제 재실행
-async function forceRedispatchTask(taskId, agentId, interimReport = '') {
+async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM') {
   if (!dbManager || !executor) return;
   try {
     const fullTask = await dbManager.getTaskById(taskId);
@@ -223,15 +223,27 @@ async function forceRedispatchTask(taskId, agentId, interimReport = '') {
       console.warn(`[ForceRedispatch] Task #${taskId} 없음 — 재착수 취소`);
       return;
     }
-    // 중간 보고를 컨텍스트로 주입: NOVA가 자신이 이미 착수 보고를 했음을 인지
-    const enrichedContent = interimReport
-      ? `${fullTask.content}\n\n---\n[이전 착수 보고]\n${interimReport}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`
-      : fullTask.content;
+    
+    // 추가 컨텍스트 주입 (재작업 지시 vs 중간 착수 보고)
+    let enrichedContent = fullTask.content;
+    if (additionalContext) {
+      if (contextType === 'REWORK') {
+        enrichedContent += `\n\n---\n[대표님 피드백 및 재작업 지시사항]\n${additionalContext}\n\n위 피드백을 철저히 반영하여 기존 결과물을 수정/보완하고 최종 결과물을 다시 제출하라.`;
+      } else {
+        enrichedContent += `\n\n---\n[이전 착수 보고]\n${additionalContext}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`;
+      }
+    }
 
-    broadcastLog('info',
-      `> [${agentId}] isFinal:false 수신 → 본작업 재착수 트리거 (Task #${taskId})`,
-      'system', taskId
-    );
+    let logMsg = `> [${agentId}] 작업 착수 트리거 (Task #${taskId})`;
+    if (contextType === 'REWORK') {
+      logMsg = `> [${agentId}] 대표님 재작업 지시 수신 → 재착수 트리거 (Task #${taskId})`;
+    } else if (contextType === 'INTERIM') {
+      logMsg = `> [${agentId}] isFinal:false 수신 → 본작업 재착수 트리거 (Task #${taskId})`;
+    } else if (contextType === 'START') {
+      logMsg = `> [${agentId}] 작업을 수신했습니다. 사고과정을 시작합니다...`;
+    }
+
+    broadcastLog('info', logMsg, 'system', taskId);
 
     setImmediate(async () => {
       try {
@@ -240,6 +252,13 @@ async function forceRedispatchTask(taskId, agentId, interimReport = '') {
         const column  = status === 'FAILED' ? 'todo' : 'review';
 
         await dbManager.updateTaskStatus(taskId, status);
+        
+        // 실제 수행된 모델과 카테고리 정보 업데이트 (UI 반영용)
+        if (result.model) {
+          await dbManager.updateTaskModel(taskId, result.model, result.category);
+          io.emit('task:updated', { taskId: String(taskId), model: result.model, category: result.category });
+        }
+
         const thoughtProcess = result._meta?.thought_process || null;
         await dbManager.createComment(taskId, agentId, result.text || '작업이 완료되었습니다.', thoughtProcess);
 
@@ -284,6 +303,19 @@ io.on('connection', (socket) => {
   // 현재 에이전트 상태 즉시 동기화
   socket.emit('agent:state_sync', Object.fromEntries(agentStates));
 
+  // ── [Phase 28a] 프로젝트 Room 구독 ─────────────────────────────
+  socket.on('project:join', ({ projectId }) => {
+    if (!projectId) return;
+    socket.join(`project_${projectId}`);
+    console.log(`[Socket] ${socket.id} joined project_${projectId}`);
+  });
+
+  socket.on('project:leave', ({ projectId }) => {
+    if (!projectId) return;
+    socket.leave(`project_${projectId}`);
+    console.log(`[Socket] ${socket.id} left project_${projectId}`);
+  });
+
   // 에이전트 Heartbeat 수신
   socket.on('agent:heartbeat', ({ agentId }) => {
     if (!agentId) return;
@@ -311,11 +343,16 @@ io.on('connection', (socket) => {
       // 상태 필드 동기화도 함께 송출
       io.emit('task:updated', { taskId, status: newStatus, column: toColumn });
 
-      // [Phase 25] 대표님 기획 반영: 진행열(in_progress)로 이동 시 즉각 착수 및 매뉴얼 오버라이드
+      // ── [Activity Log] 드래그 이동 시 상태 변경 기록 ──────────────────────
+      const ACTIVITY_LABEL = { 'PENDING': '할 일', 'IN_PROGRESS': '진행 중', 'REVIEW': '승인 대기', 'COMPLETED': '완료', 'FAILED': '실패', 'PAUSED': '중단됨', 'todo': '할 일', 'in_progress': '진행 중', 'review': '승인 대기', 'done': '완료' };
+      const prevLabel = ACTIVITY_LABEL[fromColumn] || fromColumn;
+      const nextLabel = ACTIVITY_LABEL[newStatus] || ACTIVITY_LABEL[toColumn] || toColumn;
+      await logActivity(taskId, `📋 상태: ${prevLabel} → ${nextLabel}`);
+
+
       if (toColumn === 'in_progress' && fromColumn === 'todo') {
         const task = await dbManager.getTaskById(taskId);
         if (task) {
-          const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
           const agentId = task.assigned_agent || 'system';
 
           // 기존 진행 중인 다른 작업이 있다면 일시정지(todo로 강제 강등)하여 인터럽트 수행
@@ -323,7 +360,6 @@ io.on('connection', (socket) => {
           const activeTasks = allTasks.filter(t => t.assigned_agent === agentId && (t.status === 'in_progress' || t.status === 'IN_PROGRESS') && String(t.id) !== String(taskId));
           
           for (const at of activeTasks) {
-            await filePollingAdapter.abort(at.id);
             await dbManager.updateTaskStatus(at.id, 'PENDING');
             io.emit('task:moved', { taskId: String(at.id), toColumn: 'todo' });
             io.emit('task:updated', { taskId: String(at.id), status: 'PENDING', column: 'todo' });
@@ -331,16 +367,7 @@ io.on('connection', (socket) => {
           }
 
           // 드래그된 작업 즉시 착수
-          await filePollingAdapter.execute({
-            taskId: task.id,
-            agentId: agentId,
-            category: task.category || 'WORKFLOW',
-            content: task.content,
-            systemPrompt: "이 작업은 칸반 보드에서 대표님이 직접 진행으로 옮겨 즉시 착수를 지시한 태스크입니다. 다른 작업보다 최우선으로 진행하세요.",
-            modelToUse: task.model || 'gemini-2.5-flash'
-          });
-          // 타임라인에 사고과정 시작 시스템 뱃지 렌더링
-          broadcastLog('info', `> 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', taskId);
+          forceRedispatchTask(task.id, agentId, '', 'START');
         }
       }
       
@@ -361,7 +388,10 @@ io.on('connection', (socket) => {
   socket.on('task:create', async ({ title, content, assignee, priority, column }) => {
     try {
       const requester = 'CEO';
-      const taskId = await dbManager.createTask(title, content, requester, 'gemini-2.5-flash', assignee && assignee !== '미할당' ? assignee : null);
+      const targetModel = (assignee && assignee !== '미할당')
+        ? (getAgentSignatureModel(assignee) || 'gemini-2.5-flash')
+        : 'gemini-2.5-flash';
+      const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null);
       broadcastLog('info', `태스크 생성됨: ${title}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
@@ -461,13 +491,45 @@ io.on('connection', (socket) => {
   });
 });
 
-export function broadcastLog(level, message, agentId = 'system', taskId = null, source = 'DASHBOARD') {
+export function broadcastLog(level, message, agentId = 'system', taskId = null, source = 'DASHBOARD', projectId = null) {
   console.log(`[${agentId}]${taskId ? ` (Task #${taskId})` : ''} ${message} (${source})`);
-  dbManager.insertLog(level, message, agentId, taskId, source).catch(() => {});
-  io.emit('log:append', { 
-    level, message, agentId, taskId: taskId ? String(taskId) : null,
-    timestamp: new Date().toISOString() 
-  });
+  
+  // 비동기 Fallback 래퍼 (기존 호출부 호환성 유지)
+  (async () => {
+    let resolvedProjectId = projectId;
+    
+    // projectId가 없고 taskId가 있으면 DB에서 역추적
+    if (!resolvedProjectId && taskId) {
+      try {
+        const task = await dbManager.getTaskById(taskId);
+        if (task && task.project_id) {
+          resolvedProjectId = task.project_id;
+        }
+      } catch (err) {
+        // 무시하고 진행
+      }
+    }
+    
+    dbManager.insertLog(level, message, agentId, taskId, source, resolvedProjectId)
+      .catch(err => console.warn(`[Log] Async DB Insert Failed for Task #${taskId}:`, err.message));
+    
+    const payload = { 
+      level, message, agentId, taskId: taskId ? String(taskId) : null,
+      projectId: resolvedProjectId,
+      timestamp: new Date().toISOString() 
+    };
+    
+    if (resolvedProjectId) {
+      // 1. 프로젝트 전용 룸으로 브로드캐스트
+      io.to(`project_${resolvedProjectId}`).emit('log:append', payload);
+      // [점진적 전환] 2. 아직 클라이언트 프론트가 Room 구독을 안했을 수 있으므로 임시로 전역 방출도 병행
+      // 프론트엔드 작업(28a)이 완전히 끝나면 아래 글로벌 emit은 제거 예정입니다.
+      io.emit('log:append', payload);
+    } else {
+      // 프로젝트가 없는 전역 시스템 로그
+      io.emit('log:append', payload);
+    }
+  })();
 }
 
 // 순환 참조 해결을 위한 Dependency Injection
@@ -727,7 +789,10 @@ if (token && token.length > 10) {
           bot.sendMessage(chatId, `⏳ 지시가 로컬 SQLite Task Queue에 등록됩니다...`);
         }
         const taskTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-        taskId = await dbManager.createTask(taskTitle, text, author, 'Gemini-2.5-Flash', assignedAgent);
+        const targetModel = assignedAgent 
+          ? (getAgentSignatureModel(assignedAgent) || 'gemini-2.5-flash') 
+          : 'gemini-2.5-flash';
+        taskId = await dbManager.createTask(taskTitle, text, author, targetModel, assignedAgent);
         broadcastLog('info', `태스크 생성됨: ${text}`, assignedAgent, taskId, 'TELEGRAM');
         io.emit('task:created', { taskId: String(taskId), title: taskTitle, content: text, column: 'todo', agentId: assignedAgent });
       } else {
@@ -799,8 +864,9 @@ if (token && token.length > 10) {
         await dbManager.updateTaskStatus(taskId, 'REVIEW');
         // [Phase 14] 실제 사용된 기술적 모델명(Gemini... 등)을 DB에 기록 (Normalization)
         await dbManager.updateTaskModel(taskId, result.model);
-        
         const sid = String(taskId);
+        io.emit('task:updated', { taskId: sid, model: result.model });
+        
         io.emit('task:moved', { taskId: sid, toColumn: 'review' });
         broadcastLog('success', `Task #${sid} 완료 대기 (리뷰 필요) (${result.model})`, assignedAgent, sid);
         
@@ -927,12 +993,26 @@ app.get('/api/search', async (req, res) => {
 });
 
 /**
+ * GET /api/projects — 워크스페이스 프로젝트 목록 조회
+ */
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await dbManager.getAllProjects();
+    res.json(projects);
+  } catch (err) {
+    console.error('[API] /api/projects 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * GET /api/tasks — 대시보드 초기 진입(Hydration)용 Task 전체 목록
  * 프론트엔드 KanbanBoard가 새로고침 될 때 이 API로 과거 데이터를 복원합니다.
  */
 app.get('/api/tasks', async (req, res) => {
   try {
-    const rows = await dbManager.getAllTasks();
+    const projectId = req.query.project_id || null;
+    const rows = await dbManager.getAllTasks(projectId);
     // DB status → 칸반 column 매핑
     const STATUS_TO_COLUMN = {
       PENDING:     'todo',
@@ -1039,7 +1119,10 @@ app.post('/api/tasks/mention', async (req, res) => {
     const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
     
     // [W1 Fix] 대표님 직접 멘션은 항상 'CEO' 작성자로 생성
-    const taskId = await dbManager.createTask(content.slice(0,30), content, 'CEO', MODEL.FLASH, targetAgent);
+    const targetModel = targetAgent 
+      ? (getAgentSignatureModel(targetAgent) || 'gemini-2.5-flash') 
+      : 'gemini-2.5-flash';
+    const taskId = await dbManager.createTask(content.slice(0,30), content, 'CEO', targetModel, targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
     await dbManager.updateTaskStatus(taskId, 'in_progress');
@@ -1084,8 +1167,10 @@ app.post('/api/chat', async (req, res) => {
     // 3. AI 응답 생성
     const result = await executor.run(content, evaluation, targetAgent);
 
-    // 4. AI 응답 로그 브로드캐스트
-    broadcastLog('info', result.text, targetAgent, null, 'WEB_CHAT_REPLY');
+    // 4. AI 응답 완료 알림 (타임라인에는 요약 뱃지만 — 결과물 전문은 카드 Discussion에서 확인)
+    // 결과물 전문을 broadcastLog하면 타임라인에 긴 텍스트가 그대로 노출됨 → 제거
+    broadcastLog('success', `> [${targetAgent}] 작업 완료 — 카드 Discussion에서 결과물을 확인하세요.`, targetAgent, null, 'WEB_CHAT_REPLY');
+
 
     res.status(200).json({ status: 'ok', text: result.text, agent: targetAgent });
   } catch (err) {
@@ -1097,11 +1182,12 @@ app.post('/api/chat', async (req, res) => {
 
 // ── Task 상세 REST API (Phase 11: TaskDetailModal 지원) ───────────────────
 
-/** GET /api/comments/recent — 글로벌 타임라인 조회를 위한 전체 태스크 최근 댓글 목록 (Phase 22.6) */
+/** GET /api/comments/recent — 프로젝트별 타임라인 조회를 위한 태스크 최근 댓글 목록 (Phase 28a) */
 app.get('/api/comments/recent', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 100;
-    const comments = await dbManager.getRecentGlobalComments(limit);
+    const projectId = req.query.project_id || null;
+    const comments = await dbManager.getRecentGlobalComments(limit, projectId);
     res.json({ status: 'ok', comments });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -1176,6 +1262,12 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
             'system', sid
           );
         }
+      }
+
+      // [BugFix] 할당된 담당자가 AI 에이전트가 아니면 (예: "CEO", "개발팀"), 기본 비서인 'ari'가 응답하도록 폴백
+      if (!KNOWN_AGENTS_SET.has(agentToTrigger?.toLowerCase())) {
+        console.log(`[Bypass] Target assignee '${agentToTrigger}' is NOT an AI agent. Falling back to 'ari'.`);
+        agentToTrigger = 'ari';
       }
 
       // [Phase 22.6] 동시성 개입(Interruption) 방어: 이미 에이전트가 작업 중이면 LLM 트리거 생략
@@ -1305,6 +1397,7 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
 
           // [Phase 3.2] 실제 수행된 모델과 카테고리 정보를 DB에 업데이트 (UI 필터링용)
           await dbManager.updateTaskModel(sid, result.model, result.category);
+          io.emit('task:updated', { taskId: sid, model: result.model, category: result.category });
 
           // AI의 응답을 해당 카드에 신규 코멘트로 저장
           if (cleanText) {
@@ -1402,43 +1495,32 @@ app.patch('/api/tasks/:id', async (req, res) => {
     // 기존 태스크 상태 조회 (변경 전 값과 비교용)
     const prevTask = await dbManager.getTaskById(taskId).catch(() => null);
     
-    // 할당자 처리
-    const parsedAssignee = (assignee === '미할당' || !assignee) ? null : assignee;
+    // [BugFix] 할당자 처리: payload에 assignee가 명시되지 않았다면 기존 담당자 유지
+    let parsedAssignee;
+    if (assignee === undefined) {
+      parsedAssignee = prevTask?.assigned_agent || null;
+    } else {
+      parsedAssignee = (assignee === '미할당' || assignee === null || assignee === '') ? null : assignee;
+    }
 
-    // [P-21 Fix] content가 payload에 명시된 경우 그 값을 우선 사용 (빈 문자열 포함)
-    // content가 undefined인 경우에만 기존 값으로 폴백 (|| 연산자는 빈 문자열도 falsy로 처리)
+    // [P-21 Fix & BugFix] 각 필드가 전달되지 않은 경우 기존 값으로 폴백
     const finalContent = content !== undefined ? content : (prevTask?.content || '');
     const finalTitle   = title   !== undefined ? title   : (prevTask?.title   || '');
+    const finalModel   = model   !== undefined ? model   : (prevTask?.model   || (parsedAssignee ? getAgentSignatureModel(parsedAssignee) || 'gemini-2.5-flash' : 'gemini-2.5-flash'));
     
-    await dbManager.updateTaskDetails(taskId, finalTitle, finalContent, parsedAssignee, model || 'Gemini-3-Flash');
+    await dbManager.updateTaskDetails(taskId, finalTitle, finalContent, parsedAssignee, finalModel);
     
     // ── Activity Log: 변경 내역 배치 기록 (단일 댓글로 묶음) ─────────────────
     if (prevTask) {
       const activityItems = [];
       if (parsedAssignee && prevTask.assigned_agent !== parsedAssignee) {
         const prev = prevTask.assigned_agent || '미할당';
-        activityItems.push(`👤 담당자: ${prev} → ${parsedAssignee}`);
+        activityItems.push(`[시스템] 태스크 담당자가 '${prev}'에서 '${parsedAssignee}'(으)로 변경되었습니다.`);
 
-        // ── [S4-1] Handoff 프로토콜 — 이전 작업 컨텍스트 자동 인계 ──────────
-        try {
-          const prevComments = await dbManager.getComments(taskId);
-          const agentComments = prevComments
-            .filter(c => c.author?.toLowerCase() === prev?.toLowerCase())
-            .slice(-3); // 마지막 3개만
-
-          let handoffBody = `🔁 **[Handoff] ${prev.toUpperCase()} → ${parsedAssignee.toUpperCase()} 업무 인계**\n\n`;
-          if (agentComments.length > 0) {
-            handoffBody += `**${prev.toUpperCase()}의 마지막 작업 내역:**\n`;
-            agentComments.forEach((c, i) => {
-              const preview = (c.content || '').slice(0, 200);
-              handoffBody += `${i + 1}. ${preview}${c.content?.length > 200 ? '...' : ''}\n`;
-            });
-          } else {
-            handoffBody += `이전 담당자(${prev.toUpperCase()})의 작업 이력 없음.\n`;
-          }
-          handoffBody += `\n> 위 컨텍스트를 바탕으로 태스크를 이어받아 진행하세요.`;
-
-          await dbManager.createComment(taskId, 'system', handoffBody);
+          // ── [S4-1] Handoff 프로토콜 — 이전 작업 컨텍스트 인계 로그 간소화 ──────────
+          try {
+            let handoffBody = `🔁 **[Handoff] ${prev.toUpperCase()} → ${parsedAssignee.toUpperCase()} 업무 인계 완료**`;
+            await dbManager.createComment(taskId, 'system', handoffBody);
           io.emit('task:comment_added', {
             taskId: String(taskId), author: 'system', text: handoffBody,
             createdAt: new Date().toISOString()
@@ -1451,8 +1533,7 @@ app.patch('/api/tasks/:id', async (req, res) => {
       }
       if (priority && prevTask.priority !== priority) {
         const priorityLabel = { high: '높음', medium: '보통', low: '낮음' };
-        const priorityEmoji = { high: '🔴', medium: '🟡', low: '🟢' };
-        activityItems.push(`${priorityEmoji[priority] || '📌'} 우선순위: ${priorityLabel[prevTask.priority] || prevTask.priority || 'normal'} → ${priorityLabel[priority] || priority}`);
+        activityItems.push(`[시스템] 태스크 우선순위가 '${priorityLabel[prevTask.priority] || prevTask.priority || '보통'}'에서 '${priorityLabel[priority] || priority}'(으)로 변경되었습니다.`);
       }
       if (activityItems.length > 0) {
         await logActivity(taskId, activityItems);
@@ -1470,34 +1551,28 @@ app.patch('/api/tasks/:id', async (req, res) => {
           const prevLabel = statusLabel[prevTask.status?.toUpperCase()] || prevTask.status;
           const nextLabel = statusLabel[colToStatus[column]] || column;
           // 배치 배열에 상태 변경 추가: 담당자/우선순위와 함께 묶임
-          const statusItems = [`📋 상태: ${prevLabel} → ${nextLabel}`];
+          const statusItems = [`[시스템] 태스크 진행 상태가 '${prevLabel}'에서 '${nextLabel}'(으)로 변경되었습니다.`];
           await logActivity(taskId, statusItems);
         }
       }
 
+      // ── [Fix] 모든 column 이동 시 task:moved emit (담당자 유무와 무관) ──────
+      // 이전: in_progress + assigned_agent 있을 때만 emit → 담당자 없거나 다른 column 이동 시 칸반 미반영
+      // 수정: column 변경이 있으면 무조건 task:moved emit → confirmTaskMove 트리거 보장
+      io.emit('task:moved', { taskId: String(taskId), toColumn: column });
+
       // ── [BugFix] in_progress로 변경 시 에이전트 실행 트리거 ──────────────
-      // PATCH는 소켓 드래그(task:move)와 달리 FilePollingAdapter 호출이 없었음.
-      // Ari의 updateKanbanTask 도구가 이 경로를 통해 실행되므로,
-      // 프론트 드래그와 동일하게 에이전트를 실제 실행시켜야 함.
       if (column === 'in_progress') {
         const freshTask = await dbManager.getTaskById(taskId);
         if (freshTask?.assigned_agent) {
           const agentId = freshTask.assigned_agent;
-          // 소켓으로 프론트엔드 칸반 이동 동기화
-          io.emit('task:moved', { taskId: String(taskId), toColumn: 'in_progress' });
           io.emit('task:updated', { taskId: String(taskId), status: 'IN_PROGRESS', column: 'in_progress' });
 
-          // FilePollingAdapter로 에이전트 실행 (드래그와 동일한 경로)
-          const filePollingAdapter = (await import('./ai-engine/adapters/FilePollingAdapter.js')).default;
-          await filePollingAdapter.execute({
-            taskId: freshTask.id,
-            agentId,
-            category: freshTask.category || 'WORKFLOW',
-            content: freshTask.content,
-            systemPrompt: 'Ari 비서가 이 카드를 진행 중으로 이동했습니다. 즉시 착수해 주세요.',
-            modelToUse: freshTask.model || 'gemini-2.5-flash'
-          });
-          broadcastLog('info', `> [${agentId}] Ari 지시로 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', taskId);
+          // 담당자가 CEO인 경우 AI 실행을 하지 않고 상태만 IN_PROGRESS로 업데이트
+          if (agentId.toLowerCase() !== 'ceo') {
+            // FilePollingAdapter 대신 엔진에서 직접 실행
+            forceRedispatchTask(taskId, agentId, '', 'START');
+          }
         }
       }
     }
@@ -1690,10 +1765,13 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
     const reworkMsg = `🔄 재작업 지시: ${reason}`;
     await dbManager.createComment(sid, 'CEO', reworkMsg);
     io.emit('task:comment_added', { taskId: sid, author: 'CEO', text: reworkMsg, createdAt: new Date().toISOString() });
-    broadcastLog('warn', `[REWORK] Task #${sid} 재작업 지시 → In Progress 이동`, 'CEO', sid);
+    broadcastLog('warn', `[REWORK] Task #${sid} 재작업 지시 → In Progress 이동 및 백그라운드 재실행 트리거`, 'CEO', sid);
     
     // [Phase 4] CKS 지표 - 반복 수정 횟수(IRC) 증가
     await dbManager.incrementCksIrc(sid).catch(e => console.error('[DB] IRC 증가 실패:', e));
+
+    // [버그 수정] 재작업 지시 시 에이전트가 실제로 작업을 다시 수행하도록 강제 트리거
+    forceRedispatchTask(sid, task.assigned_agent, reason, 'REWORK');
 
     
     res.json({ status: 'ok', message: '재작업 지시 완료. In Progress로 이동했습니다.' });
@@ -2101,7 +2179,44 @@ app.post('/api/onboarding/test-connection', async (req, res) => {
 
 
 
+// ─── [Agent Profile API] ──────────────────────────────────────────
+app.patch('/api/agents/:agentId/model', async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { model } = req.body;
+    if (!model) return res.status(400).json({ status: 'error', message: 'model is required' });
 
+    // [Phase 30] 1순위: DB agent_profiles 업데이트 (SSOT)
+    await dbManager.upsertAgentModel(agentId, model);
+
+    // [Phase 30] 2순위: agents.json 동기화 (읽기 전용 시드 폴백 역할 유지)
+    try {
+      const agentsFilePath = path.resolve(process.cwd(), 'agents.json');
+      const agentsData = JSON.parse(fs.readFileSync(agentsFilePath, 'utf8'));
+      for (let agent of agentsData) {
+        if (agent.id === agentId) {
+          if (agent.bridge) {
+            agent.antiModel = model;
+          } else {
+            agent.model = model;
+          }
+          break;
+        }
+      }
+      fs.writeFileSync(agentsFilePath, JSON.stringify(agentsData, null, 2), 'utf8');
+    } catch (fileErr) {
+      console.warn('[Agent Model] agents.json 동기화 실패 (DB는 저장됨):', fileErr.message);
+    }
+
+    // 메모리 캐시 즉시 갱신 + 소켓 브로드캐스트
+    updateAgentSignatureModel(agentId, model);
+    io.emit('agent:model_updated', { agentId, model });
+    res.json({ status: 'ok', agentId, model, source: 'db' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+
+});
 
 // ─── [Phase 17-4] 스킬 라이브러리 API ──────────────────────────────────────────
 
@@ -2471,8 +2586,8 @@ const batchReportQueue = []; // Case A/B 누적 보고 큐
 async function diagnoseTask(task, autoResumeLevel) {
   // Case C: CRITICAL 등급 Task → 즉시 텔레그램 보고
   if (task.risk_level === 'CRITICAL') {
-    const msg = `🚨 앗, 태스크 #${task.id}이(가) 5분째 멈춰있네요! 크리티컬 작업이라 대표님의 승인이 필요해요!\n내용: ${task.content}`;
-    broadcastLog('error', msg, 'ari');
+    const msg = `🚨 [Watchdog] CRITICAL 태스크 #${task.id} 장기 대기 감지 (관리자 승인 필요)\n내용: ${task.content}`;
+    broadcastLog('error', msg, 'system');
     if (bot) {
       const chatId = process.env.TELEGRAM_CHAT_ID;
       if (chatId) bot.sendMessage(chatId, msg).catch(() => {});
@@ -2483,14 +2598,14 @@ async function diagnoseTask(task, autoResumeLevel) {
   // Case A: SAFE 등급이고 auto_resume이 허용된 경우 → 자동 재개
   if (task.risk_level === 'SAFE' && (autoResumeLevel === 'ALL' || autoResumeLevel === 'SAFE_ONLY')) {
     await dbManager.updateTaskStatus(task.id, 'in_progress');
-    broadcastLog('warn', `보드 순찰 완료! 🏃‍♀️ 태스크 #${task.id} 승인을 기다리다 멈춰있길래 제가 이어서 진행할게요!`, 'ari');
+    broadcastLog('warn', `[Watchdog] 태스크 #${task.id} 장기 대기 감지 → 안전 상태 확인 및 자동 재개 완료`, 'system');
     io.emit('task:moved', { taskId: task.id, toColumn: 'in_progress' });
     batchReportQueue.push({ type: 'A', taskId: task.id, content: task.content, at: new Date().toISOString() });
     return;
   }
 
   // Case B: SAFE지만 auto_resume 꺼진 경우 → 초기화 후 재시작 기록
-  broadcastLog('warn', `태스크 #${task.id}가 뭔가 막힌 것 같아요. 일단 대기(To Do)로 돌려둘테니 나중에 다시 봐주세요.`, 'ari');
+  broadcastLog('warn', `[Watchdog] 태스크 #${task.id} 장기 대기 감지 → 안전 확보를 위해 대기(To Do) 상태로 롤백됨`, 'system');
   await dbManager.updateTaskStatus(task.id, 'PENDING');
   io.emit('task:moved', { taskId: task.id, toColumn: 'todo' });
   batchReportQueue.push({ type: 'B', taskId: task.id, content: task.content, at: new Date().toISOString() });
@@ -2652,7 +2767,17 @@ if (process.env.NO_SERVER !== 'true') {
               
               await dbManager.updateTaskStatus(t.id, 'REVIEW');
               await dbManager.updateTaskModel(t.id, result.model);
+              io.emit('task:updated', { taskId: String(t.id), model: result.model });
               io.emit('task:moved', { taskId: String(t.id), toColumn: 'review' });
+              
+              // [버그 수정] Boot Recovery에서도 결과물을 DB와 채팅 로그에 반영해야 함
+              const thoughtProcess = result._meta?.thought_process || null;
+              await dbManager.createComment(t.id, targetAgent, result.text || '복구 작업 완료', thoughtProcess);
+              io.emit('task:comment_added', {
+                taskId: String(t.id), author: targetAgent,
+                text: result.text || '복구 작업 완료', thought_process: thoughtProcess, createdAt: new Date().toISOString()
+              });
+
               broadcastLog('success', `Task #${t.id} 재실행 완료. 리뷰 대기(${result.model})`, targetAgent, t.id);
               
               if (bot && process.env.TELEGRAM_CHAT_ID) {
@@ -2689,7 +2814,7 @@ if (process.env.NO_SERVER !== 'true') {
 4. 서버의 \`.env\` 파일 내 \`TELEGRAM_BOT_TOKEN\` 위치에 붙여넣기 (또는 시스템 설정화면에서 입력)
 
 연결이 완료되면 이 카드를 '완료' 칸으로 옮기거나 "텔레그램 연결 완료했다"고 말씀해 주세요!`;
-        const newTaskId = await dbManager.createTask(onboardingTitle, onboardingContent, 'system', MODEL.FLASH, 'ari');
+        const newTaskId = await dbManager.createTask(onboardingTitle, onboardingContent, 'system', MODEL.PRO, 'ari');
         await dbManager.updateTaskStatus(newTaskId, 'PENDING');
       }
     } catch (err) {

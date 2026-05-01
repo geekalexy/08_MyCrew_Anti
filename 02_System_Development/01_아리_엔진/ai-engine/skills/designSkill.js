@@ -42,8 +42,9 @@ export default {
 
 ▸ Pollinations AI (즉시 렌더링):
   포맷: ![작품명](https://image.pollinations.ai/prompt/{영문_프롬프트}?width=800&height=800&nologo=true)
-  * {영문_프롬프트}: 공백을 %20으로 치환한 영문 문구
-  * 이미지 요청 시 반드시 위 포맷으로 화면에 렌더링 (필수!)
+  * 🚨 주의: 반드시 \`https://image.pollinations.ai/prompt/\` 로 시작하는 풀(Full) URL을 그대로 사용해야 합니다! 절대 도메인을 생략하거나 잘라내지 마세요.
+  * {영문_프롬프트}: 공백을 %20 또는 언더바(_)로 치환한 영문 문구
+  * 이미지 요청 시 반드시 위 마크다운 이미지 URL 포맷을 온전하게 포함하여 화면에 렌더링 (필수!)
 
 【규칙 3. 플랫폼 비율 규격 완벽 준수】
 

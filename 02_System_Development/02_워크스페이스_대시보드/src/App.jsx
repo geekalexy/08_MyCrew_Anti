@@ -22,6 +22,7 @@ import './styles/colors.css';
 
 import './styles/animations.css';
 import './styles/app.css';
+import './styles/markdown.css';
 
 /* ── SVG 아이콘 ─────────────────────────────────────────── */
 const IcoPersonAdd = () => (
@@ -43,7 +44,7 @@ const IcoCheckCircle = () => (
 export default function App() {
   const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding, activeArtifact } = useUiStore();
   const { fetchSettings } = useSettingsStore();
-  const { projects, selectedProjectId, updateProject } = useProjectStore();
+  const { projects, selectedProjectId, updateProject, fetchProjects, selectProject } = useProjectStore();
   const { selectedAgentId, addAgent } = useAgentStore();
   const [serverOnline, setServerOnline] = useState(null);
   
@@ -69,6 +70,7 @@ export default function App() {
 
   useEffect(() => {
     fetchSettings();
+    fetchProjects(); // [Phase 28a] 프로젝트 목록 및 초기 선택 동기화
     useAuthStore.getState().syncWithBackend();
     const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
     fetch(`${SERVER_URL}/health`)
@@ -127,9 +129,30 @@ export default function App() {
                 </form>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <h2 className="board-header__title" style={{ margin: 0 }}>
-                    {selectedProject?.name || 'MyCrew Dashboard'}
-                  </h2>
+                  <select 
+                    value={selectedProjectId || ''} 
+                    onChange={(e) => selectProject(e.target.value)}
+                    style={{
+                      fontSize: '1.4rem', 
+                      fontWeight: 700, 
+                      background: 'transparent', 
+                      color: 'var(--text-primary)', 
+                      border: 'none', 
+                      outline: 'none',
+                      cursor: 'pointer',
+                      appearance: 'none', // 기본 화살표 숨김
+                    }}
+                  >
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id} style={{ color: '#000' }}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', opacity: 0.5, pointerEvents: 'none', marginLeft: '-4px' }}>
+                    expand_more
+                  </span>
+                  
                   <button 
                     onClick={() => { setEditProjectNameInput(selectedProject?.name || ''); setIsEditingProjectName(true); }}
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.2rem' }}

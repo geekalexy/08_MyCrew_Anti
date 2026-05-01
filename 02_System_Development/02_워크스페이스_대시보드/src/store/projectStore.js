@@ -2,52 +2,61 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-const DEFAULT_PROJECTS = [
-  { id: 'proj-1', name: '아리 엔진', color: '#6366f1' },
-  { id: 'proj-2', name: '워크스페이스 대시보드', color: '#22d3ee' },
-];
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
 
 export const useProjectStore = create(
   persist(
     (set, get) => ({
-      projects: DEFAULT_PROJECTS,
-      selectedProjectId: DEFAULT_PROJECTS[0].id,
+      projects: [],
+      selectedProjectId: null,
+      isLoaded: false,
 
-  // 프로젝트 자유 생성
-  addProject: (name) => {
-    const newProject = {
-      id: `proj-${Date.now()}`,
-      name,
-      color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'),
-    };
-    set((s) => ({ projects: [...s.projects, newProject] }));
-    return newProject.id;
-  },
+      // 서버에서 프로젝트 목록 동기화
+      fetchProjects: async () => {
+        try {
+          const res = await fetch(`${SERVER_URL}/api/projects`);
+          const data = await res.json();
+          const activeProjects = Array.isArray(data) ? data : [];
+          
+          set((state) => {
+            let nextSelected = state.selectedProjectId;
+            // 로컬에 저장된 selectedProjectId가 서버 응답에 없거나 처음일 때
+            const isSelectedValid = activeProjects.some(p => p.id === nextSelected);
+            if (!isSelectedValid) {
+              // global_mycrew가 있으면 우선 선택, 없으면 첫 번째 프로젝트
+              const globalProject = activeProjects.find(p => p.id === 'global_mycrew');
+              nextSelected = globalProject ? globalProject.id : (activeProjects[0]?.id || null);
+            }
+            
+            return {
+              projects: activeProjects,
+              selectedProjectId: nextSelected,
+              isLoaded: true,
+            };
+          });
+        } catch (err) {
+          console.error('[projectStore] fetchProjects error:', err);
+          set({ isLoaded: true }); // 에러 나도 로드 끝난 것으로 처리해서 무한 로딩 방지
+        }
+      },
 
-  updateProject: (id, newName) =>
-    set((s) => ({
-      projects: s.projects.map((p) => p.id === id ? { ...p, name: newName } : p)
-    })),
+      selectProject: (id) => set({ selectedProjectId: id }),
 
-  selectProject: (id) => set({ selectedProjectId: id }),
-
-  deleteProject: (id) =>
-    set((s) => {
-      const filtered = s.projects.filter((p) => p.id !== id);
-      // 삭제된 프로젝트가 선택 중이었다면 첫 번째로 fallback
-      const nextSelected = s.selectedProjectId === id
-        ? (filtered[0]?.id || null)
-        : s.selectedProjectId;
-      return { projects: filtered, selectedProjectId: nextSelected };
-    }),
-
-  // 아카이브: Done 또는 장기 보류 Task를 프로젝트별로 조회
-  // (kanbanStore의 tasks를 파라미터로 받아 필터링)
+      // 아카이브: Done 또는 장기 보류 Task를 프로젝트별로 조회
+      // (kanbanStore의 tasks를 파라미터로 받아 필터링)
       getArchivedTasks: (tasks) =>
         Object.values(tasks).filter(
           (t) => t.column === 'done' || t.column === 'PENDING'
         ),
     }),
-    { name: 'mycrew-projects' } // localStorage key
+    { 
+      name: 'mycrew-projects', // localStorage key
+      // isLoaded 상태는 저장하지 않도록 필터링
+      partialize: (state) => ({ 
+        selectedProjectId: state.selectedProjectId,
+        // projects 데이터는 서버 동기화가 메인이지만 캐시용으로 저장
+        projects: state.projects
+      }),
+    }
   )
 );

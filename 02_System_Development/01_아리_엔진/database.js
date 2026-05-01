@@ -37,6 +37,7 @@ function classifyRiskLevel(content) {
 }
 
 db.serialize(() => {
+  db.run("PRAGMA foreign_keys = ON");
   // Task 테이블 생성 (최초 설치 시)
   db.run(`CREATE TABLE IF NOT EXISTS Task (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -192,15 +193,6 @@ db.serialize(() => {
             DELETE FROM TaskFTS WHERE rowid = old.id;
           END`);
 
-  // ─── [v2.0] 콜럼 마이그레이션: priority + has_artifact 신설 ──────────────────
-  db.all(`PRAGMA table_info(Task)`, (err, cols) => {
-    if (err) return;
-    const names = (cols || []).map(c => c.name);
-    if (!names.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
-    if (!names.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
-    if (!names.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
-  });
-
   // ─── [v2.0] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
   db.run(`CREATE TABLE IF NOT EXISTS projects (
     id         TEXT PRIMARY KEY,
@@ -211,7 +203,7 @@ db.serialize(() => {
 
   db.run(`CREATE TABLE IF NOT EXISTS teams (
     id          TEXT PRIMARY KEY,
-    project_id  TEXT REFERENCES projects(id),
+    project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
     name        TEXT NOT NULL,
     group_type  TEXT,
     icon        TEXT,
@@ -220,13 +212,14 @@ db.serialize(() => {
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS team_agents (
-    team_id         TEXT REFERENCES teams(id),
+    team_id         TEXT REFERENCES teams(id) ON DELETE CASCADE,
     agent_id        TEXT NOT NULL,
     experiment_role TEXT,
     PRIMARY KEY (team_id, agent_id)
   )`);
 
-  // ─── [v2.0] 시더(종자) 데이터 ──────────────────────────────────────────
+  // ─── [v2.0] 시더(종자) 데이터 (PRAGMA 전에 미리 삽입하여 외래키 만족) ────────────
+  db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('global_mycrew', 'MyCrew Global Workspace')`);
   db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_cks',   '소시안 CKS 실험')`);
   db.run(`INSERT OR IGNORE INTO projects (id, name) VALUES ('sosiann_planC', '소시안 Plan C 캠페인')`);
 
@@ -236,6 +229,45 @@ db.serialize(() => {
     VALUES ('team_A', 'sosiann_cks',   'Team A — 적대적 대조군', '적대적', '⛔', '#ffb963')`);
   db.run(`INSERT OR IGNORE INTO teams (id, project_id, name, group_type, icon, color)
     VALUES ('team_independent', NULL, '독립 심사관', '독립', '⚖️', '#b4c5ff')`);
+
+  // ─── [v2.0] 콜럼 마이그레이션: priority + has_artifact + project_id ────────────
+  // Task와 Log 마이그레이션을 단일 트랜잭션으로 통합하여 데드락 경합 방지
+  db.all(`PRAGMA table_info(Task)`, (err, taskCols) => {
+    if (err) return;
+    const taskNames = (taskCols || []).map(c => c.name);
+    
+    db.all(`PRAGMA table_info(Log)`, (err, logCols) => {
+      if (err) return;
+      const logNames = (logCols || []).map(c => c.name);
+      
+      db.serialize(() => {
+        if (!taskNames.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
+        if (!taskNames.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
+        if (!taskNames.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
+        
+        const alterTask = !taskNames.includes('project_id');
+        const alterLog = !logNames.includes('project_id');
+
+        if (alterTask) db.run(`ALTER TABLE Task ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`);
+        if (alterLog)  db.run(`ALTER TABLE Log ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`);
+
+        if (alterTask || alterLog) {
+          db.run("BEGIN TRANSACTION");
+          if (alterTask) db.run(`UPDATE Task SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
+          if (alterLog)  db.run(`UPDATE Log SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
+          
+          db.run("COMMIT", function(err) {
+            if (err) {
+              console.error("[DB] Legacy backfill failed, rolling back:", err.message);
+              db.run("ROLLBACK");
+            } else {
+              console.log(`[DB] Successfully backfilled legacy tasks & logs to 'global_mycrew' project.`);
+            }
+          });
+        }
+      });
+    });
+  });
 
   // ─── [v3.2] Final Global Roster
   db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_independent','ari','공유 라우터 (Gemini Flash)')`);
@@ -282,7 +314,61 @@ db.serialize(() => {
     created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
     resolved_at      TEXT
   )`);
+
+  // ─── [Phase 30] 에이전트 프로필 테이블 (Prime 검수 A- 승인) ──────────────
+  // - agents.json 이 SSOT → DB가 SSOT로 전환 (agents.json은 읽기 전용 시드 역할)
+  // - bridge: 파일 브릿지 vs API 직접 라우팅 구분 (executor.js 라우팅 핵심)
+  // - default_category: 텔레그램 자동 할당 카테고리 매핑
+  // - role: agents.json의 role이 정본 (team_agents.experiment_role 우선 아님)
+  db.run(`CREATE TABLE IF NOT EXISTS agent_profiles (
+    id               TEXT PRIMARY KEY,
+    nickname         TEXT,
+    role             TEXT,
+    model            TEXT,
+    bridge           INTEGER NOT NULL DEFAULT 0,
+    default_category TEXT,
+    team_id          TEXT REFERENCES teams(id) ON DELETE SET NULL,
+    project_id       TEXT REFERENCES projects(id) ON DELETE SET NULL,
+    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // [Phase 30] agents.json → agent_profiles 시드 마이그레이션
+  // INSERT OR IGNORE: 기존 레코드 보존, 최초 부팅 시에만 삽입
+  // role 정본: agents.json (team_agents.experiment_role 아님 — Prime 검수 확정)
+  // team_id 매핑: team_agents 테이블에서 JOIN으로 가져옴
+  try {
+    const _agentsRaw = readFileSync(path.resolve(__dirname, 'agents.json'), 'utf-8');
+    const _agentsSeed = JSON.parse(_agentsRaw);
+    _agentsSeed.forEach(a => {
+      db.run(
+        `INSERT OR IGNORE INTO agent_profiles (id, nickname, role, model, bridge, default_category)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          a.id,
+          a.nameKo || a.id,           // nickname 초기값: nameKo (한글 이름)
+          a.role || null,
+          a.antiModel || null,        // model 초기값: antiModel
+          a.bridge ? 1 : 0,
+          a.defaultCategory || null,
+        ],
+        (err) => { if (err) console.error(`[DB] agent_profiles 시드 실패 (${a.id}):`, err.message); }
+      );
+      // team_id 매핑: team_agents에서 이미 존재하는 레코드를 참조 (별도 UPDATE)
+      db.run(
+        `UPDATE agent_profiles
+         SET team_id    = (SELECT team_id    FROM team_agents WHERE agent_id = ? LIMIT 1),
+             project_id = (SELECT t.project_id FROM team_agents ta JOIN teams t ON t.id = ta.team_id WHERE ta.agent_id = ? LIMIT 1)
+         WHERE id = ? AND team_id IS NULL`,
+        [a.id, a.id, a.id],
+        (err) => { if (err) console.error(`[DB] agent_profiles team_id 매핑 실패 (${a.id}):`, err.message); }
+      );
+    });
+    console.log('[DB] Phase 30: agent_profiles 시드 완료');
+  } catch (e) {
+    console.warn('[DB] Phase 30: agents.json 시드 실패 —', e.message);
+  }
 });
+
 
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
@@ -322,21 +408,37 @@ class DatabaseManager {
     });
   }
 
-  // ─── 프론트엔드 Hydration용: 전체 Task 목록 조회 (경량 DTO, latest_comment JOIN 제거) ───
-  getAllTasks() {
+  // ─── 프로젝트 조회 ──────────────────────────────────────────────────────────
+  getAllProjects() {
     return new Promise((resolve, reject) => {
-      db.all(
-        `SELECT id, title, content, status, requester, model, assigned_agent, priority,
+      db.all(`SELECT id, name, status, created_at FROM projects WHERE status = 'active' ORDER BY created_at ASC`, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
+    });
+  }
+
+  // ─── 프론트엔드 Hydration용: 전체 Task 목록 조회 (경량 DTO, latest_comment JOIN 제거) ───
+  getAllTasks(projectId = null) {
+    return new Promise((resolve, reject) => {
+      let query = `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                 risk_level, execution_mode, has_artifact, artifact_url, failure_count,
                 created_at, updated_at
          FROM Task 
-         WHERE deleted_at IS NULL
-         ORDER BY id DESC LIMIT 200`,
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows || []);
-        }
-      );
+         WHERE deleted_at IS NULL`;
+      const params = [];
+      
+      if (projectId) {
+        query += ` AND project_id = ?`;
+        params.push(projectId);
+      }
+      
+      query += ` ORDER BY id DESC LIMIT 200`;
+      
+      db.all(query, params, (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows || []);
+      });
     });
   }
 
@@ -458,6 +560,7 @@ class DatabaseManager {
         `SELECT * FROM Task
          WHERE LOWER(status) = 'in_progress'
            AND execution_mode != 'omo'
+           AND deleted_at IS NULL
            AND updated_at < datetime('now', ? || ' minutes')`,
         [`-${staleMinutes}`],
         (err, rows) => {
@@ -472,7 +575,7 @@ class DatabaseManager {
   getFirstPendingTask() {
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT id, content FROM Task WHERE status = 'PENDING' ORDER BY id ASC LIMIT 1`,
+        `SELECT id, content FROM Task WHERE status = 'PENDING' AND deleted_at IS NULL ORDER BY id ASC LIMIT 1`,
         (err, row) => {
           if (err) reject(err);
           else resolve(row);
@@ -526,12 +629,12 @@ class DatabaseManager {
   }
 
   // ─── 실시간 로그 추가 ─────────────────────────────────────────────────────
-  insertLog(level, message, agentId, taskId, source) {
+  insertLog(level, message, agentId, taskId, source, projectId = null) {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO Log (level, message, agent_id, task_id, source) VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO Log (level, message, agent_id, task_id, source, project_id) VALUES (?, ?, ?, ?, ?, ?)`
       );
-      stmt.run([level, message, agentId, taskId, source], function (err) {
+      stmt.run([level, message, agentId, taskId, source, projectId], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -569,27 +672,35 @@ class DatabaseManager {
   }
 
   // ─── Task 글로벌 최근 댓글 조회 (Phase 22.6) ──────────────────────────────────
-  getRecentGlobalComments(limit = 100) {
+  getRecentGlobalComments(limit = 100, projectId = null) {
     return new Promise((resolve, reject) => {
-      db.all(
-        `SELECT task_id, author, content, meta_data, created_at FROM TaskComment ORDER BY created_at DESC LIMIT ?`,
-        [limit],
-        (err, rows) => {
-          if (err) return reject(err);
-          // [S1-1] _parseMetaRow 헬퍼로 통일
-          const result = (rows || []).reverse().map(row => {
-            const parsed = this._parseMetaRow(row);
-            return {
-              taskId: parsed.task_id,
-              author: parsed.author,
-              content: parsed.content,
-              thought_process: parsed.thought_process,
-              created_at: parsed.created_at,
-            };
-          });
-          resolve(result);
-        }
-      );
+      let query = `SELECT c.task_id, c.author, c.content, c.meta_data, c.created_at 
+                   FROM TaskComment c`;
+      const params = [];
+      
+      if (projectId) {
+        query += ` JOIN Task t ON c.task_id = t.id WHERE t.project_id = ?`;
+        params.push(projectId);
+      }
+      
+      query += ` ORDER BY c.created_at DESC LIMIT ?`;
+      params.push(limit);
+      
+      db.all(query, params, (err, rows) => {
+        if (err) return reject(err);
+        // [S1-1] _parseMetaRow 헬퍼로 통일
+        const result = (rows || []).reverse().map(row => {
+          const parsed = this._parseMetaRow(row);
+          return {
+            taskId: parsed.task_id,
+            author: parsed.author,
+            content: parsed.content,
+            thought_process: parsed.thought_process,
+            created_at: parsed.created_at,
+          };
+        });
+        resolve(result);
+      });
     });
   }
 
@@ -710,6 +821,68 @@ class DatabaseManager {
           else resolve(this.changes);
         }
       );
+    });
+  }
+
+  // ─── [Phase 30] agent_profiles CRUD ──────────────────────────────────────
+
+  /** 전체 에이전트 프로필 조회 (executor.js 부팅 시 사용) */
+  getAllAgentProfiles() {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, nickname, role, model, bridge, default_category, team_id, project_id, updated_at
+         FROM agent_profiles ORDER BY id ASC`,
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve((rows || []).map(r => ({ ...r, bridge: !!r.bridge })));
+        }
+      );
+    });
+  }
+
+  /** 단건 에이전트 프로필 조회 */
+  getAgentProfile(agentId) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, nickname, role, model, bridge, default_category, team_id, project_id, updated_at
+         FROM agent_profiles WHERE id = ?`,
+        [agentId.toLowerCase()],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? { ...row, bridge: !!row.bridge } : null);
+        }
+      );
+    });
+  }
+
+  /** 에이전트 모델 업데이트 (프로필 페이지 변경 시 호출) */
+  upsertAgentModel(agentId, model) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO agent_profiles (id, model, bridge, updated_at)
+         VALUES (?, ?, 0, CURRENT_TIMESTAMP)
+         ON CONFLICT(id) DO UPDATE SET model = excluded.model, updated_at = CURRENT_TIMESTAMP`,
+        [agentId.toLowerCase(), model],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  /** 에이전트 프로필 부분 업데이트 (nickname, role, model 등) */
+  updateAgentProfile(agentId, updates = {}) {
+    const allowed = ['nickname', 'role', 'model', 'default_category', 'team_id', 'project_id'];
+    const fields = Object.keys(updates).filter(k => allowed.includes(k));
+    if (fields.length === 0) return Promise.resolve(0);
+    const sql = `UPDATE agent_profiles SET ${fields.map(f => `${f} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+    const params = [...fields.map(f => updates[f]), agentId.toLowerCase()];
+    return new Promise((resolve, reject) => {
+      db.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
     });
   }
 

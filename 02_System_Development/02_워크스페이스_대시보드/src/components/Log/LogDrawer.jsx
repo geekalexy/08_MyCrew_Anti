@@ -4,6 +4,7 @@ import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useSocket } from '../../hooks/useSocket';
+import { useProjectStore } from '../../store/projectStore';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
@@ -53,6 +54,8 @@ export default function LogDrawer() {
   } = useUiStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const agentStates = useAgentStore((s) => s.agents); // [S2-2] 소켓 에이전트 상태
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+  const isLoaded = useProjectStore((s) => s.isLoaded);
   const { socket } = useSocket();
 
   const [panelWidth, setPanelWidth]   = useState(340);
@@ -162,27 +165,37 @@ export default function LogDrawer() {
   // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
     ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : logs.filter((log) => log.taskId))
-    : logs.filter((log) => !log.taskId); // taskId가 있는 타임라인 전용 로그는 채팅방에서 격리
+    : logs.filter((log) => {
+        if (log.taskId) return false; // 타임라인 전용 로그 격리
+        // [Fix] 엔진 내부 진행 상태 로그(> 로 시작하는 system/ari 로그)는 채팅탭에서 숨김 (타임라인 전용 속성)
+        if (log.source === 'system' && typeof log.message === 'string' && log.message.trim().startsWith('>')) {
+          return false;
+        }
+        return true;
+      });
 
-  // 타임라인용 필터 (하위 호환성 및 스크롤 감지용)
-  const filteredLogs = focusedTaskId
-    ? logs.filter((log) => String(log.taskId) === String(focusedTaskId))
-    : logs;
-
-  // [Fix Bug2] DB 댓글 + 실시간 로그 병합 (시간순, 중복 제거)
   const mergedTimeline = activeLogTab === 'time' ? [
-    ...timelineComments.map(c => ({
-      level: 'info', message: c.content, agentId: c.author,
-      taskId: String(c.taskId || focusedTaskId || ''), timestamp: c.created_at, isComment: true,
-      thought_process: c.thought_process,
-    })),
+    ...timelineComments.map(c => {
+      const isSystem = !c.author || c.author === 'system';
+      const isCeo   = c.author === 'CEO' || c.author === '대표님';
+      const displayContent = (isSystem || isCeo)
+        ? c.content
+        : `✅ ${c.author?.toUpperCase()} 작업 완료 — 카드에서 결과물 확인`;
+
+      return {
+        level: 'info', message: displayContent, agentId: c.author,
+        taskId: String(c.taskId || focusedTaskId || ''), timestamp: c.created_at, isComment: true,
+        thought_process: (isSystem || isCeo) ? null : c.thought_process,
+      };
+    }),
     ...displayLogs,
   ].sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
     .filter((item, idx, arr) =>
       arr.findIndex(x => x.message === item.message && x.agentId === item.agentId && x.taskId === item.taskId) === idx
     ) : displayLogs;
 
-  // [Phase 22.6] 글로벌 타임라인 지원: focusedTaskId가 없으면 전체 최근 로그 호출
+
+  // [Phase 22.6 & 28a] 글로벌/프로젝트별 타임라인 지원: focusedTaskId가 없으면 최근 로그 호출
   useEffect(() => {
     if (focusedTaskId) {
       fetch(`${SERVER_URL}/api/tasks/${focusedTaskId}/comments`)
@@ -190,28 +203,44 @@ export default function LogDrawer() {
         .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
         .catch(() => setTimelineComments([]));
     } else {
-      fetch(`${SERVER_URL}/api/comments/recent`)
+      if (!isLoaded || !selectedProjectId) return; // 프로젝트 로드 후 호출
+      fetch(`${SERVER_URL}/api/comments/recent?project_id=${selectedProjectId}`)
         .then(r => r.json())
         .then(data => setTimelineComments(Array.isArray(data.comments) ? data.comments : []))
         .catch(() => setTimelineComments([]));
     }
-  }, [focusedTaskId]);
+  }, [focusedTaskId, selectedProjectId, isLoaded]);
 
   // [Phase 22.6] 소켓: 새 댓글 실시간 추가 (글로벌 타임라인 처리 포함)
   useEffect(() => {
     if (!socket) return;
     const handler = ({ taskId, author, text, thought_process, createdAt }) => {
       if (!focusedTaskId || String(taskId) === String(focusedTaskId)) {
+        const isSystem = !author || author === 'system';
+        const isCeo   = author === 'CEO' || author === '대표님';
+
+        // [결과물 노출 차단] 에이전트 댓글(결과물)은 타임라인에 요약 알림만 표시
+        // 전문 내용은 카드 Discussion 탭에서 확인 — 타임라인에 긴 텍스트 노출 방지
+        const displayContent = (isSystem || isCeo)
+          ? text  // 시스템 로그·CEO 댓글: 원문 그대로
+          : `✅ ${author?.toUpperCase()} 작업 완료 — 카드에서 결과물 확인`;  // 에이전트: 요약
+
         setTimelineComments(prev => {
-          const exists = prev.some(c => c.content === text && c.author === author);
+          const exists = prev.some(c => c.content === displayContent && c.author === author);
           if (exists) return prev;
-          return [...prev, { taskId, author, content: text, thought_process, created_at: createdAt || new Date().toISOString() }];
+          return [...prev, {
+            taskId, author,
+            content: displayContent,
+            thought_process: (isSystem || isCeo) ? null : thought_process,  // 에이전트만 사고과정 포함
+            created_at: createdAt || new Date().toISOString()
+          }];
         });
       }
     };
     socket.on('task:comment_added', handler);
     return () => socket.off('task:comment_added', handler);
   }, [socket, focusedTaskId]);
+
 
   // 리사이즈
   const startResizing = useCallback((e) => { e.preventDefault(); setIsResizing(true); }, []);
@@ -315,16 +344,26 @@ export default function LogDrawer() {
       setIsStreaming(false);
       setStreamingText('');
       setBtnMode('send');
-      // 완료된 응답은 로그 스토어에 추가 (서버 broadcastLog에서도 오지만 즉각 반영)
-      if (fullText && !error) {
+      
+      if (fullText) {
         useLogStore.getState().appendLog({
           level: 'info',
           message: fullText,
           agentId: 'ari',
           timestamp: new Date().toISOString(),
         });
+      } else if (error) {
+        useLogStore.getState().appendLog({
+          level: 'error',
+          message: error,
+          agentId: 'system',
+          timestamp: new Date().toISOString(),
+        });
       }
     };
+
+
+
 
     ariSocket.on('ari:stream_chunk', onChunk);
     ariSocket.on('ari:stream_done', onDone);
@@ -353,7 +392,7 @@ export default function LogDrawer() {
     let fetchPromise;
     // 타임라인 탭이면서 태스크가 선택된 경우에만 해당 태스크의 코멘트로 전송
     if (focusedTask && activeLogTab === 'time') {
-      // 1. 특정 태스크 내부의 코멘튨 작성 (CEO 표기)
+      // 1. 특정 태스크 내부의 코멘트 작성 (CEO 표기)
       const commentContent = imageDataUrls.length > 0
         ? [trimmedText, ...imageDataUrls.map(u => `![image](${u})`)].filter(Boolean).join('\n')
         : trimmedText;
@@ -369,7 +408,7 @@ export default function LogDrawer() {
         body: JSON.stringify({
           author: 'CEO',
           content: commentContent,
-          ...(resolvedAgent ? { assignedAgent: resolvedAgent } : {}),
+          assignedAgent: resolvedAgent || 'ari', // [Fix] @멘션 없으면 ari 기본 라우팅
         }),
       });
     } else {
@@ -433,6 +472,7 @@ export default function LogDrawer() {
       } else if (activeLogTab === 'time') {
         // [Phase 14] Timeline 탭: #번호 소환 및 전환 기능
         const summonMatch = trimmedText.match(/^#(\d+)\s*(.*)/);
+
         if (summonMatch) {
           const targetId = summonMatch[1];
           const messageAfter = summonMatch[2];
@@ -445,15 +485,13 @@ export default function LogDrawer() {
             fetchPromise = fetch(`${SERVER_URL}/api/tasks/${targetId}/comments`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ author: '대표님', content: messageAfter }),
+              body: JSON.stringify({ author: 'CEO', content: messageAfter }),
             });
           } else {
-            // 전환만 하는 경우 (no-op fetch)
             fetchPromise = Promise.resolve();
           }
         } else {
-          // #번호 없이 입력한 경우 (Timeline에서는 아무 일도 일어남)
-          // 혹은 일반 지시사항(Paperclip)으로 보낼 것인지 결정 필요 -> 일단 보류
+          // #번호 없이 입력한 경우 (Timeline에서는 무시)
           fetchPromise = Promise.resolve();
         }
       } else {
@@ -481,7 +519,9 @@ export default function LogDrawer() {
       .catch(console.error)
       .finally(() => {
         isSendingRef.current = false; // 락 해제
-        setBtnMode(activeLogTab === 'time' ? (focusedTask ? 'stop' : 'idle') : 'send');
+        // [Fix] @멘션 입력 시 TIMELINE에서도 send 버튼 활성화 (idle 유지 안 함)
+        const hasMention = trimmedText.match(/^@([a-zA-Z가-힣]+)/);
+        setBtnMode(activeLogTab === 'time' ? (focusedTask || hasMention ? 'send' : 'idle') : 'send');
       });
   }, [inputText, attachedImages, focusedTask, btnMode, activeLogTab, mentionedAgent]);
 
@@ -495,7 +535,11 @@ export default function LogDrawer() {
 
   // ── 우측 액션 버튼 렌더 ────────────────────────────────────
   const renderActionBtn = () => {
-    if (btnMode === 'idle') {
+    const isTimelineNoTask = activeLogTab === 'time' && !focusedTask;
+    const hasHashInput = isTimelineNoTask && inputText.trim().startsWith('#');
+    const isValidInput = !isTimelineNoTask || hasHashInput;
+
+    if (btnMode === 'idle' || !isValidInput) {
       return (
         <button
           disabled
@@ -504,7 +548,7 @@ export default function LogDrawer() {
             border: 'none', borderRadius: '50%', width: 30, height: 30,
             display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'not-allowed',
           }}
-          title="카드를 선택하면 활성화됩니다"
+          title={isTimelineNoTask ? "카드를 선택하거나 #번호를 입력하세요" : "메시지를 입력하세요"}
         >
           <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>arrow_upward</span>
         </button>
@@ -701,18 +745,20 @@ export default function LogDrawer() {
                       .replace(/^[\w가-힣]+:\s*/, (m) => isUser ? '' : m)
                   );
 
-                  // 시스템 이벤트: 중앙 뱃지
+                  // 시스템 이벤트: 중앙 뱃지 (긴 메시지 대응)
                   if (isSystem) {
+                    const isLongMessage = log.message.length > 40;
                     return (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'center', margin: '0.6rem 0' }}>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'center', margin: '0.8rem 0' }}>
                         <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                          background: 'rgba(255,255,255,0.04)', borderRadius: 20,
-                          padding: '0.2rem 0.75rem', border: '1px solid rgba(255,255,255,0.06)',
+                          display: 'flex', alignItems: isLongMessage ? 'flex-start' : 'center', gap: '0.4rem',
+                          background: 'rgba(255,255,255,0.04)', borderRadius: isLongMessage ? 12 : 20,
+                          padding: isLongMessage ? '0.6rem 1rem' : '0.3rem 0.85rem', border: '1px solid rgba(255,255,255,0.06)',
+                          maxWidth: '90%', lineHeight: 1.5
                         }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>info</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{log.message}</span>
-                          <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)', opacity: 0.5 }}>{time}</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: isLongMessage ? '1rem' : '0.85rem', color: 'var(--text-muted)', marginTop: isLongMessage ? '0.1rem' : 0 }}>info</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'keep-all', wordWrap: 'break-word', flex: 1 }}>{log.message}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: isLongMessage ? '0.15rem' : 0 }}>{time}</span>
                         </div>
                       </div>
                     );
@@ -1003,7 +1049,7 @@ export default function LogDrawer() {
                 className="log-drawer__textarea"
                 placeholder={
                   activeLogTab === 'time'
-                    ? (focusedTask ? `Task #${focusedTask.id} 지시사항 (@멘션으로 에이전트 지정)...` : '번호(#)를 입력하거나 카드를 선택하여 대화를 시작하세요...')
+                    ? (focusedTask ? `Task #${focusedTask.id} 지시사항 (@멘션으로 에이전트 지정)...` : '번호(#)를 입력하여 카드를 찾으세요...')
                     : 'AI Crew와 채팅하기... (@에이전트명으로 직접 호출)'
                 }
                 value={inputText}

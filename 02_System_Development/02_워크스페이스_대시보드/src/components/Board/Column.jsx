@@ -22,7 +22,7 @@ export default function Column({ columnId, tasks, disableDnD }) {
   // ── 태스크 생성 폼 상태
   const [isAdding, setIsAdding] = useState(false);
   const [form, setForm] = useState({
-    title: '', content: '', assignee: '미할당', priority: 'medium',
+    title: '', content: '', assignee: 'CEO', priority: '',
   });
   const titleRef = useRef(null);
 
@@ -61,7 +61,7 @@ export default function Column({ columnId, tasks, disableDnD }) {
 
   const cancelForm = () => {
     setIsAdding(false);
-    setForm({ title: '', content: '', assignee: '미할당', priority: 'medium' });
+    setForm({ title: '', content: '', assignee: 'CEO', priority: '' });
   };
 
   const handleSubmit = (e) => {
@@ -69,9 +69,9 @@ export default function Column({ columnId, tasks, disableDnD }) {
     if (!form.title.trim()) return;
     emitTaskCreate({
       title: form.title.trim(),
-      content: form.content.trim(),
-      assignee: form.assignee,
-      priority: form.priority,
+      content: '', // content is now empty by default
+      assignee: 'CEO',
+      priority: '',
       column: columnId,
     });
     cancelForm();
@@ -157,47 +157,35 @@ export default function Column({ columnId, tasks, disableDnD }) {
         ))}
 
         {isAdding && (
-          <form className="inline-task-form" onSubmit={handleSubmit}>
+          <form 
+            className="task-card task-card--focused" 
+            onSubmit={handleSubmit}
+            style={{ cursor: 'text' }}
+          >
+            <div className="task-card__meta-row" style={{ marginBottom: '0.35rem' }}>
+              <div className="task-card__label" style={{ margin: 0 }}>새로운 작업</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>person</span>
+                CEO
+              </div>
+            </div>
+            
             <input
               ref={titleRef}
-              className="inline-task-form__input"
-              placeholder="태스크 타이틀 *"
+              style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', color: 'var(--text-secondary)', fontSize: '0.95rem', fontWeight: 500 }}
+              placeholder="태스크 타이틀 입력 후 Enter..."
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
+              onBlur={(e) => {
+                if (form.title.trim()) handleSubmit(e);
+                else cancelForm();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') cancelForm();
+              }}
               required
             />
-            <textarea
-              className="inline-task-form__textarea"
-              placeholder="상세 내용 (선택)"
-              rows={2}
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-            />
-            <div className="inline-task-form__row">
-              <select
-                className="inline-task-form__select"
-                value={form.assignee}
-                onChange={(e) => setForm({ ...form, assignee: e.target.value })}
-              >
-                <option value="미할당">미할당</option>
-                {Object.values(agentMeta).map((m) => (
-                  <option key={m.name} value={m.name}>{m.name.toLowerCase()}</option>
-                ))}
-              </select>
-              <select
-                className="inline-task-form__select"
-                value={form.priority}
-                onChange={(e) => setForm({ ...form, priority: e.target.value })}
-              >
-                {PRIORITY_OPTIONS.map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-            <div className="inline-task-form__actions">
-              <button type="submit" className="btn btn--primary btn--sm">추가</button>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={cancelForm}>취소</button>
-            </div>
+            <button type="submit" style={{ display: 'none' }} />
           </form>
         )}
       </div>

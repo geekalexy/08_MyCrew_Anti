@@ -5,6 +5,9 @@ import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useLogStore } from '../../store/logStore';
 import { useSocket } from '../../hooks/useSocket';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -254,12 +257,49 @@ const STATUS_LABEL = {
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
+const formatModelName = (modelStr, agentMeta = {}) => {
+  if (!modelStr) return '';
+  const lowerStr = modelStr.toLowerCase();
+
+  // 브릿지 에이전트인 경우 프론트엔드 프로필 설정값 동기화 반영
+  let resolvedModel = lowerStr;
+  if (lowerStr.startsWith('anti-bridge-')) {
+    const agentId = lowerStr.replace('anti-bridge-', '');
+    const profileModel = agentMeta[agentId]?.model;
+    if (profileModel) {
+      resolvedModel = profileModel.toLowerCase();
+    }
+  }
+
+  const map = {
+    'anti-gemini-3.1-pro-high': 'Gemini 3.1 Pro',
+    'anti-gemini-3.1-pro-low': 'Gemini 3.1 Pro',
+    'anti-gemini-3-flash': 'Gemini 3 Flash',
+    'anti-claude-sonnet-4.6-thinking': 'Claude Sonnet 4.6',
+    'anti-claude-opus-4.6-thinking': 'Claude Opus 4.6',
+    'anti-gpt-oss-120b': 'GPT-OSS 120B',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemini-2.5-pro': 'Gemini 2.5 Pro',
+    'gemini-exp-1206': 'Gemini Exp 1206',
+    
+    // [Bridge 에이전트 매핑] (프로필 모델이 없을 경우 대비 기본 폴백)
+    'anti-bridge-nova': 'Gemini 3.1 Pro',
+    'anti-bridge-lumi': 'Gemini 3.1 Pro',
+    'anti-bridge-lily': 'Claude Sonnet 4.6',
+    'anti-bridge-pico': 'Claude Sonnet 4.6',
+    'anti-bridge-ollie': 'Claude Opus 4.6',
+    'anti-bridge-luna': 'Claude Opus 4.6'
+  };
+  return map[resolvedModel] || resolvedModel.replace(/-preview|-latest/g, '').replace('anti-bridge-', '');
+};
+
 export default function TaskDetailModal() {
   const { activeDetailTaskId, setActiveDetailTaskId, setFocusedTaskId, focusedTaskId, openArtifact } = useUiStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const removeTask = useKanbanStore((s) => s.removeTask);
   const updateTaskStatus = useKanbanStore((s) => s.updateTaskStatus);
   const patchTask = useKanbanStore((s) => s.patchTask);
+  const agentMeta = useAgentStore((s) => s.agentMeta);
 
   const { socket } = useSocket();
   const [comments, setComments] = useState([]);
@@ -279,21 +319,24 @@ export default function TaskDetailModal() {
   const [editContent, setEditContent] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
   const [editModel, setEditModel] = useState('');
+  const [editColumn, setEditColumn] = useState('');
+  const [editPriority, setEditPriority] = useState('');
   
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [reworkReason, setReworkReason] = useState('');
   const [showReworkInput, setShowReworkInput] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
+  const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
   const textareaRef = useRef(null);
   const moreMenuRef = useRef(null);
 
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
 
-  // 댓글 로드 및 초기 폼 세팅
   useEffect(() => {
     if (!activeDetailTaskId) return;
+    setActiveCommentTab('discussion'); // [S4-2] 새로운 태스크 클릭 시 항상 디스커션 탭 기본값 유지
     setIsLoadingComments(true);
     fetch(`${SERVER_URL}/api/tasks/${activeDetailTaskId}/comments`)
       .then((r) => r.json())
@@ -301,12 +344,10 @@ export default function TaskDetailModal() {
       .catch(() => setComments([]))
       .finally(() => setIsLoadingComments(false));
       
-    // 초기 폼 상태 동기화 (최초 1회만)
-    if (task) {
-      setCommentColumn(task.column || '');
-      setCommentAssignee(task.assignee || '');
-      setCommentPriority(task.priority || 'medium');
-    }
+    // 초기 폼 상태 동기화 (항상 초기화 상태 유지 - Stateless UX)
+    setCommentColumn('NO_CHANGE');
+    setCommentAssignee('NO_CHANGE');
+    setCommentPriority('NO_CHANGE');
   }, [activeDetailTaskId]);
 
   // 텍스트에어리어 자동 높이 조절
@@ -367,7 +408,7 @@ export default function TaskDetailModal() {
           created_at: new Date().toISOString(),
         }];
       });
-      setActiveCommentTab('activity'); // Activity 탭 자동 전환
+      // setActiveCommentTab('activity'); // [버그수정] 디스커션 탭 기본 유지 요청으로 인해 자동 전환 기능 제거
     };
     socket.on('task:updated', onTaskUpdated);
     return () => socket.off('task:updated', onTaskUpdated);
@@ -391,6 +432,8 @@ export default function TaskDetailModal() {
     setEditContent(task.content || '');
     setEditAssignee(task.assignee || '');
     setEditModel(task.model || '');
+    setEditColumn(task.column || 'todo');
+    setEditPriority(task.priority || '');
     setIsEditing(true);
     setShowMoreMenu(false);
   };
@@ -400,9 +443,7 @@ export default function TaskDetailModal() {
     
     const payload = {
       title: editTitle.trim(), 
-      content: editContent.trim(),
-      assignee: editAssignee || '미할당',
-      model: editModel || '미지정'
+      content: editContent.trim()
     };
     
     patchTask(task.id, payload);
@@ -440,18 +481,20 @@ export default function TaskDetailModal() {
   const handleSubmitComment = () => {
     if (!commentText.trim() || !task) return;
 
-    let finalColumn = commentColumn;
-    if (commentPriority === 'high' && commentColumn === 'todo') {
+    let finalColumn = commentColumn === 'NO_CHANGE' ? task.column : commentColumn;
+    const finalPriority = commentPriority === 'NO_CHANGE' ? task.priority : commentPriority;
+    
+    if (finalPriority === 'high' && finalColumn === 'todo') {
       finalColumn = 'in_progress';
-      setCommentColumn('in_progress');
     }
 
-    const finalAssignee = finalColumn === 'review' ? '대표님 (나)' : commentAssignee;
-    const hasUpdates = (commentPriority !== task.priority) || (finalAssignee !== task.assignee) || (finalColumn !== task.column);
+    const finalAssignee = commentAssignee === 'NO_CHANGE' ? task.assignee : commentAssignee;
+    
+    const hasUpdates = (finalPriority !== task.priority) || (finalAssignee !== task.assignee) || (finalColumn !== task.column);
 
     if (hasUpdates) {
        patchTask(task.id, {
-         priority: commentPriority,
+         priority: finalPriority,
          assignee: finalAssignee,
          column: finalColumn
        });
@@ -464,14 +507,12 @@ export default function TaskDetailModal() {
          method: 'PATCH',
          headers: { 'Content-Type': 'application/json' },
          body: JSON.stringify({
-           priority: commentPriority,
+           priority: finalPriority,
            assignee: finalAssignee,
            column: finalColumn
          })
        }).catch(console.error);
     }
-
-    setCommentAssignee(finalAssignee);
 
     // Optimistic update: target 결정 원칙
     // CEO 댓글은 항상 현재(또는 새로 지정된) assignedAgent에게 지시
@@ -490,6 +531,9 @@ export default function TaskDetailModal() {
     // Optimistic update — 즉시 반영
     setComments((prev) => [...prev, newComment]);
     setCommentText('');
+    setCommentColumn('NO_CHANGE');
+    setCommentAssignee('NO_CHANGE');
+    setCommentPriority('NO_CHANGE');
 
     // REST 동기화 (백그라운드)
     fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
@@ -566,56 +610,36 @@ export default function TaskDetailModal() {
 
   return (
     <div
-      className="modal-overlay"
+      className={`modal-overlay ${isExpanded ? 'modal-overlay--expanded' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={`Task #${task.id} 상세`}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
-      <div className="modal modal--detail">
+      <div className={`modal modal--detail ${isExpanded ? 'modal--expanded' : ''}`}>
 
       <div className="modal__header" style={{ alignItems: 'flex-start', gap: '0.75rem' }}>
 
-          {/* ↗ 결과물 프리뷰 버튼 — 아티팩트가 있을 때만 활성화 */}
-          {task.has_artifact === 1 && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // artifact_url이 있으면 이미지/파일 뷰어, 없으면 latestComment 텍스트 뷰
-                const artifactContent = task.artifact_url
-                  ? `# ${task.title || 'Task Result'}\n\n![결과물](${task.artifact_url})\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`
-                  : `# ${task.title || 'Task Result'}\n\n${task.latestComment || '결과물이 여기에 표시됩니다.'}\n\n---\n\n*Task ID: #${task.id} | Agent: ${task.assignee || 'AI'}*`;
-                openArtifact({
-                  id: task.id,
-                  title: task.title || task.content || `Task #${task.id}`,
-                  content: artifactContent,
-                  type: task.artifact_url ? 'Image' : 'Document',
-                  agentName: task.assignee || 'AI Agent',
-                  artifactUrl: task.artifact_url || null,
-                });
-              }}
-              title="결과물 미리보기"
-              style={{
-                background: 'rgba(180,197,255,0.07)',
-                border: '1px solid rgba(180,197,255,0.18)',
-                cursor: 'pointer', padding: '6px 8px',
-                color: 'var(--brand)',
-                display: 'flex', alignItems: 'center',
-                transition: 'all 0.15s',
-                borderRadius: '8px',
-                flexShrink: 0,
-                alignSelf: 'flex-start',
-                marginTop: '2px',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(180,197,255,0.14)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(180,197,255,0.07)'; }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1.15rem' }}>open_in_full</span>
-            </button>
-          )}
-
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                title={isExpanded ? '축소' : '전체 화면으로 확장'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '2px',
+                  borderRadius: '4px',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>
+                  {isExpanded ? 'close_fullscreen' : 'open_in_full'}
+                </span>
+              </button>
               <span style={{ 
                 fontSize: '0.76rem', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
                 letterSpacing: '0.08em', color: 'var(--text-muted)' 
@@ -720,35 +744,6 @@ export default function TaskDetailModal() {
                 style={{ width: '100%', background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.8rem', outline: 'none', resize: 'vertical', fontSize: '1.05rem', lineHeight: 1.6 }}
                 placeholder="태스크 상세 내용..."
               />
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: '140px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>담당자 (Assignee)</label>
-                  <select 
-                    value={editAssignee} 
-                    onChange={(e) => setEditAssignee(e.target.value)}
-                    style={{ width: '100%', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.5rem', outline: 'none', fontSize: '0.85rem' }}
-                  >
-                    <option value="">미할당</option>
-                    {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
-                      <option key={m.name} value={m.name}>{m.name} ({m.role})</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ flex: 1, minWidth: '140px' }}>
-                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem', fontWeight: 600 }}>모델 (Model)</label>
-                  <select 
-                    value={editModel} 
-                    onChange={(e) => setEditModel(e.target.value)}
-                    style={{ width: '100%', background: 'var(--bg-surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.5rem', outline: 'none', fontSize: '0.85rem' }}
-                  >
-                    <option value="">선택 안함</option>
-                    <option value="Claude Opus 4.6 (Thinking)">Claude Opus 4.6 (Thinking)</option>
-                    <option value="Claude Sonnet 4.6 (Thinking)">Claude Sonnet 4.6 (Thinking)</option>
-                    <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High)</option>
-                    <option value="Gemini 3 Flash">Gemini 3 Flash</option>
-                  </select>
-                </div>
-              </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn--ghost btn--sm" onClick={() => setIsEditing(false)}>취소</button>
                 <button className="btn btn--primary btn--sm" onClick={handleSaveEdit}>저장</button>
@@ -756,18 +751,21 @@ export default function TaskDetailModal() {
             </div>
           ) : (
             <div className="task-content-area" style={{ position: 'relative', minHeight: '60px' }}>
-              <p style={{
+              <div style={{
                 fontSize: '1.05rem',
                 color: 'var(--text-secondary)',
                 lineHeight: 1.75,
                 marginBottom: '20px',
-                whiteSpace: 'pre-wrap',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
+                wordBreak: 'break-word',
               }}>
-                {(task.content || task.title)}
-              </p>
+                <ReactMarkdown
+                  className="notion-md"
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw]}
+                >
+                  {task.content || ''}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
 
@@ -777,30 +775,10 @@ export default function TaskDetailModal() {
               <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>edit_square</span>
               작성: {task.author || '시스템'}
             </div>
-            {task.assignee && task.assignee !== '미할당' && (
-              <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>person</span>
-                담당: {task.assignee}
-              </div>
-            )}
             {task.createdAt && (
               <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>calendar_today</span>
                 {new Date(task.createdAt).toLocaleDateString('ko-KR')}
-              </div>
-            )}
-            {/* [Phase 14] 실제 투입된 LLM 모델 정보 노출 */}
-            {task.model && !['ari', 'luca', 'sonnet', 'opus'].includes(task.model.toLowerCase()) && (
-              <div style={{ 
-                fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: '4px',
-                background: 'rgba(180,197,255,0.1)',
-                color: 'var(--brand)',
-                border: '1px solid rgba(180,197,255,0.2)',
-                fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase', letterSpacing: '0.04em',
-                display: 'flex', alignItems: 'center', gap: '0.3rem'
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>memory</span>
-                {task.model.replace(/-preview|-latest/g, '')}
               </div>
             )}
             {task.executionMode && task.executionMode !== 'ari' && (
@@ -816,8 +794,8 @@ export default function TaskDetailModal() {
             <WorkflowTimeline taskId={task.id} />
           )}
 
-          {/* todo: 실행 시작 CTA */}
-          {(task.column === 'todo' || task.status === 'PENDING') && (
+          {/* todo: 실행 시작 CTA — column과 status 모두 todo/PENDING일 때만 표시 */}
+          {(task.column === 'todo' && task.status !== 'IN_PROGRESS' && task.status !== 'REVIEW' && task.status !== 'COMPLETED') && (
             <div style={{
               background: isStarting ? 'rgba(180,197,255,0.1)' : 'rgba(180,197,255,0.06)',
               border: `1px solid ${isStarting ? 'rgba(180,197,255,0.4)' : 'rgba(180,197,255,0.18)'}`,
@@ -835,23 +813,25 @@ export default function TaskDetailModal() {
                 {isStarting
                   ? <span style={{ color: 'var(--brand)' }}><strong>{task.assignee}</strong>에게 태스크를 전달하는 중...</span>
                   : task.assignee && task.assignee !== '미할당'
-                    ? <><strong style={{ color: 'var(--text-primary)' }}>{task.assignee.toUpperCase()}</strong>에게 즉시 실행을 시작할 수 있습니다.</>
+                    ? (task.assignee.toLowerCase() === 'ceo' 
+                        ? <><strong style={{ color: 'var(--text-primary)' }}>CEO</strong>님은 직접 작업을 수행합니다. (AI 에이전트에게 할당하세요)</>
+                        : <><strong style={{ color: 'var(--text-primary)' }}>{task.assignee.toUpperCase()}</strong>에게 즉시 실행을 시작할 수 있습니다.</>)
                     : <span style={{ color: 'var(--text-muted)' }}>담당자를 지정하면 실행시킬 수 있습니다.</span>
                 }
               </div>
               <button
                 onClick={handleStartTask}
-                disabled={!task.assignee || task.assignee === '미할당' || isStarting}
+                disabled={!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo' || isStarting}
                 style={{
                   background: isStarting
                     ? 'rgba(180,197,255,0.15)'
-                    : (!task.assignee || task.assignee === '미할당')
+                    : (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo')
                       ? 'var(--bg-surface-3)'
                       : 'linear-gradient(135deg, rgba(180,197,255,0.25), rgba(120,140,255,0.35))',
-                  color: (!task.assignee || task.assignee === '미할당') ? 'var(--text-muted)' : 'var(--brand)',
+                  color: (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo') ? 'var(--text-muted)' : 'var(--brand)',
                   border: '1px solid rgba(180,197,255,0.3)', borderRadius: '8px',
                   padding: '0.45rem 1rem',
-                  cursor: (!task.assignee || task.assignee === '미할당' || isStarting) ? 'not-allowed' : 'pointer',
+                  cursor: (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo' || isStarting) ? 'not-allowed' : 'pointer',
                   fontWeight: 700, fontSize: '0.85rem',
                   display: 'flex', alignItems: 'center', gap: '0.35rem',
                   fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '0.04em',
@@ -896,6 +876,125 @@ export default function TaskDetailModal() {
             </div>
           )}
 
+          {/* 인라인 상태 및 메타 변경 컨트롤 */}
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap', padding: '0.6rem 0.8rem', background: 'var(--bg-surface-2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>담당자 (Assignee)</label>
+              <select
+                value={task.assignee || ''}
+                onChange={(e) => {
+                  const newAssignee = e.target.value;
+                  patchTask(task.id, { assignee: newAssignee || '미할당' });
+                  fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assignee: newAssignee || '미할당' })
+                  }).catch(console.error);
+                }}
+                style={{ 
+                  background: 'var(--bg-surface-3)', color: 'var(--text-primary)', 
+                  border: '1px solid var(--border)', borderRadius: '6px', 
+                  padding: '0.4rem 0.5rem', outline: 'none', fontSize: '0.8rem',
+                  cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif'
+                }}
+              >
+                <option value="">미할당</option>
+                <option value="CEO">CEO</option>
+                {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
+                  <option key={m.name} value={m.name}>{m.name} ({m.role})</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>모델 (Model)</label>
+              <div style={{ height: '32px', display: 'flex', alignItems: 'center' }}>
+                {(() => {
+                  const assigneeKey = task.assignee?.toLowerCase();
+                  const profileModel = assigneeKey ? Object.values(agentMeta).find(
+                    m => m.id?.toLowerCase() === assigneeKey || m.name?.toLowerCase() === assigneeKey
+                  )?.model : null;
+                  const displayModel = profileModel || task.model;
+                  
+                  if (!displayModel || ['ari', 'luca', 'sonnet', 'opus'].includes(displayModel.toLowerCase())) {
+                    return <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>자동 할당</span>;
+                  }
+                  
+                  return (
+                    <div style={{ 
+                      fontSize: '0.72rem', fontWeight: 700, padding: '4px 8px', borderRadius: '4px',
+                      background: 'rgba(180,197,255,0.1)',
+                      color: 'var(--brand)',
+                      border: '1px solid rgba(180,197,255,0.2)',
+                      fontFamily: 'Space Grotesk, sans-serif', letterSpacing: '0.04em',
+                      display: 'flex', alignItems: 'center', gap: '0.3rem',
+                      width: 'fit-content'
+                    }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>memory</span>
+                      {formatModelName(displayModel, agentMeta)}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>상태 (Status)</label>
+              <select
+                value={task.column || 'todo'}
+                onChange={(e) => {
+                  const newColumn = e.target.value;
+                  patchTask(task.id, { column: newColumn });
+                  fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ column: newColumn })
+                  }).catch(console.error);
+                }}
+                style={{ 
+                  background: 'var(--bg-surface-3)', color: 'var(--text-primary)', 
+                  border: '1px solid var(--border)', borderRadius: '6px', 
+                  padding: '0.4rem 0.5rem', outline: 'none', fontSize: '0.8rem',
+                  cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif'
+                }}
+              >
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+              </select>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>우선순위 (Priority)</label>
+              <select
+                value={task.priority || ''}
+                onChange={(e) => {
+                  const newPriority = e.target.value;
+                  patchTask(task.id, { priority: newPriority });
+                  fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ priority: newPriority })
+                  }).catch(console.error);
+                }}
+                style={{ 
+                  background: 'var(--bg-surface-3)', color: 'var(--text-primary)', 
+                  border: '1px solid var(--border)', borderRadius: '6px', 
+                  padding: '0.4rem 0.5rem', outline: 'none', fontSize: '0.8rem',
+                  cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif'
+                }}
+              >
+                <option value="">선택 안함</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+
           {/* 댓글 목록 */}
           <div style={{ marginBottom: '1rem' }}>
             {/* [S4-2] Discussion / Activity 탭 */}
@@ -905,8 +1004,9 @@ export default function TaskDetailModal() {
                 const s = (c.source?.name || '').toLowerCase();
                 return a === 'system' || s === 'system';
               };
+              const activityComments = comments.filter(c => isSystemComment(c));
+              // [UX] 시스템 알림은 Discussion 탭에서 완전히 제외하고 Activity 탭에만 노출
               const discussionComments = comments.filter(c => !isSystemComment(c));
-              const activityComments   = comments.filter(c =>  isSystemComment(c));
               const visibleComments    = activeCommentTab === 'discussion' ? discussionComments : activityComments;
               return (
                 <>
@@ -970,14 +1070,34 @@ export default function TaskDetailModal() {
                   // CEO: 초록 / ARI(위임): 주황 / 에이전트: 브랜드색
                   const srcColor = isCeo ? '#4ade80' : isAriDelegate ? '#fb923c' : 'var(--brand)';
                   const tgtColor = isAgentComment ? 'var(--status-active)' : (isCeo || isAriDelegate) ? 'var(--brand)' : 'var(--text-muted)';
+                  
+                  // ── [Phase 30] agentChain 오케스트레이션 파이프 커넥터 ──
+                  // [역할명] 패턴으로 시작하는 에이전트 댓글이 연속될 때 → 화살표 삽입
+                  const isChainComment = isAgentComment && /^\[.+\]\n/.test(c.content || '');
+                  const prevC = visibleComments[i - 1];
+                  const prevIsChain = prevC && !['CEO', '대표님', 'system'].includes(prevC.author) && /^\[.+\]\n/.test(prevC.content || '');
+                  const showPipe = isChainComment && prevIsChain && i > 0;
+
                   return (
-                  <div key={i} style={{
-                    background: 'var(--bg-surface-2)', borderRadius: '10px',
-                    padding: '0.7rem 0.9rem', border: '1px solid var(--border)'
+                  <div key={i} style={{ display: 'contents' }}>
+                  {showPipe && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0 0.5rem' }}>
+                      <div style={{ width: '2px', height: '18px', background: 'linear-gradient(to bottom, rgba(180,197,255,0.3), rgba(180,197,255,0.1))', marginLeft: '0.9rem', flexShrink: 0 }} />
+                      <span style={{ fontSize: '0.65rem', color: 'rgba(180,197,255,0.4)', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                        {prevC.author?.toUpperCase()} → {c.author?.toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{
+                    background: isChainComment ? 'rgba(180,197,255,0.04)' : 'var(--bg-surface-2)',
+                    borderRadius: '10px',
+                    padding: '0.7rem 0.9rem',
+                    border: isChainComment ? '1px solid rgba(180,197,255,0.15)' : '1px solid var(--border)',
                   }}>
+
                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', alignItems: 'center' }}>
-                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                         {activeCommentTab === 'activity' ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                         {c.author === 'system' ? (
                            <span style={{
                              fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)',
                              fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase',
@@ -1001,114 +1121,87 @@ export default function TaskDetailModal() {
                       </span>
                     </div>
                     <div style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
-                      {(() => {
-                        // ── 미디어 + 마크다운 통합 렌더러 ──────────────────────────────
-                        // 처리 순서: <video> 태그 → ![img] 마크다운 → 다운로드 링크 → 굵게/기울임/줄바꿈
-                        const raw = c.content || '';
-                        const parts = [];
-                        let remaining = raw;
-                        let keyIdx = 0;
-
-                        // 1) <video ...> 태그 파싱 (remotionRenderer.js 출력 포맷 대응)
-                        const videoTagRegex = /<video([^>]*)>([\s\S]*?)<\/video>/gi;
-                        // 2) 이미지 마크다운 ![alt](url)
-                        const imgMdRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-                        // 3) 마크다운 링크 [text](url) — 다운로드 링크
-                        const linkMdRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-
-                        // 통합 토크나이저: 위치 기반으로 먼저 등장하는 토큰 우선 처리
-                        const tokenize = (text) => {
-                          const tokens = [];
-                          const patterns = [
-                            { re: /<video([^>]*)>([\s\S]*?)<\/video>/gi, type: 'video' },
-                            { re: /!\[([^\]]*)\]\(([^)]+)\)/g,           type: 'img' },
-                            { re: /> 🎬[^\n]*/g,                          type: 'caption' },
-                            { re: /\[([^\]]+)\]\(([^)]+)\)/g,            type: 'link' },
-                          ];
-                          let cursor = 0;
-                          while (cursor < text.length) {
-                            let earliest = null;
-                            for (const { re, type } of patterns) {
-                              re.lastIndex = cursor;
-                              const m = re.exec(text);
-                              if (m && (earliest === null || m.index < earliest.index)) {
-                                earliest = { ...m, type, re };
-                              }
-                            }
-                            if (!earliest) {
-                              tokens.push({ type: 'text', value: text.slice(cursor) });
-                              break;
-                            }
-                            if (earliest.index > cursor) {
-                              tokens.push({ type: 'text', value: text.slice(cursor, earliest.index) });
-                            }
-                            tokens.push({ type: earliest.type, match: earliest });
-                            cursor = earliest.index + earliest[0].length;
-                          }
-                          return tokens;
-                        };
-
-                        // 인라인 마크다운 렌더(굵게/기울임/줄바꿈) — 텍스트 노드에만 적용
-                        const renderInline = (text, baseKey) => {
-                          const lines = text.split('\n');
-                          return lines.map((line, li) => {
-                            const boldParts = line.split(/\*\*([^*]+)\*\*/g);
-                            const rendered = boldParts.map((seg, si) =>
-                              si % 2 === 1
-                                ? <strong key={si} style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{seg}</strong>
-                                : seg
-                            );
-                            return (
-                              <span key={`${baseKey}-l${li}`}>
-                                {rendered}
-                                {li < lines.length - 1 && <br />}
-                              </span>
-                            );
-                          });
-                        };
-
-                        const tokens = tokenize(raw);
-                        tokens.forEach((tok, ti) => {
-                          const k = `tok-${ti}`;
-                          if (tok.type === 'text') {
-                            parts.push(<span key={k}>{renderInline(tok.value, k)}</span>);
-                          } else if (tok.type === 'video') {
-                            // <video> 태그에서 src 추출
-                            const srcMatch = /<source\s+src="([^"]+)"/i.exec(tok.match[0]);
-                            const videoSrc = srcMatch ? srcMatch[1] : null;
-                            if (videoSrc) {
-                              parts.push(
-                                <div key={k} style={{ margin: '1rem 0', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(180,197,255,0.2)', background: '#000' }}>
-                                  <video controls width="100%" style={{ display: 'block', maxHeight: '320px' }}>
-                                    <source src={videoSrc} type="video/mp4" />
-                                    브라우저가 비디오 태그를 지원하지 않습니다.
-                                  </video>
-                                </div>
-                              );
-                            }
-                          } else if (tok.type === 'img') {
-                            parts.push(
-                              <div key={k} style={{ margin: '1rem 0', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                <img src={tok.match[2]} alt={tok.match[1]} style={{ width: '100%', display: 'block' }} loading="lazy" />
-                              </div>
-                            );
-                          } else if (tok.type === 'caption') {
-                            // > 🎬 캡션 라인 스킵 (video 카드 아래 중복 방지)
-                          } else if (tok.type === 'link') {
-                            parts.push(
-                              <a key={k} href={tok.match[2]} target="_blank" rel="noopener noreferrer"
-                                style={{ color: 'var(--brand)', textDecoration: 'underline', wordBreak: 'break-all' }}>
-                                {tok.match[1]}
-                              </a>
-                            );
-                          }
-                        });
-
-                        return parts.length > 0 ? parts : raw;
-                      })()}
+                      <ReactMarkdown
+                        className="notion-md"
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw]}
+                      >
+                        {c.content || ''}
+                      </ReactMarkdown>
                     </div>
-                  </div>
-                ); })}
+
+                    {/* ── [사고과정] 에이전트 댓글에만 표시 ── */}
+                    {isAgentComment && c.thought_process && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        borderTop: '1px solid rgba(180,197,255,0.12)',
+                        paddingTop: '0.6rem',
+                      }}>
+                        {c.thought_process.thinking && (
+                          <details open style={{ marginBottom: '0.4rem' }}>
+                            <summary style={{
+                              cursor: 'pointer', fontSize: '0.72rem',
+                              color: 'rgba(180,197,255,0.6)', userSelect: 'none',
+                              fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
+                              textTransform: 'uppercase', letterSpacing: '0.06em',
+                              display: 'flex', alignItems: 'center', gap: '0.3rem',
+                              listStyle: 'none',
+                            }}>
+                              <span style={{
+                                display: 'inline-block', width: '6px', height: '6px',
+                                borderRadius: '50%', background: 'rgba(180,197,255,0.5)',
+                                flexShrink: 0,
+                              }} />
+                              사고과정 (Thinking)
+                            </summary>
+                            <div style={{
+                              fontFamily: '"JetBrains Mono", "SF Mono", monospace',
+                              fontSize: '0.78rem', color: 'rgba(200,210,255,0.7)',
+                              marginTop: '0.45rem', whiteSpace: 'pre-wrap', lineHeight: 1.65,
+                              background: 'rgba(180,197,255,0.04)',
+                              border: '1px solid rgba(180,197,255,0.1)',
+                              borderRadius: '8px', padding: '0.6rem 0.8rem',
+                            }}>
+                              {c.thought_process.thinking}
+                            </div>
+                          </details>
+                        )}
+                        {c.thought_process.working && (
+                          <details open>
+                            <summary style={{
+                              cursor: 'pointer', fontSize: '0.72rem',
+                              color: 'rgba(251,191,36,0.6)', userSelect: 'none',
+                              fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
+                              textTransform: 'uppercase', letterSpacing: '0.06em',
+                              display: 'flex', alignItems: 'center', gap: '0.3rem',
+                              listStyle: 'none',
+                            }}>
+                              <span style={{
+                                display: 'inline-block', width: '6px', height: '6px',
+                                borderRadius: '50%', background: 'rgba(251,191,36,0.5)',
+                                flexShrink: 0,
+                              }} />
+                              실행 과정 (Working)
+                            </summary>
+                            <div style={{
+                              fontFamily: '"JetBrains Mono", "SF Mono", monospace',
+                              fontSize: '0.78rem', color: 'rgba(251,191,36,0.7)',
+                              marginTop: '0.45rem', whiteSpace: 'pre-wrap', lineHeight: 1.65,
+                              background: 'rgba(251,191,36,0.04)',
+                              border: '1px solid rgba(251,191,36,0.12)',
+                              borderRadius: '8px', padding: '0.6rem 0.8rem',
+                            }}>
+                              {c.thought_process.working}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    )}
+                   </div>
+                   </div>
+                 ); })}
+
+
               </div>
             )}
                 </>
@@ -1146,6 +1239,7 @@ export default function TaskDetailModal() {
                   disabled={isArchived}
                   style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem', opacity: isArchived ? 0.5 : 1 }}
                 >
+                  <option value="NO_CHANGE" style={{ color: 'var(--text-muted)' }}>상태</option>
                   <option value="todo">진행 전 (To Do)</option>
                   <option value="in_progress">진행 중 (In Progress)</option>
                   <option value="review">승인 대기 (Review)</option>
@@ -1157,13 +1251,14 @@ export default function TaskDetailModal() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>person</span>
                 <select
-                  value={commentColumn === 'review' ? '대표님 (나)' : commentAssignee}
+                  value={commentAssignee}
                   onChange={(e) => setCommentAssignee(e.target.value)}
-                  disabled={commentColumn === 'review'}
-                  style={{ background: 'var(--bg-surface-1)', color: commentColumn === 'review' ? 'var(--brand)' : 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem', fontWeight: commentColumn === 'review' ? 700 : 400 }}
+                  disabled={isArchived}
+                  style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem' }}
                 >
+                  <option value="NO_CHANGE" style={{ color: 'var(--text-muted)' }}>담당</option>
                   <option value="">미할당</option>
-                  <option value="대표님 (나)">대표님 (나)</option>
+                  <option value="CEO">CEO</option>
                   {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
                     <option key={m.name} value={m.name}>{m.name}</option>
                   ))}
@@ -1177,6 +1272,7 @@ export default function TaskDetailModal() {
                   onChange={(e) => setCommentPriority(e.target.value)}
                   style={{ background: 'var(--bg-surface-1)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.3rem 0.5rem', outline: 'none', fontSize: '0.82rem' }}
                 >
+                  <option value="NO_CHANGE" style={{ color: 'var(--text-muted)' }}>우선순위</option>
                   <option value="low">낮음</option>
                   <option value="medium">보통</option>
                   <option value="high">높음</option>

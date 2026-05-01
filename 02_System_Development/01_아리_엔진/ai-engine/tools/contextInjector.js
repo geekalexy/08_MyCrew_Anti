@@ -231,14 +231,16 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
 - If your current response implies that the task should be moved to a different state (e.g., user asks you to archive the task, mark it as done, or reassign it), you MUST include the following JSON block EXACTLY as shown at the very end of your message.
 - Only output the JSON block if you actually intend to change the state or reassign the task. Do not output it for normal conversational replies.
 - For archiving, set target to "ARCHIVED". For completing, set target to "COMPLETED".
+- For starting a task or moving it to in progress, set target to "IN_PROGRESS".
+- To assign a task to a specific agent, provide their name in the "assignee" field (e.g., "pico", "lumi", "lily", "nova").
 
 \`\`\`json
 {
   "system_action": {
     "action": "CHANGE_STATUS",
-    "target": "ARCHIVED", 
-    "assignee": "optional_agent_id",
-    "reason": "사용자가 아카이빙을 지시함"
+    "target": "IN_PROGRESS", 
+    "assignee": "pico",
+    "reason": "피코에게 태스크 할당 및 진행 상태로 변경"
   }
 }
 \`\`\`

@@ -38,6 +38,7 @@ if (import.meta.hot) {
 
 export function useSocket() {
   const socketRef = useRef(null);
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
 
   useEffect(() => {
     if (!socketInstance) {
@@ -130,7 +131,18 @@ export function useSocket() {
       });
 
       socketInstance.on('log:append', (log) => {
-        useLogStore.getState().appendLog(log);
+        // [Phase 28a] 프로젝트 격리 (백엔드 이중 방출 필터링)
+        const currentProjectId = useProjectStore.getState().selectedProjectId;
+        if (log.projectId && log.projectId !== currentProjectId) return;
+
+        // [Phase 28a] Dedup 방어 로직 (동일 메시지 이중 렌더링 방지)
+        const { logs, appendLog } = useLogStore.getState();
+        const isDup = logs.slice(-10).some(
+          l => l.message === log.message && l.agentId === log.agentId && l.taskId === log.taskId
+        );
+        if (isDup) return;
+
+        appendLog(log);
 
         // ── 에이전트 활동 상태 감지 → 카드 애니메이션 ON/OFF ─────────────────
         // 규격화된 활동 코드 우선 탐지 ([THINKING], [EXPLORED], [EDIT], [WORKED])
@@ -195,6 +207,20 @@ export function useSocket() {
 
     return () => {};
   }, []);
+
+  // [Phase 28a] Room 스위칭 (선택된 프로젝트가 바뀔 때마다 Room Join/Leave)
+  useEffect(() => {
+    if (!socketRef.current || !selectedProjectId) return;
+    
+    // 이전에 조인했던 프로젝트가 있으면 leave
+    if (socketRef.current._lastProjectId && socketRef.current._lastProjectId !== selectedProjectId) {
+      socketRef.current.emit('project:leave', { projectId: socketRef.current._lastProjectId });
+    }
+    
+    // 새 프로젝트 join
+    socketRef.current.emit('project:join', { projectId: selectedProjectId });
+    socketRef.current._lastProjectId = selectedProjectId;
+  }, [selectedProjectId]);
 
   const emitTaskMove = useCallback((taskId, fromColumn, toColumn) => {
     const sid = String(taskId);

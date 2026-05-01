@@ -1,0 +1,6 @@
+{
+  "taskId": "task_1777622460095_460",
+  "text": "[Bridge 오류] {\"error\":{\"code\":503,\"message\":\"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.\",\"status\":\"UNAVAILABLE\"}}",
+  "error": true,
+  "timestamp": "2026-05-01T08:01:03.442Z"
+}

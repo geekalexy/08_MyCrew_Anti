@@ -118,13 +118,24 @@ export const useAgentStore = create(
   // 동적 메타데이터 (이름, 이미지 수정 등을 위해 상태화)
   agentMeta: INITIAL_AGENT_META,
   
-  updateAgentMeta: (agentId, updates) =>
+  updateAgentMeta: (agentId, updates) => {
+    // 백엔드 라우팅 로직과 실제 동기화를 위해 모델 변경 시 API 호출 (Fire-and-forget)
+    if (updates.model) {
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+      fetch(`${SERVER_URL}/api/agents/${agentId}/model`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: updates.model })
+      }).catch(err => console.error('[Store] 모델 동기화 실패:', err));
+    }
+    
     set((s) => ({
       agentMeta: {
         ...s.agentMeta,
         [agentId]: { ...s.agentMeta[agentId], ...updates },
       },
-    })),
+    }));
+  },
 
   // 신규 에이전트 생성
   addAgent: (roleDesc, teamGroup = 'B') =>

@@ -22,12 +22,15 @@ const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 export default function KanbanBoard() {
   const tasks = useKanbanStore((s) => s.tasks);
   const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
+  const isLoaded = useProjectStore((s) => s.isLoaded);
   const isBoardReadOnly = useUiStore((s) => s.isBoardReadOnly);
   const { emitTaskMove } = useSocket();
   const [activeTask, setActiveTask] = useState(null);
 
   // ── 초기 Hydration: 서버 DB 기준으로 스토어 완전 동기화 ─────────────────
   useEffect(() => {
+    if (!isLoaded || !selectedProjectId) return; // 프로젝트가 로드된 후에만 Fetch
+
     // Step 1: localStorage에 남은 temp-/local- 카드 즉시 정리
     const { tasks, removeTask } = useKanbanStore.getState();
     Object.keys(tasks).forEach((id) => {
@@ -37,8 +40,8 @@ export default function KanbanBoard() {
       }
     });
 
-    // Step 2: 서버 DB에서 실제 태스크 불러오기
-    fetch(`${SERVER_URL}/api/tasks`)
+    // Step 2: 서버 DB에서 프로젝트별 태스크 불러오기
+    fetch(`${SERVER_URL}/api/tasks?project_id=${selectedProjectId}`)
       .then((res) => res.json())
       .then(({ status, tasks: remoteTasks }) => {
         if (status !== 'ok' || !Array.isArray(remoteTasks)) return;
@@ -47,19 +50,18 @@ export default function KanbanBoard() {
         const localTasks = state.tasks;
         const remoteIds = new Set(remoteTasks.map(t => String(t.id)));
         
-        // 🚨 긴급 버그 픽스: 서버 DB에 없는(이미 삭제된) 로컬 잔존 태스크 강제 동기화(제거)
+        // 🚨 긴급 버그 픽스: 기존(다른 프로젝트 포함) 로컬 잔존 태스크 강제 초기화(제거)
         Object.keys(localTasks).forEach((id) => {
           if (!String(id).startsWith('temp-') && !String(id).startsWith('local-') && !remoteIds.has(id)) {
             state.removeTask(id);
-            console.log(`[KanbanBoard] 🗑️ 동기화: 삭제된 잔존 좀비 카드 제거 (#${id})`);
           }
         });
 
         remoteTasks.forEach((task) => state.addTask(task));
-        console.log(`[KanbanBoard] Hydration 완료: ${remoteTasks.length}개 태스크`);
+        console.log(`[KanbanBoard] Hydration 완료: ${remoteTasks.length}개 태스크 (Project: ${selectedProjectId})`);
       })
       .catch((err) => console.warn('[KanbanBoard] Hydration 실패:', err.message));
-  }, []);
+  }, [selectedProjectId, isLoaded]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

@@ -109,6 +109,22 @@ export default function AgentDetailView() {
     if (e.key === 'Escape') setIsEditingName(false);
   };
 
+  const formatModelName = (modelStr) => {
+    if (!modelStr) return '';
+    const map = {
+      'anti-gemini-3.1-pro-high': 'Gemini 3.1 Pro (High)',
+      'anti-gemini-3.1-pro-low': 'Gemini 3.1 Pro (Low)',
+      'anti-gemini-3-flash': 'Gemini 3 Flash',
+      'anti-claude-sonnet-4.6-thinking': 'Claude Sonnet 4.6 (Thinking)',
+      'anti-claude-opus-4.6-thinking': 'Claude Opus 4.6 (Thinking)',
+      'anti-gpt-oss-120b': 'GPT-OSS 120B (Medium)',
+      'gemini-2.5-flash': 'Gemini 2.5 Flash',
+      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-exp-1206': 'Gemini Exp 1206',
+    };
+    return map[modelStr.toLowerCase()] || modelStr;
+  };
+
   const myTasks = useMemo(() =>
     Object.values(tasks).filter((t) => t.agentId === agentId),
     [tasks, agentId]
@@ -190,7 +206,7 @@ export default function AgentDetailView() {
             </h2>
           )}
           <p className="agent-profile__role">{meta.role}</p>
-          <p className="agent-profile__model" style={{ opacity: 0.5, fontSize: '0.75rem' }}>{meta.model}</p>
+          <p className="agent-profile__model" style={{ opacity: 0.5, fontSize: '0.75rem' }}>{formatModelName(meta.model)}</p>
         </div>
         
         <div className="agent-profile__status" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'center', marginLeft: 'auto', paddingRight: '2rem' }}>

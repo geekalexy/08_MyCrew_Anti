@@ -24,14 +24,18 @@ import contextInjector from './tools/contextInjector.js';
 // API 사용자: Flash 유지 / Gemini Pro·Ultra 구독자: Pro 격상
 const IS_PRO_TIER = process.env.USER_MODEL_TIER === 'pro';
 
-// [Phase 26] agents.json 기반 동적 파생 — 하드코딩 BRIDGE_AGENTS 대체
-// bridge:true 인 에이전트 = AntiGravity 파일 브릿지 대상
+// [Phase 30] BRIDGE_AGENTS / AGENT_SIGNATURE_MODELS 초기화 전략
+// - 1단계(동기): agents.json 즉시 로드 → 서버 시작 즉시 라우팅 가능 (SLA 보장)
+// - 2단계(async): DB agent_profiles로 갱신 → 사용자가 변경한 모델 즉시 반영
 const BRIDGE_AGENTS = new Set();
-
-// [Phase 26] agents.json 기반 동적 파생 — 하드코딩 AGENT_SIGNATURE_MODELS 대체
-// anti-* 식별자를 antiModel 필드에서 읽음 → antigravityAdapter로 라우팅
 const AGENT_SIGNATURE_MODELS = {};
 
+const _HARDCODED_FALLBACK = {
+  bridge_agents: ['luna', 'ollie', 'lily', 'pico', 'nova', 'lumi'],
+  models: { luna: MODEL.OPUS, ollie: MODEL.OPUS, lily: MODEL.SONNET, pico: MODEL.SONNET, nova: MODEL.PRO, lumi: MODEL.PRO, ari: MODEL.PRO },
+};
+
+// ── 1단계: 동기 초기화 (agents.json 기반, 서버 시작 즉시) ──────────────
 try {
   const _agentsRaw = fs.readFileSync(path.resolve(process.cwd(), 'agents.json'), 'utf-8');
   const _agents = JSON.parse(_agentsRaw);
@@ -41,27 +45,52 @@ try {
       BRIDGE_AGENTS.add(id);
       AGENT_SIGNATURE_MODELS[id] = a.antiModel || MODEL.ANTI_GEMINI_PRO_HIGH;
     } else {
-      // 브릿지 에이전트 아님: 시그니처 모델 = ARI는 Flash, 그 외 에이전트는 Flash
-      if (id === 'ari') AGENT_SIGNATURE_MODELS[id] = MODEL.PRO; // ARI 기본 Pro
+      if (id === 'ari') AGENT_SIGNATURE_MODELS[id] = MODEL.PRO;
     }
   });
-  console.log(`[Executor] 동적 BRIDGE_AGENTS: [${[...BRIDGE_AGENTS].join(', ')}]`);
+  console.log(`[Executor] 동기 초기화 완료 (agents.json). BRIDGE_AGENTS: [${[...BRIDGE_AGENTS].join(', ')}]`);
 } catch (e) {
-  // agents.json 로드 실패 시 폴백 하드코딩 (SLA 보장)
-  console.warn('[Executor] agents.json 로드 실패, 폴백 BRIDGE_AGENTS 사용:', e.message);
-  ['luna', 'ollie', 'lily', 'pico', 'nova', 'lumi'].forEach(id => BRIDGE_AGENTS.add(id));
-  Object.assign(AGENT_SIGNATURE_MODELS, {
-    'luna':  MODEL.OPUS,
-    'ollie': MODEL.OPUS,
-    'lily':  MODEL.SONNET,
-    'pico':  MODEL.SONNET,
-    'nova':  MODEL.PRO,
-    'lumi':  MODEL.PRO,
-    'ari':   MODEL.PRO,
-  });
+  // agents.json 실패 시 하드코딩 폴백 (SLA 보장)
+  console.warn('[Executor] agents.json 로드 실패, 하드코딩 폴백:', e.message);
+  _HARDCODED_FALLBACK.bridge_agents.forEach(id => BRIDGE_AGENTS.add(id));
+  Object.assign(AGENT_SIGNATURE_MODELS, _HARDCODED_FALLBACK.models);
 }
 
+// ── 2단계: async DB 갱신 (사용자 설정 모델 반영, 서버 시작 후 비동기) ──
+async function _refreshFromDB() {
+  try {
+    const rows = await dbManager.getAllAgentProfiles();
+    if (rows && rows.length > 0) {
+      rows.forEach(a => {
+        const id = a.id.toLowerCase();
+        if (a.bridge) {
+          BRIDGE_AGENTS.add(id);
+          if (a.model) AGENT_SIGNATURE_MODELS[id] = a.model; // 사용자 설정 모델로 갱신
+        } else {
+          if (id === 'ari' && a.model) AGENT_SIGNATURE_MODELS[id] = a.model;
+        }
+      });
+      console.log(`[Executor] Phase 30 — DB agent_profiles 갱신 완료.`);
+    }
+  } catch (e) {
+    // DB 조회 실패 시 1단계 동기 초기화값 유지 (서비스 영향 없음)
+    console.warn('[Executor] DB agent_profiles 갱신 실패 (1단계 값 유지):', e.message);
+  }
+}
 
+// 비동기 갱신 실행 (서버 시작과 병렬, 실패해도 1단계 값으로 동작)
+_refreshFromDB().catch(e => console.error('[Executor] _refreshFromDB 오류:', e.message));
+
+
+
+
+export function updateAgentSignatureModel(agentId, model) {
+  AGENT_SIGNATURE_MODELS[agentId.toLowerCase()] = model;
+}
+
+export function getAgentSignatureModel(agentId) {
+  return AGENT_SIGNATURE_MODELS[agentId.toLowerCase()];
+}
 
 // ─── SKILL.md 캐시 (서버 생존 주기 동안 유지) ─────────────────────────
 export const skillCache = new Map();
@@ -408,7 +437,12 @@ class Executor {
 
     // [Phase 22] 🧠 Context Injector를 통한 완벽한 문맥 캡슐화
     const livingRules = ruleHarvester.getAppliedRules();
-    const finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
+    let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
+
+    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n\n`;
+      finalSystemPrompt = executorPersona + finalSystemPrompt;
+    }
 
     try {
       console.log(`[Executor] 투입 모델: ${modelToUse}, 카테고리: ${evaluation.category}`);
@@ -608,7 +642,12 @@ class Executor {
     const skill = router.route(taskContent, evaluation.category);
     let systemPrompt = loadSkillDocument(evaluation.category) || skill.getSystemPrompt();
     const livingRules = ruleHarvester.getAppliedRules();
-    const finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
+    let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
+
+    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n\n`;
+      finalSystemPrompt = executorPersona + finalSystemPrompt;
+    }
 
     this._log('info', `> [${evaluation.category}] 모듈 로드 완료. ${modelToUse} 엔진으로 생성을 시작합니다...`, agentId || 'system', taskId);
 

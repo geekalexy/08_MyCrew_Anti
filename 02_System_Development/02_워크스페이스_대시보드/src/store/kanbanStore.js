@@ -44,8 +44,16 @@ export const useKanbanStore = create(
         const sid = String(taskId);
         const snapshot = get().tasks[sid];
         if (snapshot) preMovSnapshot.set(sid, snapshot);
+        // column과 status를 함께 동기화 (불일치로 인한 CTA 오표시 방지)
+        const COLUMN_TO_STATUS = {
+          todo: 'PENDING',
+          in_progress: 'IN_PROGRESS',
+          review: 'REVIEW',
+          done: 'COMPLETED',
+        };
+        const syncedStatus = COLUMN_TO_STATUS[toColumn] || toColumn;
         set((s) => ({
-          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn } },
+          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn, status: syncedStatus } },
         }));
         return snapshot;
       },
@@ -62,8 +70,16 @@ export const useKanbanStore = create(
       confirmTaskMove: (taskId, toColumn) => {
         const sid = String(taskId);
         preMovSnapshot.delete(sid);
+        // column과 status를 함께 동기화
+        const COLUMN_TO_STATUS = {
+          todo: 'PENDING',
+          in_progress: 'IN_PROGRESS',
+          review: 'REVIEW',
+          done: 'COMPLETED',
+        };
+        const syncedStatus = COLUMN_TO_STATUS[toColumn] || toColumn;
         set((s) => ({
-          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn } },
+          tasks: { ...s.tasks, [sid]: { ...s.tasks[sid], column: toColumn, status: syncedStatus } },
         }));
       },
     }),

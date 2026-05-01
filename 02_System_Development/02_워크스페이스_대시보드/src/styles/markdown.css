@@ -1,0 +1,148 @@
+/* ── 노션 스타일 마크다운 (Phase 32) ── */
+.notion-md {
+  font-family: 'Pretendard', 'Inter', -apple-system, sans-serif;
+  color: var(--text-primary);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.notion-md h1, .notion-md h2, .notion-md h3, .notion-md h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.notion-md h1 {
+  font-size: 1.6rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3em;
+}
+
+.notion-md h2 {
+  font-size: 1.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.2em;
+}
+
+.notion-md h3 {
+  font-size: 1.2rem;
+}
+
+.notion-md h4 {
+  font-size: 1.1rem;
+}
+
+.notion-md p {
+  margin-bottom: 0.8em;
+  color: var(--text-secondary);
+}
+
+.notion-md ul, .notion-md ol {
+  margin-top: 0.5em;
+  margin-bottom: 0.8em;
+  padding-left: 1.2em;
+}
+
+.notion-md li {
+  margin-bottom: 0.3em;
+  color: var(--text-secondary);
+}
+
+.notion-md li > p {
+  margin-bottom: 0;
+}
+
+.notion-md blockquote {
+  border-left: 3px solid var(--brand);
+  padding-left: 1rem;
+  margin: 1em 0;
+  color: var(--text-muted);
+  background: var(--bg-surface-3);
+  padding: 0.8rem 1rem;
+  border-radius: 4px;
+}
+
+.notion-md blockquote p {
+  margin-bottom: 0;
+}
+
+.notion-md pre {
+  background: var(--bg-surface-3);
+  border: 1px solid var(--border);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.notion-md code {
+  font-family: 'Fira Code', monospace;
+  background: var(--bg-surface-3);
+  padding: 0.1em 0.3em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--brand);
+}
+
+.notion-md pre code {
+  background: none;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.notion-md table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.notion-md th, .notion-md td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+
+.notion-md th {
+  background: var(--bg-surface-3);
+  font-weight: 600;
+}
+
+.notion-md details {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.8em;
+}
+
+.notion-md details > summary {
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none; /* Hide default arrow in some browsers */
+  position: relative;
+  padding-left: 1.2rem;
+  outline: none;
+}
+
+.notion-md details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.notion-md details > summary::before {
+  content: '▶';
+  font-size: 0.7em;
+  position: absolute;
+  left: 0;
+  top: 0.4em;
+  transition: transform 0.2s;
+}
+
+.notion-md details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.notion-md details > *:not(summary) {
+  margin-top: 0.8rem;
+  padding-left: 1.2rem;
+}

@@ -62,6 +62,11 @@ export default function TaskCard({ task, isDragging }) {
     marginLeft: 0,
   };
 
+  const agentMetaMap = useAgentStore((s) => s.agentMeta) || {};
+  const assigneeMeta = task.assignee ? Object.values(agentMetaMap).find(m => (m.name && m.name.toUpperCase() === task.assignee.toUpperCase()) || (m.id && m.id.toUpperCase() === task.assignee.toUpperCase())) : null;
+  const role = assigneeMeta?.role || '';
+
+
   return (
     <div
       ref={setNodeRef}
@@ -215,13 +220,13 @@ export default function TaskCard({ task, isDragging }) {
               {task.assignee.charAt(0).toUpperCase()}
             </div>
             <span style={{
-              fontSize: '0.8rem', fontWeight: 500,
+              fontSize: '0.75rem', fontWeight: 500,
               color: 'var(--text-muted)',
               fontFamily: 'Space Grotesk, sans-serif',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
             }}>
-              {task.assignee}
+              {task.assignee}{role ? ` - ${role}` : ''}
             </span>
           </>
         )}

@@ -82,6 +82,17 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
           }
 
           await dbManagerInstance.updateTaskStatus(taskId, status);
+
+          // ── [Activity Log] 어댑터 작업 완료 상태 변경 기록 ───────────────────
+          if (status === 'REVIEW' || status === 'FAILED') {
+            const ACTIVITY_LABEL = { 'REVIEW': '승인 대기', 'FAILED': '실패', 'IN_PROGRESS': '진행 중' };
+            const statusLabel = ACTIVITY_LABEL[status] || status;
+            const logMsg = `📋 상태: 진행 중 → ${statusLabel}`;
+            await dbManagerInstance.createComment(taskId, 'system', logMsg).catch(() => {});
+            ioInstance.emit('task:comment_added', {
+              taskId, author: 'system', text: logMsg, createdAt: new Date().toISOString()
+            });
+          }
           
           // ── [Artifact Fix] artifactPath 있으면 has_artifact = 1 업데이트 ──
           // Antigravity가 completed JSON에 artifactPath 필드를 포함할 때 동작
@@ -109,12 +120,27 @@ export function initAdapterWatcher(io, dbMgr, broadcastFn, dispatchFn) {
                                .replace(/<working>[\s\S]*?<\/working>/g, '').trim();
           }
 
-          // 커멘트 로그 남기기
-          await dbManagerInstance.createComment(taskId, resultData.agentId || 'system', cleanMsg, thoughtProcess);
+          // ── [Phase 30] agentChain: 자율 오케스트레이션 체인 댓글 저장 ───────
+          // 여러 에이전트가 관여했을 때 각 기여를 순서대로 별도 댓글로 저장
+          if (resultData.agentChain && Array.isArray(resultData.agentChain) && resultData.agentChain.length > 1) {
+            for (const step of resultData.agentChain) {
+              const stepAgent = (step.agent || 'system').toLowerCase();
+              const stepContent = `[${step.role || '수행'}]\n${step.content || ''}`;
+              await dbManagerInstance.createComment(taskId, stepAgent, stepContent, null).catch(() => {});
+              ioInstance.emit('task:comment_added', {
+                taskId, author: stepAgent, text: stepContent, createdAt: new Date().toISOString()
+              });
+            }
+          } else {
+            // 단일 에이전트: 기존 방식대로 최종 결과만 저장
+            await dbManagerInstance.createComment(taskId, resultData.agentId || 'system', cleanMsg, thoughtProcess);
+          }
 
           // 브로드캐스트
           ioInstance.emit('task:moved', { taskId, toColumn: column });
           ioInstance.emit('task:comment_added', { 
+
+
             taskId, 
             author: resultData.agentId || 'system', 
             text: cleanMsg, 

@@ -12,7 +12,8 @@ export default function TaskCreateModal({ isOpen, onClose }) {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('http://localhost:4000/webhook/antigravity/command', {
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+      const res = await fetch(`${SERVER_URL}/webhook/antigravity/command`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

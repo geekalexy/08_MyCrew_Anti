@@ -8,27 +8,35 @@
 
 ### [원칙 1] 지능형 계층화 및 모델 운영 — 공식 API 식별자 SSOT
 
-> **2026-04-20 Sonnet 이중검증 완료** (공식 문서 직접 조회 확인)
-> 검증 출처: https://ai.google.dev/gemini-api/docs/models · https://docs.anthropic.com/en/docs/about-claude/models
+> **2026-05-02 Prime 갱신** — Antigravity IDE 지원 모델 목록 반영
+> 검증 출처: https://ai.google.dev/gemini-api/docs/models · https://docs.anthropic.com/en/docs/about-claude/models · Antigravity IDE 모델 선택 패널 (2026-05-02 CEO 스크린샷 검증)
 
+#### Tier 1 — API 직접 호출 가능 (GA Stable)
 * **초고속/창의 모델 (Flash)**: `gemini-2.5-flash` — GA Stable
 * **경량 Fallback**: `gemini-2.5-flash-lite` — GA Stable (2.0-flash 대체)
 * **고성능 추론 (Pro)**: `gemini-2.5-pro` — GA Stable
-* **전문 실무 모델 (Sonnet)**: `claude-sonnet-4-6` — GA Stable
-* **최고 지성 모델 (Opus)**: `claude-opus-4-6` — Antigravity IDE 제공 모델 기준 확정
+
+#### Tier 2 — Antigravity 브릿지 경유 사용 가능 (2026-05-02 추가)
+* **차세대 고성능 (Pro High)**: `Gemini 3.1 Pro (High)` — 🆕 Antigravity IDE 신규 지원
+* **차세대 경량 (Pro Low)**: `Gemini 3.1 Pro (Low)` — 🆕 Antigravity IDE 신규 지원
+* **차세대 Flash**: `Gemini 3 Flash` — 🆕 Antigravity IDE 신규 지원
+* **전문 실무 모델 (Sonnet)**: `Claude Sonnet 4.6 (Thinking)` — Antigravity IDE 제공
+* **최고 지성 모델 (Opus)**: `Claude Opus 4.6 (Thinking)` — Antigravity IDE 제공
+* **오픈소스 대형 모델**: `GPT-OSS 120B (Medium)` — 🆕 Antigravity IDE 신규 지원
 
 **금지 사항 (Forbidden)**:
 - ❌ `-preview`, `-exp`, `-experimental` 접미사 모델 사용 절대 금지
 - ❌ 존재하지 않는 환각 식별자 사용 금지
-  - 사례: `gemini-3.1-pro-preview` (루카 환각, 2026-04-20 발견·수정)
-  - 사례: `gemini-3-flash-preview` (루카 환각, 2026-04-20 발견·수정)
   - 사례: `gemini-2.5-pro-preview` (루카 환각, 2026-04-20 발견·수정, 이 식별자는 존재하지 않음)
+  - ~~사례: `gemini-3.1-pro-preview`~~ → 정정: `Gemini 3.1 Pro`는 2026-05-02 Antigravity에서 정식 출시 확인됨. **`-preview` 접미사가 붙은 식별자만 금지**, 정식 명칭은 허용
+  - ~~사례: `gemini-3-flash-preview`~~ → 정정: `Gemini 3 Flash`는 2026-05-02 Antigravity에서 정식 출시 확인됨. **`-preview` 접미사가 붙은 식별자만 금지**
 - ❌ `gemini-2.0-flash` — **공식 Deprecated** 판정 (2026-04-20 확인), Fallback 체인 사용 금지
 
 
-**Fallback 체인 (확정)**:
+**Fallback 체인 (확정, 2026-05-02 갱신)**:
 ```
-Pro 요청:   gemini-2.5-pro → gemini-2.5-flash → gemini-2.5-flash-lite
+최고성능:  Gemini 3.1 Pro (High) [브릿지] → gemini-2.5-pro [API] → gemini-2.5-flash [API]
+Pro 요청:  gemini-2.5-pro → gemini-2.5-flash → gemini-2.5-flash-lite
 Flash 요청: gemini-2.5-flash → gemini-2.5-flash-lite
 ```
 

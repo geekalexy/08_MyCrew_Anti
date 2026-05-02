@@ -3,6 +3,7 @@ import { useMemo, useEffect, useState, useRef } from 'react';
 import { useAgentStore } from '../../store/agentStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useUiStore } from '../../store/uiStore';
+import { useProjectStore } from '../../store/projectStore';
 import SkillSection from '../Skills/SkillSection';
 import SkillAddDrawer from '../Skills/SkillAddDrawer';
 
@@ -53,6 +54,8 @@ export default function AgentDetailView() {
   const { selectedAgentId, agents, agentMeta, updateAgentMeta, fetchAgentSkills } = useAgentStore();
   const tasks = useKanbanStore((s) => s.tasks);
   const { setLogPanelOpen } = useUiStore();
+  // [Fix] 프로젝트 컨텍스트 — assignedCrew에서 역할명 추출
+  const { assignedCrew, selectedProjectId } = useProjectStore();
 
   const [activeTab, setActiveTab] = useState('PERFORMANCE');
   const [showSkillDrawer, setShowSkillDrawer] = useState(false);
@@ -68,14 +71,24 @@ export default function AgentDetailView() {
 
   const agentId = selectedAgentId;
 
+  // meta는 agentMeta에 없으면 빈 객체 fallback (새 프로젝트 에이전트도 안전하게 처리)
+  const meta = agentId ? (agentMeta[agentId] || null) : null;
+  const agentState = agentId ? agents[agentId] : null;
+  const isActive = agentState?.status === 'active';
+
+  // [닉네임 설계] 현재 프로젝트에서 이 에이전트의 팀원 정보 추출
+  const projectCrewEntry = assignedCrew.find(c => c.agent_id?.toLowerCase() === agentId?.toLowerCase());
+  const teamNickname = projectCrewEntry?.nickname || null;
+  const projectRole = projectCrewEntry?.experiment_role || null;
+  const roleTitle = projectRole ? projectRole.split(/[.\-–—(]/)[0].trim() : null;
+  // 표시명 우선순위: 닉네임 > 역할명 첫절 > 전역 role > agentId
+  const displayName = teamNickname || roleTitle || meta?.role || agentId || 'Agent';
+  const teamName = assignedCrew.length > 0 ? (assignedCrew[0].team_name || null) : null;
+
   useEffect(() => {
     // [Phase 17-4] 에이전트 선택 시 DB에서 스킬 설정 로드
     if (agentId) fetchAgentSkills(agentId);
   }, [agentId]);
-
-  const meta = agentId ? agentMeta[agentId] : null;
-  const agentState = agentId ? agents[agentId] : null;
-  const isActive = agentState?.status === 'active';
 
   // 아바타 클릭 시 URL 변경 프롬프트
   const handleAvatarClick = () => {
@@ -137,19 +150,48 @@ export default function AgentDetailView() {
     return grouped;
   }, [myTasks]);
   
-  // 더미(Mock) 퍼포먼스 데이터
-  const performanceMock = useMemo(() => {
-    if (!agentId) return null;
-    const seed = agentId.charCodeAt(0) + (agentId.charCodeAt(1) || 0);
-    return {
-      tasksResolved: 12 + (seed % 20),
-      avgSpeed: 2.1 + (seed % 3),
-      tokensUsed: 12400 + (seed * 105),
-      tokenLimit: 50000,
-    };
-  }, [agentId]);
+  // 실제 프로젝트 태스크 기반 퍼포먼스 — Mock 제거
+  // 프로젝트 컨텍스트에서는 해당 프로젝트의 완료 태스크만 카운트
+  const resolvedCount = useMemo(() => {
+    if (!agentId) return 0;
+    return Object.values(tasks).filter(t =>
+      (t.agentId === agentId || t.assignee?.toLowerCase() === agentId) &&
+      t.column === 'done'
+    ).length;
+  }, [tasks, agentId]);
+
+  const inProgressCount = useMemo(() => {
+    if (!agentId) return 0;
+    return Object.values(tasks).filter(t =>
+      (t.agentId === agentId || t.assignee?.toLowerCase() === agentId) &&
+      t.column === 'in_progress'
+    ).length;
+  }, [tasks, agentId]);
+
 
   if (!meta) {
+    // agentMeta에 없는 에이전트 (Zero-Config 신규 팀원)
+    // 프로젝트 팀원 정보는 있으면 간략 프로필 표시
+    if (projectCrewEntry) {
+      return (
+        <div className="agent-detail-view" style={{ position: 'relative', overflow: 'hidden' }}>
+          <div className="agent-profile glass-panel">
+            <div className="agent-profile__avatar" style={{ background: 'var(--bg-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '2rem', color: 'var(--text-muted)' }}>person</span>
+            </div>
+            <div className="agent-profile__info">
+              <h2 className="agent-profile__name">{displayName}</h2>
+              {projectRole && <p className="agent-profile__role" style={{ color: 'var(--brand)', fontWeight: 600 }}>{projectRole}</p>}
+              {teamName && <span style={{ display: 'inline-block', marginTop: '0.2rem', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(100,135,242,0.12)', color: 'var(--brand)' }}>{teamName}</span>}
+            </div>
+          </div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>info</span>
+            에이전트 프로필이 아직 동기화되지 않았습니다.
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="view-empty">
         <IcoPersonSearch />
@@ -179,7 +221,7 @@ export default function AgentDetailView() {
         
         <div className="agent-profile__info">
           {isEditingName ? (
-              <input
+            <input
               ref={nameInputRef}
               className="agent-profile__name-input"
               value={editNameValue}
@@ -194,18 +236,38 @@ export default function AgentDetailView() {
             />
           ) : (
             <h2 className="agent-profile__name" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {meta.name}
-              <button 
-                className="btn btn--ghost btn--sm" 
-                onClick={startEditingName} 
-                style={{ padding: '4px', color: 'var(--text-muted)' }}
-                title="이름 편집"
-              >
-                <IcoEdit />
-              </button>
+              {/* 표시명: 닉네임 > 역할명 첫절 > 전역 role. agentId 노출 없음 */}
+              {displayName}
+              {/* 프로젝트 컨텍스트 없으면 이름 편집 허용 */}
+              {!projectCrewEntry && (
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={startEditingName}
+                  style={{ padding: '4px', color: 'var(--text-muted)' }}
+                  title="이름 편집"
+                >
+                  <IcoEdit />
+                </button>
+              )}
             </h2>
           )}
-          <p className="agent-profile__role">{meta.role}</p>
+          {/* 닉네임이 있으면 역할명을 서브텍스트로, 없으면 프로젝트 역할 세부 설명 표시 */}
+          {teamNickname && roleTitle ? (
+            <p className="agent-profile__role" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{roleTitle}</p>
+          ) : projectRole ? (
+            <p className="agent-profile__role" style={{ color: 'var(--brand)', fontWeight: 600 }}>{projectRole}</p>
+          ) : (
+            <p className="agent-profile__role">{meta.role}</p>
+          )}
+          {/* 팀명 배지 */}
+          {teamName && (
+            <span style={{
+              display: 'inline-block', marginTop: '0.2rem',
+              fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px',
+              borderRadius: '4px', background: 'rgba(100,135,242,0.12)',
+              color: 'var(--brand)', letterSpacing: '0.04em'
+            }}>{teamName}</span>
+          )}
           <p className="agent-profile__model" style={{ opacity: 0.5, fontSize: '0.75rem' }}>{formatModelName(meta.model)}</p>
         </div>
         
@@ -229,7 +291,7 @@ export default function AgentDetailView() {
         </div>
         
         <div className="agent-profile__skills">
-          {meta.skills.map((skill) => (
+          {(meta.skills || []).map((skill) => (
             <span key={skill} className="skill-badge">{skill}</span>
           ))}
           {/* 스킬 추가하기 버튼 */}
@@ -273,27 +335,31 @@ export default function AgentDetailView() {
       {/* ── 3. 탭 컨텐츠 ─────────────────────────────────── */}
       <div className="agent-detail-content">
 
-        {/* PERFORMANCE 탭: 스킬 및 인프라 분리 섹션 */}
+        {/* PERFORMANCE 탭 */}
         {activeTab === 'PERFORMANCE' && (
           <div className="performance-dashboard" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fadeIn 0.3s' }}>
-            
-            {/* 1. 핵심 지표 섹션 (High-level KPIs) */}
+
+            {/* 1. 핵심 지표 */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', borderLeft: '4px solid var(--status-active)' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>Resolved & Closed</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>Resolved &amp; Closed</span>
                 <span style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.5rem', fontFamily: 'Space Grotesk' }}>
-                  {performanceMock.tasksResolved} <span style={{ fontSize: '1rem', color: 'var(--status-active)', fontWeight: 500, marginLeft: '4px' }}>↑ +2</span>
+                  {resolvedCount}
+                  {resolvedCount > 0 && <span style={{ fontSize: '1rem', color: 'var(--status-active)', fontWeight: 500, marginLeft: '4px' }}>↑ +{resolvedCount}</span>}
                 </span>
-                <p style={{ margin: 0, marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>누적 업무 해결 수 (월간 기준)</p>
+                <p style={{ margin: 0, marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {selectedProjectId ? '이 프로젝트 완료 태스크' : '누적 업무 해결 수 (월간 기준)'}
+                </p>
               </div>
               <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', borderLeft: '4px solid var(--brand)' }}>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>Avg. Velocity</span>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 }}>In Progress</span>
                 <span style={{ fontSize: '2.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.5rem', fontFamily: 'Space Grotesk' }}>
-                  {performanceMock.avgSpeed}s <span style={{ fontSize: '1rem', color: 'var(--brand)', fontWeight: 500, marginLeft: '4px' }}>/ task</span>
+                  {inProgressCount} <span style={{ fontSize: '1rem', color: 'var(--brand)', fontWeight: 500, marginLeft: '4px' }}>/ tasks</span>
                 </span>
-                <p style={{ margin: 0, marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>평균 지능 연산 속도</p>
+                <p style={{ margin: 0, marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>진행 중 태스크</p>
               </div>
             </div>
+
 
             {/* 2. 엔진 인프라 섹션 (Infrastructure & Tokens) */}
             <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -342,14 +408,14 @@ export default function AgentDetailView() {
                   <div style={{ width: '100%', height: '10px', background: 'var(--bg-surface-highest)', borderRadius: '10px', overflow: 'hidden', marginBottom: '0.5rem', border: '1px solid var(--border)' }}>
                     <div style={{ 
                       height: '100%', 
-                      width: `${(performanceMock.tokensUsed / performanceMock.tokenLimit) * 100}%`,
+                      width: '0%',
                       background: 'linear-gradient(90deg, var(--brand), #9B8BFB)',
                       boxShadow: '0 0 10px var(--brand-glow)',
                     }} />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 600 }}>
-                    <span style={{ color: 'var(--brand)' }}>{performanceMock.tokensUsed.toLocaleString()} USED</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{performanceMock.tokenLimit.toLocaleString()} LIMIT</span>
+                    <span style={{ color: 'var(--brand)' }}>0 USED</span>
+                    <span style={{ color: 'var(--text-muted)' }}>세션 기준 집계 예정</span>
                   </div>
                   <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>일일 할당량 초과 시 저사양 모델로 자동 강등됩니다.</p>
                 </div>

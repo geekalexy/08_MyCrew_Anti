@@ -23,6 +23,7 @@ const TEAM_PRESETS = {
       luca:    ['development', 'fullstack'],
       sonnet:  ['coding', 'logic'],
       opus:    ['architecture', 'review'],
+      lumi:    ['prd', 'documentation'],
       devteam: ['system', 'automation'],
       ari:     ['routing', 'project_management']
     }

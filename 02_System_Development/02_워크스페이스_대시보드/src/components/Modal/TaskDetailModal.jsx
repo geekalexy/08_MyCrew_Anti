@@ -329,7 +329,20 @@ export default function TaskDetailModal() {
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
   const textareaRef = useRef(null);
+  const editAreaRef = useRef(null);
   const moreMenuRef = useRef(null);
+
+  // ── /슬래시 커맨드 자동완성 ──────────────────────────────────────────────────
+  const [slashQuery, setSlashQuery]           = useState('');
+  const [showSlash, setShowSlash]             = useState(false);
+  const [slashTarget, setSlashTarget]         = useState(null); // 'comment' | 'edit'
+  const slashRef = useRef(null);
+  
+  const SLASH_COMMANDS = [
+    { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
+    { id: '/workflow:mini-app-dev', label: '미니앱 자율 개발 파이프라인 가동', icon: 'account_tree' }
+  ];
+  const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
@@ -489,6 +502,12 @@ export default function TaskDetailModal() {
     }
 
     const finalAssignee = commentAssignee === 'NO_CHANGE' ? task.assignee : commentAssignee;
+    
+    // [UX 고도화] Handoff (담당자 변경) 시 칼럼을 명시하지 않았다면 새 담당자의 todo 큐로 자동 이동
+    const isHandoff = finalAssignee && finalAssignee !== task.assignee && finalAssignee !== '미할당';
+    if (isHandoff && commentColumn === 'NO_CHANGE' && ['in_progress', 'review'].includes(task.column)) {
+      finalColumn = 'todo';
+    }
     
     const hasUpdates = (finalPriority !== task.priority) || (finalAssignee !== task.assignee) || (finalColumn !== task.column);
 
@@ -737,13 +756,78 @@ export default function TaskDetailModal() {
           {/* 태스크 내용 */}
           {isEditing ? (
             <div style={{ marginBottom: '1.25rem' }}>
-              <textarea 
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                rows={5}
-                style={{ width: '100%', background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.8rem', outline: 'none', resize: 'vertical', fontSize: '1.05rem', lineHeight: 1.6 }}
-                placeholder="태스크 상세 내용..."
-              />
+              <div style={{ position: 'relative' }}>
+                <textarea 
+                  ref={editAreaRef}
+                  value={editContent}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setEditContent(val);
+                    const slashIdx = val.lastIndexOf('/');
+                    if (slashIdx !== -1) {
+                      const afterSlash = val.slice(slashIdx + 1);
+                      if (!afterSlash.includes(' ') && !afterSlash.includes('\n')) {
+                        setSlashQuery(afterSlash);
+                        setSlashTarget('edit');
+                        setShowSlash(true);
+                      } else {
+                        setShowSlash(false);
+                      }
+                    } else {
+                      setShowSlash(false);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (showSlash && slashTarget === 'edit' && e.key === 'Escape') { e.preventDefault(); setShowSlash(false); return; }
+                  }}
+                  onBlur={() => setTimeout(() => setShowSlash(false), 150)}
+                  rows={5}
+                  style={{ width: '100%', background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: '6px', padding: '0.8rem', outline: 'none', resize: 'vertical', fontSize: '1.05rem', lineHeight: 1.6 }}
+                  placeholder="태스크 상세 내용... (/커맨드 호출 가능)"
+                />
+                {/* ── /슬래시 커맨드 자동완성 (Edit용) ────────────────────────── */}
+                {showSlash && slashTarget === 'edit' && filteredSlash.length > 0 && (
+                  <div
+                    ref={slashRef}
+                    style={{
+                      position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                      background: 'var(--bg-surface-2)', border: '1px solid rgba(124,110,248,0.4)',
+                      borderRadius: 10, overflow: 'hidden', zIndex: 200,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                    }}
+                  >
+                    {filteredSlash.map(cmd => (
+                      <button
+                        key={cmd.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const sIdx = editContent.lastIndexOf('/');
+                          const newText = editContent.slice(0, sIdx) + `${cmd.id} `;
+                          setEditContent(newText);
+                          setShowSlash(false);
+                          setTimeout(() => editAreaRef.current?.focus(), 0);
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.6rem',
+                          width: '100%', padding: '0.6rem 0.8rem',
+                          background: 'transparent', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'left',
+                          transition: 'background 0.12s',
+                          borderBottom: '1px solid var(--border)'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,110,248,0.15)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)' }}>{cmd.icon}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cmd.id}</span>
+                          <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>{cmd.label}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn--ghost btn--sm" onClick={() => setIsEditing(false)}>취소</button>
                 <button className="btn btn--primary btn--sm" onClick={handleSaveEdit}>저장</button>
@@ -1280,21 +1364,86 @@ export default function TaskDetailModal() {
               </div>
             </div>
 
-            <textarea
-              ref={textareaRef}
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              placeholder="업무 지시나 피드백을 전달하세요..."
-              onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment(); }}
-              disabled={isArchived}
-              style={{
-                background: 'var(--bg-surface-1)', border: '1px solid var(--border)', borderRadius: '8px',
-                resize: 'none', outline: 'none',
-                color: 'var(--text-primary)', fontSize: '1.05rem', fontFamily: 'inherit',
-                lineHeight: 1.5, minHeight: '80px', maxHeight: '200px', padding: '0.8rem',
-                opacity: isArchived ? 0.45 : 1,
-              }}
-            />
+            <div style={{ position: 'relative' }}>
+              <textarea
+                ref={textareaRef}
+                value={commentText}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCommentText(val);
+                  const slashIdx = val.lastIndexOf('/');
+                  if (slashIdx !== -1) {
+                    const afterSlash = val.slice(slashIdx + 1);
+                    if (!afterSlash.includes(' ') && !afterSlash.includes('\n')) {
+                      setSlashQuery(afterSlash);
+                      setSlashTarget('comment');
+                      setShowSlash(true);
+                    } else {
+                      setShowSlash(false);
+                    }
+                  } else {
+                    setShowSlash(false);
+                  }
+                }}
+                placeholder="업무 지시나 피드백을 전달하세요... (/커맨드 호출 가능)"
+                onKeyDown={(e) => { 
+                  if (showSlash && slashTarget === 'comment' && e.key === 'Escape') { e.preventDefault(); setShowSlash(false); return; }
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment(); 
+                }}
+                onBlur={() => setTimeout(() => setShowSlash(false), 150)}
+                disabled={isArchived}
+                style={{
+                  width: '100%',
+                  background: 'var(--bg-surface-1)', border: '1px solid var(--border)', borderRadius: '8px',
+                  resize: 'none', outline: 'none',
+                  color: 'var(--text-primary)', fontSize: '1.05rem', fontFamily: 'inherit',
+                  lineHeight: 1.5, minHeight: '80px', maxHeight: '200px', padding: '0.8rem',
+                  opacity: isArchived ? 0.45 : 1,
+                }}
+              />
+              {/* ── /슬래시 커맨드 자동완성 (Comment용) ────────────────────────── */}
+              {showSlash && slashTarget === 'comment' && filteredSlash.length > 0 && (
+                <div
+                  ref={slashRef}
+                  style={{
+                    position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                    background: 'var(--bg-surface-2)', border: '1px solid rgba(124,110,248,0.4)',
+                    borderRadius: 10, overflow: 'hidden', zIndex: 200,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  {filteredSlash.map(cmd => (
+                    <button
+                      key={cmd.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const sIdx = commentText.lastIndexOf('/');
+                        const newText = commentText.slice(0, sIdx) + `${cmd.id} `;
+                        setCommentText(newText);
+                        setShowSlash(false);
+                        setTimeout(() => textareaRef.current?.focus(), 0);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                        width: '100%', padding: '0.6rem 0.8rem',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'left',
+                        transition: 'background 0.12s',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,110,248,0.15)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)' }}>{cmd.icon}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cmd.id}</span>
+                        <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>{cmd.label}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {/* 아카이빙 완료 배너 */}
             {isArchived && (
               <div style={{

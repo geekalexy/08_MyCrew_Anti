@@ -107,6 +107,17 @@ export default function LogDrawer() {
   const [mentionedAgent, setMentionedAgent]   = useState(null);  // 최종 선택된 에이전트
   const mentionRef = useRef(null);
 
+  // ── /슬래시 커맨드 자동완성 ──────────────────────────────────────────────────
+  const [slashQuery, setSlashQuery]           = useState('');
+  const [showSlash, setShowSlash]             = useState(false);
+  const slashRef = useRef(null);
+  
+  const SLASH_COMMANDS = [
+    { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
+    { id: '/workflow:mini-app-dev', label: '미니앱 자율 개발 파이프라인 가동', icon: 'account_tree' }
+  ];
+  const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
+
   const filteredCrew = crewList.filter(c =>
     c.id.startsWith(mentionQuery.toLowerCase()) || c.label.toLowerCase().startsWith(mentionQuery.toLowerCase())
   );
@@ -167,6 +178,10 @@ export default function LogDrawer() {
     ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : logs.filter((log) => log.taskId))
     : logs.filter((log) => {
         if (log.taskId) return false; // 타임라인 전용 로그 격리
+        // [B-04 Fix] 프로젝트 간 채팅 로그 격리 (projectId가 없는 레거시 로그는 'proj-1'로 간주)
+        let logProjectId = log.projectId || 'proj-1';
+        if (logProjectId === 'proj_default' || logProjectId === 'global_mycrew') logProjectId = 'proj-1';
+        if (logProjectId !== selectedProjectId) return false;
         // [Fix] 엔진 내부 진행 상태 로그(> 로 시작하는 system/ari 로그)는 채팅탭에서 숨김 (타임라인 전용 속성)
         if (log.source === 'system' && typeof log.message === 'string' && log.message.trim().startsWith('>')) {
           return false;
@@ -351,6 +366,7 @@ export default function LogDrawer() {
           message: fullText,
           agentId: 'ari',
           timestamp: new Date().toISOString(),
+          projectId: useProjectStore.getState().selectedProjectId,
         });
       } else if (error) {
         useLogStore.getState().appendLog({
@@ -358,6 +374,7 @@ export default function LogDrawer() {
           message: error,
           agentId: 'system',
           timestamp: new Date().toISOString(),
+          projectId: useProjectStore.getState().selectedProjectId,
         });
       }
     };
@@ -428,6 +445,7 @@ export default function LogDrawer() {
             message: fullMessage,
             agentId: 'CEO',
             timestamp: new Date().toISOString(),
+            projectId: selectedProjectId,
           });
         }
 
@@ -457,6 +475,7 @@ export default function LogDrawer() {
           author: 'CEO',
           images: imageDataUrls,
           preferredModel,
+          projectId: selectedProjectId,
         });
 
         // 입력창 즉시 초기화 및 포커스 유지
@@ -1056,19 +1075,31 @@ export default function LogDrawer() {
                 onChange={(e) => {
                   const val = e.target.value;
                   setInputText(val);
-                  // @멘션 감지: 마지막 @ 이후 텍스트 추출
+                  // @멘션 및 /슬래시 커맨드 감지: 마지막 특수문자 기준
                   const atIdx = val.lastIndexOf('@');
-                  if (atIdx !== -1) {
+                  const slashIdx = val.lastIndexOf('/');
+                  
+                  if (atIdx !== -1 && atIdx > slashIdx) {
+                    setShowSlash(false);
                     const afterAt = val.slice(atIdx + 1);
-                    // 공백이 없으면 아직 타이핑 중 → 드롭다운 표시
                     if (!afterAt.includes(' ') && !afterAt.includes('\n')) {
                       setMentionQuery(afterAt);
                       setShowMention(true);
                     } else {
                       setShowMention(false);
                     }
+                  } else if (slashIdx !== -1 && slashIdx > atIdx) {
+                    setShowMention(false);
+                    const afterSlash = val.slice(slashIdx + 1);
+                    if (!afterSlash.includes(' ') && !afterSlash.includes('\n')) {
+                      setSlashQuery(afterSlash);
+                      setShowSlash(true);
+                    } else {
+                      setShowSlash(false);
+                    }
                   } else {
                     setShowMention(false);
+                    setShowSlash(false);
                     setMentionedAgent(null);
                   }
                   // 높이 자동 조절
@@ -1078,9 +1109,13 @@ export default function LogDrawer() {
                 }}
                 onKeyDown={(e) => {
                   if (showMention && (e.key === 'Escape')) { e.preventDefault(); setShowMention(false); return; }
+                  if (showSlash && (e.key === 'Escape')) { e.preventDefault(); setShowSlash(false); return; }
                   handleKeyDown(e);
                 }}
-                onBlur={() => setTimeout(() => setShowMention(false), 150)}
+                onBlur={() => {
+                  setTimeout(() => setShowMention(false), 150);
+                  setTimeout(() => setShowSlash(false), 150);
+                }}
                 onScroll={(e) => {
                   if (backdropRef.current) backdropRef.current.scrollTop = e.target.scrollTop;
                 }}
@@ -1131,6 +1166,49 @@ export default function LogDrawer() {
                       <span style={{ fontSize: '1rem' }}>{crew.emoji}</span>
                       <span style={{ fontWeight: 600, color: '#4ECDC4' }}>@{crew.id}</span>
                       <span style={{ opacity: 0.55, fontSize: '0.8rem' }}>{crew.role}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {/* ── /슬래시 커맨드 자동완성 드롭다운 ────────────────────────────────── */}
+              {showSlash && filteredSlash.length > 0 && (
+                <div
+                  ref={slashRef}
+                  style={{
+                    position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                    background: 'var(--bg-surface-2)', border: '1px solid rgba(124,110,248,0.4)',
+                    borderRadius: 10, overflow: 'hidden', zIndex: 200,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+                  }}
+                >
+                  {filteredSlash.map(cmd => (
+                    <button
+                      key={cmd.id}
+                      onMouseDown={(e) => {
+                        e.preventDefault(); // blur 방지
+                        const sIdx = inputText.lastIndexOf('/');
+                        const newText = inputText.slice(0, sIdx) + `${cmd.id} `;
+                        setInputText(newText);
+                        setShowSlash(false);
+                        setTimeout(() => textareaRef.current?.focus(), 0);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.6rem',
+                        width: '100%', padding: '0.6rem 0.8rem',
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-primary)', fontSize: '0.88rem', textAlign: 'left',
+                        transition: 'background 0.12s',
+                        borderBottom: '1px solid var(--border)'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,110,248,0.15)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)' }}>{cmd.icon}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{cmd.id}</span>
+                        <span style={{ opacity: 0.6, fontSize: '0.75rem' }}>{cmd.label}</span>
+                      </div>
                     </button>
                   ))}
                 </div>

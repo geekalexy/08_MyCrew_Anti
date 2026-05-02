@@ -14,6 +14,23 @@ export const useKanbanStore = create(
       addTask: (task) =>
         set((s) => ({ tasks: { ...s.tasks, [String(task.id)]: task } })),
 
+      // Phase 31 버그수정 (B-05): 프로젝트 격리를 위해 원격 태스크를 완전히 교체
+      setRemoteTasks: (remoteTasks) =>
+        set((s) => {
+          const nextTasks = {};
+          // temp- 및 local- 태스크는 유지
+          Object.keys(s.tasks).forEach((id) => {
+            if (id.startsWith('temp-') || id.startsWith('local-')) {
+              nextTasks[id] = s.tasks[id];
+            }
+          });
+          // 원격 태스크 추가
+          remoteTasks.forEach((task) => {
+            nextTasks[String(task.id)] = task;
+          });
+          return { tasks: nextTasks };
+        }),
+
       // Phase 11: Soft Delete 후 UI에서 제거
       removeTask: (taskId) =>
         set((s) => {

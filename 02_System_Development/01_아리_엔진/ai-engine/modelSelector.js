@@ -58,7 +58,8 @@ class ModelSelector {
             const parsed = JSON.parse(cleanJson);
             
             // Validation Layer (환각 방지) — VALID_MODELS는 modelRegistry.js에서 중앙 관리
-            const VALID_CATEGORIES = ['QUICK_CHAT', 'KNOWLEDGE', 'DEEP_WORK', 'MARKETING', 'CONTENT', 'DESIGN', 'ANALYSIS', 'MEDIA', 'ROUTING', 'WORKFLOW'];
+            // [Phase 32] DOGFOODING 추가 — Prime 27th Review 판정 #4 (TEXT 컬럼, ENUM 없음, 직접 삽입 가능)
+            const VALID_CATEGORIES = ['QUICK_CHAT', 'KNOWLEDGE', 'DEEP_WORK', 'MARKETING', 'CONTENT', 'DESIGN', 'ANALYSIS', 'MEDIA', 'ROUTING', 'WORKFLOW', 'DOGFOODING'];
             
             const validated = {
                 recommended_model: VALID_MODELS.includes(parsed.recommended_model) ? parsed.recommended_model : MODEL.FLASH,

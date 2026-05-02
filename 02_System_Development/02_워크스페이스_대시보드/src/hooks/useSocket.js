@@ -71,7 +71,7 @@ export function useSocket() {
           riskLevel: 'SAFE',
           status: column === 'in_progress' ? 'in_progress' : 'PENDING',
           latestComment: null,
-          projectId: useProjectStore.getState().selectedProjectId || 'proj-1',
+          projectId: projectId || useProjectStore.getState().selectedProjectId || 'proj-1',
         });
       });
 
@@ -128,6 +128,15 @@ export function useSocket() {
 
       socketInstance.on('agent:status_change', ({ agentId, status }) => {
         useAgentStore.getState().setAgentStatus(agentId, status);
+      });
+
+      // Phase 28b: Zero-Config 프로젝트 세팅 완료
+      socketInstance.on('project:ready', async ({ projectId }) => {
+        await useProjectStore.getState().fetchProjects();
+        // [Sidebar Fix] 새 프로젝트 팀 즉시 반영
+        await useProjectStore.getState().fetchAllProjectCrews();
+        useProjectStore.getState().selectProject(projectId);
+        window.dispatchEvent(new CustomEvent('closeNewProjectModal'));
       });
 
       socketInstance.on('log:append', (log) => {
@@ -231,7 +240,8 @@ export function useSocket() {
   const emitTaskCreate = useCallback((taskData) => {
     // C2 해결: 낙관적 업데이트(tempId 생성)를 제거하고 서버 응답(task:created)을 기다림
     console.log('📝 [useSocket] 태스크 생성 요청 송신:', taskData.title);
-    socketInstance?.emit('task:create', taskData);
+    const pId = useProjectStore.getState().selectedProjectId;
+    socketInstance?.emit('task:create', { ...taskData, projectId: pId });
   }, []);
 
   return { socket: socketRef.current, emitTaskMove, emitTaskCreate };

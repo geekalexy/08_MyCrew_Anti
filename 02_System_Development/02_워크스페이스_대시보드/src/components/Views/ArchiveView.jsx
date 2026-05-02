@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUiStore } from '../../store/uiStore';
 
-const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 const IcoArchive = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -16,6 +16,7 @@ const IcoArchive = () => (
 
 export default function ArchiveView() {
   const projects = useProjectStore((s) => s.projects);
+  const selectedProjectId = useProjectStore((s) => s.selectedProjectId);
   const { setActiveDetailTaskId } = useUiStore();
   const [archivedTasks, setArchivedTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,9 +29,10 @@ export default function ArchiveView() {
 
   useEffect(() => {
     const fetchArchivedTasks = async () => {
+      if (!selectedProjectId) return;
       try {
         setIsLoading(true);
-        const res = await fetch(`${SERVER_URL}/api/tasks/archived`);
+        const res = await fetch(`${SERVER_URL}/api/tasks/archived?project_id=${selectedProjectId}`);
         if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
         if (data.status === 'ok') {
@@ -43,7 +45,7 @@ export default function ArchiveView() {
       }
     };
     fetchArchivedTasks();
-  }, []);
+  }, [selectedProjectId]);
 
   return (
     <div className="archive-view">

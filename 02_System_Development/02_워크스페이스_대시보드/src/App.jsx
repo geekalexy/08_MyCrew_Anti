@@ -10,6 +10,7 @@ import Sidebar from './components/Sidebar/Sidebar';
 import KanbanBoard from './components/Board/KanbanBoard';
 import LogDrawer from './components/Log/LogDrawer';
 import TaskDetailModal from './components/Modal/TaskDetailModal';
+import NewProjectModal from './components/Modal/NewProjectModal';
 import AgentDetailView from './components/Views/AgentDetailView';
 import ArchiveView from './components/Views/ArchiveView';
 import OrgView from './components/Views/OrgView';
@@ -47,6 +48,7 @@ export default function App() {
   const { projects, selectedProjectId, updateProject, fetchProjects, selectProject } = useProjectStore();
   const { selectedAgentId, addAgent } = useAgentStore();
   const [serverOnline, setServerOnline] = useState(null);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   
   // 헤더 채용(Recruit) 상태 변수들
   const [isRecruiting, setIsRecruiting] = useState(false);
@@ -61,6 +63,20 @@ export default function App() {
       setActiveLogTab('interaction');
       // completeOnboarding(); // Phase 20: 위저드에서 직접 완료 처리하므로 주석 처리/삭제
     }
+  }, []);
+
+  useEffect(() => {
+    const handleOpenNewProjectModal = () => setIsNewProjectModalOpen(true);
+    const handleCloseNewProjectModal = () => {
+      setIsNewProjectModalOpen(false);
+      setCurrentView('projects');
+    };
+    window.addEventListener('openNewProjectModal', handleOpenNewProjectModal);
+    window.addEventListener('closeNewProjectModal', handleCloseNewProjectModal);
+    return () => {
+      window.removeEventListener('openNewProjectModal', handleOpenNewProjectModal);
+      window.removeEventListener('closeNewProjectModal', handleCloseNewProjectModal);
+    };
   }, []);
 
 
@@ -243,6 +259,7 @@ export default function App() {
       {currentView !== 'image-lab' && currentView !== 'video-lab' && <LogDrawer />}
       {/* ── Phase 11: 태스크 상세 모달 ────────────────────────── */}
       <TaskDetailModal />
+      <NewProjectModal isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
       {/* ── 모바일 하단 네비게이션 ────────────────────────────── */}
       <nav className="mobile-nav" aria-label="모바일 네비게이션">
         <button

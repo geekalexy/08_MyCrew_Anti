@@ -1,4 +1,4 @@
-// src/components/Sidebar/Sidebar.jsx — v7
+// src/components/Sidebar/Sidebar.jsx — v8 (프로젝트별 팀 나열)
 import { useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -6,27 +6,21 @@ import { useKanbanStore } from '../../store/kanbanStore';
 import { useUiStore } from '../../store/uiStore';
 
 export default function Sidebar() {
-  const { projects, selectedProjectId, selectProject, addProject, deleteProject } = useProjectStore();
-  const { agents, selectedAgentId, selectAgent, clearAgentSelection, agentMeta } = useAgentStore();
-  const tasks = useKanbanStore((s) => s.tasks);
-  const { currentView, setCurrentView, workspaceName, workspaceLogo, teamPageTitle } = useUiStore();
+  const { projects, selectedProjectId, selectProject, deleteProject, allCrews } = useProjectStore();
+  const { agents, selectedAgentId, selectAgent, clearAgentSelection } = useAgentStore();
+  const { currentView, setCurrentView, workspaceName, workspaceLogo } = useUiStore();
 
-  // Projects 상태
-  const [newProjectName, setNewProjectName] = useState('');
-  const [isAddingProject, setIsAddingProject] = useState(false);
+  // Projects 섹션 접기
   const [isProjectsCollapsed, setIsProjectsCollapsed] = useState(false);
-  // Team 상태
-  const [isTeamCollapsed, setIsTeamCollapsed] = useState(false);
+  // 팀별 독립 collapse: { [projectId]: boolean }
+  const [collapsedTeams, setCollapsedTeams] = useState({});
 
-  const doneTasks = Object.values(tasks).filter((t) => t.column === 'done');
+  const toggleTeam = (projectId) => {
+    setCollapsedTeams(prev => ({ ...prev, [projectId]: !prev[projectId] }));
+  };
 
-  const handleAddProject = (e) => {
-    e.preventDefault();
-    if (!newProjectName.trim()) return;
-    const id = addProject(newProjectName.trim());
-    selectProject(id);
-    setNewProjectName('');
-    setIsAddingProject(false);
+  const handleAddProject = () => {
+    window.dispatchEvent(new CustomEvent('openNewProjectModal'));
   };
 
   const handleAgentClick = (agentId) => {
@@ -39,14 +33,10 @@ export default function Sidebar() {
     setCurrentView(view);
   };
 
-  const handleAddTeam = () => {
-    handleNavClick('organization');
-  };
-
-
   return (
     <aside className="sidebar">
-      {/* ── 워크스페이스 헤더 ──────────────────────────── */}
+
+      {/* ── 워크스페이스 헤더 ───────────────────────────── */}
       <div className="sidebar__workspace">
         <div className="sidebar__workspace-logo" style={workspaceLogo ? { background: 'transparent' } : {}}>
           {workspaceLogo ? (
@@ -60,9 +50,9 @@ export default function Sidebar() {
         </span>
       </div>
 
-      {/* ── 내비게이션 ──────────────────────────────────── */}
       <nav className="sidebar__nav">
 
+        {/* ── NAVIGATION 섹션 헤더 */}
         <div className="sidebar__section-header">
           <span className="sidebar__section-label">Navigation</span>
         </div>
@@ -83,18 +73,8 @@ export default function Sidebar() {
             Projects
           </button>
           <div className="sidebar__projects-actions">
-            <button
-              className="sidebar__icon-btn"
-              title={isAddingProject ? '취소' : '새 프로젝트 추가'}
-              onClick={() => {
-                if (isAddingProject) { setIsAddingProject(false); setNewProjectName(''); }
-                else { setIsAddingProject(true); }
-              }}
-              aria-label={isAddingProject ? '취소' : '프로젝트 추가'}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
-                {isAddingProject ? 'close' : 'add'}
-              </span>
+            <button className="sidebar__icon-btn" title="새 프로젝트 생성" onClick={handleAddProject} aria-label="프로젝트 추가">
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>add</span>
             </button>
             <button
               className="sidebar__icon-btn"
@@ -111,18 +91,6 @@ export default function Sidebar() {
 
         {!isProjectsCollapsed && (
           <div className="sidebar__project-list">
-            {isAddingProject && (
-              <form onSubmit={handleAddProject} className="sidebar__add-form">
-                <input
-                  className="sidebar__add-input"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  placeholder="프로젝트 이름..."
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Escape' && setIsAddingProject(false)}
-                />
-              </form>
-            )}
             {projects.map((p) => (
               <div key={p.id} className="sidebar__project-row">
                 <button
@@ -151,36 +119,15 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Archive */}
-        <button
-          className={`sidebar__nav-item ${currentView === 'archive' ? 'sidebar__nav-item--active' : ''}`}
-          onClick={() => handleNavClick('archive')}
-        >
-          <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: currentView === 'archive' ? "'FILL' 1" : "'FILL' 0" }}>archive</span>
-          Archive
-          {doneTasks.length > 0 && (
-            <span className="sidebar__badge">{doneTasks.length}</span>
-          )}
-        </button>
-
         {/* Image Lab */}
         <button
           id="sidebar-image-lab"
           className={`sidebar__nav-item ${currentView === 'image-lab' ? 'sidebar__nav-item--active' : ''}`}
           onClick={() => handleNavClick('image-lab')}
         >
-          <span
-            className="material-symbols-outlined sidebar__nav-icon"
-            style={{ fontVariationSettings: currentView === 'image-lab' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            experiment
-          </span>
+          <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: currentView === 'image-lab' ? "'FILL' 1" : "'FILL' 0" }}>experiment</span>
           Image Lab
-          <span style={{
-            fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px',
-            background: 'rgba(180,197,255,0.15)', color: 'var(--brand)',
-            fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px',
-          }}>BETA</span>
+          <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: 'rgba(180,197,255,0.15)', color: 'var(--brand)', fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px' }}>BETA</span>
         </button>
 
         {/* Video Lab */}
@@ -189,96 +136,117 @@ export default function Sidebar() {
           className={`sidebar__nav-item ${currentView === 'video-lab' ? 'sidebar__nav-item--active' : ''}`}
           onClick={() => handleNavClick('video-lab')}
         >
-          <span
-            className="material-symbols-outlined sidebar__nav-icon"
-            style={{ fontVariationSettings: currentView === 'video-lab' ? "'FILL' 1" : "'FILL' 0" }}
-          >
-            movie_filter
-          </span>
+          <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: currentView === 'video-lab' ? "'FILL' 1" : "'FILL' 0" }}>movie_filter</span>
           Video Lab
-          <span style={{
-            fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px',
-            background: 'rgba(238,42,123,0.15)', color: '#f472b6',
-            fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px',
-          }}>P1</span>
+          <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: 'rgba(238,42,123,0.15)', color: '#f472b6', fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px' }}>P1</span>
         </button>
 
 
-        {/* AI Crew 섹션 */}
+        {/* ── AI CREW 섹션 ──────────────────────────────── */}
         <div className="sidebar__section-header sidebar__section-header--mt">
           <span className="sidebar__section-label">AI Crew</span>
         </div>
 
-        {/* ── Team 행: Projects와 동일한 +/접기 패턴 ─────── */}
-        <div className="sidebar__projects-row">
-          <button
-            className={`sidebar__nav-item sidebar__nav-item--group ${currentView === 'organization' ? 'sidebar__nav-item--active' : ''}`}
-            onClick={() => handleNavClick('organization')}
-            style={{ flex: 1 }}
-          >
-            <span
-              className="material-symbols-outlined sidebar__nav-icon"
-              style={{ fontVariationSettings: currentView === 'organization' ? "'FILL' 1" : "'FILL' 0" }}
-            >
-              group
-            </span>
-            {teamPageTitle || 'Team'}
-          </button>
-          <div className="sidebar__projects-actions">
-            <button
-              className="sidebar__icon-btn"
-              title="새 팀 만들기"
-              onClick={handleAddTeam}
-              aria-label="새 팀 만들기"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>add</span>
-            </button>
-            <button
-              className="sidebar__icon-btn"
-              title={isTeamCollapsed ? '팀 목록 펼치기' : '팀 목록 접기'}
-              onClick={() => setIsTeamCollapsed(!isTeamCollapsed)}
-              aria-label="팀 목록 접기/펼치기"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
-                {isTeamCollapsed ? 'expand_more' : 'expand_less'}
-              </span>
-            </button>
-          </div>
-        </div>
+        {/* 프로젝트별 팀 나열 — 각 팀 독립 접기/펼치기 */}
+        {projects.map((project) => {
+          const teamName = `${project.name}팀`;
+          const crew = allCrews[project.id] || [];
+          const isCollapsed = collapsedTeams[project.id] ?? false; // 기본 펼침
 
-        {/* 에이전트 목록 (접기 적용) */}
-        {!isTeamCollapsed && (
-          <div className="sidebar__project-list" style={{ marginBottom: 0 }}>
-            {Object.keys(agentMeta).map((agentId) => {
-              const meta = agentMeta[agentId];
-              const agentState = agents[agentId];
-              const isActive = agentState?.status === 'active';
+          return (
+            <div key={project.id} style={{ marginBottom: '0.2rem' }}>
 
-              return (
+              {/* 팀 헤더 — + 버튼 없음 (프로젝트 생성 시 자동 생성) */}
+              <div className="sidebar__projects-row">
                 <button
-                  key={agentId}
-                  className={`sidebar__project-item ${selectedAgentId === agentId && currentView === 'agent-detail' ? 'sidebar__project-item--active' : ''}`}
-                  onClick={() => handleAgentClick(agentId)}
-                  style={{ width: '100%' }}
+                  className={`sidebar__nav-item sidebar__nav-item--group ${currentView === 'organization' && selectedProjectId === project.id ? 'sidebar__nav-item--active' : ''}`}
+                  onClick={() => { selectProject(project.id); handleNavClick('organization'); }}
+                  style={{ flex: 1 }}
                 >
-                  <span
-                    className={`sidebar__agent-dot sidebar__agent-dot--${isActive ? 'active' : 'idle'}`}
-                    style={{ flexShrink: 0 }}
-                  />
-                  <span
-                    className="sidebar__project-name"
-                    style={{ flex: 1, fontWeight: selectedAgentId === agentId ? 600 : 500 }}
-                  >
-                    {meta.name}
+                  <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: "'FILL' 0", fontSize: '1rem' }}>
+                    group
+                  </span>
+                  {teamName}
+                </button>
+                {/* 접기/펼치기 버튼만 */}
+                <button
+                  className="sidebar__icon-btn"
+                  title={isCollapsed ? '팀 펼치기' : '팀 접기'}
+                  onClick={() => toggleTeam(project.id)}
+                  aria-label="팀 접기/펼치기"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
+                    {isCollapsed ? 'expand_more' : 'expand_less'}
                   </span>
                 </button>
-              );
-            })}
-          </div>
-        )}
+              </div>
+
+              {/* 팀원 목록 */}
+              {!isCollapsed && (
+                <div className="sidebar__project-list" style={{ marginBottom: 0 }}>
+                  {crew.length === 0 ? (
+                    <div style={{ padding: '0.3rem 1.2rem', fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.5 }}>
+                      팀원 없음
+                    </div>
+                  ) : (
+                    crew.map((member) => {
+                      const agentId = member.agent_id?.toLowerCase();
+                      const agentState = agents[agentId];
+                      const isActive = agentState?.status === 'active';
+                      // [닉네임 설계] 표시명 우선순위:
+                      // 1. team_agents.nickname (사용자 지정)
+                      // 2. experiment_role 첫 절 (역할명 — 닉네임 없을 때)
+                      // agentId는 내부 식별자 — UI 절대 노출 안 함
+                      const roleTitle = (member.experiment_role || '').split(/[.\-–—(]/)[0].trim();
+                      const displayName = member.nickname || roleTitle || agentId?.toUpperCase();
+                      const roleSub = member.nickname ? roleTitle : null; // 닉네임 있을 때만 역할 서브텍스트
+
+                      return (
+                        <button
+                          key={`${project.id}-${agentId}`}
+                          className={`sidebar__project-item ${
+                            selectedAgentId === agentId &&
+                            selectedProjectId === project.id &&
+                            currentView === 'agent-detail'
+                              ? 'sidebar__project-item--active'
+                              : ''
+                          }`}
+                          onClick={() => { selectProject(project.id); handleAgentClick(agentId); }}
+                          style={{ width: '100%', flexDirection: 'column', alignItems: 'flex-start', gap: '0.1rem', padding: '0.35rem 0.8rem' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
+                            <span
+                              className={`sidebar__agent-dot sidebar__agent-dot--${isActive ? 'active' : 'idle'}`}
+                              style={{ flexShrink: 0 }}
+                            />
+                            {/* 표시명: 닉네임 > 역할명 — agentId 노출 없음 */}
+                            <span
+                              className="sidebar__project-name"
+                              style={{ flex: 1, fontWeight: selectedAgentId === agentId ? 600 : 500, fontSize: '0.82rem' }}
+                            >
+                              {displayName}
+                            </span>
+                          </div>
+                          {/* 닉네임이 있을 때만 역할명을 서브텍스트로 표시 */}
+                          {roleSub && (
+                            <div style={{ paddingLeft: '1.2rem', fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {roleSub}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+            </div>
+          );
+        })}
+
       </nav>
 
-      {/* ── 하단 (Settings + 유저 + Powered by) ────────── */}
+      {/* ── 하단 (Settings + 유저) ────────────────────── */}
       <div className="sidebar__footer">
         <button
           className={`sidebar__footer-settings ${currentView === 'settings' ? 'sidebar__nav-item--active' : ''}`}
@@ -296,6 +264,7 @@ export default function Sidebar() {
           Powered by <strong>MyCrew</strong>
         </div>
       </div>
+
     </aside>
   );
 }

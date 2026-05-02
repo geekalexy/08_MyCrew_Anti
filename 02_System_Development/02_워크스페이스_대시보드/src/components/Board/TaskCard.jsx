@@ -64,7 +64,8 @@ export default function TaskCard({ task, isDragging }) {
 
   const agentMetaMap = useAgentStore((s) => s.agentMeta) || {};
   const assigneeMeta = task.assignee ? Object.values(agentMetaMap).find(m => (m.name && m.name.toUpperCase() === task.assignee.toUpperCase()) || (m.id && m.id.toUpperCase() === task.assignee.toUpperCase())) : null;
-  const role = assigneeMeta?.role || '';
+  // [B-11 Fix] role은 카드 본문에서 제거 — hover tooltip으로만 노출
+  const roleTooltip = assigneeMeta?.role || '';
 
 
   return (
@@ -207,7 +208,15 @@ export default function TaskCard({ task, isDragging }) {
       {/* ── L5. Footer: 담당자 + Risk ─────────────────────── */}
       <div style={{ ...rowStyle, marginTop: '0.5rem' }}>
         {hasAssignee && (
-          <>
+          // [B-11 Fix] 담당자 영역 전체에 overflow 제어 + maxWidth 제한
+          <div
+            title={roleTooltip ? `${task.assignee.toUpperCase()} — ${roleTooltip}` : task.assignee.toUpperCase()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.35rem',
+              maxWidth: '70%', overflow: 'hidden', flexShrink: 1,
+            }}
+          >
+            {/* 아바타 원형 배지 — 첫 글자 */}
             <div style={{
               width: 18, height: 18, borderRadius: '50%',
               background: 'var(--brand-glow)',
@@ -219,16 +228,20 @@ export default function TaskCard({ task, isDragging }) {
             }}>
               {task.assignee.charAt(0).toUpperCase()}
             </div>
+            {/* [B-11 Fix] 에이전트 ID만 표시 — role 텍스트 제거, overflow ellipsis 적용 */}
             <span style={{
               fontSize: '0.75rem', fontWeight: 500,
               color: 'var(--text-muted)',
               fontFamily: 'Space Grotesk, sans-serif',
               letterSpacing: '0.04em',
               textTransform: 'uppercase',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
             }}>
-              {task.assignee}{role ? ` - ${role}` : ''}
+              {task.assignee}
             </span>
-          </>
+          </div>
         )}
 
         {/* [S2-3] CRITICAL 위험 배지 — 점 대신 명확한 경고 텍스트 */}

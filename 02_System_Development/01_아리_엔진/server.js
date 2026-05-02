@@ -22,6 +22,7 @@ import executor, { updateAgentSignatureModel, getAgentSignatureModel } from './a
 import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
 import obsidianAdapter from './ai-engine/adapters/obsidianAdapter.js';
+import zeroConfigService from './ai-engine/services/zeroConfigService.js';
 import statusReporter from './ai-engine/statusReporter.js';
 import { processOnboardingUrl } from './ai-engine/tools/onboardingPipeline.js';
 import { initAdapterWatcher } from './ai-engine/AdapterWatcher.js';
@@ -30,6 +31,8 @@ import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
 import b4System from './ai-engine/tools/b4System.js';
 import imageLabRouter from './routes/imageLabRouter.js';
 import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.js';
+import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
+import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -385,13 +388,14 @@ io.on('connection', (socket) => {
   });
 
   // 프론트엔드 수동 카드 생성 이벤트 (대표님이 직접 생성 → 'CEO' 표기)
-  socket.on('task:create', async ({ title, content, assignee, priority, column }) => {
+  socket.on('task:create', async ({ title, content, assignee, priority, column, projectId }) => {
     try {
       const requester = 'CEO';
       const targetModel = (assignee && assignee !== '미할당')
         ? (getAgentSignatureModel(assignee) || 'gemini-2.5-flash')
         : 'gemini-2.5-flash';
-      const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null);
+      const targetProjectId = projectId || 'proj-1';
+      const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null, 'QUICK_CHAT', targetProjectId);
       broadcastLog('info', `태스크 생성됨: ${title}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
@@ -400,6 +404,7 @@ io.on('connection', (socket) => {
         column: column || 'todo',
         agentId: assignee !== '미할당' ? assignee : null,
         priority: priority || 'medium',
+        projectId: targetProjectId,
       });
       
       // 새로 할당된 에이전트가 있으면 Dispatcher 트리거
@@ -439,6 +444,21 @@ io.on('connection', (socket) => {
       await dbManager.createComment(sid, author, text);
       io.emit('task:comment_added', { taskId: sid, author, text, createdAt: new Date().toISOString() });
       broadcastLog('info', text, author, sid);
+
+      // ── [Phase 32] @bugdog 기록 트리거 감지 (칸반 코멘트 채널) ────────────
+      if (!KNOWN_AGENTS_SET.has(author?.toLowerCase())) {
+        const bugdogTrigger = detectBugdogTrigger(text);
+        if (bugdogTrigger) {
+          executeBugdogPipeline(
+            { description: bugdogTrigger.description, taskId: sid, channel: 'kanban_comment' },
+            dbManager,
+            broadcastLog,
+            (event, payload) => io.emit(event, payload)
+          ).catch(err => console.error('[Server/Bugdog] 칸반 코멘트 파이프라인 오류:', err.message));
+          return; // bugdog 트리거면 이후 에이전트 자동 트리거 생략
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // ── 🤖 담당 에이전트 자동 트리거 ──────────────────────────────────────
       // 에이전트 자신의 응답 댓글이 다시 트리거를 유발하지 않도록 안전장치 적용
@@ -592,15 +612,30 @@ ariNs.on('connection', (socket) => {
   console.log(`[Socket/ari] ✅ Ari 비서 세션 연결됨: ${socket.id}`);
 
   socket.on('ari:message', async (data) => {
-    const { content, channel = 'dashboard', author = 'CEO', images = [], preferredModel } = data || {};
+    const { content, channel = 'dashboard', author = 'CEO', images = [], preferredModel, projectId } = data || {};
     if (!content?.trim() && images.length === 0) return;
 
     console.log(`[Socket/ari] 메시지 수신 (${channel}): ${content}`);
     // [ImageAttach] 이미지가 없는 순수 텍스트만 broadcastLog (클라이언트 optimistic과 중복 방지)
     // 이미지 포함 메시지는 클라이언트가 이미 로컬 로그에 추가했으므로 서버 broadcast 생략
     if (images.length === 0) {
-      broadcastLog('info', content, author, null, 'WEB_CHAT');
+      broadcastLog('info', content, author, null, 'WEB_CHAT', projectId);
     }
+
+    // ── [Phase 32] @bugdog 기록 트리거 감지 (Fire-and-forget) ────────────────
+    const bugdogTrigger = detectBugdogTrigger(content);
+    if (bugdogTrigger) {
+      socket.emit('ari:stream_chunk', { text: '🐕 Bugdog이 기록을 시작합니다! 잠시 후 칸반 카드가 생성됩니다.' });
+      socket.emit('ari:stream_done', { fullText: '🐕 Bugdog이 기록을 시작합니다! 잠시 후 칸반 카드가 생성됩니다.', model: 'Bugdog v1' });
+      executeBugdogPipeline(
+        { description: bugdogTrigger.description, channel },
+        dbManager,
+        broadcastLog,
+        (event, payload) => io.emit(event, payload)
+      ).catch(err => console.error('[Server/Bugdog] 파이프라인 오류:', err.message));
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     try {
       // [Phase 22] 실제 AI 실행 (executor → Ari 비서 레이어)
@@ -960,10 +995,11 @@ app.post('/api/settings', async (req, res) => {
 app.get('/api/search', async (req, res) => {
   try {
     const { q } = req.query;
+    const projectId = req.query.projectId || req.query.project_id || null;
     if (!q) return res.status(400).json({ status: 'error', message: 'Missing search query component' });
     
     // FTS DB 쿼리 실행
-    const rows = await dbManager.searchTasks(q);
+    const rows = await dbManager.searchTasks(q, projectId);
     
     // UI에 보여주기 위해 프론트엔드가 기대하는 포맷으로 간단 매핑
     const results = rows.map((row) => {
@@ -981,7 +1017,8 @@ app.get('/api/search', async (req, res) => {
         content: detailContent,
         createdAt: row.created_at,
         assignee: row.assigned_agent,
-        status: row.status
+        status: row.status,
+        projectId: row.project_id || 'proj-1'
       };
     });
 
@@ -1006,12 +1043,113 @@ app.get('/api/projects', async (req, res) => {
 });
 
 /**
+ * GET /api/projects/:id/crew — 특정 프로젝트의 할당된 팀 크루 조회
+ */
+app.get('/api/projects/:id/crew', async (req, res) => {
+  try {
+    const crew = await dbManager.getProjectCrew(req.params.id);
+    res.json(crew);
+  } catch (err) {
+    console.error('[API] /api/projects/:id/crew 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * PATCH /api/projects/:id/crew/:agentId/nickname — 팀원 닉네임 설정
+ * 닉네임 없음 = null (역할명으로 표시), 닉네임 있음 = 사용자 지정 이름으로 표시
+ */
+app.patch('/api/projects/:id/crew/:agentId/nickname', async (req, res) => {
+  try {
+    const { nickname } = req.body; // null 허용 (닉네임 제거)
+    await dbManager.setCrewNickname(req.params.id, req.params.agentId, nickname || null);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('[API] PATCH /crew/:agentId/nickname 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * POST /api/projects — 새 프로젝트(워크스페이스) 생성
+ */
+app.post('/api/projects', async (req, res) => {
+  try {
+    const { id, name, objective, isolation_scope } = req.body;
+    if (!id || !name) return res.status(400).json({ error: 'id and name are required' });
+    await dbManager.createProject(id, name, objective, isolation_scope);
+    res.json({ status: 'ok', id });
+  } catch (err) {
+    console.error('[API] POST /api/projects 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * POST /api/projects/zero-config — Zero-Config AI 빌딩
+ */
+app.post('/api/projects/zero-config', async (req, res) => {
+  try {
+    const { name, objective, isolation_scope } = req.body;
+    if (!name || !objective) return res.status(400).json({ error: 'name and objective are required' });
+    
+    // ZeroConfig 시작 알림 (현재 프로젝트 관계없이 대시보드에서 볼 수 있게 임시 브로드캐스트)
+    broadcastLog('info', `✨ [${name}] 프로젝트 생성을 시작합니다. 최적의 크루를 선발하고 초기 백로그를 기획 중입니다... (약 10~15초 소요)`, 'system', null, 'DASHBOARD');
+
+    // ZeroConfigService에 빌딩 위임 (Background 처리)
+    zeroConfigService.buildProject({ name, objective, isolation_scope })
+      .then(projectId => {
+        // 워크스페이스 세팅 완료 소켓 알림
+        broadcastLog('info', `✅ [${name}] 프로젝트 세팅 완료! 크루 배치가 완료되었으며 워크스페이스가 자동 전환됩니다.`, 'system', null, 'DASHBOARD', projectId);
+        io.emit('project:ready', { projectId });
+      })
+      .catch(err => {
+        broadcastLog('error', `❌ [${name}] 프로젝트 세팅 실패: ${err.message}`, 'system', null, 'DASHBOARD');
+        console.error('[API] Zero-Config 백그라운드 에러:', err);
+      });
+    
+    // HTTP 타임아웃을 막기 위해 즉각 응답
+    res.json({ status: 'processing', message: 'AI is building the project in the background.' });
+  } catch (err) {
+    console.error('[API] POST /api/projects/zero-config 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error', message: err.message });
+  }
+});
+
+/**
+ * PUT /api/projects/:id — 프로젝트 설정 (타이틀, 목적, 공유범위) 수정
+ */
+app.put('/api/projects/:id', async (req, res) => {
+  try {
+    const { name, objective, isolation_scope } = req.body;
+    await dbManager.updateProject(req.params.id, name, objective, isolation_scope);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('[API] PUT /api/projects/:id 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * DELETE /api/projects/:id — 프로젝트 삭제
+ */
+app.delete('/api/projects/:id', async (req, res) => {
+  try {
+    await dbManager.deleteProject(req.params.id);
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('[API] DELETE /api/projects/:id 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * GET /api/tasks — 대시보드 초기 진입(Hydration)용 Task 전체 목록
  * 프론트엔드 KanbanBoard가 새로고침 될 때 이 API로 과거 데이터를 복원합니다.
  */
 app.get('/api/tasks', async (req, res) => {
   try {
-    const projectId = req.query.project_id || null;
+    const projectId = req.query.projectId || req.query.project_id || null;
     const rows = await dbManager.getAllTasks(projectId);
     // DB status → 칸반 column 매핑
     const STATUS_TO_COLUMN = {
@@ -1047,7 +1185,7 @@ app.get('/api/tasks', async (req, res) => {
       model: row.model,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      projectId: 'proj-1',
+      projectId: row.project_id || 'proj-1',
     };
     });
     res.json({ status: 'ok', tasks });
@@ -1061,7 +1199,8 @@ app.get('/api/tasks', async (req, res) => {
 /** GET /api/tasks/archived — 보관소(Archive)용 Task 목록 */
 app.get('/api/tasks/archived', async (req, res) => {
   try {
-    const rows = await dbManager.getArchivedTasks();
+    const projectId = req.query.projectId || req.query.project_id || null;
+    const rows = await dbManager.getArchivedTasks(projectId);
     const tasks = rows.map((row) => {
       // [Phase27 Step3] title/content 분리 — DB title 컬럼 직접 사용
       const rawTitle   = (row.title || '').trim();
@@ -1083,7 +1222,7 @@ app.get('/api/tasks/archived', async (req, res) => {
         model: row.model,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
-        projectId: 'proj-1',
+        projectId: row.project_id || 'proj-1',
       };
     });
     res.json({ status: 'ok', tasks });
@@ -1151,11 +1290,11 @@ app.post('/api/tasks/mention', async (req, res) => {
 app.post('/api/chat', async (req, res) => {
   console.log(`[API] /api/chat 요청 수신:`, req.body);
   try {
-    const { agent, content, author = '대표님' } = req.body;
+    const { agent, content, author = '대표님', projectId } = req.body;
     const targetAgent = globalAgentMap[agent?.toLowerCase()] || 'ari';
 
     // 1. 유저 메시지 로그 기록
-    broadcastLog('info', `${content}`, author, null, 'WEB_CHAT');
+    broadcastLog('info', `${content}`, author, null, 'WEB_CHAT', projectId);
 
     // 2. AI 실행 (태스크 ID 없이 실행)
     const evaluation = await modelSelector.selectModel(content);
@@ -1186,7 +1325,7 @@ app.post('/api/chat', async (req, res) => {
 app.get('/api/comments/recent', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 100;
-    const projectId = req.query.project_id || null;
+    const projectId = req.query.projectId || req.query.project_id || null;
     const comments = await dbManager.getRecentGlobalComments(limit, projectId);
     res.json({ status: 'ok', comments });
   } catch (err) {
@@ -1236,6 +1375,23 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
         console.error('[PingPong] 담당자 복귀 오류:', pingPongErr.message);
       }
     }
+
+    // ── [Phase 32] @bugdog 기록 트리거 — 멘션 파싱보다 먼저 검사 ────────────
+    // (감지 시 ARI로 폴백되지 않도록 mentionMatch 이전에 처리)
+    if (!KNOWN_AGENTS_SET.has(author?.toLowerCase())) {
+      const bugdogTrigger = detectBugdogTrigger(content);
+      if (bugdogTrigger) {
+        res.json({ status: 'ok', message: '🐕 Bugdog이 기록을 시작합니다! 잠시 후 칸반 카드가 생성됩니다.' });
+        executeBugdogPipeline(
+          { description: bugdogTrigger.description, taskId: sid, channel: 'kanban_comment_rest' },
+          dbManager,
+          broadcastLog,
+          (event, payload) => io.emit(event, payload)
+        ).catch(err => console.error('[REST/Bugdog] 파이프라인 오류:', err.message));
+        return; // 이후 ARI 트리거 생략
+      }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     // ── 🤖 코멘트 내 멘션 감지 및 AI 담당자 자동 트리거 ────────────────────
     // [Fix] agents.json 기반 동적 Set 사용 (하드코딩 제거)
@@ -1510,6 +1666,8 @@ app.patch('/api/tasks/:id', async (req, res) => {
     
     await dbManager.updateTaskDetails(taskId, finalTitle, finalContent, parsedAssignee, finalModel);
     
+    let finalColumn = column; // [Handoff 고도화] 담당자 변경 시 자동 이동을 위한 변수
+    
     // ── Activity Log: 변경 내역 배치 기록 (단일 댓글로 묶음) ─────────────────
     if (prevTask) {
       const activityItems = [];
@@ -1529,6 +1687,11 @@ app.patch('/api/tasks/:id', async (req, res) => {
         } catch (handoffErr) {
           console.warn('[S4-1 Handoff] 인계 댓글 생성 오류:', handoffErr.message);
         }
+        
+        // [UX 고도화] Handoff 시, 칸반 컬럼이 명시적으로 지정되지 않았고 현재 진행 중이라면 새 담당자의 대기열(todo)로 스르륵 이동
+        if (!column && prevTask && ['IN_PROGRESS', 'REVIEW'].includes(prevTask.status?.toUpperCase())) {
+          finalColumn = 'todo';
+        }
         // ── Handoff END ───────────────────────────────────────────────────────
       }
       if (priority && prevTask.priority !== priority) {
@@ -1542,27 +1705,30 @@ app.patch('/api/tasks/:id', async (req, res) => {
 
     
     // 컬럼(status)이나 priority 변경이 있다면 처리
-    if (column) {
+    if (finalColumn) {
       const colToStatus = { todo: 'PENDING', in_progress: 'IN_PROGRESS', review: 'REVIEW', done: 'COMPLETED' };
-      if (colToStatus[column]) {
-        await dbManager.updateTaskStatus(taskId, colToStatus[column]);
+      if (colToStatus[finalColumn]) {
+        await dbManager.updateTaskStatus(taskId, colToStatus[finalColumn]);
         if (prevTask) {
           const statusLabel = { 'PENDING': '할 일', 'IN_PROGRESS': '진행 중', 'REVIEW': '승인 대기', 'COMPLETED': '완료' };
           const prevLabel = statusLabel[prevTask.status?.toUpperCase()] || prevTask.status;
-          const nextLabel = statusLabel[colToStatus[column]] || column;
+          const nextLabel = statusLabel[colToStatus[finalColumn]] || finalColumn;
           // 배치 배열에 상태 변경 추가: 담당자/우선순위와 함께 묶임
-          const statusItems = [`[시스템] 태스크 진행 상태가 '${prevLabel}'에서 '${nextLabel}'(으)로 변경되었습니다.`];
-          await logActivity(taskId, statusItems);
+          // Handoff에 의한 자동 이동인 경우 메시지 생략 (너무 많은 알림 방지)
+          if (!(!column && finalColumn === 'todo')) {
+            const statusItems = [`[시스템] 태스크 진행 상태가 '${prevLabel}'에서 '${nextLabel}'(으)로 변경되었습니다.`];
+            await logActivity(taskId, statusItems);
+          }
         }
       }
 
       // ── [Fix] 모든 column 이동 시 task:moved emit (담당자 유무와 무관) ──────
       // 이전: in_progress + assigned_agent 있을 때만 emit → 담당자 없거나 다른 column 이동 시 칸반 미반영
       // 수정: column 변경이 있으면 무조건 task:moved emit → confirmTaskMove 트리거 보장
-      io.emit('task:moved', { taskId: String(taskId), toColumn: column });
+      io.emit('task:moved', { taskId: String(taskId), toColumn: finalColumn });
 
       // ── [BugFix] in_progress로 변경 시 에이전트 실행 트리거 ──────────────
-      if (column === 'in_progress') {
+      if (finalColumn === 'in_progress') {
         const freshTask = await dbManager.getTaskById(taskId);
         if (freshTask?.assigned_agent) {
           const agentId = freshTask.assigned_agent;
@@ -1579,7 +1745,8 @@ app.patch('/api/tasks/:id', async (req, res) => {
     
     // [P-21 Fix] 소켓 전송 — DB에 실제 저장된 값(finalContent/finalTitle)을 전송
     // 원본 payload의 undefined 값 대신 확정된 값을 사용하여 store가 undefined로 덮어써지는 것 방지
-    io.emit('task:patched', { taskId, title: finalTitle, content: finalContent, assignee, model, column, priority });
+    // [Handoff Fix] assignee 파라미터가 undefined일 때도 정확한 parsedAssignee와 finalColumn을 전송
+    io.emit('task:patched', { taskId, title: finalTitle, content: finalContent, assignee: parsedAssignee, model, column: finalColumn, priority });
 
     res.json({ status: 'ok', message: 'Task updated successfully' });
   } catch (err) {
@@ -2684,7 +2851,7 @@ async function runWatchdog() {
 
 // ─── 서버 기동 (app.listen → httpServer.listen으로 변경: socket.io 필수) ────
 if (process.env.NO_SERVER !== 'true') {
-  httpServer.listen(PORT, () => {
+  httpServer.listen(PORT, '127.0.0.1', () => {
   console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);
   console.log(`📡 Linked to Local SQLite Database & AI Engine`);
@@ -2693,6 +2860,9 @@ if (process.env.NO_SERVER !== 'true') {
   // 와치독 시작 (서버 기동 5분 후 첫 사이클)
   setTimeout(runWatchdog, 5 * 60 * 1000);
   console.log('🐶 Heartbeat Watchdog 2.0 armed (첫 실행: 5분 후)');
+
+  // ─── [Phase 32] Auto-Memory Watchdog 시작 ──────────────────────────────────
+  memoryWatchdog.start();
 
   // ─── [Phase 22] Ari Daemon 자동 구동 ────────────────────────────────────────
   // ariDaemon.js는 아리의 독립 두뇌(Port 5050). 서버와 함께 자동 시작/모니터링.

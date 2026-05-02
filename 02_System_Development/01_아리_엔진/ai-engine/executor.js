@@ -440,7 +440,22 @@ class Executor {
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
     if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
-      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n\n`;
+      let projectSpecificRole = '';
+      if (taskId) {
+        try {
+          const taskInfo = await dbManager.getTaskById(taskId);
+          if (taskInfo && taskInfo.project_id) {
+            const experimentRole = await dbManager.getAgentRoleInProject(agentId, taskInfo.project_id);
+            if (experimentRole) {
+              projectSpecificRole = `\n[해당 프로젝트에서의 귀하의 특별 임무 및 역할]\n${experimentRole}\n`;
+            }
+          }
+        } catch (err) {
+          console.warn('[Executor] 프로젝트별 페르소나 조회 실패:', err.message);
+        }
+      }
+
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
 
@@ -645,7 +660,22 @@ class Executor {
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
     if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
-      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n\n`;
+      let projectSpecificRole = '';
+      if (taskId) {
+        try {
+          const taskInfo = await dbManager.getTaskById(taskId);
+          if (taskInfo && taskInfo.project_id) {
+            const experimentRole = await dbManager.getAgentRoleInProject(agentId, taskInfo.project_id);
+            if (experimentRole) {
+              projectSpecificRole = `\n[해당 프로젝트에서의 귀하의 특별 임무 및 역할]\n${experimentRole}\n`;
+            }
+          }
+        } catch (err) {
+          console.warn('[Executor] 프로젝트별 페르소나 조회 실패:', err.message);
+        }
+      }
+
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n${projectSpecificRole}\n`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
 

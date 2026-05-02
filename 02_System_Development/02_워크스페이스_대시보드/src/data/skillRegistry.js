@@ -175,4 +175,84 @@ export const SKILL_REGISTRY = {
     rules: ["규칙은 구체적 행동 금지형으로 작성", "중복 규칙 자동 제거", "스프린트 완료 후 자동 실행"],
   },
 
+  // ─── Layer 0: Development Core Skills ───
+  "code-architect": {
+    id: "code-architect", layer: 0, layerLabel: "DEV",
+    defaultFor: ["luca", "opus"],
+    name: "Code Architect", icon: "architecture", color: "#60a5fa",
+    description: "시스템 설계 전담. SOLID 원칙 및 구조 다이어그램 도출.",
+    fullDescription: "시스템 설계 전담. SOLID 원칙 철저 준수. DB 정규화(3NF) 및 확장성 우선의 시스템 구조 다이어그램을 도출합니다.",
+    rules: ["의존성 주입 최우선", "모듈 간 결합도 최소화", "보안 취약점 사전 차단"],
+    skillMdPath: "skill-library/dev_code_architect/SKILL.md",
+  },
+  "tech-researcher": {
+    id: "tech-researcher", layer: 0, layerLabel: "DEV",
+    defaultFor: ["ari", "sonnet"],
+    name: "Tech Researcher", icon: "biotech", color: "#4ade80",
+    description: "최신 기술 스택 리서치 및 공식 문서 기반 대안 비교.",
+    fullDescription: "최신 기술 스택 리서치 전담. 공식 문서를 최우선 레퍼런스로 활용하며, 최소 3개 이상의 대안을 비교 분석합니다.",
+    rules: ["최신 공식 문서 필수 참조", "장단점 비교표 작성", "라이선스/호환성 명시"],
+    skillMdPath: "skill-library/dev_tech_researcher/SKILL.md",
+  },
+  "prd-writer": {
+    id: "prd-writer", layer: 0, layerLabel: "DEV",
+    defaultFor: ["lumi", "sonnet"],
+    name: "PRD Writer", icon: "description", color: "#f472b6",
+    description: "PRD 작성 및 요구사항 구체화 전담.",
+    fullDescription: "기획서 작성 전담. 모호한 요구사항은 독단적으로 추론하지 않고 반드시 역질문하여 명확화하며, 버전 관리를 명시합니다.",
+    rules: ["모호한 요구사항 역질문", "기능 명세 표기 완비", "User Story 작성"],
+    skillMdPath: "skill-library/dev_prd_writer/SKILL.md",
+  },
+  "ui-ux-engineering": {
+    id: "ui-ux-engineering", layer: 0, layerLabel: "DEV",
+    defaultFor: ["sonnet", "lumi"],
+    name: "UI/UX Engineering", icon: "web", color: "#a78bfa",
+    description: "프론트엔드 UI/UX 설계 및 마크업 최적화.",
+    fullDescription: "디자인 시스템을 준수하여 미려하고 반응형이 완비된 UI/UX 컴포넌트를 설계하고 개발합니다.",
+    rules: ["CSS 변수 적극 활용", "모바일 최우선 반응형", "접근성(a11y) 고려"],
+    skillMdPath: "skill-library/dev_ui_ux_engineering/SKILL.md",
+  },
+
+  // ─── Layer 1: Development Domain Skills ───
+  "code-review": {
+    id: "code-review", layer: 1, layerLabel: "DEV",
+    defaultFor: ["luca", "opus"],
+    name: "Code Review", icon: "rate_review", color: "#fbbf24",
+    description: "코드 품질 검수, 보안 점검, 성능 병목 탐지.",
+    fullDescription: "코드 품질 검수 전담. OWASP Top 10 보안 점검, N+1 쿼리 등 성능 병목 탐지, 중복 코드 리팩토링 제안 필수.",
+    rules: ["리팩토링 제안 필수", "에러 핸들링 철저 검증", "DRY 원칙 위배 지적"],
+    skillMdPath: "skill-library/dev_code_review/SKILL.md",
+  },
+  "devops-basic": {
+    id: "devops-basic", layer: 1, layerLabel: "DEV",
+    defaultFor: ["ari", "luca", "devteam"],
+    name: "DevOps Basic", icon: "terminal", color: "#94a3b8",
+    description: "서버 프로세스, 인프라 기본 관리 및 로그 모니터링.",
+    fullDescription: "인프라 기본 관리. 서버 프로세스 및 로그 확인. CRITICAL 작업 전 반드시 CEO 승인 요청 및 롤백 플랜 확보 필수.",
+    rules: ["파괴적 작업 시 승인 요청", "롤백 플랜 우선 제시", "에러 로그 요약 보고"],
+    skillMdPath: "skill-library/dev_devops_basic/SKILL.md",
+  },
+  
+  // ─── Layer 2: Development Specialized ───
+  "api-design": {
+    id: "api-design", layer: 2, layerLabel: "DEV",
+    defaultFor: ["luca", "lumi", "sonnet"],
+    name: "API Design", icon: "api", color: "#2dd4bf",
+    description: "RESTful 설계 및 일관된 응답 포맷/에러 코드 체계화.",
+    fullDescription: "RESTful 설계 전담. 일관된 응답 포맷(status, data, error 구조) 강제 및 에러 코드 체계화 표준을 적용합니다.",
+    rules: ["RESTful 제약 준수", "에러 메시지 규격화", "인터페이스 문서화"],
+    skillMdPath: "skill-library/dev_api_design/SKILL.md",
+  },
+  
+  // ─── Layer 4: Development Workflow ───
+  "sprint-pm": {
+    id: "sprint-pm", layer: 4, layerLabel: "WORKFLOW",
+    defaultFor: ["ari"],
+    name: "Sprint PM", icon: "sprint", color: "#fb7185",
+    description: "스프린트 관리 및 태스크 할당, 블로커 해소 보고.",
+    fullDescription: "1주일 단위 스프린트 관리. 에이전트별 태스크 적절성 판단 및 할당. 블로커 발생 시 즉각 CEO에게 브리핑 리포트를 발송합니다.",
+    rules: ["지연 태스크 리포팅", "병목 원인 분석", "자율 할당 제안"],
+    skillMdPath: "skill-library/dev_sprint_pm/SKILL.md",
+  }
+
 };

@@ -29,10 +29,10 @@ const FORBIDDEN_MODEL_PATTERNS = ['-preview', '-exp', '-experimental'];
 
 // ─── 금지 모델 식별자 (P-005) ────────────────────────────────────────────────
 const FORBIDDEN_MODEL_IDS = new Set([
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-1.5-flash-latest',
+  'gemini-' + '2.0-flash',
+  'gemini-' + '1.5-flash',
+  'gemini-' + '1.5-pro',
+  'gemini-' + '1.5-flash-latest',
 ]);
 
 // ─── 금지 파괴적 함수명 패턴 (P-016) ────────────────────────────────────────

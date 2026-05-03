@@ -431,14 +431,16 @@ export default function ProjectSettingsModal({ isOpen, onClose, project }) {
 
           {/* 푸터 */}
           <div style={{ padding:'1.1rem 1.5rem', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', background:'var(--bg-surface-2)' }}>
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="modal-btn modal-btn--ghost"
-              style={{ color: '#ef4444', padding: '0.4rem 0.8rem' }}
-            >
-              프로젝트 삭제
-            </button>
+            {project?.id !== 'global_mycrew' ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                className="modal-btn modal-btn--ghost"
+                style={{ color: '#ef4444', padding: '0.4rem 0.8rem' }}
+              >
+                프로젝트 삭제
+              </button>
+            ) : <div />}
 
             <div style={{ display:'flex', gap:'0.6rem' }}>
               <button type="button" onClick={onClose} disabled={isSaving} className="modal-btn modal-btn--ghost">

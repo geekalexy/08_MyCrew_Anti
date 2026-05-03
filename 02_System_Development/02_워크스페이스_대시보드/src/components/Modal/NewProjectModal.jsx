@@ -30,6 +30,9 @@ export default function NewProjectModal({ isOpen, onClose, initialValues = null 
   const stageRef = useRef(null);
   const startRef = useRef(null);
 
+  // 프로젝트 스토어의 projects 길이를 추적하여 생성이 완료되었는지 확인
+  const prevProjectsLenRef = useRef(projects.length);
+
   useEffect(() => {
     if (isOpen) {
       setTitle(initialValues?.title || '');
@@ -41,8 +44,18 @@ export default function NewProjectModal({ isOpen, onClose, initialValues = null 
       setElapsed(0);
       setActive(0);
       setStageTimes([]);
+      prevProjectsLenRef.current = projects.length;
     }
   }, [isOpen, initialValues]);
+
+  // 완료 감지: isSubmitting 중인데 projects 배열이 늘어났다면 성공적으로 추가된 것!
+  useEffect(() => {
+    if (isSubmitting && projects.length > prevProjectsLenRef.current) {
+      setIsSubmitting(false);
+      onClose();
+    }
+    prevProjectsLenRef.current = projects.length;
+  }, [projects.length, isSubmitting, onClose]);
 
   useEffect(() => {
     if (!isSubmitting) {

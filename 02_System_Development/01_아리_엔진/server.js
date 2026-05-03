@@ -3047,7 +3047,7 @@ async function runWatchdog() {
 // ─── 서버 기동 (app.listen → httpServer.listen으로 변경: socket.io 필수) ────
 if (process.env.NO_SERVER !== 'true') {
   httpServer.listen(PORT, () => {
-  console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
+    console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);
   console.log(`📡 Linked to Local SQLite Database & AI Engine`);
   // [W1 Fix] 부팅 시점을 기준으로 인터벌 카운트 시작 → 재시작 직후 즉시 발송 방지

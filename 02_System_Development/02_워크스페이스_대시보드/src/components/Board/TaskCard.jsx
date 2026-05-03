@@ -63,9 +63,9 @@ export default function TaskCard({ task, isDragging }) {
   };
 
   const agentMetaMap = useAgentStore((s) => s.agentMeta) || {};
-  const assigneeMeta = task.assignee ? Object.values(agentMetaMap).find(m => (m.name && m.name.toUpperCase() === task.assignee.toUpperCase()) || (m.id && m.id.toUpperCase() === task.assignee.toUpperCase())) : null;
-  // [B-11 Fix] role은 카드 본문에서 제거 — hover tooltip으로만 노출
-  const roleTooltip = assigneeMeta?.role || '';
+  const baseAssigneeId = task.assignee?.toLowerCase().replace(/^proj-\d+-/, '');
+  const assigneeMeta = baseAssigneeId ? agentMetaMap[baseAssigneeId] : null;
+  const roleDisplay = assigneeMeta?.role || task.assignee;
 
 
   return (
@@ -131,8 +131,11 @@ export default function TaskCard({ task, isDragging }) {
             fontSize: '0.72rem', fontWeight: 500,
             fontFamily: 'Space Grotesk, sans-serif',
             letterSpacing: '0.03em',
-          }}>
-            #{task.id}
+          }}
+            title={task.id ? `Full ID: ${task.id}` : ''}
+          >
+            {/* [PROJECT-SEQ] project_task_num 있으면 프로젝트 순번, fallback은 뒤 6자리 */}
+            {task.project_task_num != null ? `#${task.project_task_num}` : (task.id ? `#${String(task.id).slice(-6)}` : '#—')}
           </span>
         </button>
 
@@ -210,7 +213,7 @@ export default function TaskCard({ task, isDragging }) {
         {hasAssignee && (
           // [B-11 Fix] 담당자 영역 전체에 overflow 제어 + maxWidth 제한
           <div
-            title={roleTooltip ? `${task.assignee.toUpperCase()} — ${roleTooltip}` : task.assignee.toUpperCase()}
+            title={task.assignee.toUpperCase()}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.35rem',
               maxWidth: '70%', overflow: 'hidden', flexShrink: 1,
@@ -226,7 +229,7 @@ export default function TaskCard({ task, isDragging }) {
               color: 'var(--brand)',
               fontFamily: 'Space Grotesk, sans-serif', flexShrink: 0,
             }}>
-              {task.assignee.charAt(0).toUpperCase()}
+              {roleDisplay.charAt(0).toUpperCase()}
             </div>
             {/* [B-11 Fix] 에이전트 ID만 표시 — role 텍스트 제거, overflow ellipsis 적용 */}
             <span style={{
@@ -239,7 +242,7 @@ export default function TaskCard({ task, isDragging }) {
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>
-              {task.assignee}
+              {roleDisplay}
             </span>
           </div>
         )}

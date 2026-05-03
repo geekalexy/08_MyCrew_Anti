@@ -178,7 +178,7 @@ export const SKILL_REGISTRY = {
   // ─── Layer 0: Development Core Skills ───
   "code-architect": {
     id: "code-architect", layer: 0, layerLabel: "DEV",
-    defaultFor: ["luca", "opus"],
+    defaultFor: ["dev_lead", "code_reviewer"],
     name: "Code Architect", icon: "architecture", color: "#60a5fa",
     description: "시스템 설계 전담. SOLID 원칙 및 구조 다이어그램 도출.",
     fullDescription: "시스템 설계 전담. SOLID 원칙 철저 준수. DB 정규화(3NF) 및 확장성 우선의 시스템 구조 다이어그램을 도출합니다.",
@@ -187,7 +187,7 @@ export const SKILL_REGISTRY = {
   },
   "tech-researcher": {
     id: "tech-researcher", layer: 0, layerLabel: "DEV",
-    defaultFor: ["ari", "sonnet"],
+    defaultFor: ["assistant", "frontend_dev"],
     name: "Tech Researcher", icon: "biotech", color: "#4ade80",
     description: "최신 기술 스택 리서치 및 공식 문서 기반 대안 비교.",
     fullDescription: "최신 기술 스택 리서치 전담. 공식 문서를 최우선 레퍼런스로 활용하며, 최소 3개 이상의 대안을 비교 분석합니다.",
@@ -196,7 +196,7 @@ export const SKILL_REGISTRY = {
   },
   "prd-writer": {
     id: "prd-writer", layer: 0, layerLabel: "DEV",
-    defaultFor: ["lumi", "sonnet"],
+    defaultFor: ["pm_agent", "frontend_dev"],
     name: "PRD Writer", icon: "description", color: "#f472b6",
     description: "PRD 작성 및 요구사항 구체화 전담.",
     fullDescription: "기획서 작성 전담. 모호한 요구사항은 독단적으로 추론하지 않고 반드시 역질문하여 명확화하며, 버전 관리를 명시합니다.",
@@ -205,7 +205,7 @@ export const SKILL_REGISTRY = {
   },
   "ui-ux-engineering": {
     id: "ui-ux-engineering", layer: 0, layerLabel: "DEV",
-    defaultFor: ["sonnet", "lumi"],
+    defaultFor: ["frontend_dev", "pm_agent"],
     name: "UI/UX Engineering", icon: "web", color: "#a78bfa",
     description: "프론트엔드 UI/UX 설계 및 마크업 최적화.",
     fullDescription: "디자인 시스템을 준수하여 미려하고 반응형이 완비된 UI/UX 컴포넌트를 설계하고 개발합니다.",
@@ -216,7 +216,7 @@ export const SKILL_REGISTRY = {
   // ─── Layer 1: Development Domain Skills ───
   "code-review": {
     id: "code-review", layer: 1, layerLabel: "DEV",
-    defaultFor: ["luca", "opus"],
+    defaultFor: ["dev_lead", "code_reviewer"],
     name: "Code Review", icon: "rate_review", color: "#fbbf24",
     description: "코드 품질 검수, 보안 점검, 성능 병목 탐지.",
     fullDescription: "코드 품질 검수 전담. OWASP Top 10 보안 점검, N+1 쿼리 등 성능 병목 탐지, 중복 코드 리팩토링 제안 필수.",
@@ -225,7 +225,7 @@ export const SKILL_REGISTRY = {
   },
   "devops-basic": {
     id: "devops-basic", layer: 1, layerLabel: "DEV",
-    defaultFor: ["ari", "luca", "devteam"],
+    defaultFor: ["assistant", "dev_lead", "system_bot"],
     name: "DevOps Basic", icon: "terminal", color: "#94a3b8",
     description: "서버 프로세스, 인프라 기본 관리 및 로그 모니터링.",
     fullDescription: "인프라 기본 관리. 서버 프로세스 및 로그 확인. CRITICAL 작업 전 반드시 CEO 승인 요청 및 롤백 플랜 확보 필수.",
@@ -236,7 +236,7 @@ export const SKILL_REGISTRY = {
   // ─── Layer 2: Development Specialized ───
   "api-design": {
     id: "api-design", layer: 2, layerLabel: "DEV",
-    defaultFor: ["luca", "lumi", "sonnet"],
+    defaultFor: ["dev_lead", "pm_agent", "frontend_dev"],
     name: "API Design", icon: "api", color: "#2dd4bf",
     description: "RESTful 설계 및 일관된 응답 포맷/에러 코드 체계화.",
     fullDescription: "RESTful 설계 전담. 일관된 응답 포맷(status, data, error 구조) 강제 및 에러 코드 체계화 표준을 적용합니다.",
@@ -247,7 +247,7 @@ export const SKILL_REGISTRY = {
   // ─── Layer 4: Development Workflow ───
   "sprint-pm": {
     id: "sprint-pm", layer: 4, layerLabel: "WORKFLOW",
-    defaultFor: ["ari"],
+    defaultFor: ["pm_agent"],
     name: "Sprint PM", icon: "sprint", color: "#fb7185",
     description: "스프린트 관리 및 태스크 할당, 블로커 해소 보고.",
     fullDescription: "1주일 단위 스프린트 관리. 에이전트별 태스크 적절성 판단 및 할당. 블로커 발생 시 즉각 CEO에게 브리핑 리포트를 발송합니다.",

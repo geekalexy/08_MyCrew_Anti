@@ -3,8 +3,10 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useKanbanStore } from '../store/kanbanStore';
 import { useAgentStore } from '../store/agentStore';
-import { useLogStore } from '../store/logStore';
+import { useChatStore } from '../store/chatStore';
+import { useTimelineStore } from '../store/timelineStore';
 import { useProjectStore } from '../store/projectStore';
+import { useUiStore } from '../store/uiStore';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
@@ -81,10 +83,11 @@ export function useSocket() {
 
       socketInstance.on('task:moved_failed', ({ taskId }) => {
         useKanbanStore.getState().rollbackTask(String(taskId));
-        useLogStore.getState().appendLog({
+        useTimelineStore.getState().appendTimeline({
           level: 'error',
           message: `Task #${taskId} 이동 실패 — 이전 상태로 복원`,
           agentId: 'system',
+          taskId: String(taskId),
           timestamp: new Date().toISOString(),
         });
       });
@@ -139,19 +142,43 @@ export function useSocket() {
         window.dispatchEvent(new CustomEvent('closeNewProjectModal'));
       });
 
+      socketInstance.on('project:error', ({ error }) => {
+        alert(`프로젝트 세팅 중 오류가 발생했습니다:\\n${error}`);
+        window.dispatchEvent(new CustomEvent('closeNewProjectModal'));
+      });
+
       socketInstance.on('log:append', (log) => {
         // [Phase 28a] 프로젝트 격리 (백엔드 이중 방출 필터링)
         const currentProjectId = useProjectStore.getState().selectedProjectId;
         if (log.projectId && log.projectId !== currentProjectId) return;
 
-        // [Phase 28a] Dedup 방어 로직 (동일 메시지 이중 렌더링 방지)
-        const { logs, appendLog } = useLogStore.getState();
-        const isDup = logs.slice(-10).some(
-          l => l.message === log.message && l.agentId === log.agentId && l.taskId === log.taskId
-        );
-        if (isDup) return;
+        // [Phase B] chatStore와 timelineStore 물리적 분리 라우팅
+        const isChat = log.type === 'agent_communication' || (!log.taskId && log.agentId !== 'system');
+        
+        if (isChat) {
+          const { chats, appendChat } = useChatStore.getState();
+          const isDup = chats.slice(-10).some(
+            l => l.message === log.message && l.agentId === log.agentId && l.taskId === log.taskId
+          );
+          if (!isDup) appendChat(log);
+        } else {
+          const { timelines, appendTimeline } = useTimelineStore.getState();
+          const isDup = timelines.slice(-10).some(
+            l => l.message === log.message && l.agentId === log.agentId && l.taskId === log.taskId
+          );
+          if (!isDup) appendTimeline(log);
+        }
 
-        appendLog(log);
+        // [아리 자동 패널 오픈] 아리가 글로벌 채팅으로 먼저 말을 걸 경우 패널 열고 채팅 탭으로 전환
+        if (!log.taskId && (log.agentId === 'ari' || log.agentId === 'assistant')) {
+          const { isLogPanelOpen, activeLogTab, setLogPanelOpen, setActiveLogTab } = useUiStore.getState();
+          if (!isLogPanelOpen) {
+            setLogPanelOpen(true);
+          }
+          if (activeLogTab !== 'interaction') {
+            setActiveLogTab('interaction');
+          }
+        }
 
         // ── 에이전트 활동 상태 감지 → 카드 애니메이션 ON/OFF ─────────────────
         // 규격화된 활동 코드 우선 탐지 ([THINKING], [EXPLORED], [EDIT], [WORKED])
@@ -204,7 +231,7 @@ export function useSocket() {
       socketInstance.on('connect_error', (err) => {
         // dedup: 동일 오류 5초 내 중복 방지
         if (shouldShowError(err.message)) {
-          useLogStore.getState().appendLog({
+          useChatStore.getState().appendChat({
             level: 'error',
             message: `소켓 연결 실패: ${err.message}`,
             agentId: 'system',

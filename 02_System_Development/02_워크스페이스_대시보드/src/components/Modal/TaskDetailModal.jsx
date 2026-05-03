@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
-import { useLogStore } from '../../store/logStore';
+import { useTimelineStore } from '../../store/timelineStore';
 import { useSocket } from '../../hooks/useSocket';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -25,7 +25,7 @@ const TEAM_AGENTS = {
 const SERVER_URL_TL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 function WorkflowTimeline({ taskId }) {
-  const logs = useLogStore((s) => s.logs);
+  const logs = useTimelineStore((s) => s.timelines);
 
   // Anti-Bridge 대기 상태
   const [bridgeWaiting, setBridgeWaiting] = useState([]);
@@ -632,7 +632,7 @@ export default function TaskDetailModal() {
       className={`modal-overlay ${isExpanded ? 'modal-overlay--expanded' : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label={`Task #${task.id} 상세`}
+      aria-label={`Task #${task.project_task_num != null ? task.project_task_num : String(task.id).slice(-6)} 상세`}
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div className={`modal modal--detail ${isExpanded ? 'modal--expanded' : ''}`}>
@@ -662,7 +662,7 @@ export default function TaskDetailModal() {
               <span style={{ 
                 fontSize: '0.76rem', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
                 letterSpacing: '0.08em', color: 'var(--text-muted)' 
-              }}>Task #{task.id}</span>
+              }}>Task #{task.project_task_num != null ? task.project_task_num : String(task.id).slice(-6)}</span>
               <span style={{
                 fontSize: '0.76rem', fontWeight: 700, padding: '2px 9px', borderRadius: '4px',
                 background: 'rgba(180,197,255,0.08)', color: statusInfo.color,
@@ -887,6 +887,11 @@ export default function TaskDetailModal() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               gap: '1rem', transition: 'all 0.3s',
             }}>
+              {(() => {
+                const assigneeKey = task.assignee?.toLowerCase().replace(/^proj-\d+-/, '');
+                const displayAssignee = (agentMeta[assigneeKey]?.role || task.assignee || '').toUpperCase();
+                return (
+                  <>
               <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <span className="material-symbols-outlined" style={{
                   fontSize: '1.1rem', color: 'var(--brand)', opacity: 0.85,
@@ -895,11 +900,11 @@ export default function TaskDetailModal() {
                   {isStarting ? 'sync' : 'pending_actions'}
                 </span>
                 {isStarting
-                  ? <span style={{ color: 'var(--brand)' }}><strong>{task.assignee}</strong>에게 태스크를 전달하는 중...</span>
+                  ? <span style={{ color: 'var(--brand)' }}><strong>{displayAssignee}</strong>에게 태스크를 전달하는 중...</span>
                   : task.assignee && task.assignee !== '미할당'
                     ? (task.assignee.toLowerCase() === 'ceo' 
                         ? <><strong style={{ color: 'var(--text-primary)' }}>CEO</strong>님은 직접 작업을 수행합니다. (AI 에이전트에게 할당하세요)</>
-                        : <><strong style={{ color: 'var(--text-primary)' }}>{task.assignee.toUpperCase()}</strong>에게 즉시 실행을 시작할 수 있습니다.</>)
+                        : <><strong style={{ color: 'var(--text-primary)' }}>{displayAssignee}</strong>에게 즉시 실행을 시작할 수 있습니다.</>)
                     : <span style={{ color: 'var(--text-muted)' }}>담당자를 지정하면 실행시킬 수 있습니다.</span>
                 }
               </div>
@@ -928,6 +933,9 @@ export default function TaskDetailModal() {
                 </span>
                 {isStarting ? '전달 중...' : '실행 시작'}
               </button>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -985,8 +993,8 @@ export default function TaskDetailModal() {
               >
                 <option value="">미할당</option>
                 <option value="CEO">CEO</option>
-                {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
-                  <option key={m.name} value={m.name}>{m.name} ({m.role})</option>
+                {Object.entries(useAgentStore.getState().agentMeta || {}).map(([id, m]) => (
+                   <option key={id} value={id}>{m.name || m.role || id}</option>
                 ))}
               </select>
             </div>
@@ -1343,8 +1351,8 @@ export default function TaskDetailModal() {
                   <option value="NO_CHANGE" style={{ color: 'var(--text-muted)' }}>담당</option>
                   <option value="">미할당</option>
                   <option value="CEO">CEO</option>
-                  {Object.values(useAgentStore.getState().agentMeta || {}).map((m) => (
-                    <option key={m.name} value={m.name}>{m.name}</option>
+                  {Object.entries(useAgentStore.getState().agentMeta || {}).map(([id, m]) => (
+                    <option key={id} value={id}>{m.name || m.role || id}</option>
                   ))}
                 </select>
               </div>

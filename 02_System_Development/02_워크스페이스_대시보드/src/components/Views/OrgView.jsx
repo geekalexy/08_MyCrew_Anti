@@ -1,10 +1,13 @@
 // src/components/Views/OrgView.jsx — v2.2: Y-Shape 조직도 + 상용화 UI + 분석 탭 + 크루 영입
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAgentStore, TEAMS_REGISTRY } from '../../store/agentStore';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
+import { useProjectStore } from '../../store/projectStore';
 import TeamGuidelinesEditor from '../Guidelines/TeamGuidelinesEditor';
-import RecruitTalentModal from '../Recruit/RecruitTalentModal';
+import { getRoleData, inferProjectType } from '../../data/roleRegistry';
+
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 /* ── 아이콘 ─ */
 const IcoPlay  = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>;
@@ -23,16 +26,15 @@ function AgentRosterCard({ agentId, meta, isActive, onSelect, isRoot = false }) 
         className="agent-roster-card__status-dot"
         style={{ background: isActive ? 'var(--status-active)' : 'var(--border)' }}
       />
-      <div className="agent-roster-card__avatar">
-        {meta.avatar?.startsWith('/') ? (
-          <img src={meta.avatar} alt={meta.name} />
+      <div className="agent-roster-card__avatar" onClick={(e) => { e.stopPropagation(); prompt('새 프로필 이미지 URL 또는 이모지를 입력하세요:', meta.avatar || '👤'); }} title="프로필 이미지 교체 (클릭)" style={{ cursor: 'pointer' }}>
+        {meta.avatar?.startsWith('/') || meta.avatar?.startsWith('http') ? (
+          <img src={meta.avatar} alt={meta.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
         ) : (
-          <span style={{ fontSize: isRoot ? '2.5rem' : '2rem' }}>{meta.avatar}</span>
+          <span style={{ fontSize: isRoot ? '2.5rem' : '2rem' }}>{meta.avatar || '👤'}</span>
         )}
       </div>
-      <span className="agent-roster-card__name">{meta.name}</span>
-      <span className="agent-roster-card__role">{meta.role}</span>
-      <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', opacity: 0.6, fontFamily: 'Space Grotesk, sans-serif' }}>
+      <span className="agent-roster-card__name" title={meta.role}>{meta.role}</span>
+      <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', opacity: 0.6, fontFamily: 'Space Grotesk, sans-serif' }} title={meta.model}>
         {meta.model}
       </span>
     </div>
@@ -57,9 +59,9 @@ function TeamBranch({ teamKey, agents, agentMeta, agentStatus, onSelectAgent, on
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
 
-  if (!reg) return null;
+  if (!reg && !agents.length) return null;
 
-  const displayName = reg.name || `프로젝트 ${teamKey}팀`;
+  const displayName = reg?.name || (teamKey === 'dev' ? '개발팀 (Dev)' : teamKey === 'mkt' ? '마케팅팀 (Mkt)' : `팀 ${teamKey}`);
 
   const startEdit = () => { setEditName(displayName); setIsEditing(true); };
   const commitEdit = () => {
@@ -106,15 +108,14 @@ function TeamBranch({ teamKey, agents, agentMeta, agentStatus, onSelectAgent, on
           onMouseEnter={e => e.currentTarget.style.borderBottomColor = 'rgba(100,135,242,0.35)'}
           onMouseLeave={e => e.currentTarget.style.borderBottomColor = 'transparent'}
         >
-          {displayName}
+          <span title={displayName}>{displayName}</span>
         </p>
       )}
 
       {/* 에이전트 그리드 */}
       <div className="roster-grid">
         {agents.map(id => {
-          const meta = agentMeta[id];
-          if (!meta) return null;
+          const meta = agentMeta[id] || { name: id, role: '신규 크루', avatar: '👤', teamGroup: 'independent', description: '새로 배정된 팀원입니다.' };
           return (
             <AgentRosterCard
               key={id}
@@ -137,9 +138,8 @@ function YShapeOrg({ teamGroups, agentMeta, agentStatus, onSelectAgent, onRecrui
     <div className="y-org">
       {/* 최상단: 독립 심사관 (ARI) */}
       <div className="y-org__root">
-        {teamGroups.independent.map(id => {
-          const meta = agentMeta[id];
-          if (!meta) return null;
+        {teamGroups.platform.map(id => {
+          const meta = agentMeta[id] || { name: id, role: '오케스트레이터', avatar: '🧠', teamGroup: 'platform', description: '시스템 오케스트레이터입니다.' };
           return (
             <AgentRosterCard
               key={id}
@@ -157,49 +157,59 @@ function YShapeOrg({ teamGroups, agentMeta, agentStatus, onSelectAgent, onRecrui
       {/* 수직 커넥터 */}
       <div className="y-org__connector-v" />
 
-      {/* 수평 분기선 */}
-      <div className="y-org__hline-wrap">
-        <div className="y-org__hline" />
-        <div className="y-org__branch-connectors">
-          <div className="y-org__branch-connector-v" />
-          <div className="y-org__branch-connector-v" />
+      {/* 수평 분기선 (양쪽 팀이 모두 있을 때만 양갈래, 아니면 직선) */}
+      {teamGroups.dev.length > 0 && teamGroups.mkt.length > 0 ? (
+        <div className="y-org__hline-wrap">
+          <div className="y-org__hline" />
+          <div className="y-org__branch-connectors">
+            <div className="y-org__branch-connector-v" />
+            <div className="y-org__branch-connector-v" />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="y-org__connector-v" style={{ marginTop: '-0.5rem' }} />
+      )}
 
       {/* 좌우 브랜치 + 중간 점선 구분선 */}
       <div className="y-org__branches">
-        {/* 좌측: Team A */}
-        <div className="y-org__branch">
-          <TeamBranch
-            teamKey="A"
-            agents={teamGroups.A}
-            agentMeta={agentMeta}
-            agentStatus={agentStatus}
-            onSelectAgent={onSelectAgent}
-            onRecruit={onRecruit}
-          />
-        </div>
+        {/* 좌측: 개발팀 (dev) */}
+        {teamGroups.dev.length > 0 && (
+          <div className="y-org__branch">
+            <TeamBranch
+              teamKey="dev"
+              agents={teamGroups.dev}
+              agentMeta={agentMeta}
+              agentStatus={agentStatus}
+              onSelectAgent={onSelectAgent}
+              onRecruit={onRecruit}
+            />
+          </div>
+        )}
 
         {/* 중간 세로 점선 구분선 */}
-        <div style={{
-          width: '1px',
-          alignSelf: 'stretch',
-          borderLeft: '1.5px dashed rgba(100,135,242,0.25)',
-          margin: '0 0.5rem',
-          flexShrink: 0,
-        }} />
+        {teamGroups.dev.length > 0 && teamGroups.mkt.length > 0 && (
+          <div style={{
+            width: '1px',
+            alignSelf: 'stretch',
+            borderLeft: '1.5px dashed rgba(100,135,242,0.25)',
+            margin: '0 0.5rem',
+            flexShrink: 0,
+          }} />
+        )}
 
-        {/* 우측: Team B */}
-        <div className="y-org__branch">
-          <TeamBranch
-            teamKey="B"
-            agents={teamGroups.B}
-            agentMeta={agentMeta}
-            agentStatus={agentStatus}
-            onSelectAgent={onSelectAgent}
-            onRecruit={onRecruit}
-          />
-        </div>
+        {/* 우측: 마케팅팀 (mkt) */}
+        {teamGroups.mkt.length > 0 && (
+          <div className="y-org__branch">
+            <TeamBranch
+              teamKey="mkt"
+              agents={teamGroups.mkt}
+              agentMeta={agentMeta}
+              agentStatus={agentStatus}
+              onSelectAgent={onSelectAgent}
+              onRecruit={onRecruit}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -215,7 +225,7 @@ function NewTeamModal({ projects = [], onClose, onCreate }) {
     if (!teamName.trim()) return;
     setIsLoading(true);
     try {
-      await fetch('http://localhost:4000/api/teams', {
+      await fetch(`${SERVER_URL}/api/teams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: teamName, groupType: '협력적', icon: '🟡', color: '#b4c5ff', projectId: selectedProjectId }),
@@ -289,24 +299,23 @@ function NewTeamModal({ projects = [], onClose, onCreate }) {
 ══════════════════════════════════════════════════════════ */
 function AnalyticsTab() {
   const [dbMetrics, setDbMetrics] = useState(null);
+  const selectedProjectId = useProjectStore(s => s.selectedProjectId);
 
   // 컴포넌트 마운트 시 실DB 통계 조회
-  import('react').then(({ useEffect }) => {
-    useEffect(() => {
-      fetch('http://localhost:4000/api/metrics/cks')
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'ok') setDbMetrics(data.metrics);
-        })
-        .catch(err => console.error('[AnalyticsTab] 메트릭 로드 실패:', err));
-    }, []);
-  });
+  useEffect(() => {
+    fetch(`${SERVER_URL}/api/metrics/cks`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'ok') setDbMetrics(data.metrics);
+      })
+      .catch(err => console.error('[AnalyticsTab] 메트릭 로드 실패:', err));
+  }, []);
 
   const tasks = useKanbanStore(s => s.tasks);
   const { agents, agentMeta } = useAgentStore();
 
   // ── 비즈니스 지표 계산 (실데이터) ─────────────────────────
-  const taskList = useMemo(() => Object.values(tasks), [tasks]);
+  const taskList = useMemo(() => Object.values(tasks).filter(t => t.projectId === selectedProjectId), [tasks, selectedProjectId]);
   const total     = taskList.length;
   const done      = taskList.filter(t => t.column === 'done').length;
   const inProg    = taskList.filter(t => t.column === 'in-progress').length;
@@ -445,32 +454,69 @@ function AnalyticsTab() {
 
 export default function OrgView() {
   const { agents, selectAgent, agentMeta, addAgent } = useAgentStore();
-  const { setCurrentView, workspaceName, workspaceLogo, updateWorkspace, projects, addTeam, teamPageTitle, teamPageSubtitle } = useUiStore();
+  const { setCurrentView, workspaceName, workspaceLogo, updateWorkspace, projects, addTeam } = useUiStore();
+  const { allCrews, selectedProjectId, projects: myProjects, updateProject } = useProjectStore();
+
+  const currentProject = myProjects?.find(p => p.id === selectedProjectId);
+  const currentTitle = currentProject?.name || 'Team';
+  const currentSub = currentProject?.objective || 'AI 팀 구성원 및 프로젝트 현황';
 
   const [activeTab, setActiveTab] = useState('roster');
   const [showNewTeamModal, setShowNewTeamModal] = useState(false);
-  const [showRecruit, setShowRecruit] = useState(false);
 
   // ── 타이틀 편집
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleInput, setTitleInput] = useState('');
-  const startTitleEdit = () => { setTitleInput(teamPageTitle || 'Team'); setIsTitleEditing(true); };
-  const commitTitleEdit = () => { if (titleInput.trim()) updateWorkspace({ teamPageTitle: titleInput.trim() }); setIsTitleEditing(false); };
+  const startTitleEdit = () => { setTitleInput(currentTitle); setIsTitleEditing(true); };
+  const commitTitleEdit = () => { 
+    if (titleInput.trim() && currentProject) {
+      updateProject(selectedProjectId, titleInput.trim(), currentProject.objective, currentProject.isolation_scope);
+    }
+    setIsTitleEditing(false); 
+  };
   const handleTitleKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); commitTitleEdit(); } if (e.key === 'Escape') setIsTitleEditing(false); };
 
   // ── 서브타이틀 편집
   const [isSubEditing, setIsSubEditing] = useState(false);
   const [subInput, setSubInput] = useState('');
-  const startSubEdit = () => { setSubInput(teamPageSubtitle || 'AI 팀 구성원 및 프로젝트 현황'); setIsSubEditing(true); };
-  const commitSubEdit = () => { if (subInput.trim()) updateWorkspace({ teamPageSubtitle: subInput.trim() }); setIsSubEditing(false); };
+  const startSubEdit = () => { setSubInput(currentSub); setIsSubEditing(true); };
+  const commitSubEdit = () => { 
+    if (subInput.trim() && currentProject) {
+      updateProject(selectedProjectId, currentProject.name, subInput.trim(), currentProject.isolation_scope);
+    }
+    setIsSubEditing(false); 
+  };
   const handleSubKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); commitSubEdit(); } if (e.key === 'Escape') setIsSubEditing(false); };
 
-  // teamGroup 기준 에이전트 분류
+  const assignedCrew = allCrews[selectedProjectId] || [];
+  const assignedAgentIds = assignedCrew.map(c => {
+    const instanceId = (c.id || c.agent_id)?.toLowerCase();
+    return (c.role_id || c.agent_id || instanceId)?.toLowerCase().replace(/^proj-\d+-/, '');
+  });
+
+  // [Phase 35] 프로젝트 전용 에이전트 분류
   const teamGroups = {
-    A:           Object.entries(agentMeta).filter(([, m]) => m.teamGroup === 'A').map(([id]) => id),
-    B:           Object.entries(agentMeta).filter(([, m]) => m.teamGroup === 'B').map(([id]) => id),
-    independent: Object.entries(agentMeta).filter(([, m]) => m.teamGroup === 'independent').map(([id]) => id),
+    platform: ['assistant'],
+    dev: assignedAgentIds.filter(id => agentMeta[id]?.teamGroup === 'dev'),
+    mkt: assignedAgentIds.filter(id => agentMeta[id]?.teamGroup === 'mkt'),
   };
+
+  // 사이드바와 동일한 표기명 결정 로직 (roleRegistry 기반)
+  const projectType = inferProjectType(currentProject?.name || '', currentProject?.isolation_scope || '');
+  const resolvedAgentMeta = useMemo(() => {
+    const result = {};
+    Object.entries(agentMeta).forEach(([id, meta]) => {
+      const roleData = getRoleData(id, projectType);
+      const rawRole = (meta?.experimentRole || '').trim();
+      const firstClause = rawRole.split(/[,.\n\r\-(]/)[0].trim();
+      const words = firstClause.split(/\s+/);
+      const fallbackRole = words.length > 3 ? words.slice(0, 2).join(' ') : firstClause;
+      const resolvedName = meta?.nickname || roleData?.mainRole || fallbackRole || id;
+      const resolvedRole = roleData?.mainRole || fallbackRole || meta?.role || id;
+      result[id] = { ...meta, name: resolvedName, role: resolvedRole };
+    });
+    return result;
+  }, [agentMeta, projectType]);
 
   const handleSelectAgent = (agentId) => {
     selectAgent(agentId);
@@ -519,7 +565,7 @@ export default function OrgView() {
             />
           ) : (
             <h2 className="board-header__title" style={{ margin: 0 }}>
-              {teamPageTitle || 'Team'}
+              {currentTitle}
             </h2>
           )}
           <button
@@ -551,7 +597,7 @@ export default function OrgView() {
             />
           ) : (
             <p className="board-header__subtitle" style={{ margin: 0 }}>
-              {teamPageSubtitle || 'AI 팀 구성원 및 프로젝트 현황'}
+              {currentSub}
             </p>
           )}
           <button
@@ -596,44 +642,17 @@ export default function OrgView() {
         <div style={{ animation: 'fadeIn 0.2s' }}>
           <YShapeOrg
             teamGroups={teamGroups}
-            agentMeta={agentMeta}
+            agentMeta={resolvedAgentMeta}
             agentStatus={agents}
             onSelectAgent={handleSelectAgent}
             onRecruit={handleRecruit}
           />
 
-          {/* [+ 크루 영입하기] 슬롯 카드 */}
-          <div
-            onClick={() => setShowRecruit(true)}
-            style={{
-              marginTop: '2rem',
-              border: '1.5px dashed rgba(100,135,242,0.35)',
-              borderRadius: '14px',
-              padding: '1.1rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem',
-              cursor: 'pointer',
-              color: 'var(--brand)',
-              fontSize: '0.82rem', fontWeight: 600,
-              transition: 'all 0.18s',
-              background: 'rgba(100,135,242,0.03)',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(100,135,242,0.08)';
-              e.currentTarget.style.borderColor = 'rgba(100,135,242,0.6)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'rgba(100,135,242,0.03)';
-              e.currentTarget.style.borderColor = 'rgba(100,135,242,0.35)';
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>person_add</span>
-            + 크루 영입하기
-          </div>
         </div>
       )}
 
       {/* ═══ 탭 2: 분석 ══════════════════════════════════════ */}
-      {activeTab === 'analytics' && <AnalyticsTab />}
+      {activeTab === 'analytics' && <AnalyticsTab selectedProjectId={selectedProjectId} />}
 
       {activeTab === 'manage' && (
         <div style={{ animation: 'fadeIn 0.2s' }}>
@@ -678,7 +697,7 @@ export default function OrgView() {
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
               Team Guidelines
             </p>
-            <TeamGuidelinesEditor agentId="team" agentName={workspaceName} />
+            <TeamGuidelinesEditor agentId={selectedProjectId || 'team'} agentName={workspaceName} />
           </div>
         </div>
       )}
@@ -692,10 +711,6 @@ export default function OrgView() {
         />
       )}
 
-      {/* ── 크루 영입 모달 ── */}
-      {showRecruit && (
-        <RecruitTalentModal onClose={() => setShowRecruit(false)} />
-      )}
     </div>
   );
 }

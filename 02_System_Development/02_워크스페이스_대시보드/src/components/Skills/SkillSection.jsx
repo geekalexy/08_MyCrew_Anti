@@ -1,5 +1,6 @@
 // src/components/Skills/SkillSection.jsx — Phase 17-4: 스킬 섹션 오케스트레이터
-import { useState } from 'react';
+// [#4 Fix] 프로젝트 전환 시 스킬 상태 초기화를 위해 useEffect 추가
+import { useState, useEffect } from 'react';
 import { useAgentStore } from '../../store/agentStore';
 import { SKILL_REGISTRY } from '../../data/skillRegistry';
 import SkillCard from './SkillCard';
@@ -21,15 +22,24 @@ const LAYER_ORDER = [
  *   agentId — 현재 에이전트 ID
  */
 export default function SkillSection({ agentId, onOpenDrawer }) {
-  const { agentMeta, toggleAgentSkill } = useAgentStore();
+  const { agentMeta, toggleAgentSkill, fetchAgentSkills } = useAgentStore();
   const skillConfig = agentMeta[agentId]?.skillConfig || {};
 
   const [selectedSkill, setSelectedSkill] = useState(null);
 
-  // 스킬 활성 여부 확인 (Builtin·Required는 항상 true, 나머지는 skillConfig 참조)
+  // [#4 Fix] 프로젝트 전환 시(agentId 변경) DB에서 스킬 상태 재로드 → 이전 프로젝트 상태 오염 방지
+  useEffect(() => {
+    if (agentId) fetchAgentSkills(agentId);
+  }, [agentId]);
+
+  // 스킬 활성 여부 확인
+  // Builtin·Required는 항상 true (DB 무관)
+  // 그 외: skillConfig에 명시된 값만 신뢰 — undefined이면 false (미장착)
   const getIsActive = (skill) => {
     if (skill.isBuiltin || skill.isRequired) return true;
-    return skillConfig[skill.id]?.active !== false; // undefined → true (기본 활성)
+    const config = skillConfig[skill.id];
+    if (config === undefined) return false; // [SKILL-FIX] 기본값 false — DB 미장착 스킬은 비활성
+    return config.active !== false;
   };
 
   // 레이어별 스킬 그룹핑 (agentOnly 필터 적용)

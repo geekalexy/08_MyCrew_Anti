@@ -90,7 +90,7 @@ export default function Column({ columnId, tasks, disableDnD }) {
     setIsEditingLabel(false);
   };
 
-  const countLabel = String(tasks.length).padStart(2, '0');
+  const countLabel = tasks.length;
 
   return (
     <div

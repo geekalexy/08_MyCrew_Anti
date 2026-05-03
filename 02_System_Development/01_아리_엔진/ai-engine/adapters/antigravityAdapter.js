@@ -8,8 +8,10 @@ const REQ_DIR = path.join(BRIDGE_DIR, 'requests');
 const RES_DIR = path.join(BRIDGE_DIR, 'responses');
 const LOCK_DIR = path.join(BRIDGE_DIR, 'locks');
 
-const TIMEOUT_MS = 5 * 60 * 1000; // 5분 (폴링 타임아웃)
-const POLL_MS = 3000; // 3초 간격 폴링
+const TIMEOUT_MS = 5 * 60 * 1000;           // 5분 (일반 에이전트 폴링 타임아웃)
+const TEAM_BUILDER_TIMEOUT_MS = 2 * 60 * 1000; // 2분 (팀빌더 전용 — 빠른 Fallback)
+const LOCK_TTL_MS = 10 * 60 * 1000;         // 10분 (lock 파일 자동 만료 TTL)
+const POLL_MS = 3000;                        // 3초 간격 폴링 [RESTORED — was deleted]
 
 class AntigravityAdapter extends BaseAdapter {
     constructor() {
@@ -26,9 +28,23 @@ class AntigravityAdapter extends BaseAdapter {
     }
 
     // [EC-2] 동시 다중 태스크 방어를 위한 락(Lock) 점유
+    // [TTL-FIX] 10분 이상 된 stale lock 파일은 자동 해제 (비정상 종료 복구)
     async acquireLock(agentKey) {
         const lockPath = path.join(LOCK_DIR, `${agentKey}.lock`);
-        if (fs.existsSync(lockPath)) return false;
+        if (fs.existsSync(lockPath)) {
+            try {
+                const lockTime = parseInt(fs.readFileSync(lockPath, 'utf8'), 10);
+                const isStale = (Date.now() - lockTime) > LOCK_TTL_MS;
+                if (isStale) {
+                    console.warn(`[Anti-Bridge] ⚠️ stale lock 감지 (${agentKey}, ${Math.round((Date.now()-lockTime)/1000)}초 경과) → 자동 해제`);
+                    fs.unlinkSync(lockPath);
+                } else {
+                    return false; // 유효한 lock → 충돌
+                }
+            } catch (e) {
+                return false; // 읽기 실패 시 안전하게 충돌 처리
+            }
+        }
         fs.writeFileSync(lockPath, String(Date.now()));
         return true;
     }
@@ -80,22 +96,25 @@ class AntigravityAdapter extends BaseAdapter {
         };
     }
 
-    async generateResponse(userPrompt, systemPrompt, agentId = 'ollie') {
+    async generateResponse(userPrompt, systemPrompt, agentId = 'ollie', overrideModel = null, overrideTimeoutMs = null) {
         // agentId: 실제 에이전트 ID (ollie, luna, lily, pico)
         const agentKey = agentId; // 파일 키로 직접 사용 → req_ollie_*.json 등
+        const effectiveTimeout = overrideTimeoutMs ?? TIMEOUT_MS; // 호출자가 타임아웃 직접 지정 가능
 
         // 에이전트 → AntiGravity 브릿지 requestedModel 매핑 (agents.json에서 동적 로드)
-        let requestedModel = 'anti-claude-opus-4.6-thinking';
-        try {
-            const agentsData = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'agents.json'), 'utf8'));
-            const agentConfig = agentsData.find(a => a.id === agentKey);
-            if (agentConfig && agentConfig.antiModel) {
-                requestedModel = agentConfig.antiModel;
-            } else if (agentConfig && agentConfig.model) {
-                requestedModel = agentConfig.model;
+        let requestedModel = overrideModel || 'anti-claude-opus-4.6-thinking';
+        if (!overrideModel) {
+            try {
+                const agentsData = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'agents.json'), 'utf8'));
+                const agentConfig = agentsData.find(a => a.id === agentKey);
+                if (agentConfig && agentConfig.antiModel) {
+                    requestedModel = agentConfig.antiModel;
+                } else if (agentConfig && agentConfig.model) {
+                    requestedModel = agentConfig.model;
+                }
+            } catch (err) {
+                console.error('[AntiGravity] agents.json 로드 실패, 기본 모델 폴백:', err.message);
             }
-        } catch (err) {
-            console.error('[AntiGravity] agents.json 로드 실패, 기본 모델 폴백:', err.message);
         }
 
 
@@ -175,7 +194,7 @@ class AntigravityAdapter extends BaseAdapter {
 
             // 3. 응답 완료 폴링 (EC-1)
             const resPath = path.join(RES_DIR, `res_${agentKey}_${taskId}.json`);
-            const deadline = Date.now() + TIMEOUT_MS;
+            const deadline = Date.now() + effectiveTimeout; // [TTL-FIX] 호출별 독립 타임아웃
 
             while (Date.now() < deadline) {
                 if (fs.existsSync(resPath)) {
@@ -198,7 +217,7 @@ class AntigravityAdapter extends BaseAdapter {
             }
 
             // 타임아웃 만료 시 Fallback
-            console.warn(`[Anti-Bridge] ⏰ [${agentKey.toUpperCase()}] 응답 대기 시간 초과 (5분). Gemini Fallback 작동.`);
+            console.warn(`[Anti-Bridge] ⏰ [${agentKey.toUpperCase()}] 응답 대기 시간 초과 (${Math.round(effectiveTimeout/1000)}초). Gemini Fallback 작동.`);
             if (fs.existsSync(reqPath)) fs.unlinkSync(reqPath); // ENOENT 방어
             return this.fallbackToGemini(userPrompt, systemPrompt, agentKey, taskId, 'TIMEOUT', requestedModel);
 
@@ -257,3 +276,4 @@ class AntigravityAdapter extends BaseAdapter {
 }
 
 export default new AntigravityAdapter();
+export { TEAM_BUILDER_TIMEOUT_MS }; // [TIMING-FIX] 팀빌더 전용 타임아웃 상수 공유

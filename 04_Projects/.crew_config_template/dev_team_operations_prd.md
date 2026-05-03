@@ -1,27 +1,30 @@
 # MyCrew 개발팀 운영 및 콘텐츠 기획서 (PRD)
-> **Phase 32 | 대상: AgentDetailView 퍼포먼스 탭 · 스킬 라이브러리 · 팀원 프로필 콘텐츠**
-> 이 문서는 MyCrew 개발팀(LUCA, SONNET, OPUS, LUMI)과 글로벌 비서(ARI) 간의 명확한 역할 분담, 워크플로우 파이프라인, 사용할 태스크 템플릿, 도구 권한, 그리고 스킬 레지스트리를 정의하는 핵심 운용 지침서입니다.
+> **Phase 35 | 대상: 프로젝트별 에이전트 워크플로우 · 스킬 라이브러리 · 팀원 프로필 콘텐츠**
+> 이 문서는 MyCrew 개발팀(dev_*)과 글로벌 비서(assistant) 간의 명확한 역할 분담, 워크플로우 파이프라인, 사용할 태스크 템플릿, 도구 권한, 그리고 스킬 레지스트리를 정의하는 핵심 운용 지침서입니다.
 
 ---
 
 ## 1. 전제 — 개발팀 에이전트 정체성 (Agent Identity)
 
-개발팀 에이전트는 **코드(Code) · 아키텍처(Architecture) · 문서(Document)**를 주요 산출물로 생산합니다. 시스템 내부에서 닉네임이 부여되기 전 초기 상태일 때, **역할명(experiment_role의 첫 절)**이 표시명이 되므로 직관적이고 전문적인 명칭을 사용합니다.
+개발팀 에이전트는 **코드(Code) · 아키텍처(Architecture) · 문서(Document)**를 주요 산출물로 생산합니다. 
+구버전의 개인화된 닉네임(luca, sonnet 등) 대신 **역할 기반의 표준 ID 체계(`dev_*`)**를 엄격히 준수하여 다중 프로젝트(Multi-Tenant) 환경에서의 컨텍스트 오염을 방지합니다.
 
 > [!IMPORTANT]
-> **ARI는 전담 개발팀에서 제외합니다.**
-> ARI는 특정 프로젝트나 코드 생산에 귀속되지 않으며, 전체 프로젝트를 넘나드는 **글로벌 통합 비서(PM 및 조율자)** 역할로 한정합니다. 실무 개발은 전담 4인 에이전트 체제(LUCA + SONNET + OPUS + LUMI)로 운영합니다.
+> **assistant(ARI)는 전담 개발팀에서 제외합니다.**
+> assistant는 특정 프로젝트나 코드 생산에 귀속되지 않으며, 전체 프로젝트를 넘나드는 **글로벌 통합 비서(PM 및 조율자)** 역할로 한정합니다. 실무 개발은 전담 `dev_*` 에이전트 체제로 운영합니다.
 
 ### 1.1 현재 활성 개발팀 에이전트 프로필
 
 | agentId | 표시명 (Role 첫 절) | 전담 핵심 영역 | 지정 모델 |
 |:---|:---|:---|:---|
-| **`luca`** | Lead System Architect | 아키텍처 설계, DB 스키마, API 설계, 고난이도 코드 작성, 코드 리뷰 | **Gemini 3.1 Pro** |
-| **`sonnet`**| AI Developer & UI/UX | 프론트엔드/백엔드 실제 코딩, 디자인 시스템, 컴포넌트 아키텍처 | **Claude Sonnet 4.6** |
-| **`opus`** | Senior Code Reviewer | 코드/보안 심층 검증, 성능 병목 탐지, 무결성 최종 검수 (PR Reviewer) | **Claude Opus 4.6** |
-| **`lumi`** | Product & Document Lead | 기획(PRD), API 명세 작성, 시스템 문서화, 스펙 버전 관리, QA | **Claude Opus 4.6** |
+| **`dev_fullstack`** | Fullstack Engineer | 프론트/백엔드 실제 코딩, 컴포넌트 개발 | **anti-gemini-3.1-pro-high** |
+| **`dev_ux`** | UI/UX Designer | 디자인 시스템, 사용자 경험 기획, 퍼블리싱 | **anti-gemini-3.1-pro-high** |
+| **`dev_senior`** | Senior Engineer | 아키텍처 설계, DB 스키마, API 설계, 리뷰 | **anti-claude-sonnet-4.6-thinking** |
+| **`dev_backend`** | Backend Engineer | 서버 로직, 데이터베이스 쿼리, 인프라 연동 | **anti-claude-sonnet-4.6-thinking** |
+| **`dev_qa`** | QA Engineer | 코드/보안 심층 검증, 테스트 코드 작성, 무결성 검수 | **anti-claude-opus-4.6-thinking** |
+| **`dev_advisor`** | Tech Advisor | 기술 검토, 시스템 문서화(PRD), 아키텍처 자문 | **anti-claude-opus-4.6-thinking** |
 
-> **설계 원칙**: 개발팀 모델은 고성능 추론이 가능한 **Gemini 3.1 Pro / Claude Sonnet 4.6 / Claude Opus 4.6** 3종으로 한정합니다. 마케팅팀(Flash 계열 등)과 명확히 분리하여 운영합니다.
+> **설계 원칙**: 개발팀 모델은 역할의 특성에 맞추어 **Gemini 3.1 Pro / Claude Sonnet 4.6 / Claude Opus 4.6** 등 적합한 엔진을 할당받아 수행합니다.
 
 ---
 
@@ -34,13 +37,13 @@
 
 ```mermaid
 graph TD
-    A[CEO 기능 요청 카드 생성] -->|할당: LUCA| B[① 아키텍처 기획]
-    B -->|할당: LUMI| C[② PRD 작성]
-    C -->|할당: OPUS| D[③ 리뷰 & 상호 검토]
+    A[CEO 기능 요청 카드 생성] -->|할당: dev_senior| B[① 아키텍처 기획]
+    B -->|할당: dev_advisor| C[② PRD 작성]
+    C -->|할당: dev_qa| D[③ 리뷰 & 상호 검토]
     D -->|할당: CEO / 상태: REVIEW| E[④ 착수 승인 대기]
     E -->|승인 / 상태: IN_PROGRESS| F[⑤ 코딩 시작]
-    F -->|할당: SONNET| G[⑥ 코딩 구현]
-    G -->|할당: OPUS| H[⑦ 코드 리뷰 & 검증]
+    F -->|할당: dev_fullstack| G[⑥ 코딩 구현]
+    G -->|할당: dev_qa| H[⑦ 코드 리뷰 & 검증]
     H -->|루프| I[⑧ 테스트 & 디버깅 자율 반복]
     I -->|할당: CEO / 상태: REVIEW| J[⑨ 최종 승인 대기]
     J -->|승인| K((✅ DONE))
@@ -53,17 +56,17 @@ graph TD
 
 ### WF-02 | 버그 수정 파이프라인 (Hotfix)
 *   **트리거**: 태스크 카테고리가 `BUG_FIX`로 생성될 때 (Bugdog 자동 리포트 또는 CEO 직접 생성)
-*   **프로세스**: `[버그 리포트 생성] → LUCA (재현·진단·코드 수정) → LUMI (관련 문서 및 CHANGELOG 반영) → CEO (최종 QA 및 승인)`
+*   **프로세스**: `[버그 리포트 생성] → dev_backend/dev_fullstack (재현·진단·코드 수정) → dev_advisor (관련 문서 및 CHANGELOG 반영) → CEO (최종 QA 및 승인)`
 *   **산출물**: 수정된 코드 커밋, 디버깅 리포트 문서 업데이트.
 
 ### WF-03 | 아키텍처 기획 파이프라인
 *   **트리거**: 태스크 카테고리가 `ARCHITECTURE`일 때.
-*   **프로세스**: `[설계 요청] → LUCA (시스템 초안 설계 및 다이어그램) → LUMI (명세서 정서 및 요구사항 매핑) → CEO (설계 승인)`
+*   **프로세스**: `[설계 요청] → dev_senior (시스템 초안 설계 및 다이어그램) → dev_advisor (명세서 정서 및 요구사항 매핑) → CEO (설계 승인)`
 *   **산출물**: 아키텍처 문서, ERD / DB 스키마, 구현 가이드라인.
 
 ### WF-04 | 코드 리뷰 파이프라인 (Quality Assurance)
 *   **트리거**: 코딩을 마친 카드의 상태가 `REVIEW`로 전환되며 코멘트로 리뷰가 요청될 때.
-*   **프로세스**: `[구현 완료] → LUMI (PRD 명세 대조 및 기능 검증) → LUCA (코드 품질 및 보안 최종 확인) → CEO (승인)`
+*   **프로세스**: `[구현 완료] → dev_advisor (PRD 명세 대조 및 기능 검증) → dev_qa (코드 품질 및 보안 최종 확인) → CEO (승인)`
 *   **산출물**: 리뷰 코멘트 목록, 리팩토링된 코드, CHANGELOG 업데이트.
 
 ---
@@ -78,9 +81,9 @@ graph TD
 > 이 기능이 해결하고자 하는 문제와 핵심 가치를 한 줄로 작성합니다.
 
 ## 📋 구현 범위
-- [ ] 시스템/백엔드 API 설계 (담당: LUCA)
-- [ ] 프론트엔드 연동 가이드 (담당: ARI/LUCA)
-- [ ] 사용자 문서 및 PRD 업데이트 (담당: LUMI)
+- [ ] 시스템/백엔드 API 설계 (담당: dev_senior)
+- [ ] 프론트엔드 연동 가이드 (담당: dev_fullstack)
+- [ ] 사용자 문서 및 PRD 업데이트 (담당: dev_advisor)
 
 ## ✅ 완료 조건 (DoD)
 - 요구사항에 명시된 모든 정상 흐름(Happy Path) 동작 확인
@@ -129,7 +132,7 @@ graph TD
 
 ### TPL-04 | 코드 리뷰 (CODE_REVIEW)
 ```markdown
-## 🔎 코드 리뷰 항목 (LUCA 주도)
+## 🔎 코드 리뷰 항목 (dev_qa 주도)
 - [ ] 아키텍처 및 디자인 패턴 원칙 준수 여부
 - [ ] DB 쿼리 최적화 (N+1 문제 등 병목 탐지)
 - [ ] 에러 핸들링 및 예외 처리 완전성
@@ -139,7 +142,7 @@ graph TD
 ## ⚡ 성능 및 규격
 - [ ] 핵심 API 응답 시간 < 200ms 보장 여부
 
-## 📝 문서화 검증 (LUMI 주도)
+## 📝 문서화 검증 (dev_advisor 주도)
 - [ ] API 명세서 최신화 반영 여부
 - [ ] CHANGELOG 및 릴리즈 노트 작성
 ```
@@ -189,20 +192,18 @@ graph TD
 
 보안과 역할의 전문성을 위해 에이전트별로 사용할 수 있는 도구(Tool)를 제한합니다.
 
-| 도구 (Tool) | ARI | LUCA | SONNET | OPUS | LUMI | 권한 레벨 및 설명 |
+| 도구 (Tool) | assistant | dev_senior | dev_fullstack | dev_qa | dev_advisor | 권한 레벨 및 설명 |
 |:---|:---:|:---:|:---:|:---:|:---:|:---|
 | `file:read` | ✅ | ✅ | ✅ | ✅ | ✅ | **CORE**: 워크스페이스 내 모든 파일 컨텍스트 열람 허용. |
-| `file:write` | ✅ | ✅ | ✅ | ❌ | ✅ | **CORE**: 코드 작성(SONNET, LUCA), 문서 작성(LUMI). OPUS는 리뷰 전문. |
+| `file:write` | ✅ | ✅ | ✅ | ❌ | ✅ | **CORE**: 코드 작성(dev_fullstack, dev_senior), 문서 작성(dev_advisor). dev_qa는 리뷰 전문. |
 | `file:move` | ✅ | ❌ | ❌ | ❌ | ✅ | **DOC**: 프로젝트 파일 구조 정리 및 아카이빙 목적. |
-| `file:delete` | ✅ | ❌ | ❌ | ❌ | ❌ | **EXEC**: 파일 영구 삭제. (위험도가 높아 ARI만 전담) |
-| `code:execute` | ✅ | ❌ | ❌ | ❌ | ❌ | **EXEC**: 로컬 터미널 스크립트 실행. (보안 샌드박스로 ARI 전담) |
+| `file:delete` | ✅ | ❌ | ❌ | ❌ | ❌ | **EXEC**: 파일 영구 삭제. (위험도가 높아 assistant만 전담) |
+| `code:execute` | ✅ | ❌ | ❌ | ❌ | ❌ | **EXEC**: 로컬 터미널 스크립트 실행. (보안 샌드박스로 assistant 전담) |
 | `web:search` | ✅ | ✅ | ✅ | ✅ | ✅ | **CORE**: 최신 레퍼런스, 라이브러리 공식 문서 검색. |
 | `db:read` | ✅ | ✅ | ✅ | ✅ | ✅ | **CORE**: 현재 칸반 태스크 및 로그 조회. |
-| `db:write` | ✅ | ✅ | ✅ | ✅ | ❌ | **ARCH/DEV**: 칸반 태스크 메타데이터 수정 및 DB 직접 조작 (LUCA/SONNET 주도). |
+| `db:write` | ✅ | ✅ | ✅ | ✅ | ❌ | **ARCH/DEV**: 칸반 태스크 메타데이터 수정 및 DB 직접 조작. |
 | `kanban:create` | ✅ | ❌ | ❌ | ❌ | ✅ | **DOC/PM**: 기획 기반의 신규 태스크 카드 파생 생성. |
 | `kanban:update` | ✅ | ❌ | ✅ | ❌ | ✅ | **DOC/PM**: 태스크 상태 및 메타데이터 동기화 관리. |
-| `git:commit` | ✅ | ✅ | ✅ | ❌ | ❌ | **ARCH**: 코드 형상 관리 및 커밋 생성 (Phase 33 이후 활성 예정). |
-| `doc:publish` | ❌ | ❌ | ❌ | ❌ | ✅ | **DOC**: 문서 배포 파이프라인 전담 (LUMI). |
 
 ---
 
@@ -212,13 +213,13 @@ graph TD
 
 | ID | Layer | 전담 에이전트 | 스킬 이름 | 아이콘 (`material-symbols`) | 스킬 상세 정의 (프롬프트 주입 규칙) |
 |:---|:---:|:---|:---|:---|:---|
-| `code-architect` | 0 | luca (전용) | Code Architect | `architecture` | 시스템 설계 전담. SOLID 원칙 철저 준수. DB 정규화(3NF) 및 확장성 우선의 시스템 구조 다이어그램 도출. |
-| `tech-researcher`| 0 | ari (개발용) | Tech Researcher | `biotech` | 최신 기술 스택 리서치 전담. 공식 문서를 최우선 레퍼런스로 활용하며, 최소 3개 이상의 대안을 비교 분석. |
-| `prd-writer` | 0 | lumi (전용) | PRD Writer | `description` | PRD 작성 전담. 모호한 요구사항은 독단적으로 추론하지 않고 반드시 역질문하여 명확화함. 버전 관리 명시. |
-| `code-review` | 1 | luca (기본) | Code Review | `rate_review` | 코드 품질 검수 전담. OWASP Top 10 보안 점검, N+1 쿼리 등 성능 병목 탐지, 중복 코드 리팩토링 제안 필수. |
-| `devops-basic` | 1 | ari, luca | DevOps Basic | `terminal` | 인프라 기본 관리. 서버 프로세스 및 로그 확인. CRITICAL 작업 전 반드시 CEO 승인 요청 및 롤백 플랜 확보 필수. |
-| `api-design` | 2 | luca, lumi | API Design | `api` | RESTful 설계 전담. 일관된 응답 포맷(status, data, error 구조) 강제. 에러 코드 체계화 표준 적용. |
-| `sprint-pm` | 4 | ari (기본) | Sprint PM | `sprint` | 1주일 단위 스프린트 관리. 에이전트별 태스크 적절성 판단 및 할당. 블로커 발생 시 즉각 CEO에게 브리핑 리포트 발송. |
+| `code-architect` | 0 | dev_senior | Code Architect | `architecture` | 시스템 설계 전담. SOLID 원칙 철저 준수. DB 정규화(3NF) 및 확장성 우선의 시스템 구조 다이어그램 도출. |
+| `tech-researcher`| 0 | assistant | Tech Researcher | `biotech` | 최신 기술 스택 리서치 전담. 공식 문서를 최우선 레퍼런스로 활용하며, 최소 3개 이상의 대안을 비교 분석. |
+| `prd-writer` | 0 | dev_advisor | PRD Writer | `description` | PRD 작성 전담. 모호한 요구사항은 독단적으로 추론하지 않고 반드시 역질문하여 명확화함. 버전 관리 명시. |
+| `code-review` | 1 | dev_qa | Code Review | `rate_review` | 코드 품질 검수 전담. OWASP Top 10 보안 점검, N+1 쿼리 등 성능 병목 탐지, 중복 코드 리팩토링 제안 필수. |
+| `devops-basic` | 1 | assistant, dev_senior | DevOps Basic | `terminal` | 인프라 기본 관리. 서버 프로세스 및 로그 확인. CRITICAL 작업 전 반드시 CEO 승인 요청 및 롤백 플랜 확보 필수. |
+| `api-design` | 2 | dev_senior, dev_advisor | API Design | `api` | RESTful 설계 전담. 일관된 응답 포맷(status, data, error 구조) 강제. 에러 코드 체계화 표준 적용. |
+| `sprint-pm` | 4 | assistant | Sprint PM | `sprint` | 1주일 단위 스프린트 관리. 에이전트별 태스크 적절성 판단 및 할당. 블로커 발생 시 즉각 CEO에게 브리핑 리포트 발송. |
 
 ---
 
@@ -226,13 +227,13 @@ graph TD
 
 단순한 완료 개수(resolvedCount)를 넘어, `category` 데이터를 조합하여 에이전트별 전문성에 맞는 세분화된 KPI를 Dashboard(Performance 탭)에 시각화합니다.
 
-| 대상 에이전트 | 핵심 KPI 1 | 핵심 KPI 2 | 데이터 추출 SQL 로직 (가이드) |
-|:---|:---|:---|:---|
-| **ARI** | Tasks Resolved (일반 완료 건수) | Bugs Fixed (버그 수정 참여도) | `WHERE assigned_agent='ari' AND column='done' AND category='BUG_FIX'` |
-| **LUCA** | Core Arch Docs (핵심 아키텍처 설계) | Refactoring Done (리팩토링 기여도) | `WHERE assigned_agent='luca' AND category IN ('ARCHITECTURE', 'FEATURE_DEV')` |
-| **SONNET** | Code Deployed (배포된 코드/기능) | UI/UX Tasks Done (디자인/프론트 구현) | `WHERE assigned_agent='sonnet' AND category IN ('FEATURE_DEV', 'UI_UX')` |
-| **OPUS** | Code/Arch Reviews Done (설계 및 코드 리뷰) | Bugs Blocked (사전 차단한 버그) | `WHERE assigned_agent='opus' AND category='CODE_REVIEW'` |
-| **LUMI** | Docs & PRDs Created (기획 및 문서 생성) | QA Passed (검증 통과 건수) | `WHERE assigned_agent='lumi' AND category IN ('DOCUMENT', 'PRD', 'QA')` |
+| 대상 에이전트 | 핵심 KPI 1 | 핵심 KPI 2 |
+|:---|:---|:---|
+| **assistant** | Tasks Resolved (일반 완료 건수) | Bugs Fixed (버그 수정 참여도) |
+| **dev_senior** | Core Arch Docs (핵심 아키텍처 설계) | Refactoring Done (리팩토링 기여도) |
+| **dev_fullstack** | Code Deployed (배포된 코드/기능) | UI/UX Tasks Done (디자인/프론트 구현) |
+| **dev_qa** | Code/Arch Reviews Done (설계 및 코드 리뷰) | Bugs Blocked (사전 차단한 버그) |
+| **dev_advisor** | Docs & PRDs Created (기획 및 문서 생성) | QA Passed (검증 통과 건수) |
 
 ---
 
@@ -240,8 +241,8 @@ graph TD
 
 | 순위 | 우선도 | 구현 대상 | 세부 작업 내용 | 예상 소요 공수 |
 |:---|:---:|:---|:---|:---|
-| **1** | 🔴 P0 | 스킬 레지스트리 탑재 | `skillRegistry.js` 파일에 개발팀 전용 7종 스킬 데이터 스키마 병합. | 30분 |
-| **2** | 🔴 P0 | Task 카테고리 확장 | SQLite DB Enum 확장 및 대시보드 태스크 생성 모달(UI)에 옵션 추가. | 30분 |
+| **1** | 🔴 P0 | 멀티 테넌트 마이그레이션 | 신규 `dev_*` 기반 에이전트 ID 전환 및 프로젝트 격리 아키텍처 완성. | 완료 |
+| **2** | 🔴 P0 | 스킬 레지스트리 탑재 | `skillRegistry.js` 파일에 개발팀 전용 7종 스킬 데이터 스키마 병합. | 완료 |
 | **3** | 🟡 P1 | 템플릿 로더 연동 | `TaskDetailModal`에서 category 선택 시 위 6종 마크다운 템플릿을 본문에 자동 삽입하는 UI 이벤트 구현. | 2시간 |
 | **4** | 🟡 P1 | 대시보드 KPI 세분화 | 에이전트 Detail View에 category 기반의 KPI 게이지 및 수치 분리 렌더링. | 1시간 |
 | **5** | 🟢 P2 | 워크플로우 시각화 | Performance 탭 내부에 현재 프로젝트의 워크플로우 파이프라인 진척도 노출. | 3시간 |
@@ -251,7 +252,7 @@ graph TD
 
 ## 8. CEO 의사결정 필요 항목 (Decision Points)
 
-다음은 Phase 32 완료를 위해 최종 결정이 필요한 정책 안건입니다.
+다음은 Phase 35 완료를 위해 최종 결정이 필요한 정책 안건입니다.
 
 1. **에이전트 닉네임 부여 시점 결정** (🟡 미확정)
    - **A안**: 대표님께서 수동으로 언제든 지정 (현재 방식)

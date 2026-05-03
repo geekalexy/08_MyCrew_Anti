@@ -23,9 +23,9 @@ class ProjectScaffolder {
    * @param {string} name        프로젝트명
    * @param {string} objective   프로젝트 목적/헌장 (요약)
    * @param {Array}  assignedCrew [{agent_id, short_role, role_description, persona_md}]
-   * @param {string} charterMd   LLM이 생성한 PROJECT.md 전체 본문
+   * @param {Object} planData    LLM이 생성한 전체 JSON 데이터 (charter, team_roster, required_skills 등)
    */
-  async scaffoldProjectWorkspace(projectId, name, objective, assignedCrew, charterMd) {
+  async scaffoldProjectWorkspace(projectId, name, objective, assignedCrew, planData) {
     let projectPath = null;
     try {
       // [B-01 Fix] 이중 접두사 제거 — projectId가 이미 'proj-'를 포함하므로 추가 접두사 없음
@@ -63,7 +63,7 @@ class ProjectScaffolder {
 
       // ─── 핵심 파일: PROJECT.md ─────────────────────────────────────────────
       // [B-09 Fix] 하드코딩 제거 — LLM 생성 본문(charterMd)을 그대로 Write
-      const finalCharter = charterMd || `# PROJECT: ${name}\n\n## 🎯 프로젝트 개요\n${objective}\n\n## 🛑 대원칙 및 톤앤매너\n- (팀과 합의 후 추가 예정)\n`;
+      const finalCharter = (planData && planData.project_charter_md) || `# PROJECT: ${name}\n\n## 🎯 프로젝트 개요\n${objective}\n\n## 🛑 대원칙 및 톤앤매너\n- (팀과 합의 후 추가 예정)\n`;
       await fs.writeFile(path.join(projectPath, 'PROJECT.md'), finalCharter, 'utf-8');
 
       // ─── Memory 파일 ──────────────────────────────────────────────────────
@@ -80,15 +80,15 @@ class ProjectScaffolder {
 
       // ─── Team 구성 및 Persona 파일 ───────────────────────────────────────
       // [B-07 Fix] 파일명 포맷: {agent_id}_{short_role}_persona.md
-      let rosterContent = `# ${name}팀 — Team Roster\n\n`;
+      let fallbackRosterContent = `# ${name}팀 — Team Roster\n\n`;
       for (const agent of assignedCrew) {
         const agentId  = (agent.agent_id || agent.agent_name || 'unknown').toLowerCase();
         const shortRole = (agent.short_role || 'member').toLowerCase().replace(/\s+/g, '_');
         const roleDesc  = agent.role_description || agent.role || '팀원';
 
-        rosterContent += `## ${agentId.toUpperCase()}\n`;
-        rosterContent += `- **역할코드:** ${shortRole}\n`;
-        rosterContent += `- **담당:** ${roleDesc}\n\n`;
+        fallbackRosterContent += `## ${agentId.toUpperCase()}\n`;
+        fallbackRosterContent += `- **역할코드:** ${shortRole}\n`;
+        fallbackRosterContent += `- **담당:** ${roleDesc}\n\n`;
 
         // [B-07 Fix] {agentId}_{shortRole}_persona.md
         const personaFileName = `${agentId}_${shortRole}_persona.md`;
@@ -97,26 +97,49 @@ class ProjectScaffolder {
           || `# Persona: ${agentId.toUpperCase()}\n\n## 이 프로젝트에서의 임무\n${roleDesc}\n\n## 행동 지침\n- 위 임무를 최우선으로 수행합니다.\n`;
         await fs.writeFile(path.join(projectPath, '02_Team', personaFileName), personaContent, 'utf-8');
       }
-      await fs.writeFile(path.join(projectPath, '02_Team', 'team_roster.md'), rosterContent, 'utf-8');
+      
+      // 오퍼스가 작성한 Team.md가 있으면 우선 사용, 없으면 폴백 사용
+      const finalRosterContent = (planData && planData.team_roster_md) || fallbackRosterContent;
+      await fs.writeFile(path.join(projectPath, '02_Team', 'team_roster.md'), finalRosterContent, 'utf-8');
 
       // ─── Skills 가이드라인 파일 ───────────────────────────────────────────
-      await fs.writeFile(
-        path.join(projectPath, '03_Skills', 'repetitive_tasks.md'),
-        `# Repetitive Tasks — ${name}\n\n> 반복 작업 절차를 이곳에 명세합니다.\n`,
-        'utf-8'
-      );
-      await fs.writeFile(
-        path.join(projectPath, '03_Skills', 'heavy_analysis.md'),
-        `# Heavy Analysis — ${name}\n\n> 무거운 데이터 분석 및 백그라운드 위임 작업 매뉴얼.\n`,
-        'utf-8'
-      );
+      if (planData && planData.required_skills && Array.isArray(planData.required_skills)) {
+        for (const skill of planData.required_skills) {
+          if (skill.skill_id && skill.skill_md) {
+            await fs.writeFile(
+              path.join(projectPath, '03_Skills', `${skill.skill_id}.md`),
+              skill.skill_md,
+              'utf-8'
+            );
+          }
+        }
+      } else {
+        // Fallback: 기존 템플릿
+        await fs.writeFile(
+          path.join(projectPath, '03_Skills', 'repetitive_tasks.md'),
+          `# Repetitive Tasks — ${name}\n\n> 반복 작업 절차를 이곳에 명세합니다.\n`,
+          'utf-8'
+        );
+        await fs.writeFile(
+          path.join(projectPath, '03_Skills', 'heavy_analysis.md'),
+          `# Heavy Analysis — ${name}\n\n> 무거운 데이터 분석 및 백그라운드 위임 작업 매뉴얼.\n`,
+          'utf-8'
+        );
+      }
 
-      // ─── .project 컨텍스트 ────────────────────────────────────────────────
+      // ─── .project 컨텍스트 및 업무 프로세스 ─────────────────────────────────
       await fs.writeFile(
         path.join(projectPath, '.project', 'context.md'),
         `# 세부 문맥 (Context) — ${name}\n\n> 상세한 기술/기획적 배경이 이곳에 기록됩니다.\n`,
         'utf-8'
       );
+      if (planData && planData.work_process_md) {
+        await fs.writeFile(
+          path.join(projectPath, '.project', 'workflow.md'),
+          planData.work_process_md,
+          'utf-8'
+        );
+      }
 
       console.log(`[ProjectScaffolder] ✅ 스캐폴딩 완료: ${projectDirName}`);
       return projectPath;

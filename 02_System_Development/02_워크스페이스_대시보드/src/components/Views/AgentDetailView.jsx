@@ -6,6 +6,7 @@ import { useUiStore } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
 import SkillSection from '../Skills/SkillSection';
 import SkillAddDrawer from '../Skills/SkillAddDrawer';
+import { getRoleData, inferProjectType } from '../../data/roleRegistry';
 
 const COLUMNS = ['todo', 'in_progress', 'review', 'done'];
 const COLUMN_LABELS = { todo: 'To Do', in_progress: 'In Progress', review: 'Review', done: 'Done' };
@@ -55,7 +56,7 @@ export default function AgentDetailView() {
   const tasks = useKanbanStore((s) => s.tasks);
   const { setLogPanelOpen } = useUiStore();
   // [Fix] 프로젝트 컨텍스트 — assignedCrew에서 역할명 추출
-  const { assignedCrew, selectedProjectId } = useProjectStore();
+  const { assignedCrew, selectedProjectId, projects } = useProjectStore();
 
   const [activeTab, setActiveTab] = useState('PERFORMANCE');
   const [showSkillDrawer, setShowSkillDrawer] = useState(false);
@@ -77,13 +78,34 @@ export default function AgentDetailView() {
   const isActive = agentState?.status === 'active';
 
   // [닉네임 설계] 현재 프로젝트에서 이 에이전트의 팀원 정보 추출
-  const projectCrewEntry = assignedCrew.find(c => c.agent_id?.toLowerCase() === agentId?.toLowerCase());
+  const projectCrewEntry = assignedCrew.find(c => (c.id || c.agent_id)?.toLowerCase() === agentId?.toLowerCase());
   const teamNickname = projectCrewEntry?.nickname || null;
-  const projectRole = projectCrewEntry?.experiment_role || null;
-  const roleTitle = projectRole ? projectRole.split(/[.\-–—(]/)[0].trim() : null;
-  // 표시명 우선순위: 닉네임 > 역할명 첫절 > 전역 role > agentId
-  const displayName = teamNickname || roleTitle || meta?.role || agentId || 'Agent';
-  const teamName = assignedCrew.length > 0 ? (assignedCrew[0].team_name || null) : null;
+  const projectRole = projectCrewEntry?.role_description || projectCrewEntry?.experiment_role || null;
+  const baseRoleId = (projectCrewEntry?.role_id || agentId)?.toLowerCase().replace(/^proj-\d+-/, '');
+
+  // ── 역할명 결정 (우선순위)
+  // 1. nickname (nickname 있으면 h2에 표시, roleRegistry.mainRole을 서브텍스트로)
+  // 2. roleRegistry.mainRole (role_id + projectType 매칭 성공)
+  // 3. extractShortRole fallback (LLM 문장 단축)
+  // 4. meta.role (전역 role)
+  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const projectType = inferProjectType(
+    selectedProject?.name || '',
+    selectedProject?.isolation_scope || ''
+  );
+  const roleData = getRoleData(baseRoleId, projectType);
+
+  // ── 역할명 추출 유틸 (roleRegistry 미매칭 시 fallback)
+  const extractShortRole = (rawRole) => {
+    if (!rawRole) return null;
+    const firstClause = rawRole.trim().split(/[,\.\n\r\-\u2013\u2014(]/)[0].trim();
+    const words = firstClause.split(/\s+/);
+    return words.length > 3 ? words.slice(0, 2).join(' ') : firstClause;
+  };
+
+  const roleTitle = roleData?.mainRole || extractShortRole(projectRole);
+  // displayName은 항상 짧은 값만: 닉네임 > 짧은 역할명 > 전역 role > agentId
+  const displayName = teamNickname || roleTitle || meta?.role || baseRoleId || 'Agent';
 
   useEffect(() => {
     // [Phase 17-4] 에이전트 선택 시 DB에서 스킬 설정 로드
@@ -122,6 +144,43 @@ export default function AgentDetailView() {
     if (e.key === 'Escape') setIsEditingName(false);
   };
 
+  // [#3 Fix] agentId 기반 기본 모델 fallback 맵 (modelRegistry CORRECT_DEFAULTS 미러)
+  const DEFAULT_MODEL_BY_AGENT = {
+    assistant:     'gemini-2.5-pro',
+    // 개발팀
+    dev_fullstack: 'anti-gemini-3.1-pro-high',
+    dev_ux:        'anti-gemini-3.1-pro-high',
+    dev_senior:    'anti-claude-sonnet-4.6-thinking',
+    dev_backend:   'anti-claude-sonnet-4.6-thinking',
+    dev_qa:        'anti-claude-sonnet-4.6-thinking', // [비용최적화] Opus 중복 방지 → Sonnet
+    dev_advisor:   'anti-claude-opus-4.6-thinking',
+    // 마케팅팀
+    mkt_lead:      'anti-gemini-3.1-pro-high',
+    mkt_planner:   'anti-claude-sonnet-4.6-thinking',
+    mkt_designer:  'anti-gemini-3.1-pro-high',
+    mkt_analyst:   'anti-claude-opus-4.6-thinking',
+    mkt_video:     'anti-claude-sonnet-4.6-thinking',
+    mkt_pm:        'anti-claude-opus-4.6-thinking',
+  };
+
+  const VALID_MODELS_SET = new Set([
+    'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite',
+    'anti-gemini-3.1-pro-high', 'anti-gemini-3.1-pro-low', 'anti-gemini-3-flash',
+    'anti-claude-sonnet-4.6-thinking', 'anti-claude-opus-4.6-thinking', 'anti-gpt-oss-120b',
+    'claude-opus-4-6', 'claude-sonnet-4-6',
+  ]);
+
+  // 현재 에이전트의 유효한 모델값 (없거나 비유효하면 기본값으로 fallback)
+  // db에 저장된 모델이 있으면 우선 사용
+  let resolvedModel = 'anti-gemini-3.1-pro-high';
+  if (projectCrewEntry?.model_id && VALID_MODELS_SET.has(projectCrewEntry.model_id)) {
+    resolvedModel = projectCrewEntry.model_id;
+  } else if (meta?.model && VALID_MODELS_SET.has(meta.model)) {
+    resolvedModel = meta.model;
+  } else {
+    resolvedModel = DEFAULT_MODEL_BY_AGENT[baseRoleId] || 'anti-gemini-3.1-pro-high';
+  }
+
   const formatModelName = (modelStr) => {
     if (!modelStr) return '';
     const map = {
@@ -133,7 +192,7 @@ export default function AgentDetailView() {
       'anti-gpt-oss-120b': 'GPT-OSS 120B (Medium)',
       'gemini-2.5-flash': 'Gemini 2.5 Flash',
       'gemini-2.5-pro': 'Gemini 2.5 Pro',
-      'gemini-exp-1206': 'Gemini Exp 1206',
+      'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite',
     };
     return map[modelStr.toLowerCase()] || modelStr;
   };
@@ -181,8 +240,8 @@ export default function AgentDetailView() {
             </div>
             <div className="agent-profile__info">
               <h2 className="agent-profile__name">{displayName}</h2>
+              {/* 역할 상세 설명: 원문 전체를 서브텍스트로. teamName 배지는 사이드바에 이미 있어 제거 */}
               {projectRole && <p className="agent-profile__role" style={{ color: 'var(--brand)', fontWeight: 600 }}>{projectRole}</p>}
-              {teamName && <span style={{ display: 'inline-block', marginTop: '0.2rem', fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', background: 'rgba(100,135,242,0.12)', color: 'var(--brand)' }}>{teamName}</span>}
             </div>
           </div>
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -251,24 +310,19 @@ export default function AgentDetailView() {
               )}
             </h2>
           )}
-          {/* 닉네임이 있으면 역할명을 서브텍스트로, 없으면 프로젝트 역할 세부 설명 표시 */}
-          {teamNickname && roleTitle ? (
-            <p className="agent-profile__role" style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{roleTitle}</p>
-          ) : projectRole ? (
-            <p className="agent-profile__role" style={{ color: 'var(--brand)', fontWeight: 600 }}>{projectRole}</p>
+          {/* 역할 서브텍스트 및 설명문 노출 */}
+          {projectCrewEntry ? (
+            <div style={{ marginTop: '0.2rem' }}>
+              {/* [P-009] experiment_role 전체 문장 노출 금지 — roleRegistry mainRole만 표시 */}
+              {roleTitle && (
+                <p className="agent-profile__role" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>{roleTitle}</p>
+              )}
+            </div>
           ) : (
             <p className="agent-profile__role">{meta.role}</p>
           )}
-          {/* 팀명 배지 */}
-          {teamName && (
-            <span style={{
-              display: 'inline-block', marginTop: '0.2rem',
-              fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px',
-              borderRadius: '4px', background: 'rgba(100,135,242,0.12)',
-              color: 'var(--brand)', letterSpacing: '0.04em'
-            }}>{teamName}</span>
-          )}
-          <p className="agent-profile__model" style={{ opacity: 0.5, fontSize: '0.75rem' }}>{formatModelName(meta.model)}</p>
+          {/* teamName 배지 제거 — 사이드바에 이미 팀명 표시됨 */}
+          <p className="agent-profile__model" style={{ opacity: 0.5, fontSize: '0.75rem', marginTop: '0.25rem' }}>{formatModelName(resolvedModel)}</p>
         </div>
         
         <div className="agent-profile__status" style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'center', marginLeft: 'auto', paddingRight: '2rem' }}>
@@ -360,6 +414,28 @@ export default function AgentDetailView() {
               </div>
             </div>
 
+            {/* [#1 Fix] 신규 프로젝트 Empty State — 지표가 모두 0일 때 CTA 안내 */}
+            {resolvedCount === 0 && inProgressCount === 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '1rem',
+                padding: '0.9rem 1.2rem',
+                borderRadius: '8px',
+                background: 'rgba(100,135,242,0.06)',
+                border: '1px dashed rgba(100,135,242,0.3)',
+                animation: 'fadeIn 0.4s',
+              }}>
+                <span className="material-symbols-outlined" style={{ color: 'var(--brand)', fontSize: '1.4rem', flexShrink: 0 }}>rocket_launch</span>
+                <div>
+                  <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    아직 완료된 태스크가 없습니다.
+                  </p>
+                  <p style={{ margin: 0, marginTop: '0.2rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    칸반 보드에서 <strong style={{ color: 'var(--brand)' }}>TO DO 카드</strong>를 만들고 엔진을 시작하세요.
+                  </p>
+                </div>
+              </div>
+            )}
+
 
             {/* 2. 엔진 인프라 섹션 (Infrastructure & Tokens) */}
             <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -371,19 +447,20 @@ export default function AgentDetailView() {
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '2rem' }}>
                 <div>
                   <h4 style={{ margin: 0, marginBottom: '0.6rem', fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>LLM Engine Adapter</h4>
+                  {/* [#3 Fix] value를 resolvedModel로 교체 — 신규 프로젝트에서 undefined 방지 */}
                   <select 
                     className="modal-select" 
-                    value={meta.model} 
+                    value={resolvedModel} 
                     onChange={(e) => updateAgentMeta(agentId, { model: e.target.value })}
                     style={{ background: 'var(--bg-surface-3)', color: 'var(--text-primary)', border: '1px solid var(--border)', padding: '0.6rem', borderRadius: '6px', width: '100%', outline: 'none' }}
                   >
-                    {/* ── ARI 전용: Gemini API 직접 호출 (소켓 + OAuth 스트리밍) ── */}
-                    {agentId === 'ari' && (<>
+                    {/* ── ARI / assistant 전용: Gemini API 직접 호출 (소켓 + OAuth 스트리밍) ── */}
+                    {(agentId === 'ari' || agentId === 'assistant') && (<>
                       <option value="gemini-2.5-flash">⚡ Gemini 2.5 Flash — 실시간 스트리밍 기본</option>
                       <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro — 고성능 추론</option>
                     </>)}
-                    {/* ── 브릿지 크루: AntiGravity 구독 모델 풀 (nova, lumi, lily, pico, ollie, luna) ── */}
-                    {agentId !== 'ari' && (<>
+                    {/* ── 브릿지 크루: AntiGravity 구독 모델 풀 ── */}
+                    {(agentId !== 'ari' && agentId !== 'assistant') && (<>
                       <optgroup label="✦ Gemini (AntiGravity 구독)">
                         <option value="anti-gemini-3.1-pro-high">🚀 Gemini 3.1 Pro (High) — 최고성능</option>
                         <option value="anti-gemini-3.1-pro-low">⚖️ Gemini 3.1 Pro (Low) — 균형</option>
@@ -450,7 +527,7 @@ export default function AgentDetailView() {
                     <div className="column__header">
                       <div className="column__header-left">
                         <h3 className="column__title">{COLUMN_LABELS[col]}</h3>
-                        <span className="column__count">{String(tasksByColumn[col].length).padStart(2, '0')}</span>
+                        <span className="column__count">{tasksByColumn[col].length}</span>
                       </div>
                     </div>
                     <div className="column__cards">

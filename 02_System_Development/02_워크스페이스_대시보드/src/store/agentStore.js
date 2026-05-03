@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { SKILL_REGISTRY } from '../data/skillRegistry';
+import { ROLE_REGISTRY } from '../data/roleRegistry';
 
 
 // 활동 타입 → 한글 레이블 맵핑
@@ -12,73 +13,132 @@ export const ACTIVITY_LABEL = {
   WORKED:   '작업 완료',
 };
 
-// 5인의 초기 메타데이터 (동적 관리를 위해 스토어 내부 initialState로 편입)
+// [Phase 34] ID 체계 v2.0: {team}_{role} 형식
+// platform: assistant  /  dev: dev_*  /  mkt: mkt_*
+// 같은 역할이라도 팀이 다르면 완전히 다른 객체 (독립 메모리/컨텍스트)
 const INITIAL_AGENT_META = {
-  ari: {
+  // ── Platform ──
+  assistant: {
     name: 'ARI',
-    role: '공유 비서 · 라우터',
+    role: '비서',
     skills: ['태스크 접수', '팀 라우팅', '사용자 대화'],
     avatar: '/avatars/ari.svg',
-    model: 'gemini-2.5-pro',  // 2026-04-28 Flash → Pro 격상 (지능 우선)
-    teamGroup: 'independent',
-    experimentRole: '사용자 ⇔ 팀 가교 (팀 외부 독립)',
+    model: 'gemini-2.5-pro',
+    teamGroup: 'platform',
+    experimentRole: '사용자 ⇔ 팀 가교 (전체 공유)',
   },
-  nova: {
-    name: 'NOVA',
-    role: '이미지 크리에이터',
-    skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', '이미지 벤치마크'],
+
+  // ── 개발팀 (dev_*) ──
+  dev_fullstack: {
+    name: '노바',
+    role: '풀스택 엔지니어',
+    skills: ['Frontend', 'Backend', 'DevOps', 'CI/CD'],
     avatar: '/avatars/nova.svg',
-    model: 'anti-gemini-3.1-pro-high', // AntiGravity 구독 — Gemini 3.1 Pro (High)
-    teamGroup: 'A',
-    experimentRole: 'Team A — 이미지 실무',
+    model: 'anti-gemini-3.1-pro-high',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — 풀스택 개발',
   },
-  lily: {
-    name: 'LILY',
-    role: '영상 프로듀서',
-    skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
-    avatar: '/avatars/lily.png',
-    model: 'anti-claude-sonnet-4.6-thinking', // AntiGravity 구독 — Claude Sonnet 4.6 (Thinking)
-    teamGroup: 'A',
-    experimentRole: 'Team A — 영상/코드 실무',
-  },
-  ollie: {
-    name: 'OLLIE',
-    role: '적대적 판관',
-    skills: ['비판적 검토', '오류 탐지', '품질 심사'],
-    avatar: '/avatars/ollie.svg',
-    model: 'anti-claude-opus-4.6-thinking', // AntiGravity 구독 — Claude Opus 4.6 (Thinking)
-    teamGroup: 'A',
-    experimentRole: 'Team A — 적대적 판관 (Phase 2·4)',
-  },
-
-  lumi: {
-    name: 'LUMI',
-    role: '이미지 크리에이터',
-    skills: ['NanoBanana 프롬프팅', 'Imagen 3 생성', 'SKILL.md 학습'],
+  dev_ux: {
+    name: '루미',
+    role: 'UI/UX 디자이너',
+    skills: ['Figma', 'Interaction Design', 'Design System'],
     avatar: '/avatars/lumi.svg',
-    model: 'anti-gemini-3.1-pro-high', // AntiGravity 구독 — Gemini 3.1 Pro (High)
-    teamGroup: 'B',
-    experimentRole: 'Team B — 이미지 실무',
+    model: 'anti-gemini-3.1-pro-high',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — UI/UX 디자인',
   },
-  pico: {
-    name: 'PICO',
-    role: '영상 프로듀서',
-    skills: ['Remotion 코딩', 'React 컴포지션', '영상 파이프라인'],
+  dev_senior: {
+    name: '맔리',
+    role: '시니어 엔지니어',
+    skills: ['Full Stack', 'Code Review', 'Mentoring'],
+    avatar: '/avatars/lily.png',
+    model: 'anti-claude-sonnet-4.6-thinking',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — 핵심 개발·코드 리뷰',
+  },
+  dev_backend: {
+    name: '피코',
+    role: '백엔드 엔지니어',
+    skills: ['API Design', 'Node.js', 'Database'],
     avatar: '/avatars/pico.svg',
-    model: 'anti-claude-sonnet-4.6-thinking', // AntiGravity 구독 — Claude Sonnet 4.6 (Thinking)
-    teamGroup: 'B',
-    experimentRole: 'Team B — 영상/코드 실무',
+    model: 'anti-claude-sonnet-4.6-thinking',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — API·DB 구축',
   },
-  luna: {
-    name: 'LUNA',
-    role: '협력 합성자',
-    skills: ['결과물 통합', '지식 동기화', 'CKS 프로토콜'],
+  dev_qa: {
+    name: '올리',
+    role: 'QA 엔지니어',
+    skills: ['Test Design', 'Bug Tracking', 'E2E Test'],
+    avatar: '/avatars/ollie.svg',
+    model: 'anti-claude-opus-4.6-thinking',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — 품질 검증·테스트',
+  },
+  dev_advisor: {
+    name: '루나',
+    role: '테크 어드바이저',
+    skills: ['Architecture Review', 'Tech Advisory', 'Risk Assessment'],
     avatar: '/avatars/luna.png',
-    model: 'anti-claude-opus-4.6-thinking', // AntiGravity 구독 — Claude Opus 4.6 (Thinking)
-    teamGroup: 'B',
-    experimentRole: 'Team B — 협력적 합성자 (Phase 2·4)',
+    model: 'anti-claude-opus-4.6-thinking',
+    teamGroup: 'dev',
+    experimentRole: '개발팀 — 아키텍쳐 자문 (Prime)',
   },
 
+  // ── 마케팅팀 (mkt_*) ──
+  mkt_lead: {
+    name: '마케팅 리더',
+    role: '마케팅 리더',
+    skills: ['Campaign Lead', 'Brand Strategy', 'Performance'],
+    avatar: '/avatars/nova.svg',
+    model: 'anti-gemini-3.1-pro-high',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 쾔드 운영 총괄',
+  },
+  mkt_planner: {
+    name: '기획자',
+    role: '기획자',
+    skills: ['Campaign Planning', 'Content Strategy', 'Roadmap'],
+    avatar: '/avatars/pico.svg',
+    model: 'anti-claude-sonnet-4.6-thinking',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 캐립페인 기획',
+  },
+  mkt_designer: {
+    name: '디자이너',
+    role: '디자이너',
+    skills: ['Brand Design', 'Ad Creative', 'SNS Visual'],
+    avatar: '/avatars/lumi.svg',
+    model: 'anti-gemini-3.1-pro-high',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 비주얼 디자인',
+  },
+  mkt_analyst: {
+    name: '분석가',
+    role: '분석가',
+    skills: ['Analytics', 'A/B Test', 'ROAS'],
+    avatar: '/avatars/ollie.svg',
+    model: 'anti-claude-opus-4.6-thinking',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 성과 지표 분석',
+  },
+  mkt_video: {
+    name: '영상 디렉터',
+    role: '영상 디렉터',
+    skills: ['Video Production', 'Editing', 'YouTube', 'Shorts'],
+    avatar: '/avatars/lily.png',
+    model: 'anti-claude-sonnet-4.6-thinking',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 영상 제작·연출',
+  },
+  mkt_pm: {
+    name: 'PM',
+    role: 'PM',
+    skills: ['Project Management', 'KPI', 'Sprint'],
+    avatar: '/avatars/luna.png',
+    model: 'anti-claude-opus-4.6-thinking',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 프로젝트 관리',
+  },
 };
 
 
@@ -165,6 +225,57 @@ export const useAgentStore = create(
   // { agentId: { status: 'active'|'idle', lastHeartbeat } }
   agents: {},
   selectedAgentId: null,   // null = 전체 뷰, agentId = 해당 에이전트 단독 뷰
+
+  // [Phase 35] 프로젝트별 에이전트 로드
+  fetchProjectAgents: async (projectId) => {
+    if (!projectId) return;
+    try {
+      const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+      const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/agents`);
+      if (res.ok) {
+        const data = await res.json();
+        const newAgentMeta = {};
+        const newAgents = {};
+        data.forEach(agent => {
+          // [BUG-01 FIX] agentMeta 키는 role_id 기준 (OrgView/Sidebar와 동일한 키 체계)
+          // instanceId(proj-xxx-role_id)는 메타 내부에 보관
+          const roleKey = (agent.role_id || agent.id || '').toLowerCase();
+          const roleId = (agent.role_id || '').toLowerCase();
+
+          // [BUG-02 FIX] role_id null-safe 처리
+          const teamGroup = roleId.startsWith('mkt_') ? 'mkt'
+            : (roleId === 'assistant' ? 'platform' : 'dev');
+
+          newAgentMeta[roleKey] = {
+            name: agent.nickname || agent.role_id,
+            role: ROLE_REGISTRY[roleId]?.mainRole || agent.role_id,
+            avatar: agent.avatar || '/avatars/nova.svg',
+            model: agent.model_id,
+            experimentRole: agent.role_description,
+            teamGroup,
+            instanceId: agent.id,   // 원본 instanceId 보존 (프로필 수정 API용)
+            skillConfig: {},
+          };
+          newAgents[roleKey] = { status: 'idle', lastHeartbeat: Date.now() };
+        });
+        
+        // [BUG-06 FIX] 이전 프로젝트 에이전트 잔류 방지: 플랫폼 에이전트만 유지
+        const platformMeta = Object.fromEntries(
+          Object.entries(INITIAL_AGENT_META).filter(([k]) =>
+            (INITIAL_AGENT_META[k]?.teamGroup === 'platform') || k === 'assistant'
+          )
+        );
+        set((s) => ({
+          agentMeta: { ...platformMeta, ...newAgentMeta },
+          agents: { ...newAgents },  // 이전 상태 완전 교체
+        }));
+      }
+    } catch (err) {
+      console.error('[Store] 프로젝트 에이전트 조회 실패:', err);
+    }
+  },
+
+  clearAgents: () => set({ agentMeta: INITIAL_AGENT_META, agents: {} }),
 
   /**
    * activeTaskMap: Map<taskId(string), { type: 'THINKING'|'EXPLORED'|'EDIT', since: timestamp }>
@@ -298,25 +409,28 @@ export const useAgentStore = create(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
 
-        // ── 에이전트 API 그룹 정의 ──────────────────────────────────────
-        const GEMINI_GROUP    = ['ari', 'nova', 'lumi'];
-        // ── ARI만 Gemini 직접 모델 / 나머지 크루는 AntiGravity 브릿지 모델 ──
-        const ARI_MODELS    = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
-        const ANTI_MODELS   = [
-          'anti-gemini-3.1-pro-high', 'anti-gemini-3.1-pro-low', 'anti-gemini-3-flash',
-          'anti-claude-sonnet-4.6-thinking', 'anti-claude-opus-4.6-thinking', 'anti-gpt-oss-120b',
-        ];
-        const CREW_AGENTS   = ['nova', 'lumi', 'lily', 'pico', 'ollie', 'luna'];
+        // [Phase 33] Role ID 체계 기준
+        const DEV_AGENTS = ['dev_fullstack', 'dev_ux', 'dev_senior', 'dev_backend', 'dev_qa', 'dev_advisor'];
+        const MKT_AGENTS = ['mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_pm'];
+        const CREW_AGENTS = [...DEV_AGENTS, ...MKT_AGENTS];
 
-        // 에이전트별 올바른 기본값 (AntiGravity 구독 모델 기준)
+        // 에이전트별 기본 모델
         const CORRECT_DEFAULTS = {
-          ari:   'gemini-2.5-pro',                 // ARI: Gemini Pro (2026-04-28 격상)
-          nova:  'anti-gemini-3.1-pro-high',        // AntiGravity: Gemini 3.1 Pro (High)
-          lumi:  'anti-gemini-3.1-pro-high',        // AntiGravity: Gemini 3.1 Pro (High)
-          lily:  'anti-claude-sonnet-4.6-thinking', // AntiGravity: Claude Sonnet 4.6 (Thinking)
-          pico:  'anti-claude-sonnet-4.6-thinking', // AntiGravity: Claude Sonnet 4.6 (Thinking)
-          ollie: 'anti-claude-opus-4.6-thinking',   // AntiGravity: Claude Opus 4.6 (Thinking)
-          luna:  'anti-claude-opus-4.6-thinking',   // AntiGravity: Claude Opus 4.6 (Thinking)
+          assistant:    'gemini-2.5-pro',
+          // 개발팀
+          dev_fullstack: 'anti-gemini-3.1-pro-high',
+          dev_ux:        'anti-gemini-3.1-pro-high',
+          dev_senior:    'anti-claude-sonnet-4.6-thinking',
+          dev_backend:   'anti-claude-sonnet-4.6-thinking',
+          dev_qa:        'anti-claude-opus-4.6-thinking',
+          dev_advisor:   'anti-claude-opus-4.6-thinking',
+          // 마케팅팀
+          mkt_lead:      'anti-gemini-3.1-pro-high',
+          mkt_planner:   'anti-claude-sonnet-4.6-thinking',
+          mkt_designer:  'anti-gemini-3.1-pro-high',
+          mkt_analyst:   'anti-claude-opus-4.6-thinking',
+          mkt_video:     'anti-claude-sonnet-4.6-thinking',
+          mkt_pm:        'anti-claude-opus-4.6-thinking',
         };
 
         Object.keys(state.agentMeta || {}).forEach((agentId) => {

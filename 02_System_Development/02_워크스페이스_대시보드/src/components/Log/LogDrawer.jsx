@@ -1,5 +1,6 @@
 // src/components/Log/LogDrawer.jsx — Phase 22 Sprint 1: Ari Socket 스트리밍
-import { useLogStore } from '../../store/logStore';
+import { useChatStore } from '../../store/chatStore';
+import { useTimelineStore } from '../../store/timelineStore';
 import { useUiStore } from '../../store/uiStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
@@ -45,7 +46,8 @@ if (import.meta.hot) {
 // 'sending'→ 전송 중: dimmed
 
 export default function LogDrawer() {
-  const logs = useLogStore((s) => s.logs);
+  const chatLogs = useChatStore((s) => s.chats);
+  const timelineLogs = useTimelineStore((s) => s.timelines);
   const agentMeta = useAgentStore((s) => s.agentMeta);
 
   const {
@@ -60,7 +62,10 @@ export default function LogDrawer() {
 
   const [panelWidth, setPanelWidth]   = useState(340);
   const [isResizing, setIsResizing]   = useState(false);
-  const [inputText, setInputText]     = useState('');
+  const [chatInputText, setChatInputText] = useState('');
+  const [timeInputText, setTimeInputText] = useState('');
+  const inputText = activeLogTab === 'interaction' ? chatInputText : timeInputText;
+  const setInputText = activeLogTab === 'interaction' ? setChatInputText : setTimeInputText;
   const [btnMode, setBtnMode]         = useState('idle'); // idle | stop | send | sending
   const [isDragOver, setIsDragOver]   = useState(false);  // 드래그&드롭 오버레이
   const [timelineComments, setTimelineComments] = useState([]); // [Fix Bug2] Timeline DB 댓글
@@ -71,36 +76,25 @@ export default function LogDrawer() {
   const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
 
   // ── @멘션 자동완성 ────────────────────────────────────────────────────────
-  // /api/agents에서 동적 로드 → role 필드 동기화
-  const [crewList, setCrewList] = useState([
-    { id: 'ari',   label: 'Ari',   role: '비서',               emoji: '🤖' },
-    { id: 'nova',  label: 'Nova',  role: '브랜드 마케터',        emoji: '🌟' },
-    { id: 'lumi',  label: 'Lumi',  role: '비주얼 아트 디렉터',  emoji: '✨' },
-    { id: 'pico',  label: 'Pico',  role: '콘텐츠 카피라이터',  emoji: '🎬' },
-    { id: 'ollie', label: 'Ollie', role: '그로스 데이터 분석가', emoji: '🔭' },
-  ]);
+  const [crewList, setCrewList] = useState([]);
   const EMOJI_MAP = { ari: '🤖', nova: '🌟', lumi: '✨', pico: '🎬', ollie: '🔭', lily: '🌸', luna: '🌙', luca: '🛠️', sonnet: '💡', opus: '🏛️', devteam: '👨‍💻' };
 
   useEffect(() => {
-    fetch(`${SERVER_URL}/api/agents`)
-      .then(r => r.json())
-      .then(data => {
-        const agents = data.agents || data;
-        if (!Array.isArray(agents)) return;
-        // 에이전트 목록을 CREW_LIST로 변환 (시스템 에이전트 제외)
-        const SYSTEM_IDS = ['luca', 'sonnet', 'opus', 'devteam'];
-        const list = agents
-          .filter(a => !SYSTEM_IDS.includes(a.id))
-          .map(a => ({
-            id: a.id,
-            label: a.nameKo || a.id,
-            role: a.role || '',
-            emoji: EMOJI_MAP[a.id] || '🤖',
-          }));
-        if (list.length > 0) setCrewList(list);
-      })
-      .catch(() => {}); // 오프라인 시 기본값 유지
-  }, []);
+    // [Phase 35] useAgentStore의 agentMeta(현재 프로젝트 에이전트 목록)를 멘션 목록으로 동기화
+    const list = [];
+    Object.entries(agentMeta).forEach(([id, meta]) => {
+      // 시스템 에이전트(루카, 소넷, 오퍼스)는 멘션에서 제외
+      if (['luca', 'sonnet', 'opus', 'devteam'].includes(id)) return;
+      
+      list.push({
+        id,
+        label: meta.name || id,
+        role: meta.role || '',
+        emoji: EMOJI_MAP[id.replace(/^(dev_|mkt_)/, '')] || '👤',
+      });
+    });
+    setCrewList(list);
+  }, [agentMeta]);
 
   const [mentionQuery, setMentionQuery]       = useState('');   // @뒤 타이핑 중인 키워드
   const [showMention, setShowMention]         = useState(false); // 드롭다운 표시 여부
@@ -114,7 +108,7 @@ export default function LogDrawer() {
   
   const SLASH_COMMANDS = [
     { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
-    { id: '/workflow:mini-app-dev', label: '미니앱 자율 개발 파이프라인 가동', icon: 'account_tree' }
+    { id: '/run', label: '크루 런 (파이프라인 연속 실행)', icon: 'account_tree' }
   ];
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
@@ -175,9 +169,17 @@ export default function LogDrawer() {
 
   // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
-    ? (focusedTaskId ? logs.filter((log) => String(log.taskId) === String(focusedTaskId)) : logs.filter((log) => log.taskId))
-    : logs.filter((log) => {
-        if (log.taskId) return false; // 타임라인 전용 로그 격리
+    ? (focusedTaskId 
+        ? timelineLogs.filter((log) => String(log.taskId) === String(focusedTaskId)) 
+        : timelineLogs.filter((log) => {
+            // [Fix #10] 타임라인 오염 방지: projectId를 기준으로 필터링 (레거시는 proj-1)
+            let logProjectId = log.projectId || 'proj-1';
+            if (logProjectId === 'proj_default' || logProjectId === 'global_mycrew') logProjectId = 'proj-1';
+            if (selectedProjectId && logProjectId !== selectedProjectId) return false;
+            return true;
+          })
+      )
+    : chatLogs.filter((log) => {
         // [B-04 Fix] 프로젝트 간 채팅 로그 격리 (projectId가 없는 레거시 로그는 'proj-1'로 간주)
         let logProjectId = log.projectId || 'proj-1';
         if (logProjectId === 'proj_default' || logProjectId === 'global_mycrew') logProjectId = 'proj-1';
@@ -361,7 +363,7 @@ export default function LogDrawer() {
       setBtnMode('send');
       
       if (fullText) {
-        useLogStore.getState().appendLog({
+        useChatStore.getState().appendChat({
           level: 'info',
           message: fullText,
           agentId: 'ari',
@@ -369,7 +371,7 @@ export default function LogDrawer() {
           projectId: useProjectStore.getState().selectedProjectId,
         });
       } else if (error) {
-        useLogStore.getState().appendLog({
+        useChatStore.getState().appendChat({
           level: 'error',
           message: error,
           agentId: 'system',
@@ -440,7 +442,7 @@ export default function LogDrawer() {
         if (imageDataUrls.length > 0) {
           const imageMarkdown = imageDataUrls.map(u => `![image](${u})`).join('\n');
           const fullMessage = [trimmedText, imageMarkdown].filter(Boolean).join('\n');
-          useLogStore.getState().appendLog({
+          useChatStore.getState().appendChat({
             level: 'info',
             message: fullMessage,
             agentId: 'CEO',
@@ -453,7 +455,7 @@ export default function LogDrawer() {
         
         // 소켓이 연결되지 않은 상태(오프라인/에러)라면 전송 차단 및 에러 안내
         if (!ariSocket.connected) {
-          useLogStore.getState().appendLog({
+          useChatStore.getState().appendChat({
             level: 'error',
             message: '서버 연결이 원활하지 않습니다. (소켓 오프라인) 잠시 후 다시 시도해주세요.',
             agentId: 'system',
@@ -718,6 +720,21 @@ export default function LogDrawer() {
               className={`log-drawer__tab ${activeLogTab === 'interaction' ? 'log-drawer__tab--active' : ''}`}
               onClick={() => setActiveLogTab('interaction')}
             >Chatting</button>
+            {activeLogTab === 'interaction' && (
+              <button 
+                className="btn btn--ghost btn--icon" 
+                style={{ marginLeft: 'auto', marginRight: '0.2rem', padding: '0.2rem', minWidth: 'auto', height: 'auto' }}
+                onClick={() => {
+                  if (window.confirm('현재 프로젝트의 채팅 히스토리를 초기화하시겠습니까?')) {
+                    const currentProjectId = useProjectStore.getState().selectedProjectId;
+                    useChatStore.getState().clearChatLogs(currentProjectId);
+                  }
+                }}
+                title="채팅 히스토리 초기화"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>delete_sweep</span>
+              </button>
+            )}
           </div>
           <button className="log-drawer__collapse" onClick={() => setLogPanelOpen(false)}>
             <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>chevron_right</span>
@@ -854,8 +871,8 @@ export default function LogDrawer() {
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
                             {log.agentId}
                             {!focusedTaskId && log.taskId && (
-                               <span style={{ marginLeft: '0.4rem', padding: '1px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '0.65rem', color: 'var(--brand)' }}>
-                                 Task #{log.taskId}
+                               <span title={`Full ID: ${log.taskId}`} style={{ marginLeft: '0.4rem', padding: '1px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '0.65rem', color: 'var(--brand)', cursor: 'default' }}>
+                                 #{String(log.taskId).slice(-6)}
                                </span>
                             )}
                             <span style={{ opacity: 0.5, marginLeft: '0.4rem' }}>· {time}</span>
@@ -903,7 +920,7 @@ export default function LogDrawer() {
                                 onMouseEnter={(e) => e.target.style.color = '#fff'}
                                 onMouseLeave={(e) => e.target.style.color = 'var(--brand)'}
                               >
-                                #{log.taskId} 상세 확인
+                                #{String(log.taskId).slice(-6)} 상세 확인
                               </button>
                             </>
                           ) : (
@@ -954,7 +971,7 @@ export default function LogDrawer() {
                                }}>● ONLINE</span>
                              </div>
                              {!focusedTaskId && (
-                               <span style={{ fontSize: '0.65rem', color: 'var(--brand)', opacity: 0.8 }}>Task #{t.id}: {t.title}</span>
+                               <span style={{ fontSize: '0.65rem', color: 'var(--brand)', opacity: 0.8 }} title={`Task #${t.id}`}>#{String(t.id).slice(-6)}: {t.title}</span>
                              )}
                           </div>
                         </div>
@@ -1069,7 +1086,7 @@ export default function LogDrawer() {
                 placeholder={
                   activeLogTab === 'time'
                     ? (focusedTask ? `Task #${focusedTask.id} 지시사항 (@멘션으로 에이전트 지정)...` : '번호(#)를 입력하여 카드를 찾으세요...')
-                    : 'AI Crew와 채팅하기... (@에이전트명으로 직접 호출)'
+                    : '아리에게 말을 걸어보세요...'
                 }
                 value={inputText}
                 onChange={(e) => {

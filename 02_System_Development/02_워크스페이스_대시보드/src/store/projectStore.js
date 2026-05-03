@@ -51,7 +51,7 @@ export const useProjectStore = create(
       fetchProjectCrew: async (projectId) => {
         if (!projectId) return set({ assignedCrew: [] });
         try {
-          const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/crew`);
+          const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/agents`);
           const data = await res.json();
           const crew = Array.isArray(data) ? data : [];
           set((state) => ({
@@ -72,7 +72,7 @@ export const useProjectStore = create(
           const results = await Promise.all(
             projects.map(async (p) => {
               try {
-                const res = await fetch(`${SERVER_URL}/api/projects/${p.id}/crew`);
+                const res = await fetch(`${SERVER_URL}/api/projects/${p.id}/agents`);
                 const data = await res.json();
                 return [p.id, Array.isArray(data) ? data : []];
               } catch {
@@ -121,13 +121,15 @@ export const useProjectStore = create(
         }
       },
 
-      updateProject: async (id, name, objective, isolation_scope) => {
+      updateProject: async (id, name, objective, isolation_scope, objective_raw, workflow_raw) => {
         try {
           const currentProject = get().projects.find(p => p.id === id) || {};
           const payload = {
             name: name !== undefined ? name : currentProject.name,
             objective: objective !== undefined ? objective : currentProject.objective,
-            isolation_scope: isolation_scope !== undefined ? isolation_scope : currentProject.isolation_scope
+            isolation_scope: isolation_scope !== undefined ? isolation_scope : currentProject.isolation_scope,
+            objective_raw: objective_raw !== undefined ? objective_raw : currentProject.objective_raw,
+            workflow_raw: workflow_raw !== undefined ? workflow_raw : currentProject.workflow_raw
           };
           const res = await fetch(`${SERVER_URL}/api/projects/${id}`, {
             method: 'PUT',

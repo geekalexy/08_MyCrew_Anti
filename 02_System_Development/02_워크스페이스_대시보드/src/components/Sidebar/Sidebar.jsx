@@ -4,6 +4,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useKanbanStore } from '../../store/kanbanStore';
 import { useUiStore } from '../../store/uiStore';
+import { getRoleData, inferProjectType } from '../../data/roleRegistry';
 
 export default function Sidebar() {
   const { projects, selectedProjectId, selectProject, deleteProject, allCrews } = useProjectStore();
@@ -45,9 +46,7 @@ export default function Sidebar() {
             <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>terminal</span>
           )}
         </div>
-        <span className="sidebar__workspace-name" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>
-          {workspaceName || 'Socian'}
-        </span>
+        <span className="sidebar__workspace-name">{workspaceName || 'Socian'}</span>
       </div>
 
       <nav className="sidebar__nav">
@@ -100,19 +99,6 @@ export default function Sidebar() {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '0.75rem', opacity: 0.5 }}>fiber_manual_record</span>
                   <span className="sidebar__project-name">{p.name}</span>
-                </button>
-                <button
-                  className="sidebar__project-delete"
-                  title="프로젝트 삭제"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`'${p.name}' 프로젝트를 삭제할까요?`)) deleteProject(p.id);
-                  }}
-                  aria-label="삭제"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
                 </button>
               </div>
             ))}
@@ -190,28 +176,37 @@ export default function Sidebar() {
                     </div>
                   ) : (
                     crew.map((member) => {
-                      const agentId = member.agent_id?.toLowerCase();
-                      const agentState = agents[agentId];
-                      const isActive = agentState?.status === 'active';
-                      // [닉네임 설계] 표시명 우선순위:
                       // 1. team_agents.nickname (사용자 지정)
-                      // 2. experiment_role 첫 절 (역할명 — 닉네임 없을 때)
-                      // agentId는 내부 식별자 — UI 절대 노출 안 함
-                      const roleTitle = (member.experiment_role || '').split(/[.\-–—(]/)[0].trim();
-                      const displayName = member.nickname || roleTitle || agentId?.toUpperCase();
-                      const roleSub = member.nickname ? roleTitle : null; // 닉네임 있을 때만 역할 서브텍스트
+                      // 2. roleRegistry 사전 (role_id + projectType 매칭)
+                      // 3. extractShortRole fallback (LLM 문장 단축)
+                      const instanceId = (member.id || member.agent_id)?.toLowerCase();
+                      const baseRoleId = (member.role_id || member.agent_id || instanceId)?.toLowerCase().replace(/^proj-\d+-/, '');
+                      const agentState = agents[baseRoleId];
+                      const isActive = agentState?.status === 'active';
+
+                      const projectType = inferProjectType(project.name, project.isolation_scope || '');
+                      const roleData = getRoleData(baseRoleId, projectType);
+
+                      const rawRole = (member.role_description || member.experiment_role || '').trim();
+                      const firstClause = rawRole.split(/[,\.\n\r\-\u2013\u2014(]/)[0].trim();
+                      const words = firstClause.split(/\s+/);
+                      const fallbackRole = words.length > 3 ? words.slice(0, 2).join(' ') : firstClause;
+
+                      const displayName = member.nickname || roleData?.mainRole || fallbackRole || baseRoleId?.toUpperCase();
+                      // [UI-FIX] 역할명 2중 노출 방지 — 서브텍스트 제거 (1줄 단독 표시)
+                      const roleSub = null;
 
                       return (
                         <button
-                          key={`${project.id}-${agentId}`}
+                          key={`${project.id}-${baseRoleId}`}
                           className={`sidebar__project-item ${
-                            selectedAgentId === agentId &&
+                            selectedAgentId === baseRoleId &&
                             selectedProjectId === project.id &&
                             currentView === 'agent-detail'
                               ? 'sidebar__project-item--active'
                               : ''
                           }`}
-                          onClick={() => { selectProject(project.id); handleAgentClick(agentId); }}
+                          onClick={() => { selectProject(project.id); handleAgentClick(baseRoleId); }}
                           style={{ width: '100%', flexDirection: 'column', alignItems: 'flex-start', gap: '0.1rem', padding: '0.35rem 0.8rem' }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%' }}>
@@ -222,14 +217,13 @@ export default function Sidebar() {
                             {/* 표시명: 닉네임 > 역할명 — agentId 노출 없음 */}
                             <span
                               className="sidebar__project-name"
-                              style={{ flex: 1, fontWeight: selectedAgentId === agentId ? 600 : 500, fontSize: '0.82rem' }}
+                              style={{ flex: 1, fontWeight: selectedAgentId === baseRoleId ? 600 : 500, fontSize: '0.82rem' }}
                             >
                               {displayName}
                             </span>
                           </div>
-                          {/* 닉네임이 있을 때만 역할명을 서브텍스트로 표시 */}
                           {roleSub && (
-                            <div style={{ paddingLeft: '1.2rem', fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div title={roleSub} style={{ paddingLeft: '1.2rem', fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'left', width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {roleSub}
                             </div>
                           )}

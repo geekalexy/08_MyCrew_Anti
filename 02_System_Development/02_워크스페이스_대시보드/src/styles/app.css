@@ -879,6 +879,16 @@ html, body, #root {
   box-shadow: 0 0 16px rgba(100,135,242,0.3);
   transform: translateY(-1px);
 }
+/* 라이트모드 — 확실한 버튼 활성화 느낌 부여 */
+[data-theme="light"] .modal-btn--approve {
+  background: var(--brand);
+  color: #ffffff;
+  border-color: var(--brand);
+}
+[data-theme="light"] .modal-btn--approve:hover {
+  background: var(--brand-hover);
+  box-shadow: 0 4px 12px var(--brand-glow);
+}
 /* 재작업 — 앰버/주황 계열 */
 .modal-btn--rework {
   background: rgba(255,180,80,0.10);

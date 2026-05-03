@@ -11,6 +11,7 @@ import KanbanBoard from './components/Board/KanbanBoard';
 import LogDrawer from './components/Log/LogDrawer';
 import TaskDetailModal from './components/Modal/TaskDetailModal';
 import NewProjectModal from './components/Modal/NewProjectModal';
+import ProjectSettingsModal from './components/Modal/ProjectSettingsModal';
 import AgentDetailView from './components/Views/AgentDetailView';
 import ArchiveView from './components/Views/ArchiveView';
 import OrgView from './components/Views/OrgView';
@@ -46,9 +47,10 @@ export default function App() {
   const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding, activeArtifact } = useUiStore();
   const { fetchSettings } = useSettingsStore();
   const { projects, selectedProjectId, updateProject, fetchProjects, selectProject } = useProjectStore();
-  const { selectedAgentId, addAgent } = useAgentStore();
+  const { selectedAgentId, addAgent, fetchProjectAgents, clearAgents } = useAgentStore();
   const [serverOnline, setServerOnline] = useState(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+  const [isSettingsModalOpen,   setIsSettingsModalOpen]   = useState(false);
   
   // 헤더 채용(Recruit) 상태 변수들
   const [isRecruiting, setIsRecruiting] = useState(false);
@@ -78,6 +80,15 @@ export default function App() {
       window.removeEventListener('closeNewProjectModal', handleCloseNewProjectModal);
     };
   }, []);
+
+  // [Phase 35] 선택된 프로젝트 변경 시 해당 프로젝트의 에이전트 목록 동적으로 불러오기
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchProjectAgents(selectedProjectId);
+    } else {
+      clearAgents();
+    }
+  }, [selectedProjectId]);
 
 
   useEffect(() => {
@@ -165,21 +176,25 @@ export default function App() {
                       </option>
                     ))}
                   </select>
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', opacity: 0.5, pointerEvents: 'none', marginLeft: '-4px' }}>
-                    expand_more
-                  </span>
-                  
+              {/* #31: 연필 → 설정 아이콘 교체 + ProjectSettingsModal 오픈 */}
                   <button 
-                    onClick={() => { setEditProjectNameInput(selectedProject?.name || ''); setIsEditingProjectName(true); }}
+                    onClick={() => setIsSettingsModalOpen(true)}
                     style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0.2rem' }}
-                    title="프로젝트 이름 수정"
+                    title="프로젝트 설정"
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', opacity: 0.6 }}>edit</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', opacity: 0.6 }}>settings</span>
                   </button>
                 </div>
               )}
+              {/* #30: 설명글 → selectedProject.objective_raw 또는 objective 파싱값으로 동적 표시 */}
               <p className="board-header__subtitle" style={{ marginTop: '0.3rem' }}>
-                AI 에이전트가 실시간으로 작업을 처리하고 있습니다
+                {(() => {
+                  if (!selectedProject) return 'AI 에이전트가 실시간으로 작업을 처리하고 있습니다';
+                  const flow = selectedProject.workflow_raw
+                    || (selectedProject.objective || '').split('[업무 흐름]')[1]?.trim()
+                    || (selectedProject.objective || '').split('[업무 흐름]')[0].replace('[목적]', '').trim();
+                  return flow || '업무 흐름을 설정해 주세요';
+                })()} 
               </p>
             </div>
             <KanbanBoard />
@@ -207,12 +222,20 @@ export default function App() {
       <div className="app__content">
         {/* ── 헤더 ──────────────────────────────────────────────── */}
         <header className="app__header glass-panel">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+            {selectedProject && currentView !== 'projects' && (
+              <div className="header-project-badge" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'var(--brand-glow)', padding: '0.25rem 0.6rem', borderRadius: '6px', border: '1px solid var(--brand)', opacity: 0.9 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '0.8rem', color: 'var(--brand)' }}>grid_view</span>
+                <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand)' }}>{selectedProject.name}</span>
+              </div>
+            )}
             {currentView !== 'organization' && currentView !== 'agent-detail' && (
               <div className="app__search">
                 <span className="material-symbols-outlined app__search-icon" style={{ fontSize: '1rem' }}>search</span>
                 <input className="app__search-input" placeholder="Global search commands..." />
               </div>
             )}
+          </div>
 
 
           <div className="app__header-actions">
@@ -260,6 +283,11 @@ export default function App() {
       {/* ── Phase 11: 태스크 상세 모달 ────────────────────────── */}
       <TaskDetailModal />
       <NewProjectModal isOpen={isNewProjectModalOpen} onClose={() => setIsNewProjectModalOpen(false)} />
+      <ProjectSettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        project={selectedProject}
+      />
       {/* ── 모바일 하단 네비게이션 ────────────────────────────── */}
       <nav className="mobile-nav" aria-label="모바일 네비게이션">
         <button

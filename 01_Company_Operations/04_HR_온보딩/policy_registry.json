@@ -1,0 +1,191 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-05-03T22:30",
+  "prime_review_grade": "A",
+  "total_policies": 18,
+  "strict_count": 11,
+  "warn_count": 7,
+  "note": "자동 승격 없음 — CEO 또는 소넷/루카의 명시적 지시로만 심각도 변경",
+  "policies": [
+    {
+      "id": "P-001",
+      "category": "agent_id",
+      "severity": "STRICT",
+      "title": "구 에이전트 ID 폐기",
+      "summary": "Phase 33 이전 ID 사용 절대 금지",
+      "forbidden_values": ["marketing_lead", "visual_director", "copywriter", "researcher", "data_analyst", "strategy_advisor", "luca", "lumi", "nova", "sonnet", "opus", "dev_lead"],
+      "source_doc": "02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-002",
+      "category": "agent_id",
+      "severity": "STRICT",
+      "title": "에이전트 ID 명명 규칙",
+      "summary": "신규 에이전트 ID는 반드시 {팀코드}_{역할코드} 형식",
+      "valid_prefixes": ["dev_", "mkt_", "sales_", "ops_", "hr_"],
+      "platform_exception": ["assistant"],
+      "source_doc": "02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-003",
+      "category": "agent_id",
+      "severity": "STRICT",
+      "title": "팀 격리 원칙",
+      "summary": "같은 역할이라도 팀이 다르면 다른 ID — 동일 ID를 여러 팀에서 공유 금지",
+      "source_doc": "02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-004",
+      "category": "model",
+      "severity": "STRICT",
+      "title": "preview/exp 모델 금지",
+      "summary": "-preview, -exp, -experimental 접미사 절대 금지",
+      "forbidden_patterns": ["-preview", "-exp", "-experimental"],
+      "source_doc": "01_Company_Operations/04_HR_온보딩/strategic_memory.md",
+      "updated": "2026-04-20",
+      "updated_by": "Luca"
+    },
+    {
+      "id": "P-005",
+      "category": "model",
+      "severity": "STRICT",
+      "title": "deprecated 모델 금지",
+      "summary": "공식 폐기 모델 사용 금지",
+      "forbidden_values": ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"],
+      "source_doc": "01_Company_Operations/04_HR_온보딩/strategic_memory.md",
+      "updated": "2026-04-20",
+      "updated_by": "Luca"
+    },
+    {
+      "id": "P-006",
+      "category": "model",
+      "severity": "STRICT",
+      "title": "모델 식별자 환각 금지",
+      "summary": "모델 식별자는 반드시 modelRegistry.js 상수 참조 — 직접 문자열 하드코딩 금지",
+      "source_doc": "02_System_Development/01_아리_엔진/ai-engine/modelRegistry.js",
+      "updated": "2026-04-20",
+      "updated_by": "Luca"
+    },
+    {
+      "id": "P-007",
+      "category": "file_system",
+      "severity": "STRICT",
+      "title": "M-FDS 준수",
+      "summary": "새 파일/폴더 생성 전 rule_document_structure.md 먼저 확인 필수",
+      "source_doc": "01_Company_Operations/04_HR_온보딩/rule_document_structure.md",
+      "updated": "2026-04-26",
+      "updated_by": "Luca"
+    },
+    {
+      "id": "P-008",
+      "category": "file_system",
+      "severity": "STRICT",
+      "title": "루트 오염 금지",
+      "summary": "프로젝트 루트 및 개발 루트에 문서 직접 저장 금지",
+      "source_doc": "01_Company_Operations/04_HR_온보딩/rule_document_structure.md",
+      "updated": "2026-04-26",
+      "updated_by": "Luca"
+    },
+    {
+      "id": "P-009",
+      "category": "ui_display",
+      "severity": "WARN",
+      "title": "역할명 긴 문장 노출 금지",
+      "summary": "experiment_role 전체 문장을 UI 이름(h2)으로 직접 노출 금지 — roleRegistry 우선 참조",
+      "source_doc": "02_System_Development/02_워크스페이스_대시보드/src/data/roleRegistry.js",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-010",
+      "category": "ui_display",
+      "severity": "WARN",
+      "title": "팀명 배지 중복 금지",
+      "summary": "사이드바에 팀명이 표시되면 프로필에 재표시 불필요",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-011",
+      "category": "ui_display",
+      "severity": "WARN",
+      "title": "내부 agentId UI 노출 금지",
+      "summary": "dev_fullstack 등 내부 ID를 UI에 직접 노출 금지 — displayName 로직 필수",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-012",
+      "category": "architecture",
+      "severity": "WARN",
+      "title": "단편적 수정 금지",
+      "summary": "버그 수정 시 증상만 고치지 말고 근본 원인 분석 후 수정",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-013",
+      "category": "architecture",
+      "severity": "WARN",
+      "title": "roleRegistry 우선 참조",
+      "summary": "역할 표시는 roleRegistry.js를 1순위 — LLM 생성 문자열보다 사전 우선",
+      "source_doc": "02_System_Development/02_워크스페이스_대시보드/src/data/roleRegistry.js",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-014",
+      "category": "architecture",
+      "severity": "WARN",
+      "title": "팀 컨텍스트 격리",
+      "summary": "개발팀/마케팅팀 에이전트 컨텍스트는 독립 유지 — 팀 간 컨텍스트 혼용 금지",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-015",
+      "category": "ui_display",
+      "severity": "WARN",
+      "title": "불필요한 헤더 배지 금지",
+      "summary": "워크스페이스 헤더의 불필요한 배지(아리엔진 등) 표시 금지",
+      "updated": "2026-05-03",
+      "updated_by": "Sonnet"
+    },
+    {
+      "id": "P-016",
+      "category": "code_safety",
+      "severity": "STRICT",
+      "title": "파괴적 함수 dangerously 접두사 필수",
+      "summary": "데이터 삭제·초기화·전체 삭제 함수에는 dangerously 접두사 필수 (예: dangerouslyPurgeAllLogs)",
+      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/clearLogs_사건",
+      "updated": "2026-05-03",
+      "updated_by": "Prime"
+    },
+    {
+      "id": "P-017",
+      "category": "code_safety",
+      "severity": "STRICT",
+      "title": "프로젝트 전환 시 AbortController 필수",
+      "summary": "프로젝트 전환 시 이전 프로젝트의 비동기 작업을 AbortController로 정리 필수",
+      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/26_Phase32_Bugdog_파이프라인_리뷰요청서_Prime.md",
+      "updated": "2026-05-03",
+      "updated_by": "Prime"
+    },
+    {
+      "id": "P-018",
+      "category": "code_safety",
+      "severity": "STRICT",
+      "title": "시스템 에이전트 제외는 ID 배열 기반",
+      "summary": "시스템 에이전트 제외 로직은 하드코딩 금지 — 반드시 ID 배열 기반으로 처리",
+      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md",
+      "updated": "2026-05-03",
+      "updated_by": "Prime"
+    }
+  ]
+}

@@ -31,8 +31,23 @@ const BRIDGE_AGENTS = new Set();
 const AGENT_SIGNATURE_MODELS = {};
 
 const _HARDCODED_FALLBACK = {
-  bridge_agents: ['luna', 'ollie', 'lily', 'pico', 'nova', 'lumi'],
-  models: { luna: MODEL.OPUS, ollie: MODEL.OPUS, lily: MODEL.SONNET, pico: MODEL.SONNET, nova: MODEL.PRO, lumi: MODEL.PRO, ari: MODEL.PRO },
+  // [Phase 33] agents.json Role ID 마이그레이션 반영
+  bridge_agents: [
+    'dev_fullstack', 'dev_ux', 'dev_senior', 'dev_backend', 'dev_qa', 'dev_advisor',
+    'mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_pm',
+  ],
+  DEFAULT_MODELS: {
+    // 개발팀
+    dev_fullstack: MODEL.PRO,    dev_ux: MODEL.PRO,
+    dev_senior:    MODEL.SONNET, dev_backend: MODEL.SONNET,
+    dev_qa:        MODEL.OPUS,   dev_advisor: MODEL.OPUS,
+    // 마케팅팀
+    mkt_lead:      MODEL.PRO,    mkt_designer: MODEL.PRO,
+    mkt_planner:   MODEL.SONNET, mkt_video: MODEL.SONNET,
+    mkt_analyst:   MODEL.OPUS,   mkt_pm: MODEL.OPUS,
+    // platform
+    assistant:     MODEL.PRO,
+  },
 };
 
 // ── 1단계: 동기 초기화 (agents.json 기반, 서버 시작 즉시) ──────────────
@@ -45,7 +60,8 @@ try {
       BRIDGE_AGENTS.add(id);
       AGENT_SIGNATURE_MODELS[id] = a.antiModel || MODEL.ANTI_GEMINI_PRO_HIGH;
     } else {
-      if (id === 'ari') AGENT_SIGNATURE_MODELS[id] = MODEL.PRO;
+      // [Phase 33] ARI의 신규 Role ID = 'assistant'
+      if (id === 'assistant') AGENT_SIGNATURE_MODELS[id] = MODEL.PRO;
     }
   });
   console.log(`[Executor] 동기 초기화 완료 (agents.json). BRIDGE_AGENTS: [${[...BRIDGE_AGENTS].join(', ')}]`);
@@ -67,7 +83,8 @@ async function _refreshFromDB() {
           BRIDGE_AGENTS.add(id);
           if (a.model) AGENT_SIGNATURE_MODELS[id] = a.model; // 사용자 설정 모델로 갱신
         } else {
-          if (id === 'ari' && a.model) AGENT_SIGNATURE_MODELS[id] = a.model;
+          // [Phase 33] ARI의 신규 Role ID = 'assistant'
+          if (id === 'assistant' && a.model) AGENT_SIGNATURE_MODELS[id] = a.model;
         }
       });
       console.log(`[Executor] Phase 30 — DB agent_profiles 갱신 완료.`);
@@ -439,7 +456,7 @@ class Executor {
     const livingRules = ruleHarvester.getAppliedRules();
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
-    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
+    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'assistant') {
       let projectSpecificRole = '';
       if (taskId) {
         try {
@@ -659,7 +676,7 @@ class Executor {
     const livingRules = ruleHarvester.getAppliedRules();
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
-    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'ari') {
+    if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'assistant') {
       let projectSpecificRole = '';
       if (taskId) {
         try {

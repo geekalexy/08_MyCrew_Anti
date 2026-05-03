@@ -18,6 +18,11 @@ At the start of ANY new conversation or after a system restart, you MUST autonom
 Read: `01_Company_Operations/04_HR_온보딩/user_sonnet_persona.md`
 → 나의 이름(소넷), 역할(기획·설계·UI/UX·코딩), 루카와의 관계 확인
 
+### Step 1.5 — 정책 인덱스 동기화 ← NEW
+Read: `01_Company_Operations/04_HR_온보딩/POLICY_INDEX.md`
+→ `last_updated` 확인. 이전 세션보다 최신이면 변경된 소스 문서도 읽기
+→ **strategic_memory보다 먼저 읽어 정책 오버라이드를 반영**
+
 ### Step 2 — 프로젝트 전략 규칙 확인
 Read: `01_Company_Operations/04_HR_온보딩/strategic_memory.md`
 → 모델 식별자 규칙, 아키텍처 v4.0, Phase 22 완료 상태, 금지 식별자 목록 확인
@@ -38,3 +43,4 @@ Read: `02_System_Development/SESSION_LOG_*.md` (최신 파일)
 ## No Hallucination Rule
 - 이전 작업을 추측하지 말 것 — 반드시 SESSION_LOG 파일에 근거할 것
 - 존재하지 않는 모델 식별자 사용 금지 (`strategic_memory.md` 금지 목록 참고)
+- **POLICY_INDEX의 STRICT 정책을 위반하는 코드/결정 즉시 중단**

@@ -2,6 +2,8 @@ import sqlite3 from 'sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import { validateCrewIds } from './ai-engine/policyGuard.js';
+import { MODEL } from './ai-engine/modelRegistry.js';
 
 const sqlite3Verbose = sqlite3.verbose();
 const __filename = fileURLToPath(import.meta.url);
@@ -15,7 +17,7 @@ const AGENT_IDS = (() => {
     return new Set(agents.map(a => (a.id || a.name || '').toLowerCase()).filter(Boolean));
   } catch (e) {
     console.warn('[DB] agents.json 로드 실패, 기본값 사용:', e.message);
-    return new Set(['ari', 'nova', 'lumi', 'pico', 'ollie', 'lily', 'luna']);
+    return new Set(['assistant', 'fullstack_engineer', 'ux_designer', 'backend_engineer', 'qa_engineer', 'senior_engineer', 'tech_advisor']);
   }
 })();
 // 시스템 주체(system, devteam)는 항상 포함
@@ -87,6 +89,20 @@ db.serialize(() => {
     if (!names.includes('failure_count')) {
       db.run(`ALTER TABLE Task ADD COLUMN failure_count INTEGER DEFAULT 0`);
       console.log('[DB] S4-3 마이그레이션: failure_count 컬럼 추가 완료');
+    }
+    // [PROJECT-SEQ] 프로젝트별 태스크 순번 (#1부터 시작)
+    if (!names.includes('project_task_num')) {
+      db.run(`ALTER TABLE Task ADD COLUMN project_task_num INTEGER DEFAULT NULL`);
+      // 기존 데이터 소급: 프로젝트별 생성 순서대로 순번 부여
+      db.run(`
+        UPDATE Task SET project_task_num = (
+          SELECT COUNT(*) FROM Task t2
+          WHERE t2.project_id = Task.project_id
+            AND t2.id <= Task.id
+            AND t2.deleted_at IS NULL
+        ) WHERE project_task_num IS NULL
+      `);
+      console.log('[DB] PROJECT-SEQ 마이그레이션: project_task_num 컬럼 추가 및 소급 완료');
     }
   });
 
@@ -214,7 +230,17 @@ db.serialize(() => {
       db.run(`ALTER TABLE projects ADD COLUMN isolation_scope TEXT DEFAULT '{"type":"strict_isolation","shared_projects":[]}'`);
       console.log('[DB] Phase 28a 마이그레이션: isolation_scope 컬럼 추가 완료');
     }
+    // [CP-4 / PRD#32] objective_raw, workflow_raw 분리 컬럼 추가
+    if (!names.includes('objective_raw')) {
+      db.run(`ALTER TABLE projects ADD COLUMN objective_raw TEXT`);
+      console.log('[DB] Phase 33 마이그레이션: projects.objective_raw 컬럼 추가 완료');
+    }
+    if (!names.includes('workflow_raw')) {
+      db.run(`ALTER TABLE projects ADD COLUMN workflow_raw TEXT`);
+      console.log('[DB] Phase 33 마이그레이션: projects.workflow_raw 컬럼 추가 완료');
+    }
   });
+
 
   db.run(`CREATE TABLE IF NOT EXISTS teams (
     id          TEXT PRIMARY KEY,
@@ -234,13 +260,80 @@ db.serialize(() => {
     PRIMARY KEY (team_id, agent_id)
   )`);
 
-  // [Phase 31+] team_agents nickname 컨럼 마이그레이션
+  // [Phase 31+] team_agents nickname 컬럼 마이그레이션
   db.all(`PRAGMA table_info(team_agents)`, (err, cols) => {
     if (err) return;
     const names = (cols || []).map(c => c.name);
     if (!names.includes('nickname')) {
       db.run(`ALTER TABLE team_agents ADD COLUMN nickname TEXT`);
-      console.log('[DB] Phase 31+ 마이그레이션: team_agents.nickname 컨럼 추가 완료');
+      console.log('[DB] Phase 31+ 마이그레이션: team_agents.nickname 컬럼 추가 완료');
+    }
+  });
+
+  // ─── [Phase 35] Dynamic Team Instantiation: project_agents 테이블 ────────
+  db.run(`CREATE TABLE IF NOT EXISTS project_agents (
+    id              TEXT PRIMARY KEY,
+    project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    role_id         TEXT NOT NULL,
+    model_id        TEXT NOT NULL,
+    nickname        TEXT,
+    avatar          TEXT,
+    role_description TEXT,
+    status          TEXT DEFAULT 'active',
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  
+  db.run(`CREATE INDEX IF NOT EXISTS idx_project_agents_project ON project_agents(project_id)`);
+
+  // ─── [Phase 35] 마이그레이션: 기존 team_agents 데이터를 project_agents로 복제 (Dual Write 준비)
+  db.get(`SELECT COUNT(*) as cnt FROM project_agents`, (err, row) => {
+    if (!err && row && row.cnt === 0) {
+      db.all(`SELECT ta.team_id, ta.agent_id, ta.experiment_role, ta.nickname, t.project_id 
+              FROM team_agents ta 
+              JOIN teams t ON t.id = ta.team_id`, (err, rows) => {
+        if (err || !rows || rows.length === 0) return;
+        
+        try {
+          const raw = readFileSync(path.resolve(__dirname, 'agents.json'), 'utf-8');
+          const agentConfig = JSON.parse(raw);
+          const agentMap = {};
+          agentConfig.forEach(a => agentMap[a.id] = a);
+
+          db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+            const stmt = db.prepare(`INSERT OR IGNORE INTO project_agents 
+              (id, project_id, role_id, model_id, nickname, avatar, role_description) 
+              VALUES (?, ?, ?, ?, ?, ?, ?)`);
+
+            rows.forEach(r => {
+              // project_id가 없으면 스킵 (예: team_independent 등 global_mycrew에 속하지 않는 고아 팀)
+              if (!r.project_id) return;
+              
+              const baseAgent = agentMap[r.agent_id] || {};
+              const projAgentId = `${r.project_id}-${r.agent_id}`;
+              const roleId = r.agent_id;
+              const modelId = baseAgent.antiModel || MODEL.ANTI_GEMINI_PRO_HIGH;
+              const nickname = r.nickname || baseAgent.nickname || '';
+              const avatar = '👤'; // Default fallback
+              const roleDesc = r.experiment_role || baseAgent.role || '팀원';
+
+              stmt.run(projAgentId, r.project_id, roleId, modelId, nickname, avatar, roleDesc);
+            });
+
+            stmt.finalize();
+            db.run('COMMIT', (commitErr) => {
+              if (commitErr) {
+                console.error('[DB] Phase 35 마이그레이션 실패:', commitErr.message);
+              } else {
+                console.log(`[DB] Phase 35 마이그레이션 완료: 기존 에이전트 인스턴스 복제됨`);
+              }
+            });
+          });
+        } catch (e) {
+          console.error('[DB] Phase 35 마이그레이션 에러:', e.message);
+        }
+      });
     }
   });
 
@@ -270,6 +363,9 @@ db.serialize(() => {
 
         if (alterTask || alterLog) {
           db.run("BEGIN TRANSACTION");
+          // [BUG-05 FIX] FK 무결성 보장: UPDATE 전에 부모 레코드 시딩
+          db.run(`INSERT OR IGNORE INTO projects (id, name, objective, isolation_scope, status)
+                  VALUES ('global_mycrew', 'MyCrew 운영센터', '시스템 전역 태스크 및 로그 저장소', '{"type":"global_knowledge"}', 'active')`);
           if (alterTask) db.run(`UPDATE Task SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
           if (alterLog)  db.run(`UPDATE Log SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
           
@@ -291,8 +387,8 @@ db.serialize(() => {
 
   // Team B 맴버 (LUNA, PICO, LUMI)
   db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','luna','Team B — 최종 합성자 (Claude Opus)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','pico','Team B — 영상 담당 (Claude Sonnet)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','lumi','Team B — 이미지 담당 (Gemini Flash)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','backend_engineer','Team B — 영상 담당 (Claude Sonnet)')`);
+  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','ux_designer','Team B — 이미지 담당 (Gemini Flash)')`);
   
   // Team A 맴버 (OLLIE, LILY, NOVA)
   db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','ollie','Team A — 적대적 판관 (Claude Opus)')`);
@@ -362,7 +458,7 @@ db.serialize(() => {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
           a.id,
-          a.nameKo || a.id,           // nickname 초기값: nameKo (한글 이름)
+          a.nickname || a.id,           // nickname 초기값: nickname (한글 이름)
           a.role || null,
           a.antiModel || null,        // model 초기값: antiModel
           a.bridge ? 1 : 0,
@@ -390,17 +486,20 @@ db.serialize(() => {
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(title, content, requester, model = 'Gemini-2.0-Flash', assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1') {
+  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1') {
     const riskLevel = classifyRiskLevel(content || '');
     return new Promise((resolve, reject) => {
-      const stmt = db.prepare(
-        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      db.run(
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+           (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL)
+         )`,
+        [title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category, projectId, projectId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
       );
-      stmt.run([title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category, projectId], function (err) {
-        if (err) reject(err);
-        else resolve(this.lastID);
-      });
-      stmt.finalize();
     });
   }
 
@@ -440,9 +539,18 @@ class DatabaseManager {
   // ─── 프로젝트 조회 ──────────────────────────────────────────────────────────
   getAllProjects() {
     return new Promise((resolve, reject) => {
-      db.all(`SELECT id, name, objective, isolation_scope, status, created_at FROM projects WHERE status = 'active' ORDER BY created_at ASC`, (err, rows) => {
+      db.all(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, created_at FROM projects WHERE status = 'active' ORDER BY created_at ASC`, (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
+      });
+    });
+  }
+
+  getProjectById(id) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, created_at FROM projects WHERE id = ?`, [id], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
       });
     });
   }
@@ -500,17 +608,38 @@ class DatabaseManager {
   }
 
   // ─── [Phase 28b] Zero-Config 단일 트랜잭션 파이프라인 ──────────────────────
-  createZeroConfigProject(id, name, objective, isolation_scope, crew, initialTasks) {
+  createZeroConfigProject(id, name, objective, isolation_scope, crew, initialTasks, requiredSkills = []) {
+    // [Phase B] P-001/P-002: 크루 에이전트 ID 정책 검증
+    const guardResult = validateCrewIds(crew || []);
+    if (!guardResult.valid) {
+      console.error(`[DB] createZeroConfigProject 거부: 금지 에이전트 ID 포함`);
+      return Promise.reject(new Error(
+        `[P-001 STRICT] 확인되지 않은 에이전트 ID가 크루에 포함되어 있습니다:\n${guardResult.errors.join('\n')}`
+      ));
+    }
     return new Promise((resolve, reject) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
         const teamId = `team-${Date.now()}`;
 
+        // [CP-4] [목적]과 [업무 흐름] 태그 파싱 및 분리 저장
+        let parsedObjective = objective;
+        let objRaw = null;
+        let flowRaw = null;
+        if (objective && objective.includes('[목적]')) {
+          const parts = objective.split('[업무 흐름]');
+          objRaw = parts[0].replace('[목적]', '').trim();
+          flowRaw = parts[1] ? parts[1].trim() : '';
+          parsedObjective = objRaw; // UI 노출용 (태그 제거)
+        } else {
+          objRaw = objective;
+        }
+
         // 1. Project
         db.run(
-          `INSERT INTO projects (id, name, objective, isolation_scope, status) VALUES (?, ?, ?, ?, ?)`,
-          [id, name, objective, JSON.stringify(isolation_scope || {"type":"strict_isolation","shared_projects":[]}), 'active'],
+          `INSERT INTO projects (id, name, objective, isolation_scope, status, objective_raw, workflow_raw) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, name, parsedObjective, JSON.stringify(isolation_scope || {"type":"strict_isolation","shared_projects":[]}), 'active', objRaw, flowRaw],
           function(err) {
             if (err) return rollback(err);
           }
@@ -525,12 +654,55 @@ class DatabaseManager {
           }
         );
 
-        // 3. Team Agents Insert (프로젝트 격리 페르소나 부여)
-        const stmtAgent = db.prepare(`INSERT OR REPLACE INTO team_agents (team_id, agent_id, experiment_role) VALUES (?, ?, ?)`);
+        // 3. Project Agents Insert (Phase 35: 동적 인스턴스 패러다임)
+        // [ROLE-FIX] 백엔드 역할 사전 — 프론트엔드 roleRegistry와 동일한 한국어 표기명
+        const ROLE_DISPLAY_NAMES = {
+          dev_fullstack: '풀스택 엔지니어', dev_ux: 'UI/UX 디자이너', dev_senior: '시니어 엔지니어',
+          dev_backend: '백엔드 엔지니어', dev_qa: 'QA 엔지니어', dev_advisor: '테크 어드바이저',
+          mkt_lead: '마케팅 리더', mkt_planner: '기획자', mkt_designer: '디자이너',
+          mkt_analyst: '분석가', mkt_video: '영상 디렉터', mkt_pm: 'PM',
+          assistant: 'ARI',
+        };
+
+        let agentMap = {};
+        try {
+          const raw = readFileSync(path.resolve(__dirname, 'agents.json'), 'utf-8');
+          JSON.parse(raw).forEach(a => agentMap[a.id] = a);
+        } catch(e) {}
+
+        // [MODEL-FIX] 역할별 기본 모델 맵 — crew/task 루프 공통 참조 (스코프 수정)
+        const ROLE_DEFAULT_MODELS = {
+          dev_advisor:  MODEL.ANTI_OPUS_THINK,
+          dev_qa:       MODEL.ANTI_SONNET_THINK,    // [비용최적화] Opus 중복 방지 → Sonnet
+          dev_senior:   MODEL.ANTI_SONNET_THINK,
+          dev_backend:  MODEL.ANTI_SONNET_THINK,
+          dev_fullstack: MODEL.ANTI_GEMINI_PRO_HIGH,
+          dev_ux:       MODEL.ANTI_GEMINI_PRO_HIGH,
+          mkt_lead:     MODEL.ANTI_GEMINI_PRO_HIGH,
+          mkt_planner:  MODEL.ANTI_SONNET_THINK,
+          mkt_analyst:  MODEL.ANTI_OPUS_THINK,
+          mkt_pm:       MODEL.ANTI_OPUS_THINK,
+          mkt_designer: MODEL.ANTI_GEMINI_PRO_HIGH,
+          mkt_video:    MODEL.ANTI_SONNET_THINK,
+        };
+
+        const stmtAgent = db.prepare(`
+          INSERT INTO project_agents (id, project_id, role_id, model_id, nickname, avatar, role_description) 
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
         for (const agent of crew) {
-          const agentId = (agent.agent_id || agent.agent_name || 'unknown').toLowerCase();
+          const roleId = (agent.agent_id || agent.agent_name || 'unknown').toLowerCase();
           const roleDesc = agent.role_description || agent.role || '팀원';
-          stmtAgent.run([teamId, agentId, roleDesc], function(err) {
+          const baseAgent = agentMap[roleId] || {};
+          const projAgentId = `${id}-${roleId}`;
+          // 우선순위: crew.model(LLM 생성) > agents.json antiModel > ROLE_DEFAULT_MODELS > fallback
+          const modelId = agent.model || baseAgent.antiModel || ROLE_DEFAULT_MODELS[roleId] || MODEL.ANTI_GEMINI_PRO_HIGH;
+
+          // [ROLE-FIX] roleRegistry 사전 우선, fallback → agents.json nickname → 빈 문자열
+          const nickname = ROLE_DISPLAY_NAMES[roleId] || baseAgent.nickname || '';
+          const avatar = '👤'; // 기본 아바타
+
+          stmtAgent.run([projAgentId, id, roleId, modelId, nickname, avatar, roleDesc], function(err) {
             if (err) return rollback(err);
           });
         }
@@ -538,16 +710,41 @@ class DatabaseManager {
 
         // 4. Tasks Insert
         const stmtTask = db.prepare(`
-          INSERT INTO Task (id, title, content, status, project_id, requester, assigned_agent, model, execution_mode) 
-          VALUES (?, ?, ?, 'PENDING', ?, 'CEO', ?, 'gemini-2.5-flash', 'ari')
+          INSERT INTO Task (title, content, status, project_id, requester, assigned_agent, model, execution_mode, project_task_num) 
+          VALUES (?, ?, 'PENDING', ?, 'CEO', ?, ?, 'ari',
+            (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL)
+          )
         `);
         for (const task of initialTasks) {
-          const taskId = Date.now().toString() + Math.floor(Math.random() * 1000);
-          stmtTask.run([taskId, task.title, task.title, id, task.assignee?.toLowerCase() || 'ari'], function(err) {
+          const taskContent = task.content || task.title;
+          const taskAssignee = task.assignee?.toLowerCase() || 'ari';
+          // [TASK-MODEL-FIX] 담당 에이전트 모델 동적 배정 (ROLE_DEFAULT_MODELS 참조)
+          const taskModel = ROLE_DEFAULT_MODELS[taskAssignee] || MODEL.ANTI_GEMINI_PRO_HIGH;
+          stmtTask.run([task.title, taskContent, id, taskAssignee, taskModel, id], function(err) {
             if (err) return rollback(err);
           });
         }
         stmtTask.finalize();
+
+        // 5. [SKILL-FIX] required_skills → AgentSkill 테이블에 INSERT
+        // 프로젝트 LLM이 설계한 스킬을 모든 크루원에게 is_active=1로 장착
+        if (requiredSkills && requiredSkills.length > 0) {
+          const stmtSkill = db.prepare(
+            `INSERT OR IGNORE INTO AgentSkill (agent_id, skill_id, is_active, updated_at)
+             VALUES (?, ?, 1, CURRENT_TIMESTAMP)`
+          );
+          for (const agent of crew) {
+            const roleId = (agent.agent_id || agent.agent_name || 'unknown').toLowerCase();
+            for (const skill of requiredSkills) {
+              if (!skill.skill_id) continue;
+              stmtSkill.run([roleId, skill.skill_id], function(err) {
+                if (err) console.warn(`[DB] AgentSkill INSERT 실패 (${roleId}/${skill.skill_id}):`, err.message);
+              });
+            }
+          }
+          stmtSkill.finalize();
+          console.log(`[DB] SKILL-FIX: ${requiredSkills.length}개 스킬 → ${crew.length}명 크루에 장착 완료`);
+        }
 
         db.run('COMMIT', (err) => {
           if (err) {
@@ -564,12 +761,12 @@ class DatabaseManager {
     });
   }
 
-  // ─── [Phase 28a] 프로젝트 설정(범위) 수정 ─────────────────────────────────
-  updateProject(id, name, objective, isolation_scope) {
+  // ─── [PRD#32 / CP-4] 프로젝트 설정 수정 — objective_raw, workflow_raw 분리 저장
+  updateProject(id, name, objective, isolation_scope, objective_raw, workflow_raw) {
     return new Promise((resolve, reject) => {
       db.run(
-        `UPDATE projects SET name = ?, objective = ?, isolation_scope = ? WHERE id = ?`,
-        [name, objective, isolation_scope, id],
+        `UPDATE projects SET name = ?, objective = ?, isolation_scope = ?, objective_raw = ?, workflow_raw = ? WHERE id = ?`,
+        [name, objective, isolation_scope, objective_raw || null, workflow_raw || null, id],
         function(err) {
           if (err) reject(err);
           else resolve(this.changes);
@@ -598,7 +795,7 @@ class DatabaseManager {
       return new Promise((resolve, reject) => {
         let query = `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                   risk_level, execution_mode, has_artifact, artifact_url, failure_count,
-                  created_at, updated_at, project_id
+                  created_at, updated_at, project_id, project_task_num
            FROM Task 
            WHERE deleted_at IS NULL`;
         const params = [];
@@ -1191,7 +1388,7 @@ class DatabaseManager {
       db.all(
         `SELECT t.id as team_id, t.name as team_name, t.group_type, t.icon, t.color,
                 p.id as project_id, p.name as project_name,
-                ta.agent_id, ta.experiment_role
+                ta.agent_id, ta.experiment_role, ta.nickname
          FROM teams t
          LEFT JOIN projects p ON t.project_id = p.id
          LEFT JOIN team_agents ta ON t.id = ta.team_id
@@ -1210,7 +1407,7 @@ class DatabaseManager {
             }
             if (row.agent_id) {
               teamMap.get(row.team_id).agents.push({
-                id: row.agent_id, experimentRole: row.experiment_role,
+                id: row.agent_id, experimentRole: row.experiment_role, nickname: row.nickname
               });
             }
           }
@@ -1374,8 +1571,8 @@ class DatabaseManager {
   _getTeamType(agentId) {
     if (!agentId) return null;
     const a = agentId.toLowerCase();
-    if (['nova', 'lily', 'ollie'].includes(a)) return 'team_A';
-    if (['lumi', 'pico', 'luna'].includes(a)) return 'team_B';
+    if (['fullstack_engineer', 'senior_engineer', 'qa_engineer'].includes(a)) return 'team_A';
+    if (['ux_designer', 'backend_engineer', 'tech_advisor'].includes(a)) return 'team_B';
     return 'independent';
   }
 
@@ -1496,6 +1693,40 @@ class DatabaseManager {
          WHERE agent_id = ?
            AND team_id = (SELECT id FROM teams WHERE project_id = ? LIMIT 1)`,
         [nickname || null, agentId, projectId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 35] 프로젝트 전용 에이전트 (project_agents) 관련 메서드 ──────────────
+  getProjectAgents(projectId) {
+    return new Promise((resolve, reject) => {
+      if (!projectId) return resolve([]);
+      db.all(
+        `SELECT id, project_id, role_id, model_id, nickname, avatar, role_description, status, created_at
+         FROM project_agents
+         WHERE project_id = ? AND status = 'active'`,
+        [projectId],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  updateProjectAgentProfile(agentId, nickname, avatar) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE project_agents
+         SET nickname = COALESCE(?, nickname),
+             avatar = COALESCE(?, avatar),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [nickname, avatar, agentId],
         function(err) {
           if (err) reject(err);
           else resolve(this.changes);

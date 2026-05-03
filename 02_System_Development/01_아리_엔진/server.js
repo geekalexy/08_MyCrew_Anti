@@ -36,7 +36,7 @@ import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 4005;
+const PORT = process.env.PORT || 4007;
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
   ? process.env.FRONTEND_ORIGIN.split(',')
   : ['http://localhost:5173', 'http://localhost:5174']; // 포트 5173/5174 동시 허용
@@ -307,10 +307,22 @@ io.on('connection', (socket) => {
   socket.emit('agent:state_sync', Object.fromEntries(agentStates));
 
   // ── [Phase 28a] 프로젝트 Room 구독 ─────────────────────────────
-  socket.on('project:join', ({ projectId }) => {
+  socket.on('project:join', async ({ projectId }) => {
     if (!projectId) return;
     socket.join(`project_${projectId}`);
     console.log(`[Socket] ${socket.id} joined project_${projectId}`);
+
+    // [Fix #7 & #11] 엔진 컨텍스트 리셋 및 신규 프로젝트(TO DO) 자동 Pull 로직 트리거
+    try {
+      const crew = await dbManager.getProjectCrew(projectId);
+      for (const member of crew) {
+        if (member.agent_id) {
+          dispatchNextTaskForAgent(member.agent_id);
+        }
+      }
+    } catch (e) {
+      console.error('[Engine AutoPull] 프로젝트 초기화 중 에러:', e);
+    }
   });
 
   socket.on('project:leave', ({ projectId }) => {
@@ -469,7 +481,7 @@ io.on('connection', (socket) => {
 
         // @멘션이 있으면 해당 에이전트, 없으면 카드 담당자로 자동 라우팅
         const mentionMatch = text.match(/^@([a-zA-Z가-힣]+)\s+(.*)/);
-        let agentToTrigger = task?.assigned_agent || 'ari';
+        let agentToTrigger = task?.assigned_agent || 'assistant';
         let aiRequestText = text;
 
         if (mentionMatch) {
@@ -713,7 +725,7 @@ ariNs.on('connection', (socket) => {
 
       reqDaemon.on('error', async (err) => {
         console.warn('[Socket/ari] 독립 Daemon(5050) 통신 실패. 로컬 엔진으로 폴백합니다.', err.message);
-        const result = await executor.run(content, evaluation, 'ari');
+        const result = await executor.run(content, evaluation, 'assistant');
         const words = (result.text || '').split(' ');
         for (let i = 0; i < words.length; i++) {
           const isLast = i === words.length - 1;
@@ -816,7 +828,7 @@ if (token && token.length > 10) {
 
       // [Bug 2] 담당자(Assignee) 자동 할당 매핑 — agents.json의 defaultCategory 기반 (하드코딩 제거)
       // CATEGORY_TO_AGENT는 agents.json 로드 시 동적으로 구성됨
-      const assignedAgent = CATEGORY_TO_AGENT[evaluation.category] || 'ari';
+      const assignedAgent = CATEGORY_TO_AGENT[evaluation.category] || 'assistant';
 
       let taskId = null;
       if (shouldCreateTask) {
@@ -1071,6 +1083,33 @@ app.patch('/api/projects/:id/crew/:agentId/nickname', async (req, res) => {
 });
 
 /**
+ * [Phase 35] GET /api/projects/:id/agents — 프로젝트별 동적 에이전트 목록 조회
+ */
+app.get('/api/projects/:id/agents', async (req, res) => {
+  try {
+    const agents = await dbManager.getProjectAgents(req.params.id);
+    res.json(agents);
+  } catch (err) {
+    console.error('[API] GET /api/projects/:id/agents 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * [Phase 35] PATCH /api/agents/:agentId/profile — 에이전트 인스턴스 프로필(닉네임, 아바타) 수정
+ */
+app.patch('/api/agents/:agentId/profile', async (req, res) => {
+  try {
+    const { nickname, avatar } = req.body;
+    await dbManager.updateProjectAgentProfile(req.params.agentId, nickname, avatar);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] PATCH /api/agents/:agentId/profile 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * POST /api/projects — 새 프로젝트(워크스페이스) 생성
  */
 app.post('/api/projects', async (req, res) => {
@@ -1092,22 +1131,26 @@ app.post('/api/projects/zero-config', async (req, res) => {
   try {
     const { name, objective, isolation_scope } = req.body;
     if (!name || !objective) return res.status(400).json({ error: 'name and objective are required' });
-    
-    // ZeroConfig 시작 알림 (현재 프로젝트 관계없이 대시보드에서 볼 수 있게 임시 브로드캐스트)
-    broadcastLog('info', `✨ [${name}] 프로젝트 생성을 시작합니다. 최적의 크루를 선발하고 초기 백로그를 기획 중입니다... (약 10~15초 소요)`, 'system', null, 'DASHBOARD');
+
+    // [STAGE-LOG] 단계별 로그 콜백 함수 충주 — zeroConfigService가 호출하여 실시간 진행 현황 전송
+    const projectBroadcast = (message, level = 'info') => {
+      broadcastLog(level, message, 'system', null, 'DASHBOARD');
+    };
+
+    projectBroadcast(`✨ [${name}] 프로젝트 생성을 시작합니다. (실제 소요시간: 약 1분 15초)`);
 
     // ZeroConfigService에 빌딩 위임 (Background 처리)
-    zeroConfigService.buildProject({ name, objective, isolation_scope })
+    zeroConfigService.buildProject({ name, objective, isolation_scope }, projectBroadcast)
       .then(projectId => {
-        // 워크스페이스 세팅 완료 소켓 알림
-        broadcastLog('info', `✅ [${name}] 프로젝트 세팅 완료! 크루 배치가 완료되었으며 워크스페이스가 자동 전환됩니다.`, 'system', null, 'DASHBOARD', projectId);
+        broadcastLog('success', `✅ [${name}] 프로젝트 세팅 완료! 크루 배치가 완료되었으며 워크스페이스가 자동 전환됩니다.`, 'system', null, 'DASHBOARD', projectId);
         io.emit('project:ready', { projectId });
       })
       .catch(err => {
         broadcastLog('error', `❌ [${name}] 프로젝트 세팅 실패: ${err.message}`, 'system', null, 'DASHBOARD');
         console.error('[API] Zero-Config 백그라운드 에러:', err);
+        io.emit('project:error', { error: err.message });
       });
-    
+
     // HTTP 타임아웃을 막기 위해 즉각 응답
     res.json({ status: 'processing', message: 'AI is building the project in the background.' });
   } catch (err) {
@@ -1118,11 +1161,14 @@ app.post('/api/projects/zero-config', async (req, res) => {
 
 /**
  * PUT /api/projects/:id — 프로젝트 설정 (타이틀, 목적, 공유범위) 수정
+ * [PRD#32 / CP-4] objective_raw, workflow_raw 분리 저장 지원
  */
 app.put('/api/projects/:id', async (req, res) => {
   try {
-    const { name, objective, isolation_scope } = req.body;
-    await dbManager.updateProject(req.params.id, name, objective, isolation_scope);
+    const { name, objective, isolation_scope, objective_raw, workflow_raw } = req.body;
+    await dbManager.updateProject(req.params.id, name, objective, isolation_scope, objective_raw, workflow_raw);
+    // 실시간 프로젝트 업데이트 소켓 알림
+    io.emit('project:updated', { id: req.params.id, name, objective, objective_raw, workflow_raw, isolation_scope });
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('[API] PUT /api/projects/:id 에러:', err);
@@ -1139,6 +1185,141 @@ app.delete('/api/projects/:id', async (req, res) => {
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('[API] DELETE /api/projects/:id 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * [Phase 36] GET /api/projects/:id/project_md — PROJECT.md 읽기
+ */
+app.get('/api/projects/:id/project_md', async (req, res) => {
+  try {
+    const { version } = req.query;
+    const project = await dbManager.getProjectById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
+      ? path.resolve(process.env.PROJECTS_ROOT_PATH)
+      : path.resolve(process.cwd(), '../../04_Projects');
+
+    const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
+    const shortId = project.id.slice(-5);
+    
+    let targetPath = path.join(PROJECTS_ROOT, `${safeName}_${shortId}`, 'PROJECT.md');
+    if (version && version.startsWith('PROJECT_v') && version.endsWith('.md')) {
+      targetPath = path.join(PROJECTS_ROOT, `${safeName}_${shortId}`, '.versions', path.basename(version));
+    }
+
+    try {
+      const content = await fs.promises.readFile(targetPath, 'utf-8');
+      res.json({ content });
+    } catch (e) {
+      if (e.code === 'ENOENT') {
+        res.json({ content: '' }); // 파일이 없으면 빈 문자열
+      } else {
+        throw e;
+      }
+    }
+  } catch (err) {
+    console.error('[API] GET /api/projects/:id/project_md 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * [Phase 36] GET /api/projects/:id/project_md/versions — PROJECT.md 버전 목록 조회
+ */
+app.get('/api/projects/:id/project_md/versions', async (req, res) => {
+  try {
+    const project = await dbManager.getProjectById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
+      ? path.resolve(process.env.PROJECTS_ROOT_PATH)
+      : path.resolve(process.cwd(), '../../04_Projects');
+
+    const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
+    const shortId = project.id.slice(-5);
+    const versionsDir = path.join(PROJECTS_ROOT, `${safeName}_${shortId}`, '.versions');
+
+    let files = [];
+    try {
+      files = await fs.promises.readdir(versionsDir);
+    } catch (e) {
+      // 폴더 없으면 넘어감
+    }
+
+    const versions = files
+      .filter(f => f.startsWith('PROJECT_v') && f.endsWith('.md'))
+      .map(f => {
+        const parts = f.replace('PROJECT_v', '').replace('.md', '').split('_');
+        return {
+          filename: f,
+          label: `ver.${parts[0]}_${parts[1]}`, 
+          date: parts[0],
+          time: parts[1]
+        };
+      })
+      .sort((a, b) => {
+        // 최신순 정렬 (내림차순)
+        if (a.date === b.date) return b.time.localeCompare(a.time);
+        return b.date.localeCompare(a.date);
+      });
+
+    res.json({ versions });
+  } catch (err) {
+    console.error('[API] GET /api/projects/:id/project_md/versions 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * [Phase 36] PUT /api/projects/:id/project_md — PROJECT.md 쓰기 (자동 버전 백업)
+ */
+app.put('/api/projects/:id/project_md', async (req, res) => {
+  try {
+    const { content } = req.body;
+    const project = await dbManager.getProjectById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
+      ? path.resolve(process.env.PROJECTS_ROOT_PATH)
+      : path.resolve(process.cwd(), '../../04_Projects');
+
+    const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
+    const shortId = project.id.slice(-5);
+    const projectRoot = path.join(PROJECTS_ROOT, `${safeName}_${shortId}`);
+    const projectPath = path.join(projectRoot, 'PROJECT.md');
+    const versionsDir = path.join(projectRoot, '.versions');
+
+    // 1. 버전 폴더 확인 및 생성
+    try {
+      await fs.promises.mkdir(versionsDir, { recursive: true });
+    } catch (e) {}
+
+    // 2. 기존 파일 읽어서 백업 (내용이 변경된 경우만)
+    try {
+      const oldContent = await fs.promises.readFile(projectPath, 'utf-8');
+      if (oldContent.trim() !== content.trim()) {
+        const date = new Date();
+        const yy = String(date.getFullYear()).slice(2);
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const HH = String(date.getHours()).padStart(2, '0');
+        const MM = String(date.getMinutes()).padStart(2, '0');
+        const SS = String(date.getSeconds()).padStart(2, '0');
+        const versionFileName = `PROJECT_v${yy}${mm}${dd}_${HH}${MM}${SS}.md`;
+        await fs.promises.writeFile(path.join(versionsDir, versionFileName), oldContent, 'utf-8');
+      }
+    } catch (e) {
+      // 기존 파일이 없으면 그냥 넘어감
+    }
+
+    // 3. 새 내용 덮어쓰기
+    await fs.promises.writeFile(projectPath, content, 'utf-8');
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error('[API] PUT /api/projects/:id/project_md 에러:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -1178,7 +1359,7 @@ app.get('/api/tasks', async (req, res) => {
       column: STATUS_TO_COLUMN[row.status] || 'todo',
       status: row.status,
       riskLevel: row.risk_level || 'SAFE',
-      executionMode: row.execution_mode || 'ari',
+      executionMode: row.execution_mode || 'assistant',
       assignee: row.assigned_agent || row.requester,
       author: row.requester,
       assignedAgent: row.assigned_agent || '미할당',
@@ -1186,6 +1367,7 @@ app.get('/api/tasks', async (req, res) => {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       projectId: row.project_id || 'proj-1',
+      project_task_num: row.project_task_num ?? null,  // [프로젝트 순번] #1부터 시작
     };
     });
     res.json({ status: 'ok', tasks });
@@ -1215,7 +1397,7 @@ app.get('/api/tasks/archived', async (req, res) => {
         column: 'archived',
         status: row.status,
         riskLevel: row.risk_level || 'SAFE',
-        executionMode: row.execution_mode || 'ari',
+        executionMode: row.execution_mode || 'assistant',
         assignee: row.assigned_agent || row.requester,
         author: row.requester,
         assignedAgent: row.assigned_agent || '미할당',
@@ -1223,6 +1405,7 @@ app.get('/api/tasks/archived', async (req, res) => {
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         projectId: row.project_id || 'proj-1',
+        project_task_num: row.project_task_num ?? null,  // [프로젝트 순번]
       };
     });
     res.json({ status: 'ok', tasks });
@@ -1255,7 +1438,7 @@ app.post('/api/tasks/notify-created', async (req, res) => {
 app.post('/api/tasks/mention', async (req, res) => {
   try {
     const { agent, content } = req.body;
-    const targetAgent = globalAgentMap[agent.toLowerCase()] || 'ari';
+    const targetAgent = globalAgentMap[agent.toLowerCase()] || 'assistant';
     
     // [W1 Fix] 대표님 직접 멘션은 항상 'CEO' 작성자로 생성
     const targetModel = targetAgent 
@@ -1291,7 +1474,7 @@ app.post('/api/chat', async (req, res) => {
   console.log(`[API] /api/chat 요청 수신:`, req.body);
   try {
     const { agent, content, author = '대표님', projectId } = req.body;
-    const targetAgent = globalAgentMap[agent?.toLowerCase()] || 'ari';
+    const targetAgent = globalAgentMap[agent?.toLowerCase()] || 'assistant';
 
     // 1. 유저 메시지 로그 기록
     broadcastLog('info', `${content}`, author, null, 'WEB_CHAT', projectId);
@@ -1341,7 +1524,7 @@ app.get('/api/tasks/:id/comments', async (req, res) => {
     // [v2.1] getCommentsWithTopology: requester(보고 대상)도 전달 → 크루가 CEO/ARI 중 올바른 대상에게 보고
     const comments = await dbManager.getCommentsWithTopology(
       sid,
-      task?.assigned_agent || 'ari',
+      task?.assigned_agent || 'assistant',
       task?.requester || 'CEO'
     );
     res.json({ status: 'ok', comments });
@@ -1398,7 +1581,7 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
     if (!KNOWN_AGENTS_SET.has(author?.toLowerCase())) {
       const task = await dbManager.getTaskById(sid);
       // [Fix] 모달에서 비동기로 전달된 assignedAgent를 최우선으로 사용하여 Race Condition 방지
-      let agentToTrigger = assignedAgent || task?.assigned_agent || 'ari';
+      let agentToTrigger = assignedAgent || task?.assigned_agent || 'assistant';
       let aiRequestText = content;
       // [S3-1] 멘션 라우팅 메타: @멘션은 이 댓글의 실행자만 바꾼다. DB assigned_agent는 변경 안함.
       let isMentionRouted = false;
@@ -1784,7 +1967,7 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
       id: task.id,
       content: task.content,
       requester: task.requester,
-      execution_mode: task.execution_mode || 'ari',
+      execution_mode: task.execution_mode || 'assistant',
       model: task.model || 'unknown',
     });
 
@@ -1984,7 +2167,16 @@ app.post('/webhook/antigravity/command', async (req, res) => {
         args = ['paperclipai', ['issue', 'comment', payload.ticketId, '--body', String(payload.text)]];
         break;
       case 'ISSUE_CREATE':
-        args = ['paperclipai', ['issue', 'create', '--title', String(payload.title)]];
+        args = [
+          'paperclipai',
+          [
+            'issue', 'create',
+            '--title', String(payload.title),
+            ...(payload.assignee ? ['--assignee', payload.assignee] : []),
+            ...(payload.priority ? ['--priority', payload.priority] : []),
+            ...(payload.category ? ['--category', payload.category] : [])
+          ]
+        ];
         break;
       case 'WORKSPACE_STATUS':
         args = ['paperclipai', ['doctor']];
@@ -2316,8 +2508,11 @@ app.post('/api/onboarding/activate-team', async (req, res) => {
 
 app.post('/api/onboarding/finish', async (req, res) => {
   try {
-    const { userName, teamName } = req.body;
-    await tutorialManager.bootstrap(userName || '대표님', teamName || '우리팀', io);
+    const { userName, teamName, projectId } = req.body;
+    if (!projectId) {
+      return res.status(400).json({ status: 'error', message: 'projectId is required' });
+    }
+    await tutorialManager.bootstrap(userName || '대표님', teamName || '우리팀', io, projectId);
     res.json({ status: 'ok', message: 'Tutorial missions created.' });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -2851,7 +3046,7 @@ async function runWatchdog() {
 
 // ─── 서버 기동 (app.listen → httpServer.listen으로 변경: socket.io 필수) ────
 if (process.env.NO_SERVER !== 'true') {
-  httpServer.listen(PORT, '127.0.0.1', () => {
+  httpServer.listen(PORT, () => {
   console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);
   console.log(`📡 Linked to Local SQLite Database & AI Engine`);
@@ -2931,7 +3126,7 @@ if (process.env.NO_SERVER !== 'true') {
           // 백그라운드 재실행 (강제 투입)
           (async () => {
             try {
-              const targetAgent = t.assigned_agent || 'ari';
+              const targetAgent = t.assigned_agent || 'assistant';
               const evaluation = await modelSelector.selectModel(t.content);
               const result = await executor.run(t.content, evaluation, targetAgent);
               
@@ -2984,7 +3179,7 @@ if (process.env.NO_SERVER !== 'true') {
 4. 서버의 \`.env\` 파일 내 \`TELEGRAM_BOT_TOKEN\` 위치에 붙여넣기 (또는 시스템 설정화면에서 입력)
 
 연결이 완료되면 이 카드를 '완료' 칸으로 옮기거나 "텔레그램 연결 완료했다"고 말씀해 주세요!`;
-        const newTaskId = await dbManager.createTask(onboardingTitle, onboardingContent, 'system', MODEL.PRO, 'ari');
+        const newTaskId = await dbManager.createTask(onboardingTitle, onboardingContent, 'system', MODEL.PRO, 'assistant');
         await dbManager.updateTaskStatus(newTaskId, 'PENDING');
       }
     } catch (err) {

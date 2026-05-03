@@ -1,146 +1,13 @@
 // src/components/Guidelines/TeamGuidelinesEditor.jsx
 // Phase 21 — Task 2: 팀 가이드라인 마크다운 에디터 (team.md)
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useProjectStore } from '../../store/projectStore';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
 
 const Icon = ({ name, size = '1rem', style = {} }) => (
   <span className="material-symbols-outlined" style={{ fontSize: size, lineHeight: 1, ...style }}>{name}</span>
 );
-
-/* ── 기본 팀 가이드라인 템플릿 (SOCIAN_TEAM.md 기반) ──────── */
-const DEFAULT_MD = `# 소시안 MyCrew 팀 플레이북 (Team Playbook)
-
-> 이 문서는 AI 크루 전원이 작업을 수행할 때 따르는 SOP(표준 운영 절차)입니다.
-> **다음 태스크부터 적용**되며, 진행 중인 태스크는 기존 규칙을 따릅니다.
-> 버전: v2.0 | 최종 갱신: 2026-04-18
-
----
-
-## 1. 크루 구성 & 역할
-
-### 공통 — ARI (오케스트레이터)
-- 대표님의 지시를 받아 두 팀에 동일 태스크를 동시 배분합니다.
-- 발행 전 5-Points QA를 통과한 결과물만 보고합니다.
-- 내부 멀티에이전트 복잡성을 사용자에게 노출하지 않습니다.
-
-### 프로젝트 A팀 (초안·검증 라인)
-- **NOVA** — 전략 마케터: 컨텍스트 로드 후 첫 기획안을 빠르게 제출합니다.
-- **OLLIE** — 데이터 전략가: NOVA 기획안의 치명적 약점 3개 이상을 먼저 지목한 후 대안을 제시합니다.
-- **ARI** — 판관: 양측을 채점하고 최상의 요소를 병합하여 최종안을 도출합니다.
-
-### 프로젝트 B팀 (협력·발전 라인)
-- **PICO** — 카피라이터: 제약 없이 창의적 카피·아이디어 뼈대를 발산합니다.
-- **LUMI** — 비주얼 디렉터: PICO의 원시 텍스트를 SEO·포맷 규격에 맞춰 정제합니다.
-- **ARI** — 어드바이저: 두 크루가 지나치게 비슷해질 때 개입하여 다양성을 유지합니다.
-- **B4 회고자** (System): 태스크 완료 후 수정 내역을 분석하여 그라운드룰을 자동 갱신합니다.
-
----
-
-## 2. 스킬 & 전문 영역
-
-| 크루 | 핵심 스킬 | 출력 포맷 |
-|------|-----------|-----------|
-| NOVA | 3초 Hook 기획, 콘텐츠 피라미드, FOMO 전략 | 기획안 마크다운 |
-| OLLIE | KPI 3계층 분석, 역설계, A/B 테스트 설계 | 분석 리포트 |
-| PICO | 릴스 초단위 대본, 바이럴 트리거, 해시태그 3단계 | 플랫폼별 카피 |
-| LUMI | Midjourney 프롬프트, 플랫폼 비율 규격, 즉시 렌더링 | 디자인 시안 |
-| ARI | 발행 전 QA, CCB 인수인계, 에러 복구 계약 | 종합 보고서 |
-
----
-
-## 3. 워크플로우 — 프로젝트 A팀 (3턴)
-
-\`\`\`
-[태스크 입력]
-  ↓
-NOVA (T+0): 컨텍스트 로드 → 템플릿 기반 초안 제출
-  ↓
-OLLIE (T+1): 약점 3개 이상 지목 → 대안 제시
-  ↓
-ARI (T+2): 채점 → 최상 요소 병합 → 최종안 → 대표님 보고
-\`\`\`
-
-**규칙**: OLLIE는 반드시 약점을 먼저 열거한 후 대안을 제시합니다. 순서 역전 불가.
-
----
-
-## 4. 워크플로우 — 프로젝트 B팀 (4단계)
-
-\`\`\`
-[태스크 입력] + [팀 그라운드룰 자동 로드]
-  ↓
-Phase 1 (병렬): PICO 창의 발산 / LUMI 정밀 구조화 (상호 차단)
-  ↓
-Phase 2: ARI 방향 가이드 (판정 없음, 개선 방향만 제시)
-  ↓
-Phase 3 (병렬 교차): PICO가 LUMI 구조 흡수 / LUMI가 PICO 창의성 흡수
-  ↓
-Phase 4: ARI 동조 방지 + 최종 통합 → 대표님 보고
-  ↓
-[B4 자동 실행] 회고 일지 생성 → 팀 그라운드룰 갱신
-\`\`\`
-
-**규칙**: Phase 3 교차 흡수 시 단순 복사 금지. 반드시 자신의 관점으로 재해석합니다.
-
----
-
-## 5. 인수인계 프로토콜 (CCB)
-
-태스크를 다음 크루에게 넘길 때 반드시 아래 블록을 사용합니다:
-
-\`\`\`
-## [CCB] 카드 컨텍스트 블록
-태스크 ID: SOC-XX
-원래 요청: (대표님의 첫 지시 원문)
-담당 히스토리:
-  - @NOVA: 기획안 초안 작성 완료
-  - @OLLIE: 약점 3개 지적 + 대안 제시 완료
-핵심 결정:
-  - 플랫폼: 인스타그램 릴스
-  - Hook 패턴: FOMO형
-제약 조건:
-  - 발행 기한: [날짜]
-  - 필수 포함: #소시안 #SaaS
-다음 담당자 전달 사항: [내용]
-\`\`\`
-
----
-
-## 6. 발행 전 5-Points QA (ARI 필수 수행)
-
-ARI는 모든 결과물을 대표님께 보고하기 전 아래 5가지를 점검합니다:
-
-- [ ] 3초 Hook 유무 — 첫 문장이 시청자를 멈추게 하는가?
-- [ ] 명확한 CTA — "저장 필수", "댓글 달아주세요" 등 행동 유도가 있는가?
-- [ ] 플랫폼 규격 매칭 — 비율, 길이, 글자 수가 각 플랫폼 스펙에 맞는가?
-- [ ] 해시태그 10개 이상 — 대·중·소 믹스로 구성됐는가?
-- [ ] 브랜드 톤앤매너 — 소시안의 톤과 일관성이 있는가?
-
----
-
-## 7. 팀 운영 원칙
-
-- **최우선**: 대표님 승인 없이 결제·계약 관련 액션 절대 불가
-- **개인정보**: PII 데이터 외부 API 전송 절대 불가
-- **에러 발생 시**: 즉시 멈춤 → 원인 진단 → 자연어로 대표님 보고 → 승인 후 재개
-- **보고 언어**: 기술 용어 금지. "NOVA 에이전트가 스킬 발동" ❌ → "기획안이 완성됐습니다" ✅
-
----
-
-## 8. 팀 그라운드룰 (시드 v0)
-
-1. 컨텍스트 폴더의 최신 정보를 반드시 참조한다.
-2. 소시안의 공식 가격·기능은 추측하지 않고 확인한다.
-3. 이전 태스크의 대표님 피드백을 다음 태스크에 반영한다.
-4. 약점 지적 후에만 대안을 제시한다 (순서 역전 금지).
-5. Phase 3 교차 흡수 시 단순 복사 금지 — 반드시 재해석한다.
-
----
-
-*v2.0 업데이트: 크루 전체 로스터, 워크플로우, CCB 프로토콜, 5-Points QA 통합*
-*B4 회고자가 스프린트 완료 시 이 문서의 섹션 8을 자동 갱신합니다.*
-`;
 
 /* ── 간이 마크다운 미리보기 렌더러 ─────────────────────── */
 function MdPreview({ content }) {
@@ -201,26 +68,95 @@ function SaveConfirmModal({ onConfirm, onCancel }) {
 
 /* ── 메인 에디터 컴포넌트 ────────────────────────────────── */
 export default function TeamGuidelinesEditor({ agentId, agentName }) {
-  const [content, setContent]     = useState(DEFAULT_MD);
-  const [original, setOriginal]   = useState(DEFAULT_MD);
+  const { projects, allCrews, selectedProjectId } = useProjectStore();
+  
+  // 동적 기본값 생성 (Phase 33 Role ID 및 선택된 프로젝트 반영)
+  const defaultMd = useMemo(() => {
+    const project = projects.find(p => p.id === (agentId === 'team' ? selectedProjectId : agentId?.replace('guidelines_', '')));
+    const assignedCrew = allCrews[project?.id] || [];
+    
+    let md = `# ${project ? project.name : agentName || '팀'} 플레이북\n\n`;
+    if (project?.objective) {
+      md += `> **목적**: ${project.objective}\n`;
+    }
+    md += `> 이 문서는 이 프로젝트에 배정된 AI 크루 전원이 작업을 수행할 때 따르는 SOP(표준 운영 절차)입니다.\n\n---\n\n`;
+    
+    md += `## 1. 크루 구성 & 역할\n\n`;
+    if (assignedCrew.length > 0) {
+      assignedCrew.forEach(c => {
+        const agId = c.id || c.agent_id;
+        const role = c.role_description || c.experiment_role || c.role || '팀원';
+        md += `- **${c.nickname || agId}** (${agId}) — ${role}\n`;
+      });
+    } else {
+      md += `- 프로젝트에 배정된 크루가 아직 없습니다.\n`;
+    }
+    
+    md += `\n---\n\n## 2. 기본 워크플로우 & 규칙\n\n`;
+    md += `1. **컨텍스트 확인**: 작업 시작 전 반드시 폴더의 최신 정보를 참조한다.\n`;
+    md += `2. **인수인계**: 다음 담당자에게 넘길 때 [CCB] 카드 컨텍스트 블록 양식을 사용하여 핵심 결정사항을 전달한다.\n`;
+    md += `3. **QA 필수**: 발행 전 요구사항(규격, 톤앤매너 등)이 충족되었는지 점검한다.\n`;
+    md += `4. **승인 우선**: 대표님 승인 없이 독단적인 결제/배포 액션은 절대 불가하다.\n`;
+    
+    return md;
+  }, [agentId, agentName, projects, allCrews, selectedProjectId]);
+
+  const [content, setContent]     = useState(defaultMd);
+  const [original, setOriginal]   = useState(defaultMd);
   const [mode, setMode]           = useState('split'); // 'edit' | 'preview' | 'split'
   const [showModal, setShowModal] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'saved' | 'error'
+  const [versions, setVersions]   = useState([]); // 버전 리스트
   const textareaRef = useRef(null);
 
   const isDirty = content !== original;
+  const isTeamPlaybook = agentId === selectedProjectId || agentId === 'team';
 
-  /* 탭 진입 시 서버에서 기존 가이드라인 로드 (있으면) */
-  useEffect(() => {
-    if (!agentId) return;
-    fetch(`${SERVER_URL}/api/settings?key=guidelines_${agentId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const saved = data?.settings?.[`guidelines_${agentId}`];
-        if (saved) { setContent(saved); setOriginal(saved); }
+  // 버전 목록 로드 함수
+  const fetchVersions = useCallback(() => {
+    if (!isTeamPlaybook || !selectedProjectId) return;
+    fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/project_md/versions`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.versions) setVersions(data.versions);
       })
       .catch(() => {});
-  }, [agentId]);
+  }, [isTeamPlaybook, selectedProjectId]);
+
+  /* ── 초기 데이터 및 버전 목록 로드 ── */
+  useEffect(() => {
+    if (!agentId) return;
+
+    if (isTeamPlaybook && selectedProjectId) {
+      fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/project_md`)
+        .then(r => r.json())
+        .then(data => {
+          if (data && data.content) {
+            setContent(data.content);
+            setOriginal(data.content);
+          } else {
+            setContent(defaultMd);
+            setOriginal(defaultMd);
+          }
+          fetchVersions(); // 버전 목록도 같이 로드
+        })
+        .catch(() => {});
+    } else {
+      fetch(`${SERVER_URL}/api/settings?key=guidelines_${agentId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          const saved = data?.settings?.[`guidelines_${agentId}`];
+          if (saved) { 
+            setContent(saved); 
+            setOriginal(saved); 
+          } else {
+            setContent(defaultMd);
+            setOriginal(defaultMd);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [agentId, defaultMd, selectedProjectId, isTeamPlaybook, fetchVersions]);
 
   /* Tab 키 처리 — 들여쓰기 */
   const handleKeyDown = (e) => {
@@ -236,30 +172,75 @@ export default function TeamGuidelinesEditor({ agentId, agentName }) {
     }
   };
 
-  const handleSaveClick = () => {
+  const handleSaveClick = useCallback(async () => {
     if (!isDirty) return;
-    setShowModal(true);
-  };
-
-  const handleConfirm = async () => {
-    setShowModal(false);
-    setSaveStatus('saving');
     try {
-      await fetch(`${SERVER_URL}/api/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: `guidelines_${agentId}`, value: content }),
-      });
+      setSaveStatus('saving');
+      
+      let res;
+      if (isTeamPlaybook && selectedProjectId) {
+        res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/project_md`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        });
+        // 저장 성공 시 버전 목록 갱신
+        if (res.ok) fetchVersions();
+      } else {
+        res = await fetch(`${SERVER_URL}/api/settings`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: `guidelines_${agentId}`, value: content }),
+        });
+      }
+
+      if (!res.ok) throw new Error('Save failed');
       setOriginal(content);
       setSaveStatus('saved');
-    } catch {
+    } catch (err) {
+      console.error(err);
       setSaveStatus('error');
     }
     setTimeout(() => setSaveStatus(null), 2500);
-  };
+  }, [isDirty, content, selectedProjectId, agentId]);
+
+  // ── 자동저장 (Auto-save) 로직 (수정 발생 후 2초 뒤 자동 저장)
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = setTimeout(() => {
+      handleSaveClick();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [content, isDirty, handleSaveClick]);
+
+  // ── 브라우저 종료 시 보호 로직
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   const handleReset = () => {
     if (window.confirm('모든 변경사항을 되돌릴까요?')) setContent(original);
+  };
+
+  const handleLoadVersion = (versionFileName) => {
+    if (isDirty && !window.confirm('저장되지 않은 변경사항이 있습니다. 이전 버전을 불러오시겠습니까?')) return;
+    
+    fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/project_md?version=${versionFileName}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.content) {
+          setContent(data.content);
+          // original을 업데이트하여 바로 저장(isDirty=true)되게 만들지는 않음
+        }
+      })
+      .catch(e => console.error(e));
   };
 
   const wordCount = content.trim().split(/\s+/).length;
@@ -363,6 +344,29 @@ export default function TeamGuidelinesEditor({ agentId, agentName }) {
           : <span style={{ color: 'var(--status-active)' }}>✓ 저장됨</span>
         }
       </div>
+
+      {/* ── 버전 리스트 (프로젝트 플레이북인 경우만 표시) ── */}
+      {isTeamPlaybook && versions.length > 0 && (
+        <div className="tge-versions-panel">
+          <div className="tge-versions-header">
+            <Icon name="history" size="0.8rem" /> 이전 버전 기록
+          </div>
+          <div className="tge-versions-list">
+            {versions.map(v => (
+              <div key={v.filename} className="tge-version-item">
+                <span>{v.label}</span>
+                <button 
+                  className="tge-version-btn"
+                  onClick={() => handleLoadVersion(v.filename)}
+                  title="이 버전의 내용으로 즉시 복원합니다"
+                >
+                  Rollback
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 저장 확인 모달 */}
       {showModal && (
@@ -549,4 +553,31 @@ const editorCSS = `
     display: flex; align-items: center; gap: 0.35rem;
   }
   .tge-modal__confirm:hover { filter: brightness(1.1); }
+
+  /* ── 버전 리스트 ── */
+  .tge-versions-panel {
+    border-top: 1px solid var(--border);
+    background: rgba(0,0,0,0.1);
+    padding: 0.6rem 1rem;
+    flex-shrink: 0;
+  }
+  .tge-versions-header {
+    font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+    margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.3rem;
+  }
+  .tge-versions-list {
+    display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.3rem;
+  }
+  .tge-version-item {
+    display: flex; align-items: center; gap: 0.5rem;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    padding: 0.3rem 0.6rem; border-radius: 6px;
+    font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap;
+  }
+  .tge-version-btn {
+    background: var(--brand-glow); color: var(--brand);
+    border: none; border-radius: 4px; padding: 0.2rem 0.4rem;
+    font-size: 0.65rem; cursor: pointer; font-weight: 600;
+  }
+  .tge-version-btn:hover { background: var(--brand); color: #000; }
 `;

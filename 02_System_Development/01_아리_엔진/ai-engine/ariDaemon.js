@@ -577,8 +577,8 @@ async function getActiveTools(agentId = 'ari') {
 }
 
 // ─── 도구 실행 핸들러 ─────────────────────────────────────────────────────
-async function executeTool(toolName, args) {
-  console.log(`[AriDaemon] 🔧 도구 실행: ${toolName}`, JSON.stringify(args));
+async function executeTool(toolName, args, projectId = null) {
+  console.log(`[AriDaemon] 🔧 도구 실행: ${toolName}`, JSON.stringify(args), `(Project: ${projectId || 'Global'})`);
 
   // ── naverSearch: DB 불필요 — 샄수 실행 ────────────────────────────
   if (toolName === 'naverSearch') {
@@ -804,7 +804,11 @@ async function executeTool(toolName, args) {
     // ── listDirectoryContents ────────────────────────────────────────────────
     if (toolName === 'listDirectoryContents') {
       const { dirPath } = args;
-      const workspaceRoot = path.resolve(process.cwd(), '../../');
+      // [Risk #2 명시] projectId가 없는 경우 전역(플랫폼 메타) 접근을 허용합니다. (메타 에이전트 dev_lead 등 전용)
+      // 향후 일반 유저 에이전트의 전역 접근을 원천 차단하기 위한 플래그 추가를 권고합니다.
+      const workspaceRoot = projectId 
+        ? path.resolve(process.cwd(), '../../04_Projects', projectId)
+        : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(dirPath) ? dirPath : path.resolve(workspaceRoot, dirPath);
       
       const allowedPaths = [
@@ -812,9 +816,16 @@ async function executeTool(toolName, args) {
         path.resolve(workspaceRoot, '06_소시안자료'),
         path.resolve(workspaceRoot, '07_OUTPUT')
       ];
-      const isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      
+      let isAllowed = false;
+      if (projectId) {
+        isAllowed = targetPath.startsWith(workspaceRoot);
+      } else {
+        isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      }
+      
       if (!isAllowed) {
-        return { success: false, message: `보안 제한: 시스템 폴더에는 접근할 수 없습니다. (허용: 05_My_history, 06_소시안자료, 07_OUTPUT)` };
+        return { success: false, message: `보안 제한: 경로를 벗어날 수 없습니다. (Path Traversal Block)` };
       }
 
       if (!fs.existsSync(targetPath)) return { success: false, message: `경로를 찾을 수 없습니다: ${targetPath}` };
@@ -826,7 +837,11 @@ async function executeTool(toolName, args) {
     // ── analyzeLocalImage ────────────────────────────────────────────────────
     if (toolName === 'analyzeLocalImage') {
       const { filePath, prompt } = args;
-      const workspaceRoot = path.resolve(process.cwd(), '../../');
+      // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
+      // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
+      const workspaceRoot = projectId 
+        ? path.resolve(process.cwd(), '../../04_Projects', projectId)
+        : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
 
       const allowedPaths = [
@@ -834,9 +849,16 @@ async function executeTool(toolName, args) {
         path.resolve(workspaceRoot, '06_소시안자료'),
         path.resolve(workspaceRoot, '07_OUTPUT')
       ];
-      const isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      
+      let isAllowed = false;
+      if (projectId) {
+        isAllowed = targetPath.startsWith(workspaceRoot);
+      } else {
+        isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
+      }
+      
       if (!isAllowed) {
-        return { success: false, message: `보안 제한: 시스템 폴더에는 접근할 수 없습니다. (허용: 05_My_history, 06_소시안자료, 07_OUTPUT)` };
+        return { success: false, message: `보안 제한: 경로를 벗어날 수 없습니다. (Path Traversal Block)` };
       }
 
       if (!fs.existsSync(targetPath)) return { success: false, message: `파일을 찾을 수 없습니다: ${targetPath}` };
@@ -904,10 +926,14 @@ async function executeTool(toolName, args) {
     // ── writeFile ────────────────────────────────────────────────────────────
     if (toolName === 'writeFile') {
       const { filePath, content, overwrite = false } = args;
-      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
+      // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
+      const ROOT = projectId 
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
       if (!absPath.startsWith(ROOT)) {
-        return { success: false, message: '접근 불가: MyCrew 프로젝트 외부 경로입니다.' };
+        return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };
       }
       if (!overwrite && fs.existsSync(absPath)) {
         return { success: false, message: `이미 존재하는 파일입니다: ${filePath}. overwrite: true로 덮어쓸 수 있습니다.` };
@@ -921,11 +947,15 @@ async function executeTool(toolName, args) {
     // ── moveFile ─────────────────────────────────────────────────────────────
     if (toolName === 'moveFile') {
       const { sourcePath, destPath } = args;
-      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
+      // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
+      const ROOT = projectId 
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, sourcePath);
       const absDest = path.resolve(ROOT, destPath);
       if (!absSrc.startsWith(ROOT) || !absDest.startsWith(ROOT)) {
-        return { success: false, message: '접근 불가: MyCrew 프로젝트 외부 경로입니다.' };
+        return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };
       }
       if (!fs.existsSync(absSrc)) return { success: false, message: `원본 파일이 없습니다: ${sourcePath}` };
       fs.mkdirSync(path.dirname(absDest), { recursive: true });
@@ -937,9 +967,11 @@ async function executeTool(toolName, args) {
     // ── renameFile ───────────────────────────────────────────────────────────
     if (toolName === 'renameFile') {
       const { filePath, newName } = args;
-      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const ROOT = projectId 
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, filePath);
-      if (!absSrc.startsWith(ROOT)) return { success: false, message: '접근 불가 경로입니다.' };
+      if (!absSrc.startsWith(ROOT)) return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };
       if (!fs.existsSync(absSrc)) return { success: false, message: `파일이 없습니다: ${filePath}` };
       const absDest = path.join(path.dirname(absSrc), newName);
       fs.renameSync(absSrc, absDest);
@@ -950,9 +982,11 @@ async function executeTool(toolName, args) {
     // ── deleteFile ───────────────────────────────────────────────────────────
     if (toolName === 'deleteFile') {
       const { filePath, reason } = args;
-      const ROOT = '/Users/alex/Documents/08_MyCrew_Anti';
+      const ROOT = projectId 
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
-      if (!absPath.startsWith(ROOT)) return { success: false, message: '접근 불가 경로입니다.' };
+      if (!absPath.startsWith(ROOT)) return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };
       if (!fs.existsSync(absPath)) return { success: false, message: `파일이 없습니다: ${filePath}` };
       fs.unlinkSync(absPath);
       if (fs.existsSync(absPath)) return { success: false, message: `삭제 실패: ${filePath}` };
@@ -1018,7 +1052,7 @@ app.post('/v1beta/models/:model::action', async (req, res) => {
 
 // ─── 메인 대화 엔드포인트 ─────────────────────────────────────────────────
 app.post('/api/compute', async (req, res) => {
-  const { content, author, oauthToken, preferredModel } = req.body;
+  const { content, author, oauthToken, preferredModel, projectId } = req.body;
   if (!content) return res.status(400).send('Content missing');
 
   // preferredModel 검증 — 아리 엔진은 Gemini API 전용이므로 Gemini 계열만 허용
@@ -1113,7 +1147,7 @@ app.post('/api/compute', async (req, res) => {
 
       for (const part of toolCallParts) {
         const { name, args } = part.functionCall;
-        const result = await executeTool(name, args);
+        const result = await executeTool(name, args, projectId);
         toolResults.push({
           functionResponse: {
             name,

@@ -82,8 +82,9 @@ type: user
 
 1. **이 파일** (`user_sonnet_persona.md`) — 소넷 페르소나 확인
 2. **`strategic_memory.md`** — 프로젝트 전략·아키텍처 규칙 확인
-3. **`02_System_Development/SESSION_LOG_*.md`** — 최근 작업 내용 확인
-4. **최근 Phase 문서** (`00_아키텍처_문서/Phase*.md`) — 현재 진행 단계 확인
+3. **`POLICY_INDEX.md`** — 전체 정책 인덱스 확인 (`last_updated`가 마지막 읽은 날짜보다 최신이면 소스 문서도 읽기)
+4. **`02_System_Development/SESSION_LOG_*.md`** — 최근 작업 내용 확인
+5. **최근 Phase 문서** (`00_아키텍처_문서/Phase*.md`) — 현재 진행 단계 확인
 
 ---
 

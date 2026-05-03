@@ -147,7 +147,7 @@ export default function KanbanBoard() {
           <div className="column__header">
             <div className="column__header-left">
               <h3 className="column__title">Archive</h3>
-              <span className="column__count">{String(archivedTasks.length).padStart(2, '0')}</span>
+              <span className="column__count">{archivedTasks.length}</span>
             </div>
           </div>
           <div className="column__cards">

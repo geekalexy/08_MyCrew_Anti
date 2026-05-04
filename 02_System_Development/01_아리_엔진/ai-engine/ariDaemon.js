@@ -95,16 +95,32 @@ if (dbManager) {
   })();
 }
 
-// ─── 크루원 정보 SSOT ────────────────────────────────────────────────────
-const CREW_INFO = {
-  luca:  { name: 'Luca',  role: 'CTO / 시스템 아키텍트', model: 'Antigravity(Claude)', specialties: ['시스템 설계', '코드 구현', '아키텍처', '백엔드 개발'] },
-  nova:  { name: 'Nova',  role: 'CMO / 마케팅 전략가',   model: MODEL.PRO,           specialties: ['SNS 전략', '콘텐츠 기획', '바이럴', '릴스/쇼츠'] },
-  pico:  { name: 'Pico',  role: '영상 디렉터',            model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상 제작', '릴스 시나리오', '숏폼 스크립트', '편집'] },
-  lumi:  { name: 'Lumi',  role: '이미지 디렉터',          model: MODEL.PRO,              specialties: ['이미지 생성', '디자인', '비주얼 기획', '썸네일'] },
-  luna:  { name: 'Luna',  role: '최종 합성자',             model: MODEL.ANTIGRAVITY_NEXUS,  specialties: ['종합 분석', '전략 합성', '보고서', '최종 검토'] },
-  ollie: { name: 'Ollie', role: '적대적 판관',             model: MODEL.ANTIGRAVITY_PRIME,  specialties: ['크리티컬 리뷰', '품질 검증', '반론 제시'] },
-  lily:  { name: 'Lily',  role: '영상 담당 (Team A)',      model: MODEL.ANTIGRAVITY_SONNET, specialties: ['영상', '시나리오'] },
-};
+// ─── 크루원 정보: DB에서 동적 로딩 ─────────────────────────────────────────
+// 구 하드코딩(luca/nova/lily…) 제거 → DB의 실제 agent_id 기반으로 갱신
+let CREW_INFO = {};
+
+async function refreshCrewInfo() {
+  if (!dbManager) return;
+  try {
+    // agents 테이블 또는 project_agents 뷰에서 전체 에이전트 로드
+    const agents = await dbManager.getAllAgents?.();
+    if (agents && agents.length > 0) {
+      const newInfo = {};
+      for (const a of agents) {
+        newInfo[a.agent_id] = {
+          name: a.display_name || a.agent_id,
+          role: a.role_description || a.short_role || a.agent_id,
+          model: a.anti_model || a.model || '',
+          specialties: [],
+        };
+      }
+      CREW_INFO = newInfo;
+      console.log(`[AriDaemon] 👥 CREW_INFO 갱신 완료: ${Object.keys(newInfo).join(', ')}`);
+    }
+  } catch (e) {
+    console.warn('[AriDaemon] CREW_INFO 갱신 실패 (기존값 유지):', e.message);
+  }
+}
 
 // ─── 칸반 칼럼 정의 (DB에서 동적 로딩 — 확장 가능) ─────────────────────────
 // 기본값: 서버 기동 시 DB에서 갱신. 30분마다 재로딩.
@@ -179,8 +195,7 @@ function buildAriTools(cols) {
             },
             assigneeId: {
               type: 'string',
-              enum: ['luca', 'nova', 'pico', 'lumi', 'luna', 'ollie', 'lily'],
-              description: '담당 크루원 ID. 업무 성격에 따라 최적 담당자를 선택합니다. 절대로 enum 목록에 없는 이름(예: luma)을 임의로 생성하거나 할당하지 마십시오. 오직 명시된 크루원만 사용 가능합니다.',
+              description: '담당 크루원 ID. DB에 등록된 에이전트 ID를 사용하세요. 예: dev_advisor, dev_fullstack, mkt_lead 등. 유효하지 않은 ID는 거부됩니다.',
             },
             content: {
               type: 'string',
@@ -500,9 +515,13 @@ refreshKanbanCols().then(() => {
   ARI_TOOLS = buildAriTools(_kanbanCols);
 });
 
-// 30분마다 칼럼 정의 갱신 (사용자가 컬럼 추가/변경 시 자동 반영)
+// DB CREW_INFO 최초 로딩
+refreshCrewInfo();
+
+// 30분마다 칼럼 정의 갱신
 setInterval(async () => {
   await refreshKanbanCols();
+  await refreshCrewInfo();
   ARI_TOOLS = buildAriTools(_kanbanCols);
 }, 30 * 60 * 1000);
 
@@ -1179,7 +1198,9 @@ app.post('/api/compute', async (req, res) => {
       for await (const chunk of finalStream) {
         if (chunk.text) {
           finalText += chunk.text;
-          res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+          // [JSON-GATE] system_action JSON 블록 제거 후 전송
+          const cleanChunk = chunk.text.replace(/\{\s*"system_action"[\s\S]*?\}\s*/g, '').trim();
+          if (cleanChunk) res.write(`data: ${JSON.stringify({ text: cleanChunk })}\n\n`);
         }
       }
 

@@ -5,9 +5,9 @@
     "role": "비서",
     "team": "platform",
     "bridge": false,
-    "antiModel": null,
+    "antiModel": "anti-gemini-3-flash",
     "defaultCategory": "QUICK_CHAT",
-    "note": "전체 공유 라우터 — 유일한 platform 에이전트"
+    "note": "라우팅·조율 전담 — Flash: 초고속 응답 필수"
   },
 
   
@@ -53,7 +53,7 @@
     "role": "QA 엔지니어",
     "team": "dev",
     "bridge": true,
-    "antiModel": "anti-claude-opus-4.6-thinking",
+    "antiModel": "anti-claude-sonnet-4.6-thinking",
     "defaultCategory": "QUALITY"
   },
   {
@@ -64,6 +64,16 @@
     "bridge": true,
     "antiModel": "anti-claude-opus-4.6-thinking",
     "defaultCategory": "DEEP_WORK"
+  },
+  {
+    "id": "dev_pm",
+    "nickname": "기술 PM",
+    "role": "개발 PM",
+    "team": "dev",
+    "bridge": true,
+    "antiModel": "anti-gemini-3.1-pro-high",
+    "defaultCategory": "DEEP_WORK",
+    "note": "기술 스프린트 관리, 백로그 정제, 기술 요구사항 조율 전담 — Gemini: 빈번한 대화 대응"
   },
 
   
@@ -91,8 +101,9 @@
     "role": "디자이너",
     "team": "mkt",
     "bridge": true,
-    "antiModel": "anti-gemini-3.1-pro-high",
-    "defaultCategory": "DESIGN"
+    "antiModel": "anti-gemini-3-flash",
+    "defaultCategory": "DESIGN",
+    "note": "디자인 레퍼런스 수집·시각화 — Flash: 만복 작업 최적화"
   },
   {
     "id": "mkt_analyst",
@@ -100,7 +111,7 @@
     "role": "분석가",
     "team": "mkt",
     "bridge": true,
-    "antiModel": "anti-claude-opus-4.6-thinking",
+    "antiModel": "anti-gemini-3.1-pro-high",
     "defaultCategory": "ANALYSIS"
   },
   {
@@ -109,17 +120,19 @@
     "role": "영상 디렉터",
     "team": "mkt",
     "bridge": true,
-    "antiModel": "anti-claude-sonnet-4.6-thinking",
-    "defaultCategory": "CONTENT"
+    "antiModel": "anti-gemini-3-flash",
+    "defaultCategory": "CONTENT",
+    "note": "영상 스크립트 초안·연출 이론 — Flash: 따릅한 반복 콘텐츠 최적화"
   },
   {
     "id": "mkt_pm",
     "nickname": "PM",
-    "role": "PM",
+    "role": "마케팅 PM",
     "team": "mkt",
     "bridge": true,
-    "antiModel": "anti-claude-opus-4.6-thinking",
-    "defaultCategory": "DEEP_WORK"
+    "antiModel": "anti-gemini-3.1-pro-high",
+    "defaultCategory": "DEEP_WORK",
+    "note": "캠페인·런칭·예산 관리 전담 — Gemini: 빈번한 대화 대응"
   },
 
   

@@ -11,21 +11,36 @@
 ### Platform
 assistant          → ARI (전체 공유, 유일한 예외)
 
-### 개발팀 (dev_*)          기본 모델
-dev_fullstack      → 풀스택 엔지니어    anti-gemini-3.1-pro-high
-dev_ux             → UI/UX 디자이너     anti-gemini-3.1-pro-high
-dev_senior         → 시니어 엔지니어    anti-claude-sonnet-4.6-thinking
-dev_backend        → 백엔드 엔지니어    anti-claude-sonnet-4.6-thinking
-dev_qa             → QA 엔지니어        anti-claude-opus-4.6-thinking
-dev_advisor        → 테크 어드바이저    anti-claude-opus-4.6-thinking  ← Prime 역할
+### 개발팀 (dev_*)          기본 모델                   Tier
+dev_fullstack      → 풀스택 엔지니어    anti-gemini-3.1-pro-high        🟢 T3
+dev_ux             → UI/UX 디자이너     anti-gemini-3.1-pro-high        🟢 T3
+dev_senior         → 시니어 엔지니어    anti-claude-sonnet-4.6-thinking 🟡 T2
+dev_backend        → 백엔드 엔지니어    anti-claude-sonnet-4.6-thinking 🟡 T2
+dev_qa             → QA 엔지니어        anti-claude-sonnet-4.6-thinking 🟡 T2
+dev_advisor        → 테크 어드바이저    anti-claude-opus-4.6-thinking   🔴 T1 ← 유일한 Opus
+dev_pm             → 개발 PM            anti-gemini-3.1-pro-high        🟢 T3
 
-### 마케팅팀 (mkt_*)        기본 모델
-mkt_lead           → 마케팅 리더        anti-gemini-3.1-pro-high
-mkt_planner        → 기획자             anti-claude-sonnet-4.6-thinking
-mkt_designer       → 디자이너           anti-gemini-3.1-pro-high
-mkt_analyst        → 분석가             anti-claude-opus-4.6-thinking
-mkt_video          → 영상 디렉터        anti-claude-sonnet-4.6-thinking
-mkt_pm             → PM                 anti-claude-opus-4.6-thinking
+### 마케팅팀 (mkt_*)        기본 모델                   Tier
+mkt_lead           → 마케팅 리더        anti-gemini-3.1-pro-high        🟢 T3
+mkt_planner        → 기획자             anti-gemini-3.1-pro-high        🟢 T3
+mkt_designer       → 디자이너           anti-gemini-3-flash             ⚡ T4
+mkt_analyst        → 분석가             anti-gemini-3.1-pro-high        🟢 T3
+mkt_video          → 영상 디렉터        anti-gemini-3-flash             ⚡ T4
+mkt_pm             → 마케팅 PM          anti-gemini-3.1-pro-high        🟢 T3
+
+### Platform
+assistant          → ARI (비서·라우터)  anti-gemini-3-flash             ⚡ T4
+
+## dev_pm vs mkt_pm 스킬 구분
+| 스킬          | dev_pm | mkt_pm |
+|--------------|--------|--------|
+| Code Architect | ✅    | ❌     |
+| PRD Writer   | ✅     | ❌     |
+| API Design   | ✅     | ❌     |
+| Sprint PM    | ✅     | ✅     |
+| Tech Researcher | ✅  | ❌     |
+| marketing    | ❌     | ✅     |
+| content      | ❌     | ✅     |
 
 ## 금지 규칙
 - 구 ID 절대 금지: marketing_lead, visual_director, copywriter, researcher, data_analyst, strategy_advisor

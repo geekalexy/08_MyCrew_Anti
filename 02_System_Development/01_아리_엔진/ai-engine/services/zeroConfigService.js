@@ -12,7 +12,7 @@ const LEGACY_ID_MAP = {
   'visual_director': 'mkt_designer', 'marketing_lead': 'mkt_lead',
 };
 const ALLOWED_IDS = new Set([
-  'dev_senior','dev_fullstack','dev_backend','dev_ux','dev_qa','dev_advisor',
+  'dev_senior','dev_fullstack','dev_backend','dev_ux','dev_qa','dev_advisor','dev_pm',
   'mkt_lead','mkt_planner','mkt_designer','mkt_video','mkt_pm','mkt_analyst','assistant',
 ]);
 
@@ -24,20 +24,39 @@ class ZeroConfigService {
 
     // ─── 역할별 권장 모델 가이드 (SSOT) ─────────────────────────────────────
     const MODEL_GUIDE = `
-[역할별 배정 모델 (MANDATORY — 반드시 아래 기준 준수)]
-- dev_advisor   : anti-claude-opus-4.6-thinking   ← 아키텍처·전략 판단, 최고 사고력 필수
-- dev_qa        : anti-claude-sonnet-4.6-thinking ← 품질 검증·리스크 탐지 (Opus 중복 방지, 균형형)
-- dev_senior    : anti-claude-sonnet-4.6-thinking ← 시니어 개발, 균형형 실력
-- dev_backend   : anti-claude-sonnet-4.6-thinking ← API·DB 설계, 균형형
+[🔴 OPUS 1인 제한 정책 — 절대 위반 불가]
+- anti-claude-opus-4.6-thinking 모델은 프로젝트 전체에서 단 1명에게만 배정 가능.
+- 반드시 'dev_advisor' (개발 프로젝트) 또는 가장 핵심적인 전략가 1명에게만 부여.
+- 2명 이상에게 Opus 배정 시 월간 API 예산 초과 위험 → 즉시 거부.
+
+[4-Tier 모델 배정 전략 (MANDATORY)]
+🔴 Tier 1 — Opus (깊은 전략·아키텍처, 프로젝트 1인 절대 제한)
+- dev_advisor   : anti-claude-opus-4.6-thinking   ← 유일한 Opus 허용 역할
+
+🟡 Tier 2 — Sonnet (기술 정밀성, 코드 품질 중심 실무자)
+- dev_senior    : anti-claude-sonnet-4.6-thinking ← 시니어 코드 품질, 아키텍처 설계
+- dev_backend   : anti-claude-sonnet-4.6-thinking ← API·DB 설계 정밀성
+- dev_qa        : anti-claude-sonnet-4.6-thinking ← 품질 검증·테스트 설계
+
+🟢 Tier 3 — Gemini Pro High (빈번한 대화, 중간 복잡도 — 토큰 리밋 없음)
+- dev_pm        : anti-gemini-3.1-pro-high        ← 기술 PM, 빈번한 커뮤니케이션
 - dev_fullstack : anti-gemini-3.1-pro-high        ← 풀스택 실행, 고속·다목적
-- dev_ux        : anti-gemini-3.1-pro-high        ← UI/UX·디자인, 고속 실행
-- mkt_lead      : anti-gemini-3.1-pro-high        ← 전략 리더, 고속
-- mkt_planner   : anti-claude-sonnet-4.6-thinking ← 콘텐츠 기획, 균형형
-- mkt_analyst   : anti-claude-opus-4.6-thinking   ← 데이터 분석·인사이트, 정밀 추론
-- mkt_pm        : anti-claude-opus-4.6-thinking   ← 프로젝트 관리, 체계적 사고
-- mkt_designer  : anti-gemini-3.1-pro-high        ← 비주얼 디자인, 고속 실행
-- mkt_video     : anti-claude-sonnet-4.6-thinking ← 영상 기획, 균형형
-- assistant     : anti-gemini-3.1-pro-high        ← 라우팅·조율, 고속
+- dev_ux        : anti-gemini-3.1-pro-high        ← UI/UX 설계, 시각적 실행
+- mkt_lead      : anti-gemini-3.1-pro-high        ← 마케팅 전략 리더
+- mkt_planner   : anti-gemini-3.1-pro-high        ← 콘텐츠 기획, 빈번한 대화
+- mkt_analyst   : anti-gemini-3.1-pro-high        ← 데이터 분석, 빈번한 리포팅
+- mkt_pm        : anti-gemini-3.1-pro-high        ← 마케팅 PM, 빈번한 커뮤니케이션
+
+⚡ Tier 4 — Gemini Flash (초고속·저비용, 단순 반복·리서치·초안 작업)
+- mkt_designer  : anti-gemini-3-flash             ← 디자인 레퍼런스 수집, 반복 시각화
+- mkt_video     : anti-gemini-3-flash             ← 영상 스크립트 초안, 반복 콘텐츠
+- assistant     : anti-gemini-3-flash             ← 라우팅·조율, 초고속 응답
+
+[모델 선택 판단 기준 (자율 배정 시 참고)]
+- 코드 작성·디버깅·아키텍처 설계 → Sonnet 이상
+- 전략 판단·기술 의사결정 → Opus (어드바이저만)
+- 기획·분석·PM·빈번한 대화 → Gemini Pro High
+- 리서치·초안·단순 반복·라우팅·조율 → Gemini Flash
 `;
 
     // ─── [Phase 35 v2] 1-Stage 원샷 파이프라인 (Gemini 3.1 Pro High) ────────
@@ -56,12 +75,20 @@ class ZeroConfigService {
    - 🔴 개발(IT) 프로젝트 → assigned_crew 첫 번째에 'dev_advisor' 반드시 포함 (Opus 배정 필수).
    - 아래 [역할별 배정 모델] 기준을 반드시 따라 다양한 모델 조합 구성.
 2. 커스텀 스킬: 이 프로젝트에 특화된 스킬 3~5개를 설계하고 YAML Frontmatter 포함 마크다운으로 작성.
-3. 초기 태스크: 칸반 보드에 즉시 등록할 핵심 태스크 3~5개 기획 (담당자는 아래 허용 ID 중 하나).
+3. 초기 태스크 (CRITICAL — 아래 규칙 엄수):
+   - initial_tasks는 반드시 1개만 생성한다. PRD, 아키텍처, UX 태스크를 미리 만들지 말 것.
+   - 단 1개의 태스크: "[기획] 핵심 기능 요구사항 도출"
+   - 이 태스크의 목적: CEO와 대화하여 원하는 핵심 기능 3~5개를 확정받는 것.
+   - 담당자: dev_advisor (개발 프로젝트) 또는 가장 적합한 기획 담당자 1명.
+   - 태스크 content에 프로젝트 목적 기반 기능 후보 3~5개를 포함하여 CEO에게 선택지를 제시할 것.
+   - ⚠️ 이유: 기능이 확정되지 않은 상태에서 PRD·아키텍처·UX를 생성하면 잘못된 방향을 유도함.
+   - PRD, 아키텍처 설계, UX 와이어프레임 등 후속 태스크는 이 카드 완료 후 팀이 자율 생성한다.
 4. 업무 프로세스: R&R, /run 명령 스프린트 자율 완주 흐름 명시.
 
 [⚠️ CRITICAL: 허용된 에이전트 ID (STRICT 정책)]
-- 개발/IT: dev_senior, dev_fullstack, dev_backend, dev_ux, dev_qa, dev_advisor
+- 개발/IT: dev_senior, dev_fullstack, dev_backend, dev_ux, dev_qa, dev_advisor, dev_pm
 - 마케팅/기획: mkt_lead, mkt_planner, mkt_designer, mkt_video, mkt_pm, mkt_analyst
+- ⚠️ dev_pm(기술 PM)과 mkt_pm(마케팅 PM)은 완전히 다른 역할 — 프로젝트 성격에 맞게 선택
 - 위 목록 외 임의 ID 생성 시 시스템 치명적 오류 발생
 ${MODEL_GUIDE}
 
@@ -87,9 +114,9 @@ ${MODEL_GUIDE}
   ],
   "initial_tasks": [
     {
-      "title": "[유형] 태스크 제목",
-      "content": "수행해야 할 구체적 작업 내용과 목표 (2~3문장)",
-      "assignee": "담당 에이전트ID"
+      "title": "[기획] 핵심 기능 요구사항 도출",
+      "content": "CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 기능을 확정합니다.\n\n**[기능 후보 제안 — 프로젝트 목적 기반]**\n아래는 '${name}' 프로젝트 목적을 분석하여 제안드리는 기능 후보입니다. 원하시는 기능을 선택하거나 직접 말씀해주세요:\n\n① (프로젝트에 맞는 핵심 기능 후보 1)\n② (프로젝트에 맞는 핵심 기능 후보 2)\n③ (프로젝트에 맞는 핵심 기능 후보 3)\n④ (선택적 기능 후보 4)\n⑤ (선택적 기능 후보 5)\n\n**[다음 단계]**\n기능이 확정되면 PRD 작성 → 아키텍처 설계 → UX 와이어프레임 순서로 태스크를 생성합니다.",
+      "assignee": "dev_advisor"
     }
   ]
 }
@@ -173,6 +200,85 @@ ${MODEL_GUIDE}
         role_description: '프로젝트 기술 리더로서 아키텍처 설계, 태스크 분해, 기술 의사결정을 주도합니다.',
         persona_md: '# Persona: dev_advisor\n\n## 임무\n이 프로젝트의 수석 아키텍트로서 기술 전략을 수립하고 팀원들의 작업을 조율합니다.\n\n## 행동 지침\n- 모든 태스크는 아키텍처 관점에서 먼저 분해합니다.\n- /run 명령 시 가장 먼저 스프린트 계획을 수립하고 팀원에게 배정합니다.\n- 기술 부채를 최소화하고 확장 가능한 설계를 추구합니다.\n',
       });
+    }
+
+    // ─── [OPUS-LIMIT] Opus 1인 초과 시 자동 강제 교체 ──────────────────
+    // LLM이 프롬프트를 무시하고 Opus를 여러 명 배정할 경우를 코드 레벨에서 방어
+    const OPUS_MODEL = 'anti-claude-opus-4.6-thinking';
+    const FALLBACK_MODEL = 'anti-gemini-3.1-pro-high';
+    let opusCount = 0;
+    let agentsJsonCache = null;
+    try {
+      const { readFileSync } = await import('fs');
+      const { resolve } = await import('path');
+      agentsJsonCache = JSON.parse(readFileSync(resolve(process.cwd(), 'agents.json'), 'utf8'));
+    } catch (e) {
+      console.warn('[Zero-Config] agents.json 로드 실패 — Opus 제한 체크 건너뜀:', e.message);
+    }
+    if (agentsJsonCache) {
+      planData.assigned_crew = planData.assigned_crew.map(c => {
+        const agentConfig = agentsJsonCache.find(a => a.id === c.agent_id);
+        const assignedModel = c.model || agentConfig?.antiModel || '';
+        if (assignedModel === OPUS_MODEL) {
+          opusCount++;
+          if (opusCount > 1) {
+            console.warn(`[Zero-Config] ⚠️ Opus 1인 제한 위반 감지: ${c.agent_id} → ${FALLBACK_MODEL} 강제 교체`);
+            return { ...c, model: FALLBACK_MODEL };
+          }
+        }
+        return c;
+      });
+      if (opusCount > 1) {
+        console.log(`[Zero-Config] Opus ${opusCount}명 → 1명 보정 완료 (나머지 ${opusCount - 1}명 Gemini 교체)`);
+      }
+    }
+
+    // ─── [TASK-GATE] initial_tasks 강제 교체 ────────────────────────────
+    // 기능 목록이 있으면: [기능 도출 확인] + [PRD 기획서] 2개
+    // 기능 목록 없으면: [기능 도출] 1개만
+    {
+      const llmTasks = planData.initial_tasks || [];
+      const hasFeaturesInObjective = objective && objective.includes('[원하는 기능 목록]');
+
+      // LLM 태스크 제목에서 기능 힌트 추출 (기능 목록 없을 때 활용)
+      const featureHints = llmTasks
+        .slice(0, 5)
+        .map((t, i) => {
+          const circled = ['①','②','③','④','⑤'];
+          const cleanTitle = (t.title || '').replace(/^\[.*?\]\s*/, '').trim();
+          return `${circled[i]} ${cleanTitle}`;
+        })
+        .join('\n');
+
+      const advisorId = planData.assigned_crew.find(c => c.agent_id === 'dev_advisor')?.agent_id
+        || planData.assigned_crew.find(c => c.agent_id === 'dev_pm')?.agent_id
+        || planData.assigned_crew[0]?.agent_id
+        || 'dev_advisor';
+
+      if (hasFeaturesInObjective) {
+        // 기능이 이미 명확 → PRD 카드 포함 2개 생성
+        planData.initial_tasks = [
+          {
+            title: '[기획] 핵심 기능 명세 PRD 기획서',
+            content: `입력받은 기능 목록을 바탕으로 정식 PRD(Product Requirements Document)를 작성합니다.\n\n**[기반 정보]**\n${objective}\n\n**[작성 항목]**\n1. 개요 (Overview) — 프로젝트 목적 및 범위\n2. 핵심 기능 정의 (Core Feature Definitions) — 각 기능의 유저 스토리·기능 요구사항·성공 기준\n3. 비기능 요구사항 — 성능, 보안, 확장성\n4. 후속 고려사항 — 향후 추가 기능 로드맵\n\n**[다음 단계]**\nPRD 완료 후 → 아키텍처 설계 → UX 와이어프레임 → 개발 착수`,
+            assignee: advisorId,
+          },
+          {
+            title: '[기획] 추가 기능 요구사항 보완',
+            content: `PRD 작성 전 CEO님과 확인이 필요한 추가 사항을 점검합니다.\n\n빠진 기능이 있거나 우선순위 조정이 필요하면 말씀해주세요.\n기능 목록이 확정되면 PRD 태스크를 시작합니다.`,
+            assignee: advisorId,
+          },
+        ];
+        console.log(`[Zero-Config][TASK-GATE] 기능 명세 확인 — PRD 포함 2개 태스크 생성`);
+      } else {
+        // 기능 미입력 → 도출 카드 1개만
+        planData.initial_tasks = [{
+          title: '[기획] 핵심 기능 요구사항 도출',
+          content: `CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 기능을 확정합니다.\n\n**[기능 후보 제안]**\n${featureHints || '① 기능 후보를 직접 말씀해주세요\n② ...\n③ ...'}\n\n**[다음 단계]**\n기능이 확정되면: PRD 작성 → 아키텍처 설계 → UX 와이어프레임 → 개발 착수`,
+          assignee: advisorId,
+        }];
+        console.log(`[Zero-Config][TASK-GATE] 기능 미입력 — 기능 도출 카드 1개 생성`);
+      }
     }
 
     // ─── [C-02] required_skills 미생성 시 기본 스킬 보장 ───────────────

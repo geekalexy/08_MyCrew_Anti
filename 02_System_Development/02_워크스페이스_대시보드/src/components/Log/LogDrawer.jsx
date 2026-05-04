@@ -870,11 +870,17 @@ export default function LogDrawer() {
                         {!sameAuthor && (
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
                             {log.agentId}
-                            {!focusedTaskId && log.taskId && (
-                               <span title={`Full ID: ${log.taskId}`} style={{ marginLeft: '0.4rem', padding: '1px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '0.65rem', color: 'var(--brand)', cursor: 'default' }}>
-                                 #{String(log.taskId).slice(-6)}
-                               </span>
-                            )}
+                            {!focusedTaskId && log.taskId && (() => {
+                               const logTask = Object.values(tasks).find(t => String(t.id) === String(log.taskId));
+                               const displayNum = logTask?.project_task_num != null
+                                 ? `#${logTask.project_task_num}`
+                                 : `#${String(log.taskId).slice(-6)}`;
+                               return (
+                                 <span title={`Full ID: ${log.taskId}`} style={{ marginLeft: '0.4rem', padding: '1px 5px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '0.65rem', color: 'var(--brand)', cursor: 'default' }}>
+                                   {displayNum}
+                                 </span>
+                               );
+                            })()}
                             <span style={{ opacity: 0.5, marginLeft: '0.4rem' }}>· {time}</span>
                           </p>
                         )}
@@ -920,7 +926,7 @@ export default function LogDrawer() {
                                 onMouseEnter={(e) => e.target.style.color = '#fff'}
                                 onMouseLeave={(e) => e.target.style.color = 'var(--brand)'}
                               >
-                                #{String(log.taskId).slice(-6)} 상세 확인
+                                {(() => { const lt = Object.values(tasks).find(t => String(t.id) === String(log.taskId)); return lt?.project_task_num != null ? `#${lt.project_task_num}` : `#${String(log.taskId).slice(-6)}`; })()} 상세 확인
                               </button>
                             </>
                           ) : (
@@ -971,7 +977,9 @@ export default function LogDrawer() {
                                }}>● ONLINE</span>
                              </div>
                              {!focusedTaskId && (
-                               <span style={{ fontSize: '0.65rem', color: 'var(--brand)', opacity: 0.8 }} title={`Task #${t.id}`}>#{String(t.id).slice(-6)}: {t.title}</span>
+                               <span style={{ fontSize: '0.65rem', color: 'var(--brand)', opacity: 0.8 }} title={`Task #${t.id}`}>
+                                 {t.project_task_num != null ? `#${t.project_task_num}` : `#${String(t.id).slice(-6)}`}: {t.title}
+                               </span>
                              )}
                           </div>
                         </div>
@@ -1085,7 +1093,9 @@ export default function LogDrawer() {
                 className="log-drawer__textarea"
                 placeholder={
                   activeLogTab === 'time'
-                    ? (focusedTask ? `Task #${focusedTask.id} 지시사항 (@멘션으로 에이전트 지정)...` : '번호(#)를 입력하여 카드를 찾으세요...')
+                    ? (focusedTask
+                        ? `Task ${focusedTask.project_task_num != null ? `#${focusedTask.project_task_num}` : `#${String(focusedTask.id).slice(-6)}`} 지시사항 (@멘션으로 에이전트 지정)...`
+                        : '번호(#)를 입력하여 카드를 찾으세요...')
                     : '아리에게 말을 걸어보세요...'
                 }
                 value={inputText}

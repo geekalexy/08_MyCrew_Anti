@@ -53,6 +53,10 @@ export default function TaskCard({ task, isDragging }) {
   // [S2-3] 상태 배지 결정: status 기준 우선, column 보조
   const statusBadge = STATUS_BADGE[task.status] || null;
 
+  // [Phase 36] CEO 검토 배지: REVIEW 커럼 + CEO 할당 카드
+  const isCeoReview = (task.status === 'REVIEW' || task.column === 'review')
+    && (task.assignee === 'CEO' || task.assigned_agent === 'CEO');
+
   // 공통 좌측 기준선 — 모든 행이 동일한 left 시작점 유지
   const rowStyle = {
     display: 'flex',
@@ -187,6 +191,27 @@ export default function TaskCard({ task, isDragging }) {
                 ×{task.failureCount}
               </span>
             )}
+          </span>
+        )}
+
+        {/* [Phase 36] CEO 검토 배지 — REVIEW 커럼 + CEO 할당 시 표시 */}
+        {isCeoReview && (
+          <span
+            title="Advisor PASS — CEO 최종 검토 대기"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+              fontSize: '0.62rem', fontWeight: 700,
+              fontFamily: 'Space Grotesk, sans-serif',
+              letterSpacing: '0.05em',
+              background: 'rgba(124,110,248,0.12)',
+              color: '#9B8BFB',
+              border: '1px solid rgba(124,110,248,0.3)',
+              borderRadius: '4px',
+              padding: '1px 5px',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '0.7rem' }}>person_check</span>
+            CEO 검토중
           </span>
         )}
 

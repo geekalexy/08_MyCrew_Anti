@@ -16,6 +16,78 @@ const ALLOWED_IDS = new Set([
   'mkt_lead','mkt_planner','mkt_designer','mkt_video','mkt_pm','mkt_analyst','assistant',
 ]);
 
+// ─── [Phase 36] 파이프라인 정의 상수 ────────────────────────────────────────
+// /run 명령 시 자동 생성되는 단계별 카드 순서 (P-001: ALLOWED_IDS 기반)
+const DEV_PIPELINE = [
+  {
+    step: 1,
+    title: 'PRD 기능정의서',
+    getContent: (objective) =>
+      `## 🎯 목적\n${objective}\n\n## 📋 작성 항목\n1. 개요 (Overview) — 프로젝트 목적 및 범위\n2. 핵심 기능 정의 — 각 기능의 유저 스토리·요구사항·성공 기준\n3. 비기능 요구사항 — 성능, 보안, 확장성\n4. 우선순위 매트릭스\n\n⚠️ 기술 스택은 이 단계에서 언급하지 않습니다. 사용자 관점으로 작성하세요.`,
+    assignedRole: 'dev_senior',
+    isReviewStop: false,
+  },
+  {
+    step: 2,
+    title: '개발 계획서',
+    getContent: () =>
+      `## 📋 작성 항목\n1. 기술 스택 선정 및 근거\n2. 시스템 아키텍처 개요\n3. 개발 단계별 스프린트 계획 (Phase 1~N)\n4. 예상 리스크 및 대응 방안\n\n<!-- [PIPELINE CONTEXT] 이전 단계 PRD 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'dev_fullstack',
+    isReviewStop: false,
+  },
+  {
+    step: 3,
+    title: '와이어프레임 설계',
+    getContent: () =>
+      `## 📋 작성 항목\n1. 핵심 화면 흐름 (텍스트 기반 설계)\n2. 컴포넌트 계층 구조\n3. 사용자 인터랙션 정의\n4. 화면 전환 및 예외 처리\n\n<!-- [PIPELINE CONTEXT] 이전 단계 개발 계획서 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'dev_ux',
+    isReviewStop: false,
+  },
+  {
+    step: 4,
+    title: 'Advisor 아키텍처 리뷰',
+    getContent: () =>
+      `## 📋 리뷰 항목\n1. PRD 완성도 및 일관성 검토\n2. 개발 계획 실현 가능성 평가\n3. 와이어프레임 UX 적절성\n4. 전체 아키텍처 위험 요소\n5. CEO에게 최종 권고사항 및 다음 단계 제시\n\n<!-- [PIPELINE CONTEXT] 모든 이전 단계 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'dev_advisor',
+    isReviewStop: true,  // 완료 후 /run 자동 중단
+  },
+];
+
+const MKT_PIPELINE = [
+  {
+    step: 1,
+    title: '마케팅 전략 기획서',
+    getContent: (objective) =>
+      `## 🎯 목적\n${objective}\n\n## 📋 작성 항목\n1. 시장 분석 및 타겟 고객 정의\n2. 핵심 메시지 및 포지셔닝\n3. 채널별 전략 방향\n4. KPI 및 성과 측정 기준`,
+    assignedRole: 'mkt_lead',
+    isReviewStop: false,
+  },
+  {
+    step: 2,
+    title: '콘텐츠 계획서',
+    getContent: () =>
+      `## 📋 작성 항목\n1. 콘텐츠 유형 및 포맷 정의\n2. 채널별 콘텐츠 캘린더 (4주 계획)\n3. 핵심 카피 및 비주얼 가이드\n\n<!-- [PIPELINE CONTEXT] 이전 단계 전략 기획서 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'mkt_planner',
+    isReviewStop: false,
+  },
+  {
+    step: 3,
+    title: '채널 실행 계획',
+    getContent: () =>
+      `## 📋 작성 항목\n1. 채널별 세부 실행 계획\n2. 예산 배분 제안\n3. A/B 테스트 설계\n4. 성과 추적 방법\n\n<!-- [PIPELINE CONTEXT] 이전 단계 콘텐츠 계획서 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'mkt_analyst',
+    isReviewStop: false,
+  },
+  {
+    step: 4,
+    title: 'Advisor 마케팅 리뷰',
+    getContent: () =>
+      `## 📋 리뷰 항목\n1. 전략 기획서 완성도 검토\n2. 콘텐츠 계획 실현 가능성\n3. 채널 전략 적절성\n4. CEO에게 최종 권고사항\n\n<!-- [PIPELINE CONTEXT] 모든 이전 단계 산출물이 자동 주입됩니다 -->`,
+    assignedRole: 'mkt_lead',
+    isReviewStop: true,
+  },
+];
+
 class ZeroConfigService {
   async buildProject(projectData, broadcast = () => {}) {
     const { name, objective, isolation_scope } = projectData;
@@ -314,6 +386,57 @@ ${MODEL_GUIDE}
       planData.required_skills  // [SKILL-FIX] LLM 설계 커스텀 스킬 전달
     );
     broadcast(`[4/5] 팀원 ${planData.assigned_crew.length}명 등록 완료. 프로젝트 파일 시스템 구성 중입니다...`);
+
+    // ─── [Phase 36] 파이프라인 카드 자동 생성 ──────────────────────────────
+    // 프로젝트 타입 판별 (dev vs mkt)
+    const isMktProject = planData.assigned_crew.some(c => (c.agent_id || '').startsWith('mkt_'))
+      && !planData.assigned_crew.some(c => (c.agent_id || '').startsWith('dev_'));
+    const pipeline = isMktProject ? MKT_PIPELINE : DEV_PIPELINE;
+
+    // 팀에서 실제 배정된 에이전트로 fallback
+    const crewIds = planData.assigned_crew.map(c => c.agent_id);
+    const getActualAgent = (preferredRole) => {
+      if (crewIds.includes(preferredRole)) return preferredRole;
+      // fallback: 같은 prefix(dev_/mkt_) 첫 번째 에이전트
+      const prefix = preferredRole.startsWith('dev_') ? 'dev_' : 'mkt_';
+      return crewIds.find(id => id.startsWith(prefix)) || planData.assigned_crew[0]?.agent_id || 'dev_advisor';
+    };
+
+    // ROLE_DEFAULT_MODELS 참조 (database.js와 동일)
+    const PIPELINE_MODEL_MAP = {
+      dev_advisor: MODEL.ANTI_OPUS_THINK,
+      dev_senior:  MODEL.ANTI_SONNET_THINK,
+      dev_qa:      MODEL.ANTI_SONNET_THINK,
+      dev_fullstack: MODEL.ANTI_GEMINI_PRO_HIGH,
+      dev_ux:      MODEL.ANTI_GEMINI_PRO_HIGH,
+      mkt_lead:    MODEL.ANTI_GEMINI_PRO_HIGH,
+      mkt_planner: MODEL.ANTI_GEMINI_PRO_HIGH,
+      mkt_analyst: MODEL.ANTI_GEMINI_PRO_HIGH,
+    };
+
+    try {
+      for (const pStage of pipeline) {
+        const assignee = getActualAgent(pStage.assignedRole);
+        const model = PIPELINE_MODEL_MAP[assignee] || MODEL.ANTI_GEMINI_PRO_HIGH;
+        const content = pStage.getContent(objective);
+        await dbManager.createTask(
+          pStage.title,
+          content,
+          'PIPELINE',             // requester: 파이프라인 자동 생성 표시
+          model,
+          assignee,
+          'PIPELINE',             // category
+          projectId,
+          pStage.step,            // pipeline_step
+          pStage.isReviewStop ? 1 : 0  // pipeline_is_review_stop
+        );
+        console.log(`[Zero-Config] 파이프라인 카드 생성: step${pStage.step} "${pStage.title}" → ${assignee}`);
+      }
+      console.log(`[Zero-Config] 파이프라인 ${pipeline.length}개 카드 생성 완료 (${isMktProject ? 'MKT' : 'DEV'})`);
+    } catch (pipelineErr) {
+      // 파이프라인 카드 생성 실패 시 프로젝트 자체는 정상 진행 (non-critical)
+      console.error('[Zero-Config] 파이프라인 카드 생성 실패 (프로젝트 생성은 정상):', pipelineErr.message);
+    }
 
     // strict_isolation → DEV 스킬 자동 장착
     if (isolation_scope && isolation_scope.type === 'strict_isolation') {

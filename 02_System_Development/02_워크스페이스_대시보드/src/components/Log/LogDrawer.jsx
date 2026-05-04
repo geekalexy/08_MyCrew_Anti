@@ -108,7 +108,8 @@ export default function LogDrawer() {
   
   const SLASH_COMMANDS = [
     { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
-    { id: '/run', label: '크루 런 (파이프라인 연속 실행)', icon: 'account_tree' }
+    { id: '/run',   label: '자율 릴레이 — PRD→Advisor 자동 완주', icon: 'play_arrow' },
+    { id: '/run-b', label: '단계별 확인 모드 — 매 단계 수동 승인',  icon: 'step_into'  },
   ];
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
@@ -406,7 +407,42 @@ export default function LogDrawer() {
     const trimmedText = inputText.trim();
     setShowMention(false); // 전송 시 멘션 드롭다운 닫기
 
-    // 이미지가 있으면 텍스트에 [IMAGE:n]을 놓는 대신 이미지를 직접 소켓에 포함 
+    // ── [Phase 36] /run, /run-b 파이프라인 슬래시 커맨드 인터셉트 ────────────
+    if (trimmedText === '/run' || trimmedText === '/run-b') {
+      const pipelineMode = trimmedText === '/run-b' ? 'run-b' : 'run';
+      const projectId = selectedProjectId;
+      if (!projectId) {
+        useChatStore.getState().appendChat({
+          level: 'error', message: '프로젝트를 먼저 선택해주세요.',
+          agentId: 'system', timestamp: new Date().toISOString(),
+        });
+        setBtnMode('send'); isSendingRef.current = false; setInputText('');
+        return;
+      }
+      fetch(`${SERVER_URL}/api/projects/${projectId}/pipeline/${pipelineMode}`, { method: 'POST' })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '파이프라인 시작 실패');
+          const msg = pipelineMode === 'run'
+            ? `🚀 /run 파이프라인 시작 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
+            : `⏸ /run-b 단계별 확인 모드 시작`;
+          useTimelineStore.getState().appendTimeline({
+            level: 'info', message: msg, agentId: 'system',
+            timestamp: new Date().toISOString(), projectId,
+          });
+        })
+        .catch((err) => {
+          useTimelineStore.getState().appendTimeline({
+            level: 'error', message: `❌ 파이프라인 시작 실패: ${err.message}`,
+            agentId: 'system', timestamp: new Date().toISOString(), projectId,
+          });
+        })
+        .finally(() => { setBtnMode('send'); isSendingRef.current = false; });
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     const imageDataUrls = attachedImages.map(img => img.dataUrl);
     let fetchPromise;
     // 타임라인 탭이면서 태스크가 선택된 경우에만 해당 태스크의 코멘트로 전송

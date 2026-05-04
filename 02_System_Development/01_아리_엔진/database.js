@@ -104,6 +104,18 @@ db.serialize(() => {
       `);
       console.log('[DB] PROJECT-SEQ 마이그레이션: project_task_num 컬럼 추가 및 소급 완료');
     }
+    // [Phase 36 /run] 파이프라인 릴레이 순번 컬럼
+    // NULL = 일반 카드, 1~N = 파이프라인 카드 (자동 릴레이 대상)
+    if (!names.includes('pipeline_step')) {
+      db.run(`ALTER TABLE Task ADD COLUMN pipeline_step INTEGER DEFAULT NULL`);
+      console.log('[DB] Phase 36 마이그레이션: Task.pipeline_step 컬럼 추가 완료');
+    }
+    // [Phase 36 /run] 파이프라인 카드 상태: PLANNED = 잠금(실행 불가)
+    // PENDING/IN_PROGRESS/DONE 은 기존과 동일
+    if (!names.includes('pipeline_is_review_stop')) {
+      db.run(`ALTER TABLE Task ADD COLUMN pipeline_is_review_stop INTEGER DEFAULT 0`);
+      console.log('[DB] Phase 36 마이그레이션: Task.pipeline_is_review_stop 컬럼 추가 완료');
+    }
   });
 
   db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
@@ -238,6 +250,12 @@ db.serialize(() => {
     if (!names.includes('workflow_raw')) {
       db.run(`ALTER TABLE projects ADD COLUMN workflow_raw TEXT`);
       console.log('[DB] Phase 33 마이그레이션: projects.workflow_raw 컬럼 추가 완료');
+    }
+    // [Phase 36 /run] 파이프라인 실행 모드
+    // 'none': 비활성 | 'run': 자율 릴레이 | 'run-b': 단계별 확인
+    if (!names.includes('pipeline_mode')) {
+      db.run(`ALTER TABLE projects ADD COLUMN pipeline_mode TEXT DEFAULT 'none'`);
+      console.log('[DB] Phase 36 마이그레이션: projects.pipeline_mode 컬럼 추가 완료');
     }
   });
 
@@ -486,15 +504,17 @@ db.serialize(() => {
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1') {
+  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0) {
     const riskLevel = classifyRiskLevel(content || '');
+    const initialStatus = pipelineStep != null && pipelineStep > 1 ? 'PLANNED' : 'PENDING';
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num)
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num, pipeline_step, pipeline_is_review_stop)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
-           (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL)
+           (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL),
+           ?, ?
          )`,
-        [title || '', content || '', 'PENDING', requester, model, riskLevel, assignedAgent, category, projectId, projectId],
+        [title || '', content || '', initialStatus, requester, model, riskLevel, assignedAgent, category, projectId, projectId, pipelineStep, pipelineIsReviewStop ? 1 : 0],
         function(err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -761,6 +781,94 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 36] 파이프라인 모드 설정 ───────────────────────────────────────
+  setPipelineMode(projectId, mode) {
+    // mode: 'none' | 'run' | 'run-b'
+    return new Promise((resolve, reject) => {
+      db.run(`UPDATE projects SET pipeline_mode = ? WHERE id = ?`, [mode, projectId], function(err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
+    });
+  }
+
+  // ─── [Phase 36] 다음 파이프라인 스텝 카드 조회 ─────────────────────────────
+  getNextPipelineTask(projectId, currentStep) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, title, content, assigned_agent, model, pipeline_step, pipeline_is_review_stop
+         FROM Task
+         WHERE project_id = ? AND pipeline_step = ? AND deleted_at IS NULL
+         LIMIT 1`,
+        [projectId, currentStep + 1],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36] 파이프라인 프로젝트 모드 조회 ──────────────────────────────
+  getProjectPipelineMode(projectId) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT pipeline_mode FROM projects WHERE id = ?`, [projectId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row?.pipeline_mode || 'none');
+      });
+    });
+  }
+
+  // ─── [Phase 36 V2] 카드의 마지막 에이전트 코멘트 조회 (컨텍스트 주입용) ───
+  getLastAgentComment(taskId) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT content FROM TaskComment
+         WHERE task_id = ? AND author != 'CEO' AND author != 'system'
+         ORDER BY created_at DESC LIMIT 1`,
+        [taskId],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row?.content || null);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36] 파이프라인 step 1~N 카드 조회 (PASS/FAIL 루프용) ───────────
+  getPipelineStepTasks(projectId, maxStep = 3) {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, title, content, assigned_agent, model, pipeline_step, failure_count, status
+         FROM Task
+         WHERE project_id = ?
+           AND pipeline_step IS NOT NULL
+           AND pipeline_step <= ?
+           AND deleted_at IS NULL
+         ORDER BY pipeline_step ASC`,
+        [projectId, maxStep],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36] 카드 담당 에이전트 재할당 (PASS → CEO, FAIL → 원래 에이전트) ──
+  updateTaskAssignedAgent(taskId, agentId) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task SET assigned_agent = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [agentId, taskId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
   // ─── [PRD#32 / CP-4] 프로젝트 설정 수정 — objective_raw, workflow_raw 분리 저장
   updateProject(id, name, objective, isolation_scope, objective_raw, workflow_raw) {
     return new Promise((resolve, reject) => {
@@ -945,6 +1053,20 @@ class DatabaseManager {
       db.run(
         `UPDATE Task SET execution_mode = ? WHERE id = ?`,
         [executionMode, id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36 V2] 파이프라인 컨텍스트 주입용 content 단독 업데이트 ────────
+  updateTaskContent(id, content) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [content || '', id],
         function (err) {
           if (err) reject(err);
           else resolve(this.changes);

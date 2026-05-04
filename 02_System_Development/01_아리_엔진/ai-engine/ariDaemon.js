@@ -125,12 +125,12 @@ async function refreshCrewInfo() {
 // ─── 칸반 칼럼 정의 (DB에서 동적 로딩 — 확장 가능) ─────────────────────────
 // 기본값: 서버 기동 시 DB에서 갱신. 30분마다 재로딩.
 let _kanbanCols = [
-  { status: 'PENDING',     label: 'To Do',      column: 'todo',        aliases: ['TODO', 'todo', 'PENDING', '대기', '할일'] },
+  { status: 'PENDING', label: 'To Do', column: 'todo', aliases: ['TODO', 'todo', 'PENDING', '대기', '할일'] },
   { status: 'IN_PROGRESS', label: 'In Progress', column: 'in_progress', aliases: ['in_progress', '진행중', '진행'] },
-  { status: 'REVIEW',      label: 'Review',      column: 'review',      aliases: ['검토', '검토대기', '리뷰'] },
-  { status: 'COMPLETED',   label: 'Done',        column: 'done',        aliases: ['DONE', 'done', '완료', '완성'] },
-  { status: 'FAILED',      label: 'Failed',      column: 'failed',      aliases: ['실패', '오류'] },
-  { status: 'ARCHIVED',    label: 'Archived',    column: 'archive',     aliases: ['archive', 'ARCHIVED', '아카이브', '보관'] },
+  { status: 'REVIEW', label: 'Review', column: 'review', aliases: ['검토', '검토대기', '리뷰'] },
+  { status: 'COMPLETED', label: 'Done', column: 'done', aliases: ['DONE', 'done', '완료', '완성'] },
+  { status: 'FAILED', label: 'Failed', column: 'failed', aliases: ['실패', '오류'] },
+  { status: 'ARCHIVED', label: 'Archived', column: 'archive', aliases: ['archive', 'ARCHIVED', '아카이브', '보관'] },
 ];
 
 /** DB에서 최신 칸반 칼럼 정의를 로드 */
@@ -174,32 +174,32 @@ function buildStatusToColumn(cols) {
 // ─── 도구(Function Calling) 정의 팩토리 ─────────────────────────────────────
 // 칼럼 정의가 변경되면 buildAriTools()를 재호출하여 Tool 스펙을 즉시 갱신합니다.
 function buildAriTools(cols) {
-  const statusEnums  = cols.map(c => c.status);
-  const statusDesc   = cols.map(c => `${c.status}(${c.label})`).join(', ');
+  const statusEnums = cols.map(c => c.status);
+  const statusDesc = cols.map(c => `${c.status}(${c.label})`).join(', ');
   return [
-  {
-    functionDeclarations: [
+    {
+      functionDeclarations: [
 
-      // ── [도구 1] 칸반 카드 생성 ──────────────────────────────────────
-      {
-        name: 'createKanbanTask',
-        description: `칸반 보드에 새 태스크 카드를 생성하고 크루원에게 할당합니다.
-사용자가 '루카한테 시켜', '태스크 만들어줘', '피코가 릴스 만들어줘' 등을 말할 때 호출합니다.
+        // ── [도구 1] 칸반 카드 생성 ──────────────────────────────────────
+        {
+          name: 'createKanbanTask',
+          description: `칸반 보드에 새 태스크 카드를 생성하고 크루원에게 할당합니다.
+사용자가 '팀원한테 시켜', '태스크 만들어줘', '카드 만들어줘' 등을 말할 때 호출합니다.
 중요: 사용자의 간단한 지시를 전문적인 업무 지시서로 업그레이드하여 작성합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            title: {
-              type: 'string',
-              description: '태스크 제목. 명확하고 행동지향적으로. 예: "[마케팅] 소시안 Plan C 인스타 릴스 3편 기획"',
-            },
-            assigneeId: {
-              type: 'string',
-              description: '담당 크루원 ID. DB에 등록된 에이전트 ID를 사용하세요. 예: dev_advisor, dev_fullstack, mkt_lead 등. 유효하지 않은 ID는 거부됩니다.',
-            },
-            content: {
-              type: 'string',
-              description: `태스크 본문 내용.
+          parameters: {
+            type: 'object',
+            properties: {
+              title: {
+                type: 'string',
+                description: '태스크 제목. 명확하고 행동지향적으로. 예: "PRD 기능정의서"',
+              },
+              assigneeId: {
+                type: 'string',
+                description: '담당의 역할명. DB에 등록된 에이전트 ID를 사용하세요. 예: dev_advisor, dev_fullstack, mkt_lead 등. 유효하지 않은 ID는 거부됩니다.',
+              },
+              content: {
+                type: 'string',
+                description: `태스크 본문 내용.
 
 [Phase 27 — 컨펌 기반 태스크 생성 루프]
 이 도구를 호출하기 전에 반드시 아래 순서를 따르라:
@@ -216,26 +216,26 @@ function buildAriTools(cols) {
 4. 【작성】 컨펌 후 마크다운 포맷으로 목적, 배경, 세부 지시사항을 구체적으로 작성한다.
    담당자가 읽고 즉시 실행할 수 있는 수준의 업무 지시서 형태로 작성한다.
    절대 사용자의 짧은 요청을 그대로 복사붙여넣기 하지 말 것.`,
+              },
+              priority: {
+                type: 'string',
+                enum: ['high', 'medium', 'low'],
+                description: '우선순위. 긴급/중요하면 high, 일반은 medium, 나중에 해도 되면 low.',
+              },
+              category: {
+                type: 'string',
+                enum: ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'ANALYSIS', 'MEDIA', 'RESEARCH'],
+                description: '작업 카테고리. 업무 성격에 맞게 선택.',
+              },
             },
-            priority: {
-              type: 'string',
-              enum: ['high', 'medium', 'low'],
-              description: '우선순위. 긴급/중요하면 high, 일반은 medium, 나중에 해도 되면 low.',
-            },
-            category: {
-              type: 'string',
-              enum: ['DEEP_WORK', 'CONTENT', 'MARKETING', 'DESIGN', 'ANALYSIS', 'MEDIA', 'RESEARCH'],
-              description: '작업 카테고리. 업무 성격에 맞게 선택.',
-            },
+            required: ['title', 'assigneeId', 'content', 'priority', 'category'],
           },
-          required: ['title', 'assigneeId', 'content', 'priority', 'category'],
         },
-      },
 
-      // ── [도구 2] 칸반 카드 수정 ──────────────────────────────────────
-      {
-        name: 'updateKanbanTask',
-        description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자, 내용을 변경합니다.
+        // ── [도구 2] 칸반 카드 수정 ──────────────────────────────────────
+        {
+          name: 'updateKanbanTask',
+          description: `기존 칸반 태스크를 수정하거나 상태(status), 담당자, 내용을 변경합니다.
 중요(CRITICAL): 사용자가 카드 내용에 대한 추가/수정을 지시하거나 피드백을 줄 때, **절대 채팅창에 말(텍스트)로만 "네 추가하겠습니다"라고 대답해서는 안 됩니다.** 반드시 이 도구를 즉시 호출하여 DB의 카드 내용(content)을 실제로 풍부하게 업데이트 하십시오.
 사용자가 '72번 카드 진행열로 옮겨줘', '#72 상태 바꿔줘', '담당자 바꿔줘', '이 내용을 추가해줘' 등을 말할 때 이 도구를 반드시 사용합니다.
 
@@ -245,266 +245,266 @@ function buildAriTools(cols) {
   → 이것이 UI의 "실행 시작" 버튼과 동일한 동작입니다. 별도 API 없이 이 도구 하나로 처리됩니다.
 - 담당자가 없는 경우: assigneeId도 함께 지정하면 담당자 배정 + 실행 시작이 동시에 처리됩니다.
 - 예시: updateKanbanTask({ taskId: 117, assigneeId: 'nova', status: 'IN_PROGRESS' })`,
-        parameters: {
-          type: 'object',
-          properties: {
-            taskId: {
-              type: 'number',
-              description: '수정할 태스크 ID (숫자)',
+          parameters: {
+            type: 'object',
+            properties: {
+              taskId: {
+                type: 'number',
+                description: '수정할 태스크 ID (숫자)',
+              },
+              content: {
+                type: 'string',
+                description: '수정할 새 내용 (없으면 기존 유지)',
+              },
+              assigneeId: {
+                type: 'string',
+                description: '새 담당자 ID (없으면 기존 유지)',
+              },
+              status: {
+                type: 'string',
+                enum: statusEnums,
+                description: `변경할 상태. DB 실제값 기준: ${statusDesc}. 아카이브는 ARCHIVED를 사용하세요.`,
+              },
             },
-            content: {
-              type: 'string',
-              description: '수정할 새 내용 (없으면 기존 유지)',
-            },
-            assigneeId: {
-              type: 'string',
-              description: '새 담당자 ID (없으면 기존 유지)',
-            },
-            status: {
-              type: 'string',
-              enum: statusEnums,
-              description: `변경할 상태. DB 실제값 기준: ${statusDesc}. 아카이브는 ARCHIVED를 사용하세요.`,
-            },
+            required: ['taskId'],
           },
-          required: ['taskId'],
         },
-      },
 
-      // ── [도구 3] 칸반 카드 삭제 ──────────────────────────────────────
-      {
-        name: 'deleteKanbanTask',
-        description: `칸반 태스크를 삭제(소프트 딜리트)합니다.
+        // ── [도구 3] 칸반 카드 삭제 ──────────────────────────────────────
+        {
+          name: 'deleteKanbanTask',
+          description: `칸반 태스크를 삭제(소프트 딜리트)합니다.
 사용자가 '카드 지워줘', '태스크 삭제해줘', '#{ID} 없애' 등을 말할 때 호출합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            taskId: {
-              type: 'number',
-              description: '삭제할 태스크 ID',
+          parameters: {
+            type: 'object',
+            properties: {
+              taskId: {
+                type: 'number',
+                description: '삭제할 태스크 ID',
+              },
+              reason: {
+                type: 'string',
+                description: '삭제 이유 (선택)',
+              },
             },
-            reason: {
-              type: 'string',
-              description: '삭제 이유 (선택)',
-            },
+            required: ['taskId'],
           },
-          required: ['taskId'],
         },
-      },
 
-      // ── [도구 3.5] 특정 칸반 카드 상세 조회 ──────────────────────────────────
-      {
-        name: 'getTaskDetails',
-        description: `특정 칸반 태스크 카드의 상세 내용, 담당자, 현재 상태를 조회합니다.
+        // ── [도구 3.5] 특정 칸반 카드 상세 조회 ──────────────────────────────────
+        {
+          name: 'getTaskDetails',
+          description: `특정 칸반 태스크 카드의 상세 내용, 담당자, 현재 상태를 조회합니다.
 중요: 사용자가 '93번 카드 내용 봐봐', '이 태스크 상태가 어때?' 등 특정 카드를 지칭할 때, "직접 접근이 불가하다"고 대답하지 말고 반드시 이 도구를 호출하여 내용을 확인하십시오. 당신은 전권을 가진 비서입니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            taskId: {
-              type: 'number',
-              description: '조회할 태스크 ID (숫자)',
+          parameters: {
+            type: 'object',
+            properties: {
+              taskId: {
+                type: 'number',
+                description: '조회할 태스크 ID (숫자)',
+              },
             },
+            required: ['taskId'],
           },
-          required: ['taskId'],
         },
-      },
 
-      // ── [도구 4] 크루 현황 조회 ───────────────────────────────────────
-      {
-        name: 'getCrewStatus',
-        description: `크루원의 현재 진행 중인 태스크와 보드 현황을 조회합니다.
+        // ── [도구 4] 크루 현황 조회 ───────────────────────────────────────
+        {
+          name: 'getCrewStatus',
+          description: `크루원의 현재 진행 중인 태스크와 보드 현황을 조회합니다.
 사용자가 '루카 뭐 해?', '지금 진행 중인 태스크?', '크루 상태 알려줘' 등을 말할 때 호출합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            agentId: {
-              type: 'string',
-              description: '특정 크루원 ID. 없으면 전체 크루 조회.',
+          parameters: {
+            type: 'object',
+            properties: {
+              agentId: {
+                type: 'string',
+                description: '특정 크루원 ID. 없으면 전체 크루 조회.',
+              },
+              statusFilter: {
+                type: 'string',
+                enum: ['all', ...statusEnums],
+                description: `필터할 상태. DB 실제값 기준: ${statusDesc}. 기본값 all(전체).`,
+              },
             },
-            statusFilter: {
-              type: 'string',
-              enum: ['all', ...statusEnums],
-              description: `필터할 상태. DB 실제값 기준: ${statusDesc}. 기본값 all(전체).`,
-            },
+            required: [],
           },
-          required: [],
         },
-      },
 
-      // ── [도구 5] 로컬 폴더 조회 ───────────────────────────────────────
-      {
-        name: 'listDirectoryContents',
-        description: `워크스페이스 전체 파일 시스템 구조를 탐색합니다.
+        // ── [도구 5] 로컬 폴더 조회 ───────────────────────────────────────
+        {
+          name: 'listDirectoryContents',
+          description: `워크스페이스 전체 파일 시스템 구조를 탐색합니다.
 기본 워크스페이스 루트를 기준으로 탐색하며, 절대 경로 입력도 가능합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            dirPath: {
-              type: 'string',
-              description: '조회할 폴더 경로 (예: "01_아리_엔진/outputs", "/Users/alex/.../outputs")',
+          parameters: {
+            type: 'object',
+            properties: {
+              dirPath: {
+                type: 'string',
+                description: '조회할 폴더 경로 (예: "01_아리_엔진/outputs", "/Users/alex/.../outputs")',
+              },
             },
+            required: ['dirPath'],
           },
-          required: ['dirPath'],
         },
-      },
-      // ── [도구 6] 로컬 이미지 인식 (Vision) ───────────────────────────
-      {
-        name: 'analyzeLocalImage',
-        description: `로컬에 저장된 이미지 파일(.png, .jpg 등)을 시각적으로 분석(Vision)합니다.
+        // ── [도구 6] 로컬 이미지 인식 (Vision) ───────────────────────────
+        {
+          name: 'analyzeLocalImage',
+          description: `로컬에 저장된 이미지 파일(.png, .jpg 등)을 시각적으로 분석(Vision)합니다.
 사용자가 워크스페이스 전체에서 첨부한 파일 경로나 특정 이미지를 분석해달라고 할 때 호출합니다. 상대경로(워크스페이스 루트 기준) 및 절대경로를 모두 지원합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            filePath: {
-              type: 'string',
-              description: '분석할 이미지 파일 경로 (예: "01_아리_엔진/outputs/result.png", "/Users/alex/.../image.png")',
+          parameters: {
+            type: 'object',
+            properties: {
+              filePath: {
+                type: 'string',
+                description: '분석할 이미지 파일 경로 (예: "01_아리_엔진/outputs/result.png", "/Users/alex/.../image.png")',
+              },
+              prompt: {
+                type: 'string',
+                description: '이미지에 대해 알고 싶은 구체적인 질문 (예: "이 이미지의 전반적인 분위기와 객체들을 상세히 묘사해줘")',
+              },
             },
-            prompt: {
-              type: 'string',
-              description: '이미지에 대해 알고 싶은 구체적인 질문 (예: "이 이미지의 전반적인 분위기와 객체들을 상세히 묘사해줘")',
-            },
+            required: ['filePath', 'prompt'],
           },
-          required: ['filePath', 'prompt'],
         },
-      },
-      // ── [도구 7] 에이전트 스킬 관리 (장착/해제) ───────────────────────
-      {
-        name: 'manageAgentSkills',
-        description: `본인(아리) 또는 다른 에이전트의 스킬을 장착(equip)하거나 해제(unequip)합니다.
+        // ── [도구 7] 에이전트 스킬 관리 (장착/해제) ───────────────────────
+        {
+          name: 'manageAgentSkills',
+          description: `본인(아리) 또는 다른 에이전트의 스킬을 장착(equip)하거나 해제(unequip)합니다.
 사용자가 '스킬 빼줘', '마케팅 스킬 장착해' 등을 말하거나, 아리 스스로 상황에 맞게 스킬 조정이 필요할 때 자율적으로 판단해 호출합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            agentId: {
-              type: 'string',
-              description: '스킬을 변경할 에이전트 ID (예: "ari", "nova", "lumi")',
+          parameters: {
+            type: 'object',
+            properties: {
+              agentId: {
+                type: 'string',
+                description: '스킬을 변경할 에이전트 ID (예: "ari", "nova", "lumi")',
+              },
+              skillId: {
+                type: 'string',
+                description: '장착/해제할 스킬 ID (예: "marketing", "content", "design", "analysis", "socian-analysis")',
+              },
+              action: {
+                type: 'string',
+                enum: ['equip', 'unequip'],
+                description: '장착할지 해제할지 여부',
+              },
             },
-            skillId: {
-              type: 'string',
-              description: '장착/해제할 스킬 ID (예: "marketing", "content", "design", "analysis", "socian-analysis")',
-            },
-            action: {
-              type: 'string',
-              enum: ['equip', 'unequip'],
-              description: '장착할지 해제할지 여부',
-            },
+            required: ['agentId', 'skillId', 'action'],
           },
-          required: ['agentId', 'skillId', 'action'],
         },
-      },
-      // ── [도구 8] 대표님 관찰 에세이 작성 ───────────────────────
-      {
-        name: 'writeCEOLog',
-        description: `대표님이 요청할 때 관찰 에세이를 작성하거나 대화 내용을 파일로 저장합니다. 코드 수정 없이 05_My_history 폴더에 저장합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            essayContent: {
-              type: 'string',
-              description: '저장할 내용 (대표님의 관찰 에세이 또는 기록)',
+        // ── [도구 8] 대표님 관찰 에세이 작성 ───────────────────────
+        {
+          name: 'writeCEOLog',
+          description: `대표님이 요청할 때 관찰 에세이를 작성하거나 대화 내용을 파일로 저장합니다. 코드 수정 없이 05_My_history 폴더에 저장합니다.`,
+          parameters: {
+            type: 'object',
+            properties: {
+              essayContent: {
+                type: 'string',
+                description: '저장할 내용 (대표님의 관찰 에세이 또는 기록)',
+              },
+              fileName: {
+                type: 'string',
+                description: '(선택) 저장할 파일명. 확장자 포함 (예: ESSAY_Alex_2026-04-28_Ari.md). 지정하지 않으면 CEO_ESSAY_YYYY-MM-DD.md 형식으로 자동 생성.',
+              },
+              targetDir: {
+                type: 'string',
+                description: '(선택) 저장 하위 폴더 이름 (05_My_history 하위). 예: Ari, Luca. 기본값: Ari',
+              },
             },
-            fileName: {
-              type: 'string',
-              description: '(선택) 저장할 파일명. 확장자 포함 (예: ESSAY_Alex_2026-04-28_Ari.md). 지정하지 않으면 CEO_ESSAY_YYYY-MM-DD.md 형식으로 자동 생성.',
-            },
-            targetDir: {
-              type: 'string',
-              description: '(선택) 저장 하위 폴더 이름 (05_My_history 하위). 예: Ari, Luca. 기본값: Ari',
-            },
+            required: ['essayContent'],
           },
-          required: ['essayContent'],
         },
-      },
-      // ── [도구 9] 파일 생성 / 수정 ────────────────────────────────────────
-      {
-        name: 'writeFile',
-        description: `대표님이 지정한 경로에 파일을 생성하거나 내용을 수정합니다. MyCrew 프로젝트 폴더 내에서만 동작합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            filePath: {
-              type: 'string',
-              description: '08_MyCrew_Anti 프로젝트 루트 기준 상대 경로. 예: 05_My_history/Ari/ESSAY_2026-04-28.md',
+        // ── [도구 9] 파일 생성 / 수정 ────────────────────────────────────────
+        {
+          name: 'writeFile',
+          description: `대표님이 지정한 경로에 파일을 생성하거나 내용을 수정합니다. MyCrew 프로젝트 폴더 내에서만 동작합니다.`,
+          parameters: {
+            type: 'object',
+            properties: {
+              filePath: {
+                type: 'string',
+                description: '08_MyCrew_Anti 프로젝트 루트 기준 상대 경로. 예: 05_My_history/Ari/ESSAY_2026-04-28.md',
+              },
+              content: {
+                type: 'string',
+                description: '파일에 저장할 내용 (마크다운 형식 권장)',
+              },
+              overwrite: {
+                type: 'boolean',
+                description: '이미 존재하는 파일 덮어쓰기 허용 여부. 기본값: false (안전)',
+              },
             },
-            content: {
-              type: 'string',
-              description: '파일에 저장할 내용 (마크다운 형식 권장)',
+            required: ['filePath', 'content'],
+          },
+        },
+        // ── [도구 10] 파일 이동 ───────────────────────────────────────────────
+        {
+          name: 'moveFile',
+          description: `파일을 한 위치에서 다른 위치로 이동합니다. 대상 폴더가 없으면 자동 생성합니다.`,
+          parameters: {
+            type: 'object',
+            properties: {
+              sourcePath: { type: 'string', description: '이동할 파일의 현재 경로 (프로젝트 루트 기준)' },
+              destPath: { type: 'string', description: '이동할 목적지 경로 (파일명 포함)' },
             },
-            overwrite: {
-              type: 'boolean',
-              description: '이미 존재하는 파일 덮어쓰기 허용 여부. 기본값: false (안전)',
+            required: ['sourcePath', 'destPath'],
+          },
+        },
+        // ── [도구 11] 파일 이름 변경 ──────────────────────────────────────────
+        {
+          name: 'renameFile',
+          description: `파일의 이름을 변경합니다 (같은 폴더 내에서).`,
+          parameters: {
+            type: 'object',
+            properties: {
+              filePath: { type: 'string', description: '이름을 바꿀 파일의 현재 경로' },
+              newName: { type: 'string', description: '새 파일명 (확장자 포함, 예: ESSAY_Alex_2026-04-28_Ari.md)' },
             },
+            required: ['filePath', 'newName'],
           },
-          required: ['filePath', 'content'],
         },
-      },
-      // ── [도구 10] 파일 이동 ───────────────────────────────────────────────
-      {
-        name: 'moveFile',
-        description: `파일을 한 위치에서 다른 위치로 이동합니다. 대상 폴더가 없으면 자동 생성합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            sourcePath: { type: 'string', description: '이동할 파일의 현재 경로 (프로젝트 루트 기준)' },
-            destPath: { type: 'string', description: '이동할 목적지 경로 (파일명 포함)' },
+        // ── [도구 12] 파일 삭제 ───────────────────────────────────────────────
+        {
+          name: 'deleteFile',
+          description: `파일을 영구 삭제합니다. 대상 확인 후 실행 권장.`,
+          parameters: {
+            type: 'object',
+            properties: {
+              filePath: { type: 'string', description: '삭제할 파일의 경로 (프로젝트 루트 기준)' },
+              reason: { type: 'string', description: '삭제 이유 (로그용)' },
+            },
+            required: ['filePath'],
           },
-          required: ['sourcePath', 'destPath'],
         },
-      },
-      // ── [도구 11] 파일 이름 변경 ──────────────────────────────────────────
-      {
-        name: 'renameFile',
-        description: `파일의 이름을 변경합니다 (같은 폴더 내에서).`,
-        parameters: {
-          type: 'object',
-          properties: {
-            filePath: { type: 'string', description: '이름을 바꿀 파일의 현재 경로' },
-            newName: { type: 'string', description: '새 파일명 (확장자 포함, 예: ESSAY_Alex_2026-04-28_Ari.md)' },
-          },
-          required: ['filePath', 'newName'],
-        },
-      },
-      // ── [도구 12] 파일 삭제 ───────────────────────────────────────────────
-      {
-        name: 'deleteFile',
-        description: `파일을 영구 삭제합니다. 대상 확인 후 실행 권장.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            filePath: { type: 'string', description: '삭제할 파일의 경로 (프로젝트 루트 기준)' },
-            reason: { type: 'string', description: '삭제 이유 (로그용)' },
-          },
-          required: ['filePath'],
-        },
-      },
 
-      // ── [도구 13] 네이버 검색 ────────────────────────────────────────────
-      {
-        name: 'naverSearch',
-        description: `네이버 뉴스/블로그/웹문서를 검색합니다. 한국어 콘텐츠와 최신 트렌드 조사에 유리합니다.
+        // ── [도구 13] 네이버 검색 ────────────────────────────────────────────
+        {
+          name: 'naverSearch',
+          description: `네이버 뉴스/블로그/웹문서를 검색합니다. 한국어 콘텐츠와 최신 트렌드 조사에 유리합니다.
 사용자가 '네이버에서 찾아봐', '한국 시장 동향', '최신 뉴스', Google Grounding으로 못 찾는 정보 등을 요청할 때 호출합니다.`,
-        parameters: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: '검색할 한국어 키워드. 구체적일수록 정대제 (2~4단어 권장)',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: '검색할 한국어 키워드. 구체적일수록 정대제 (2~4단어 권장)',
+              },
+              type: {
+                type: 'string',
+                enum: ['news', 'blog', 'webkr', 'encyc'],
+                description: '검색 유형. news=언론사 기사, blog=블로그(생활형 정보), webkr=웹문서(전문사이트), encyc=백과사전(개념정의). 기본: news',
+              },
+              display: {
+                type: 'number',
+                description: '가져올 결과 수 (1~10, 기본 5). 요약할 때는 3, 상세 조사는 10을 권장.',
+              },
             },
-            type: {
-              type: 'string',
-              enum: ['news', 'blog', 'webkr', 'encyc'],
-              description: '검색 유형. news=언론사 기사, blog=블로그(생활형 정보), webkr=웹문서(전문사이트), encyc=백과사전(개념정의). 기본: news',
-            },
-            display: {
-              type: 'number',
-              description: '가져올 결과 수 (1~10, 기본 5). 요약할 때는 3, 상세 조사는 10을 권장.',
-            },
+            required: ['query'],
           },
-          required: ['query'],
         },
-      },
 
-    ],  // end functionDeclarations
-  }];  // end object + return array
+      ],  // end functionDeclarations
+    }];  // end object + return array
 } // end buildAriTools
 
 // 초기 Tool 정의 빌드 (서버 기동 시 기본값 사용)
@@ -642,7 +642,7 @@ async function executeTool(toolName, args, projectId = null) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId: assigneeId })
         }).catch(err => console.warn('[AriDaemon] Dispatch trigger failed:', err.message));
-      } catch (e) {}
+      } catch (e) { }
 
       // [버그 패치] 실시간 UI 갱신을 위한 socket.io 브로드캐스트 트리거
       try {
@@ -658,7 +658,7 @@ async function executeTool(toolName, args, projectId = null) {
             priority
           })
         }).catch(err => console.warn('[AriDaemon] notify-created trigger failed:', err.message));
-      } catch (e) {}
+      } catch (e) { }
 
       return {
         success: true,
@@ -676,7 +676,7 @@ async function executeTool(toolName, args, projectId = null) {
       }
 
       // status 정규화 + column 매핑 (칼럼 정의에서 동적 생성 — 컨테이너 추가 시 코드 수정 없음)
-      const aliasMap       = buildAliasMap(_kanbanCols);
+      const aliasMap = buildAliasMap(_kanbanCols);
       const statusToColumn = buildStatusToColumn(_kanbanCols);
       const normalizedStatus = aliasMap[status] || aliasMap[status?.toUpperCase()] || status;
       const column = normalizedStatus ? statusToColumn[normalizedStatus] : undefined;
@@ -714,7 +714,7 @@ async function executeTool(toolName, args, projectId = null) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatePayload)
         });
-        
+
         if (!resp.ok) {
           const errBody = await resp.text();
           return { success: false, message: `#${taskId} 수정 실패 (서버 응답코드: ${resp.status}): ${errBody}` };
@@ -825,30 +825,30 @@ async function executeTool(toolName, args, projectId = null) {
       const { dirPath } = args;
       // [Risk #2 명시] projectId가 없는 경우 전역(플랫폼 메타) 접근을 허용합니다. (메타 에이전트 dev_lead 등 전용)
       // 향후 일반 유저 에이전트의 전역 접근을 원천 차단하기 위한 플래그 추가를 권고합니다.
-      const workspaceRoot = projectId 
+      const workspaceRoot = projectId
         ? path.resolve(process.cwd(), '../../04_Projects', projectId)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(dirPath) ? dirPath : path.resolve(workspaceRoot, dirPath);
-      
+
       const allowedPaths = [
         path.resolve(workspaceRoot, '05_My_history'),
         path.resolve(workspaceRoot, '06_소시안자료'),
         path.resolve(workspaceRoot, '07_OUTPUT')
       ];
-      
+
       let isAllowed = false;
       if (projectId) {
         isAllowed = targetPath.startsWith(workspaceRoot);
       } else {
         isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
       }
-      
+
       if (!isAllowed) {
         return { success: false, message: `보안 제한: 경로를 벗어날 수 없습니다. (Path Traversal Block)` };
       }
 
       if (!fs.existsSync(targetPath)) return { success: false, message: `경로를 찾을 수 없습니다: ${targetPath}` };
-      
+
       const files = fs.readdirSync(targetPath);
       return { success: true, message: `📂 ${dirPath} 폴더 내용:\n${files.join('\n')}` };
     }
@@ -858,7 +858,7 @@ async function executeTool(toolName, args, projectId = null) {
       const { filePath, prompt } = args;
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
-      const workspaceRoot = projectId 
+      const workspaceRoot = projectId
         ? path.resolve(process.cwd(), '../../04_Projects', projectId)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
@@ -868,40 +868,40 @@ async function executeTool(toolName, args, projectId = null) {
         path.resolve(workspaceRoot, '06_소시안자료'),
         path.resolve(workspaceRoot, '07_OUTPUT')
       ];
-      
+
       let isAllowed = false;
       if (projectId) {
         isAllowed = targetPath.startsWith(workspaceRoot);
       } else {
         isAllowed = allowedPaths.some(p => targetPath === p || targetPath.startsWith(p + path.sep));
       }
-      
+
       if (!isAllowed) {
         return { success: false, message: `보안 제한: 경로를 벗어날 수 없습니다. (Path Traversal Block)` };
       }
 
       if (!fs.existsSync(targetPath)) return { success: false, message: `파일을 찾을 수 없습니다: ${targetPath}` };
-      
+
       try {
         const mimeType = filePath.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
         const imageBase64 = fs.readFileSync(targetPath).toString('base64');
-        
+
         // Gemini API를 직접 호출하여 Vision 분석
         const response = await ai.models.generateContent({
-            model: MODEL.FLASH,
-            contents: [
-                {
-                    role: 'user',
-                    parts: [
-                        { inlineData: { mimeType, data: imageBase64 } },
-                        { text: prompt }
-                    ]
-                }
-            ]
+          model: MODEL.FLASH,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { inlineData: { mimeType, data: imageBase64 } },
+                { text: prompt }
+              ]
+            }
+          ]
         });
         const resultText = response.text;
         return { success: true, message: `👁️ 이미지 분석 결과:\n${resultText}` };
-      } catch(err) {
+      } catch (err) {
         return { success: false, message: `Vision 분석 실패: ${err.message}` };
       }
     }
@@ -911,21 +911,21 @@ async function executeTool(toolName, args, projectId = null) {
       const { agentId, skillId, action } = args;
       const isActive = action === 'equip';
       await dbManager.toggleAgentSkill(agentId, skillId, isActive);
-      
+
       // REST API로도 변경 사실을 알리기 (프론트 실시간 동기화를 위해)
       fetch(`http://localhost:${process.env.PORT || 4005}/api/agents/${agentId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skillId, active: isActive })
-      }).catch(() => {});
-      
+      }).catch(() => { });
+
       return { success: true, message: `✅ ${agentId}의 ${skillId} 스킬이 ${action === 'equip' ? '장착' : '해제'}되었습니다.` };
     }
 
     // ── writeCEOLog ──────────────────────────────────────────────────────────
     if (toolName === 'writeCEOLog') {
       const { essayContent, fileName, targetDir = 'Ari' } = args;
-      const baseHistoryDir = '/Users/alex/Documents/08_MyCrew_Anti/05_My_history';
+      const baseHistoryDir = '/Users/alex/Documents/08_MyCrew_Anti/05_My_history/Ari';
       const historyDir = path.join(baseHistoryDir, targetDir);
       if (!fs.existsSync(historyDir)) {
         fs.mkdirSync(historyDir, { recursive: true });
@@ -947,7 +947,7 @@ async function executeTool(toolName, args, projectId = null) {
       const { filePath, content, overwrite = false } = args;
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
-      const ROOT = projectId 
+      const ROOT = projectId
         ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
@@ -968,7 +968,7 @@ async function executeTool(toolName, args, projectId = null) {
       const { sourcePath, destPath } = args;
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
-      const ROOT = projectId 
+      const ROOT = projectId
         ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, sourcePath);
@@ -986,7 +986,7 @@ async function executeTool(toolName, args, projectId = null) {
     // ── renameFile ───────────────────────────────────────────────────────────
     if (toolName === 'renameFile') {
       const { filePath, newName } = args;
-      const ROOT = projectId 
+      const ROOT = projectId
         ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, filePath);
@@ -1001,7 +1001,7 @@ async function executeTool(toolName, args, projectId = null) {
     // ── deleteFile ───────────────────────────────────────────────────────────
     if (toolName === 'deleteFile') {
       const { filePath, reason } = args;
-      const ROOT = projectId 
+      const ROOT = projectId
         ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
@@ -1025,10 +1025,10 @@ async function executeTool(toolName, args, projectId = null) {
 app.post('/v1beta/models/:model::action', async (req, res) => {
   try {
     const { model, action } = req.params;
-    
+
     const targetUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}`;
     const urlObj = new URL(targetUrl);
-    
+
     // 원본 요청에서 쿼리 파라미터가 있으면 전달 (특히 alt=sse)
     for (const [key, value] of Object.entries(req.query)) {
       if (key !== 'key') { // 가짜 key 제거
@@ -1054,7 +1054,7 @@ app.post('/v1beta/models/:model::action', async (req, res) => {
         res.setHeader(k, v);
       }
     });
-    
+
     if (response.body) {
       for await (const chunk of response.body) {
         res.write(chunk);
@@ -1087,7 +1087,7 @@ app.post('/api/compute', async (req, res) => {
   if (oauthToken) {
     try {
       localAi = new GoogleGenAI({
-        apiKey: 'empty', 
+        apiKey: 'empty',
         httpOptions: {
           baseUrl: `http://localhost:${PORT}`,
           headers: { 'Authorization': `Bearer ${oauthToken}` }
@@ -1118,7 +1118,7 @@ app.post('/api/compute', async (req, res) => {
 
     // ── [자동 스킬 주입] URL 또는 리서치 요청 감지 시 research 도구 강제 포함 ──
     // research 스킬이 미장착이어도 URL/조사 키워드 탐지 시 웹 검색 도구 자동 추가
-    const URL_PATTERN   = /https?:\/\/|www\.|notion\.so|github\.com/i;
+    const URL_PATTERN = /https?:\/\/|www\.|notion\.so|github\.com/i;
     const RESEARCH_KEYS = /조사해|리서치|검색해|찾아봐|읽어봐|내용.*봐|정보.*알려|웹에서|구글|검색|url|링크/i;
     const needsWebSearch = URL_PATTERN.test(content) || RESEARCH_KEYS.test(content);
 
@@ -1155,8 +1155,8 @@ app.post('/api/compute', async (req, res) => {
     const parts = candidate?.content?.parts || [];
 
     // ── 도구 호출 처리 루프 ───────────────────────────────────────────────
-    const toolCallParts   = parts.filter(p => p.functionCall);
-    const textParts       = parts.filter(p => p.text);
+    const toolCallParts = parts.filter(p => p.functionCall);
+    const textParts = parts.filter(p => p.text);
 
     let finalText = '';
 
@@ -1179,7 +1179,7 @@ app.post('/api/compute', async (req, res) => {
       const followUpContents = [
         ...contents,
         { role: 'model', parts: toolCallParts },
-        { role: 'user',  parts: toolResults },
+        { role: 'user', parts: toolResults },
       ];
 
       let finalStream;
@@ -1229,7 +1229,7 @@ app.post('/api/compute', async (req, res) => {
 
     // ── 대화 히스토리 업데이트 ────────────────────────────────────────────
     if (finalText.trim()) {
-      conversationHistory.push({ role: 'user',  parts: [{ text: content }] });
+      conversationHistory.push({ role: 'user', parts: [{ text: content }] });
       conversationHistory.push({ role: 'model', parts: [{ text: finalText }] });
     }
 
@@ -1284,17 +1284,17 @@ app.post('/api/bugdog-alert', async (req, res) => {
     }
 
     const severityIcon = severity === 'CRITICAL' ? '🔴' : '🟡';
-    const timestamp    = detectedAt ? new Date(detectedAt).toLocaleString('ko-KR') : new Date().toLocaleString('ko-KR');
+    const timestamp = detectedAt ? new Date(detectedAt).toLocaleString('ko-KR') : new Date().toLocaleString('ko-KR');
 
     // ── 전체 감시 결과 요약 (allResults가 있는 경우) ─────────────────────────
     let resultsSummary = '';
     if (Array.isArray(allResults) && allResults.length > 0) {
       const criticals = allResults.filter(r => r.severity === 'CRITICAL');
-      const warnings  = allResults.filter(r => r.severity === 'WARNING');
+      const warnings = allResults.filter(r => r.severity === 'WARNING');
       if (criticals.length > 0 || warnings.length > 0) {
         resultsSummary = '\n\n[전체 감시 결과]\n';
         criticals.forEach(r => { resultsSummary += `🔴 ${r.service}: ${r.errorMsg || r.errorCode}\n`; });
-        warnings.forEach(r  => { resultsSummary += `🟡 ${r.service}: ${r.errorMsg || r.errorCode}\n`; });
+        warnings.forEach(r => { resultsSummary += `🟡 ${r.service}: ${r.errorMsg || r.errorCode}\n`; });
       }
     }
 
@@ -1305,7 +1305,7 @@ app.post('/api/bugdog-alert', async (req, res) => {
       `📍 감지 서비스: ${service}`,
       errorCode ? `🔑 에러 코드: ${errorCode}` : '',
       `💬 내용: ${errorMsg}`,
-      reportNo  ? `📋 CS 리포트: #${reportNo}` : '',
+      reportNo ? `📋 CS 리포트: #${reportNo}` : '',
       resultsSummary,
       '',
       severity === 'CRITICAL'
@@ -1353,10 +1353,10 @@ app.listen(PORT, () => {
 // Gemini(구독 세션)으로 처리 → .bridge/responses/ 에 응답 저장
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BRIDGE_REQ_DIR  = path.resolve(__dirname, '../.bridge/requests');
-const BRIDGE_RES_DIR  = path.resolve(__dirname, '../.bridge/responses');
-const BRIDGE_LOG_DIR  = path.resolve(__dirname, '../.bridge/logs');
-const BRIDGE_POLL_MS  = 3000;  // 3초마다 폴링
+const BRIDGE_REQ_DIR = path.resolve(__dirname, '../.bridge/requests');
+const BRIDGE_RES_DIR = path.resolve(__dirname, '../.bridge/responses');
+const BRIDGE_LOG_DIR = path.resolve(__dirname, '../.bridge/logs');
+const BRIDGE_POLL_MS = 3000;  // 3초마다 폴링
 
 // 디렉토리 보장
 [BRIDGE_REQ_DIR, BRIDGE_RES_DIR, BRIDGE_LOG_DIR].forEach(dir => {
@@ -1365,8 +1365,8 @@ const BRIDGE_POLL_MS  = 3000;  // 3초마다 폴링
 
 // agentKey별 크루 특성 시스템 보조 프롬프트
 const BRIDGE_AGENT_HINTS = {
-  prime:  '당신은 MyCrew의 Senior AI입니다. 깊이 있는 분석과 전문적인 판단을 제공하세요.',
-  nexus:  '당신은 MyCrew의 최고 전략 AI입니다. 통합적 시각으로 최종 결론을 도출하세요.',
+  prime: '당신은 MyCrew의 Senior AI입니다. 깊이 있는 분석과 전문적인 판단을 제공하세요.',
+  nexus: '당신은 MyCrew의 최고 전략 AI입니다. 통합적 시각으로 최종 결론을 도출하세요.',
   sonnet: '당신은 MyCrew의 창의적 AI입니다. 감각적이고 구체적인 콘텐츠를 생성하세요.',
 };
 

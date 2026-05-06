@@ -109,7 +109,8 @@ export default function LogDrawer() {
   const SLASH_COMMANDS = [
     { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
     { id: '/run',   label: '자율 릴레이 — PRD→Advisor 자동 완주', icon: 'play_arrow' },
-    { id: '/run-b', label: '단계별 확인 모드 — 매 단계 수동 승인',  icon: 'step_into'  },
+    { id: '/run-b', label: '중간 확인 자율완주 — Advisor 리뷰 후 CEO 승인 대기',  icon: 'step_into'  },
+    { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
   ];
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
@@ -168,23 +169,30 @@ export default function LogDrawer() {
     }
   }, [focusedTaskId, setActiveLogTab]);
 
-  // 로그 필터링: 타임라인은 선택된 태스크 기준, 채팅은 taskId가 부여되지 않은 글로벌(Ari 1:1 독대) 로그만 표시
   const displayLogs = activeLogTab === 'time'
     ? (focusedTaskId 
         ? timelineLogs.filter((log) => String(log.taskId) === String(focusedTaskId)) 
         : timelineLogs.filter((log) => {
+            if (!selectedProjectId) return false; // 프로젝트가 없으면 타임라인 표시 안함
+            
             // [Fix #10] 타임라인 오염 방지: projectId를 기준으로 필터링 (레거시는 proj-1)
             let logProjectId = log.projectId || 'proj-1';
             if (logProjectId === 'proj_default' || logProjectId === 'global_mycrew') logProjectId = 'proj-1';
-            if (selectedProjectId && logProjectId !== selectedProjectId) return false;
+            if (logProjectId !== selectedProjectId) return false;
             return true;
           })
       )
     : chatLogs.filter((log) => {
-        // [B-04 Fix] 프로젝트 간 채팅 로그 격리 (projectId가 없는 레거시 로그는 'proj-1'로 간주)
+        // [B-04 Fix] 프로젝트 간 채팅 로그 격리
+        // selectedProjectId가 없으면, 명시적으로 projectId가 없는 글로벌 에러 메시지만 표시
+        if (!selectedProjectId) {
+          return !log.projectId;
+        }
+
         let logProjectId = log.projectId || 'proj-1';
         if (logProjectId === 'proj_default' || logProjectId === 'global_mycrew') logProjectId = 'proj-1';
         if (logProjectId !== selectedProjectId) return false;
+
         // [Fix] 엔진 내부 진행 상태 로그(> 로 시작하는 system/ari 로그)는 채팅탭에서 숨김 (타임라인 전용 속성)
         if (log.source === 'system' && typeof log.message === 'string' && log.message.trim().startsWith('>')) {
           return false;
@@ -407,9 +415,10 @@ export default function LogDrawer() {
     const trimmedText = inputText.trim();
     setShowMention(false); // 전송 시 멘션 드롭다운 닫기
 
-    // ── [Phase 36] /run, /run-b 파이프라인 슬래시 커맨드 인터셉트 ────────────
-    if (trimmedText === '/run' || trimmedText === '/run-b') {
-      const pipelineMode = trimmedText === '/run-b' ? 'run-b' : 'run';
+    // ── [Phase 36] /run, /run-b, /stop 파이프라인 슬래시 커맨드 인터셉트 ────────────
+    if (trimmedText.startsWith('/run') || trimmedText.startsWith('/run-b') || trimmedText.startsWith('/stop')) {
+      const isStop = trimmedText.startsWith('/stop');
+      const pipelineMode = isStop ? 'stop' : (trimmedText.startsWith('/run-b') ? 'run-b' : 'run');
       const projectId = selectedProjectId;
       if (!projectId) {
         useChatStore.getState().appendChat({
@@ -419,13 +428,15 @@ export default function LogDrawer() {
         setBtnMode('send'); isSendingRef.current = false; setInputText('');
         return;
       }
-      fetch(`${SERVER_URL}/api/projects/${projectId}/pipeline/${pipelineMode}`, { method: 'POST' })
+      fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
         .then(async (res) => {
           const data = await res.json();
-          if (!res.ok) throw new Error(data.error || '파이프라인 시작 실패');
-          const msg = pipelineMode === 'run'
-            ? `🚀 /run 파이프라인 시작 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
-            : `⏸ /run-b 단계별 확인 모드 시작`;
+          if (!res.ok) throw new Error(data.error || '파이프라인 명령 실패');
+          const msg = isStop
+            ? `🛑 /stop 파이프라인이 정상적으로 종료(초기화)되었습니다.`
+            : (pipelineMode === 'run'
+              ? `🚀 /run 파이프라인 시작 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
+              : `⏸ /run-b 단계별 확인 모드 시작`);
           useTimelineStore.getState().appendTimeline({
             level: 'info', message: msg, agentId: 'system',
             timestamp: new Date().toISOString(), projectId,
@@ -433,13 +444,37 @@ export default function LogDrawer() {
         })
         .catch((err) => {
           useTimelineStore.getState().appendTimeline({
-            level: 'error', message: `❌ 파이프라인 시작 실패: ${err.message}`,
+            level: 'error', message: `❌ ${isStop ? '파이프라인 종료 실패' : '파이프라인 시작 실패'}: ${err.message}`,
             agentId: 'system', timestamp: new Date().toISOString(), projectId,
           });
         })
         .finally(() => { setBtnMode('send'); isSendingRef.current = false; });
       setInputText('');
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      return;
+    }
+
+    // ── [Phase 32] 버그독 커맨드 인터셉트 (타임라인 휘발 방지) ────────────
+    if (trimmedText.startsWith('/bugdog기록')) {
+      const projectId = selectedProjectId;
+      if (!projectId) {
+        useChatStore.getState().appendChat({
+          level: 'error', message: '프로젝트를 먼저 선택해주세요.',
+          agentId: 'system', timestamp: new Date().toISOString(),
+        });
+        setBtnMode('send'); isSendingRef.current = false; setInputText('');
+        return;
+      }
+      const ariSocket = getAriSocket();
+      ariSocket.emit('ari:message', {
+        content: trimmedText,
+        channel: 'dashboard',
+        author: 'CEO',
+        projectId,
+      });
+      setInputText('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+      isSendingRef.current = false;
       return;
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -810,9 +845,21 @@ export default function LogDrawer() {
                   const time     = new Date(log.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
                   const prevLog  = i > 0 ? mergedTimeline[i - 1] : null;
                   const sameAuthor = prevLog && prevLog.agentId === log.agentId;
+                  // [Phase 36] 메시지 내의 #글로벌ID 를 #프로젝트태스크번호 로 동적 변환
+                  let transformedMsg = log.message;
+                  if (typeof transformedMsg === 'string') {
+                    transformedMsg = transformedMsg.replace(/#(\d+)/g, (match, idStr) => {
+                      const matchedTask = Object.values(tasks).find(t => String(t.id) === idStr);
+                      if (matchedTask && matchedTask.project_task_num != null) {
+                        return `#${matchedTask.project_task_num}`;
+                      }
+                      return match;
+                    });
+                  }
+
                   // [S1-4] 내부 태그 필터 + 레거시 프리픽스 제거
                   const cleanMsg = scrubContent(
-                    log.message
+                    transformedMsg
                       .replace(/^💬\s*[\w가-힣]+:\s*/, '')
                       .replace(/^[\w가-힣]+:\s*/, (m) => isUser ? '' : m)
                   );
@@ -829,7 +876,7 @@ export default function LogDrawer() {
                           maxWidth: '90%', lineHeight: 1.5
                         }}>
                           <span className="material-symbols-outlined" style={{ fontSize: isLongMessage ? '1rem' : '0.85rem', color: 'var(--text-muted)', marginTop: isLongMessage ? '0.1rem' : 0 }}>info</span>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'keep-all', wordWrap: 'break-word', flex: 1 }}>{log.message}</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'keep-all', wordWrap: 'break-word', flex: 1 }}>{transformedMsg}</span>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: isLongMessage ? '0.15rem' : 0 }}>{time}</span>
                         </div>
                       </div>
@@ -1173,6 +1220,52 @@ export default function LogDrawer() {
                 onKeyDown={(e) => {
                   if (showMention && (e.key === 'Escape')) { e.preventDefault(); setShowMention(false); return; }
                   if (showSlash && (e.key === 'Escape')) { e.preventDefault(); setShowSlash(false); return; }
+                  
+                  if (showSlash && filteredSlash.length > 0 && e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const cmd = filteredSlash[0];
+                    setShowSlash(false);
+
+                    // ── 파이프라인 명령어: 자동완성 없이 즉시 실행 ──────────
+                    if (cmd.id === '/run' || cmd.id === '/run-b') {
+                      const pipelineMode = cmd.id === '/run-b' ? 'run-b' : 'run';
+                      const pid = selectedProjectId;
+                      setInputText('');
+                      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+                      if (!pid) {
+                        useChatStore.getState().appendChat({
+                          level: 'error', message: '프로젝트를 먼저 선택해주세요.',
+                          agentId: 'system', timestamp: new Date().toISOString(),
+                        });
+                        return;
+                      }
+                      fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(pid)}/pipeline/${pipelineMode}`, { method: 'POST' })
+                        .then(async (res) => {
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.error || '파이프라인 시작 실패');
+                          useChatStore.getState().appendChat({
+                            level: 'info',
+                            message: `${cmd.id} 파이프라인 시작됨 — ${data.title || ''}`,
+                            agentId: 'system', timestamp: new Date().toISOString(),
+                          });
+                        })
+                        .catch((err) => {
+                          useChatStore.getState().appendChat({
+                            level: 'error', message: `파이프라인 오류: ${err.message}`,
+                            agentId: 'system', timestamp: new Date().toISOString(),
+                          });
+                        });
+                      return;
+                    }
+
+                    // ── 그 외 명령어: 기존 자동완성 ──────────────────────────
+                    const sIdx = inputText.lastIndexOf('/');
+                    const newText = inputText.slice(0, sIdx) + `${cmd.id} `;
+                    setInputText(newText);
+                    return;
+                  }
+
+
                   handleKeyDown(e);
                 }}
                 onBlur={() => {

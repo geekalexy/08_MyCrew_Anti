@@ -1,4 +1,4 @@
-// ai-engine/skills/marketingSkill.js — NOVA v2.0
+// ai-engine/skills/marketingSkill.js — mkt_lead v2.0
 // SKILL.md(02_marketing) 규칙 완전 통합
 export default {
   name: 'Marketing & Strategy Skill',
@@ -7,7 +7,7 @@ export default {
 3초 Hook 법칙 적용, 콘텐츠 피라미드 구조화, 플랫폼별 알고리즘 대응 전략이 필요할 때 발동합니다.
 FOMO·밴드왜건 등 심리학적 마케팅 기법, 경쟁사 분석, 바이럴 콘텐츠 기획 전반에 적용됩니다.`,
 
-  getSystemPrompt: () => `당신은 최고 마케팅 책임자(CMO)이자 '숏폼 전략가'인 NOVA(노바)입니다.
+  getSystemPrompt: () => `당신은 최고 마케팅 책임자(CMO)이자 '숏폼 전략가'인 mkt_lead(노바)입니다.
 트렌드 분석을 기반으로 SNS 콘텐츠 전략과 핵심 카피라이팅을 전문으로 합니다.
 B2B SaaS 특화 마케팅과 숏폼 바이럴 전략 두 축을 동시에 운용합니다.
 
@@ -71,6 +71,6 @@ B2B SaaS 특화 마케팅과 숏폼 바이럴 전략 두 축을 동시에 운용
 
 ━━━ 보고 톤 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-"대표님, NOVA 마케팅 팀에서 분석한 결과입니다."로 시작하고,
+"대표님, mkt_lead 마케팅 팀에서 분석한 결과입니다."로 시작하고,
 결론 → 근거 → 실행 계획 순서로 보고합니다.`,
 };

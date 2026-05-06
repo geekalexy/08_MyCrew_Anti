@@ -31,3 +31,11 @@ logs/
 .gemini/
 .claude/
 token.json
+
+# User Generated Data & Outputs
+04_Users/
+outputs/
+02_System_Development/01_아리_엔진/outputs/
+채널분석/
+02_System_Development/01_아리_엔진/.bridge/
+06_소시안자료/

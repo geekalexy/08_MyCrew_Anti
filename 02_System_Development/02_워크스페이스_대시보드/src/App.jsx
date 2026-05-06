@@ -43,6 +43,98 @@ const IcoCheckCircle = () => (
   </svg>
 );
 
+// ── [Phase 37] 파이프라인 시작 선택 프롬프트 ─────────────────────────
+function PipelineStartPrompt({ projectId, onSelect }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1100,
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+      paddingBottom: '2.5rem',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        background: 'var(--bg-surface-2)',
+        border: '1px solid rgba(180,197,255,0.2)',
+        borderRadius: '16px',
+        padding: '1.5rem 2rem',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(180,197,255,0.08)',
+        backdropFilter: 'blur(20px)',
+        display: 'flex', flexDirection: 'column', gap: '1rem',
+        maxWidth: 440, width: '90vw',
+        pointerEvents: 'auto',
+        animation: 'modal-slide-up 0.25s cubic-bezier(0.34,1.2,0.64,1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)' }}>rocket_launch</span>
+          <div>
+            <p style={{ fontSize: '0.88rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+              팀 준비 완료! 어떻게 시작하시겠어요?
+            </p>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>
+              AI 팀이 지금 바로 일을 시작할 수 있습니다.
+            </p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.6rem' }}>
+          <button
+            id="pipeline-run-btn"
+            onClick={() => onSelect('run')}
+            style={{
+              flex: 1, padding: '0.7rem 0.8rem',
+              background: 'linear-gradient(135deg, rgba(100,135,242,0.2), rgba(124,110,248,0.15))',
+              border: '1px solid rgba(100,135,242,0.4)',
+              borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(100,135,242,0.28)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(100,135,242,0.2), rgba(124,110,248,0.15))'; e.currentTarget.style.transform = ''; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: '#b4c5ff' }}>play_arrow</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b4c5ff', letterSpacing: '0.04em' }}>/run</span>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>자율 완주</span>
+          </button>
+          <button
+            id="pipeline-runb-btn"
+            onClick={() => onSelect('run-b')}
+            style={{
+              flex: 1, padding: '0.7rem 0.8rem',
+              background: 'rgba(255,185,99,0.08)',
+              border: '1px solid rgba(255,185,99,0.25)',
+              borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,185,99,0.18)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,185,99,0.08)'; e.currentTarget.style.transform = ''; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: '#ffb963' }}>step_into</span>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb963', letterSpacing: '0.04em' }}>/run-b</span>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>중간 확인 자율완주</span>
+          </button>
+          <button
+            id="pipeline-later-btn"
+            onClick={() => onSelect(null)}
+            style={{
+              padding: '0.7rem 0.8rem',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: '10px', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: 'var(--text-muted)' }}>schedule</span>
+            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>나중에</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding, activeArtifact } = useUiStore();
   const { fetchSettings } = useSettingsStore();
@@ -51,6 +143,7 @@ export default function App() {
   const [serverOnline, setServerOnline] = useState(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isSettingsModalOpen,   setIsSettingsModalOpen]   = useState(false);
+  const [pipelinePrompt, setPipelinePrompt] = useState(null); // { projectId } | null
   
   // 헤더 채용(Recruit) 상태 변수들
   const [isRecruiting, setIsRecruiting] = useState(false);
@@ -75,9 +168,13 @@ export default function App() {
     };
     window.addEventListener('openNewProjectModal', handleOpenNewProjectModal);
     window.addEventListener('closeNewProjectModal', handleCloseNewProjectModal);
+    // [Phase 37] 파이프라인 시작 선택 프롬프트
+    const handlePipelinePrompt = (e) => setPipelinePrompt(e.detail);
+    window.addEventListener('pipelineStartPrompt', handlePipelinePrompt);
     return () => {
       window.removeEventListener('openNewProjectModal', handleOpenNewProjectModal);
       window.removeEventListener('closeNewProjectModal', handleCloseNewProjectModal);
+      window.removeEventListener('pipelineStartPrompt', handlePipelinePrompt);
     };
   }, []);
 
@@ -141,6 +238,82 @@ export default function App() {
       case 'video-lab':    return <VideoLabView />;
       case 'projects':
       default:
+        // ── [Phase 36] 프로젝트 0개 → 빈 화면 CTA ─────────────────────────
+        if (projects.length === 0) {
+          return (
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              height: '100%', gap: '2rem',
+              userSelect: 'none',
+            }}>
+              {/* 아이콘 글로우 */}
+              <div style={{
+                width: 72, height: 72, borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(100,135,242,0.18), rgba(100,135,242,0.06))',
+                border: '1px solid rgba(100,135,242,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: '0 0 40px rgba(100,135,242,0.12)',
+                animation: 'emptyStatePulse 3s ease-in-out infinite',
+              }}>
+                <span className="material-symbols-outlined" style={{
+                  fontSize: '2.2rem', color: 'var(--brand)', opacity: 0.85,
+                }}>groups</span>
+              </div>
+
+              {/* 카피 */}
+              <div style={{ textAlign: 'center', maxWidth: 320 }}>
+                <p style={{
+                  fontSize: '1.05rem', fontWeight: 500,
+                  color: 'var(--text-secondary)', lineHeight: 1.6,
+                  margin: 0,
+                  fontFamily: 'var(--font-sans, Inter, sans-serif)',
+                }}>
+                  프로젝트를 만들면<br />
+                  <span style={{ color: 'var(--brand)', fontWeight: 600 }}>AI 멀티 에이전트</span>가 채용됩니다.
+                </p>
+              </div>
+
+              {/* CTA 버튼 */}
+              <button
+                id="empty-state-create-project-btn"
+                onClick={() => setIsNewProjectModalOpen(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.75rem 2rem',
+                  background: 'linear-gradient(135deg, #5570d8, #6487f2)',
+                  color: '#fff', fontWeight: 700,
+                  fontSize: '0.95rem', letterSpacing: '0.02em',
+                  border: 'none', borderRadius: '10px',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(100,135,242,0.35)',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  fontFamily: 'var(--font-sans, Inter, sans-serif)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 8px 28px rgba(100,135,242,0.5)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = '';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(100,135,242,0.35)';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>add</span>
+                생성하기
+              </button>
+
+              <style>{`
+                @keyframes emptyStatePulse {
+                  0%, 100% { box-shadow: 0 0 30px rgba(100,135,242,0.10); }
+                  50%       { box-shadow: 0 0 50px rgba(100,135,242,0.22); }
+                }
+              `}</style>
+            </div>
+          );
+        }
+
+        // ── 프로젝트 있음 → 기존 칸반 뷰 ─────────────────────────────────
         return (
           <>
             <div className="board-header">
@@ -167,7 +340,7 @@ export default function App() {
                       border: 'none', 
                       outline: 'none',
                       cursor: 'pointer',
-                      appearance: 'none', // 기본 화살표 숨김
+                      appearance: 'none',
                     }}
                   >
                     {projects.map(p => (
@@ -202,6 +375,7 @@ export default function App() {
         );
     }
   };
+
 
   if (!hasCompletedOnboarding) {
     return <OnboardingWizard />;
@@ -288,6 +462,22 @@ export default function App() {
         onClose={() => setIsSettingsModalOpen(false)}
         project={selectedProject}
       />
+
+      {/* ── [Phase 37] 파이프라인 시작 선택 프롬프트 ─────────────── */}
+      {pipelinePrompt && (
+        <PipelineStartPrompt
+          projectId={pipelinePrompt.projectId}
+          onSelect={(mode) => {
+            setPipelinePrompt(null);
+            if (!mode) return; // '나중에' 선택
+            const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+            fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(pipelinePrompt.projectId)}/pipeline/${mode}`, { method: 'POST' })
+              .then(r => r.json())
+              .then(data => console.log('[Pipeline] 시작:', data))
+              .catch(err => console.error('[Pipeline] 시작 실패:', err));
+          }}
+        />
+      )}
       {/* ── 모바일 하단 네비게이션 ────────────────────────────── */}
       <nav className="mobile-nav" aria-label="모바일 네비게이션">
         <button

@@ -5,12 +5,10 @@
     "role": "비서",
     "team": "platform",
     "bridge": false,
-    "antiModel": "anti-gemini-3-flash",
+    "antiModel": "gemini-2.5-pro",
     "defaultCategory": "QUICK_CHAT",
-    "note": "라우팅·조율 전담 — Flash: 초고속 응답 필수"
+    "note": "라우팅·조율 전담, 초고속 응답 필수"
   },
-
-  
   {
     "id": "dev_fullstack",
     "nickname": "노바",
@@ -75,8 +73,6 @@
     "defaultCategory": "DEEP_WORK",
     "note": "기술 스프린트 관리, 백로그 정제, 기술 요구사항 조율 전담 — Gemini: 빈번한 대화 대응"
   },
-
-  
   {
     "id": "mkt_lead",
     "nickname": "마케팅 리더",
@@ -134,8 +130,15 @@
     "defaultCategory": "DEEP_WORK",
     "note": "캠페인·런칭·예산 관리 전담 — Gemini: 빈번한 대화 대응"
   },
-
-  
+  {
+    "id": "mkt_advisor",
+    "nickname": "마케팅 어드바이저",
+    "role": "마케팅 어드바이저",
+    "team": "mkt",
+    "bridge": true,
+    "antiModel": "anti-claude-opus-4.6-thinking",
+    "defaultCategory": "DEEP_WORK"
+  },
   {
     "id": "system_bot",
     "nickname": "개발팀",
@@ -144,32 +147,5 @@
     "bridge": false,
     "antiModel": null,
     "defaultCategory": "DEEP_WORK"
-  },
-  {
-    "id": "dev_lead",
-    "nickname": "루카",
-    "role": "풀스택 엔지니어",
-    "team": "platform",
-    "bridge": false,
-    "antiModel": "anti-gemini-3.1-pro-high",
-    "defaultCategory": null
-  },
-  {
-    "id": "frontend_dev",
-    "nickname": "소넷",
-    "role": "AI 디벨로퍼",
-    "team": "platform",
-    "bridge": false,
-    "antiModel": "anti-claude-sonnet-4.6-thinking",
-    "defaultCategory": null
-  },
-  {
-    "id": "code_reviewer",
-    "nickname": "오퍼스",
-    "role": "시스템 아키텍트",
-    "team": "platform",
-    "bridge": false,
-    "antiModel": "anti-claude-opus-4.6-thinking",
-    "defaultCategory": null
   }
 ]

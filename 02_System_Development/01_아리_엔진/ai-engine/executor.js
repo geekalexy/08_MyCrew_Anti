@@ -33,18 +33,18 @@ const AGENT_SIGNATURE_MODELS = {};
 const _HARDCODED_FALLBACK = {
   // [Phase 33] agents.json Role ID 마이그레이션 반영
   bridge_agents: [
-    'dev_fullstack', 'dev_ux', 'dev_senior', 'dev_backend', 'dev_qa', 'dev_advisor',
-    'mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_pm',
+    'dev_fullstack', 'dev_ux', 'dev_senior', 'dev_qa', 'dev_advisor',
+    'mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_advisor',
   ],
   DEFAULT_MODELS: {
     // 개발팀
     dev_fullstack: MODEL.PRO,    dev_ux: MODEL.PRO,
-    dev_senior:    MODEL.SONNET, dev_backend: MODEL.SONNET,
-    dev_qa:        MODEL.OPUS,   dev_advisor: MODEL.OPUS,
+    dev_senior:    MODEL.SONNET, dev_qa: MODEL.OPUS,
+    dev_advisor:   MODEL.OPUS,
     // 마케팅팀
     mkt_lead:      MODEL.PRO,    mkt_designer: MODEL.PRO,
     mkt_planner:   MODEL.SONNET, mkt_video: MODEL.SONNET,
-    mkt_analyst:   MODEL.OPUS,   mkt_pm: MODEL.OPUS,
+    mkt_analyst:   MODEL.OPUS,   mkt_advisor: MODEL.OPUS,
     // platform
     assistant:     MODEL.PRO,
   },
@@ -332,6 +332,46 @@ class Executor {
       actualContent = taskContent.replace(/--opus/g, '').trim();
     }
 
+    // [Phase 37] #N 카드 레퍼런스 자동 resolve — 환각 리뷰 차단
+    // next_sprint로 생성된 카드 content에 "#3" 형태로 참조된 카드의 실제 산출물을 주입
+    const cardRefMatches = [...new Set(actualContent.match(/#(\d+)/g) || [])];
+    if (cardRefMatches.length > 0 && taskId) {
+      try {
+        const refInjections = [];
+        // 현재 실행 중인 태스크의 project_id 조회
+        const currentTask = await dbManager.getTaskById(taskId);
+        const projectId = currentTask?.project_id;
+
+        for (const ref of cardRefMatches) {
+          const refNum = parseInt(ref.slice(1), 10);
+          if (isNaN(refNum)) continue;
+
+          // project_task_num → task.id 조회
+          const refTaskId = await dbManager.getTaskIdByProjectNum(projectId, refNum);
+          if (!refTaskId) continue;
+
+          // 해당 카드의 마지막 에이전트 산출물(코멘트) 조회
+          const lastOutput = await dbManager.getLastAgentComment(refTaskId);
+          if (!lastOutput) continue;
+
+          // 참조 카드의 타이틀도 조회 (컨텍스트 명확화)
+          const refTask = await dbManager.getTaskById(refTaskId);
+          const refTitle = refTask?.title || `Task #${refNum}`;
+
+          refInjections.push(
+            `\n\n---\n[🔗 참조 카드 #${refNum}: ${refTitle}]\n아래는 이전 담당자가 작성한 실제 산출물입니다. 이를 바탕으로 작업하세요:\n\n${lastOutput}\n---`
+          );
+          console.log(`[CardRef] #${refNum}(id:${refTaskId}) 산출물 ${lastOutput.length}자 주입 완료`);
+        }
+
+        if (refInjections.length > 0) {
+          actualContent += refInjections.join('');
+        }
+      } catch (err) {
+        console.warn('[CardRef] 카드 레퍼런스 resolve 중 오류 (무시):', err.message);
+      }
+    }
+
     // [Phase 18-1 Ollie GAP-2] URL 스크래핑 및 Context 주입
     const urlMatches = actualContent.match(/https?:\/\/[^\s]+/g);
     if (urlMatches && urlMatches.length > 0) {
@@ -456,11 +496,12 @@ class Executor {
     const livingRules = ruleHarvester.getAppliedRules();
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
+    let taskInfo = null;
     if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'assistant') {
       let projectSpecificRole = '';
       if (taskId) {
         try {
-          const taskInfo = await dbManager.getTaskById(taskId);
+          taskInfo = await dbManager.getTaskById(taskId);
           if (taskInfo && taskInfo.project_id) {
             const experimentRole = await dbManager.getAgentRoleInProject(agentId, taskInfo.project_id);
             if (experimentRole) {
@@ -472,7 +513,9 @@ class Executor {
         }
       }
 
-      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n`;
+      const relayInstruction = `\n\n[자율 릴레이 바통 터치 규칙 — Phase 37 MANDATORY]\n작업 완료 후, 본문 최하단에 다음 목적에 맞는 태그를 작성하세요.\n\n🚨 [dev_advisor 필수 검수 규칙 — 모든 규칙보다 우선 적용]\n아래 상황에서는 반드시 review_request로 dev_advisor에게 넘겨야 합니다:\n  ✅ 코드(백엔드/프론트엔드/API)를 직접 작성하여 완료한 경우\n  ✅ 아키텍처 설계 문서를 완성한 경우\n  ✅ 데이터베이스 스키마를 설계/완성한 경우\n  ✅ 핵심 비즈니스 로직을 구현한 경우\n  ✅ QA 테스트를 완료하고 최종 결과를 보고하는 경우\n→ 위 경우 반드시: "assignee": "dev_advisor"\n\n━━ 방법 A: 핑퐁 (같은 카드, 다른 담당자에게) ━━\n사용 시점: 동일 산출물에 대한 반복 작업\n[핑퐁 키워드 패턴 — 아래 상황에서는 반드시 <review_request> 사용]\n  • 구현 완료 → 코드 리뷰 요청 → assignee: dev_advisor (필수)\n  • 코드 리뷰 완료 → 피드백 반영 → assignee: 원래 구현자\n  • 피드백 반영 완료 → 재검토 요청 → assignee: dev_advisor\n  • 재검토 통과 → QA 요청 → assignee: dev_qa\n  • QA 완료 → QA 결과 보고 → assignee: dev_advisor (최종 승인)\n  • 문서/설계 작성 완료 → 검토 요청 → assignee: dev_advisor\n<review_request>\n{\n  "title": "[리뷰] 작업 제목 (예: 텔레그램 미니앱 백엔드 API 코드 리뷰)",\n  "assignee": "dev_advisor",\n  "message": "검토 요청 내용 및 주요 구현 사항 요약"\n}\n</review_request>\n\n━━ 방법 B: 신규 카드 (완전히 새로운 업무 단위) ━━\n사용 시점: 새로운 기능·컴포넌트·시작\n주의: PRD/아키텍처 완료 후 바로 개발 카드를 만들지 말 것. 반드시 dev_advisor 검수 먼저.\n  • 아키텍처 승인 완료 → 백엔드 개발 시작\n  • 기능 A 완료 + 리뷰 통과 → 독립적인 기능 B 시작\n  • QA 중 신규 버그 발견 → 버그 수정 카드 생성\n<next_sprint>\n{\n  "title": "새 카드 제목",\n  "content": "새 담당자가 수행할 지시사항",\n  "assignee": "다음 담당자 역할 ID"\n}\n</next_sprint>\n\n━━ 방법 C: 릴레이 종료 (프로젝트/스프린트 완전 종료) ━━\n사용 시점: 모든 요구사항이 구현되고 QA까지 통과하여 더 이상 진행할 작업이 없는 경우.\n이 태그를 사용하면 자율 릴레이가 깔끔하게 종료되며 CEO의 최종 승인을 대기합니다.\n<pipeline_end>\n{\n  "message": "최종 완성되었습니다. 승인 부탁드립니다."\n}\n</pipeline_end>\n\n🔴 절대 금지 사항:\n- 본인(현재 담당자)에게 넘기는 것 금지\n- 코드 작성 완료 후 dev_advisor 검수 없이 next_sprint로 다음 개발 카드 생성 금지\n- dev_advisor 미거침 직행 개발 릴레이 금지\n`;
+      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다.\n이 태그를 사용하면 프로젝트의 input/output 폴더 구조에 맞게 시스템이 물리적으로 파일을 자동 저장합니다.\n🚨 주의: <file_operations> 태그는 시스템 백그라운드에서 처리되므로 사용자 화면에는 코드가 보이지 않습니다.\n따라서 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문(채팅창)에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output", // "input" 또는 "output"\n    "path": "code/backend/main.js", // 하위 폴더 및 파일명\n    "content": "여기에 저장할 파일 내용 전체를 작성하세요..."\n  }\n]\n</file_operations>\n`;
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
 
@@ -579,6 +622,49 @@ class Executor {
 
       const parsed = this._extractThoughtProcess(result);
 
+      // [B-2] File I/O 파서 및 물리적 저장 연동 (Hardcoding 타파)
+      if (parsed.file_operations && Array.isArray(parsed.file_operations)) {
+        if (!taskInfo && taskId) {
+           taskInfo = await dbManager.getTaskById(taskId).catch(()=>null);
+        }
+        if (taskInfo && taskInfo.project_id) {
+          // [Fix] 실제 생성된 물리적 프로젝트 폴더명 계산 로직 추가
+          const projectRow = await dbManager.getProjectById(taskInfo.project_id).catch(()=>null);
+          const projectDirName = projectRow ? `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}` : taskInfo.project_id;
+          const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+          const ioLogs = [];
+          for (const op of parsed.file_operations) {
+            if (op.action === 'write' && op.path) {
+              // [Fix] 하드코딩된 폴더명 대신 실제 디스크 구조에 매핑
+              const targetFolder = (op.type === 'input') ? 'inputs' : 'outputs';
+              const safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+              const absolutePath = path.join(projectRoot, targetFolder, safePath);
+
+              // [Fix] Path Traversal 이중 방어 — projectRoot 외부 접근 차단
+              if (!absolutePath.startsWith(projectRoot)) {
+                console.error(`[File I/O] 경로 탈출 시도 차단: ${absolutePath}`);
+                ioLogs.push(`- ⛔ \`${op.path}\` 경로 탈출 시도 차단됨 (보안 정책)`);
+                continue;
+              }
+              
+              try {
+                fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+                fs.writeFileSync(absolutePath, op.content || '', 'utf-8');
+                ioLogs.push(`- 💾 \`${targetFolder}/${safePath}\` 물리 디스크 저장 완료`);
+              } catch(e) {
+                console.error(`[File I/O] 파일 쓰기 실패: ${absolutePath}`, e.message);
+                ioLogs.push(`- ❌ \`${targetFolder}/${safePath}\` 디스크 저장 실패: ${e.message}`);
+              }
+            }
+          }
+          if (ioLogs.length > 0) {
+            parsed.finalText = parsed.finalText + '\n\n**[File I/O System Result]**\n' + ioLogs.join('\n');
+          }
+        } else {
+          console.warn('[File I/O] project_id를 찾을 수 없어 물리적 저장을 건너뜁니다.');
+        }
+      }
+
       return {
         text: parsed.finalText,
         model: result.model,
@@ -627,10 +713,57 @@ class Executor {
       finalText = finalText.replace(/<working>[\s\S]*?<\/working>/g, '').trim();
     }
 
+    // [Phase 36-A] 자율 릴레이 — next_sprint (신규 카드) 파싱
+    let nextSprint = null;
+    const sprintMatch = finalText.match(/<next_sprint>([\s\S]*?)<\/next_sprint>/i);
+    if (sprintMatch) {
+      try {
+        nextSprint = JSON.parse(sprintMatch[1].trim());
+      } catch (e) {
+        console.warn('[Executor Parser] next_sprint JSON 파싱 실패:', e.message);
+      }
+      finalText = finalText.replace(/<next_sprint>[\s\S]*?<\/next_sprint>/ig, '').trim();
+    }
+
+    // [Phase 36-B] 자율 릴레이 — review_request (핑퐁: 같은 카드 재할당) 파싱
+    let reviewRequest = null;
+    const reviewMatch = finalText.match(/<review_request>([\s\S]*?)<\/review_request>/i);
+    if (reviewMatch) {
+      try {
+        reviewRequest = JSON.parse(reviewMatch[1].trim());
+      } catch (e) {
+        console.warn('[Executor Parser] review_request JSON 파싱 실패:', e.message);
+      }
+      finalText = finalText.replace(/<review_request>[\s\S]*?<\/review_request>/ig, '').trim();
+    }
+
+    let pipelineEnd = false;
+    const endMatch = finalText.match(/<pipeline_end>([\s\S]*?)<\/pipeline_end>/i);
+    if (endMatch) {
+      pipelineEnd = true;
+      finalText = finalText.replace(/<pipeline_end>[\s\S]*?<\/pipeline_end>/ig, '').trim();
+    }
+
+    // [File I/O] 파일 물리 저장 파싱 추가
+    let fileOperations = null;
+    const fileOpMatch = finalText.match(/<file_operations>([\s\S]*?)<\/file_operations>/i);
+    if (fileOpMatch) {
+      try {
+        fileOperations = JSON.parse(fileOpMatch[1].trim());
+      } catch (e) {
+        console.warn('[Executor Parser] file_operations JSON 파싱 실패:', e.message);
+      }
+      // 파일 컨텐츠는 너무 길 수 있으므로, 로그에 남기지 않고 제외함 (옵션)
+      finalText = finalText.replace(/<file_operations>[\s\S]*?<\/file_operations>/ig, '\n[파일 I/O 저장 로직 수행됨]\n').trim();
+    }
+
     // _meta 기존 필드 보존 (thinking_tokens, bridge_id 등 어댑터 필드 유실 방지)
     const _metaOut = { ..._metaIn, thought_process: thoughtProcess || null };
+    if (nextSprint) _metaOut.next_sprint = nextSprint;
+    if (reviewRequest) _metaOut.review_request = reviewRequest;
+    if (pipelineEnd) _metaOut.pipeline_end = true;
 
-    return { finalText, thoughtProcess, _meta: _metaOut };
+    return { finalText, thoughtProcess, file_operations: fileOperations, _meta: _metaOut };
   }
 
   /**
@@ -692,20 +825,58 @@ class Executor {
         }
       }
 
-      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n${projectSpecificRole}\n`;
+      const relayInstruction = `\n\n[자율 릴레이 바통 터치 규칙 — Phase 37 MANDATORY]\n작업 완료 후, 본문 최하단에 다음 목적에 맞는 태그를 작성하세요.\n\n🚨 [dev_advisor 필수 검수 규칙 — 모든 규칙보다 우선 적용]\n아래 상황에서는 반드시 review_request로 dev_advisor에게 넘겨야 합니다:\n  ✅ 코드(백엔드/프론트엔드/API)를 직접 작성하여 완료한 경우\n  ✅ 아키텍처 설계 문서를 완성한 경우\n  ✅ 데이터베이스 스키마를 설계/완성한 경우\n  ✅ 핵심 비즈니스 로직을 구현한 경우\n  ✅ QA 테스트를 완료하고 최종 결과를 보고하는 경우\n→ 위 경우 반드시: "assignee": "dev_advisor"\n\n━━ 방법 A: 핑퐁 (같은 카드, 다른 담당자에게) ━━\n사용 시점: 동일 산출물에 대한 반복 작업\n[핑퐁 키워드 패턴 — 아래 상황에서는 반드시 <review_request> 사용]\n  • 구현 완료 → 코드 리뷰 요청 → assignee: dev_advisor (필수)\n  • 코드 리뷰 완료 → 피드백 반영 → assignee: 원래 구현자\n  • 피드백 반영 완료 → 재검토 요청 → assignee: dev_advisor\n  • 재검토 통과 → QA 요청 → assignee: dev_qa\n  • QA 완료 → QA 결과 보고 → assignee: dev_advisor (최종 승인)\n  • 문서/설계 작성 완료 → 검토 요청 → assignee: dev_advisor\n<review_request>\n{\n  "title": "[리뷰] 작업 제목 (예: 텔레그램 미니앱 백엔드 API 코드 리뷰)",\n  "assignee": "dev_advisor",\n  "message": "검토 요청 내용 및 주요 구현 사항 요약"\n}\n</review_request>\n\n━━ 방법 B: 신규 카드 (완전히 새로운 업무 단위) ━━\n사용 시점: 새로운 기능·컴포넌트·시작\n주의: PRD/아키텍처 완료 후 바로 개발 카드를 만들지 말 것. 반드시 dev_advisor 검수 먼저.\n  • 아키텍처 승인 완료 → 백엔드 개발 시작\n  • 기능 A 완료 + 리뷰 통과 → 독립적인 기능 B 시작\n  • QA 중 신규 버그 발견 → 버그 수정 카드 생성\n<next_sprint>\n{\n  "title": "새 카드 제목",\n  "content": "새 담당자가 수행할 지시사항",\n  "assignee": "다음 담당자 역할 ID"\n}\n</next_sprint>\n\n━━ 방법 C: 릴레이 종료 (프로젝트/스프린트 완전 종료) ━━\n사용 시점: 모든 요구사항이 구현되고 QA까지 통과하여 더 이상 진행할 작업이 없는 경우.\n이 태그를 사용하면 자율 릴레이가 깔끔하게 종료되며 CEO의 최종 승인을 대기합니다.\n<pipeline_end>\n{\n  "message": "최종 완성되었습니다. 승인 부탁드립니다."\n}\n</pipeline_end>\n\n🔴 절대 금지 사항:\n- 본인(현재 담당자)에게 넘기는 것 금지\n- 코드 작성 완료 후 dev_advisor 검수 없이 next_sprint로 다음 개발 카드 생성 금지\n- dev_advisor 미거침 직행 개발 릴레이 금지\n`;
+      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다.\n🚨 주의: 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output",\n    "path": "code/backend/main.js",\n    "content": "저장할 파일 내용 전체..."\n  }\n]\n</file_operations>\n`;
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '繞에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흔내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
 
     this._log('info', `> [${evaluation.category}] 모듈 로드 완료. ${modelToUse} 엔진으로 생성을 시작합니다...`, agentId || 'system', taskId);
+
+    // [Phase 37] #N 카드 레퍼런스 자동 resolve (run()과 동기화)
+    let resolvedContent = taskContent;
+    const cardRefMatchesDirect = [...new Set(taskContent.match(/#(\d+)/g) || [])];
+    if (cardRefMatchesDirect.length > 0 && taskId) {
+      try {
+        const refInjections = [];
+        const currentTask = await dbManager.getTaskById(taskId);
+        const projectId = currentTask?.project_id;
+
+        for (const ref of cardRefMatchesDirect) {
+          const refNum = parseInt(ref.slice(1), 10);
+          if (isNaN(refNum)) continue;
+
+          const refTaskId = await dbManager.getTaskIdByProjectNum(projectId, refNum);
+          if (!refTaskId) continue;
+
+          const lastOutput = await dbManager.getLastAgentComment(refTaskId);
+          if (!lastOutput) continue;
+
+          const refTask = await dbManager.getTaskById(refTaskId);
+          const refTitle = refTask?.title || `Task #${refNum}`;
+
+          refInjections.push(
+            `\n\n---\n[🔗 참조 카드 #${refNum}: ${refTitle}]\n아래는 이전 담당자가 작성한 실제 산출물입니다. 이를 바탕으로 작업하세요:\n\n${lastOutput}\n---`
+          );
+          console.log(`[CardRef/runDirect] #${refNum}(id:${refTaskId}) 산출물 ${lastOutput.length}자 주입 완료`);
+        }
+
+        if (refInjections.length > 0) {
+          resolvedContent = taskContent + refInjections.join('');
+        }
+      } catch (err) {
+        console.warn('[CardRef/runDirect] 카드 레퍼런스 resolve 중 오류 (무시):', err.message);
+      }
+    }
 
     // 3. 모델 직접 호출 (filePollingAdapter 미경유)
     // 라우팅: BRIDGE_AGENTS → antigravityAdapter(파일 브릿지), 나머지 → Gemini API 직접
     let result;
     try {
       if (BRIDGE_AGENTS.has(agentId?.toLowerCase())) {
-        result = await antigravityAdapter.generateResponse(taskContent, finalSystemPrompt, agentId.toLowerCase());
+        result = await antigravityAdapter.generateResponse(resolvedContent, finalSystemPrompt, agentId.toLowerCase());
       } else {
-        result = await geminiAdapter.generateResponse(taskContent, finalSystemPrompt, modelToUse);
+        result = await geminiAdapter.generateResponse(resolvedContent, finalSystemPrompt, modelToUse);
       }
     } catch (err) {
       throw err; // 호출부에서 처리
@@ -719,6 +890,41 @@ class Executor {
     this._log('info', `> [WORKED] Task #${taskId} 생성 완료 (${result.model})`, agentId || 'system', taskId);
 
     const parsed = this._extractThoughtProcess(result);
+
+    // [Hotfix #3] File I/O 파서 — runDirect()에도 동일 적용 (run()과 동기화)
+    if (parsed.file_operations && Array.isArray(parsed.file_operations)) {
+      let taskInfoForIO = null;
+      if (taskId) {
+        taskInfoForIO = await dbManager.getTaskById(taskId).catch(() => null);
+      }
+      if (taskInfoForIO && taskInfoForIO.project_id) {
+        const projectRow = await dbManager.getProjectById(taskInfoForIO.project_id).catch(()=>null);
+        const projectDirName = projectRow ? `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}` : taskInfoForIO.project_id;
+        const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+        const ioLogs = [];
+        for (const op of parsed.file_operations) {
+          if (op.action === 'write' && op.path) {
+            const targetFolder = (op.type === 'input') ? 'inputs' : 'outputs';
+            const safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+            const absolutePath = path.join(projectRoot, targetFolder, safePath);
+            if (!absolutePath.startsWith(projectRoot)) {
+              ioLogs.push(`- ⛔ \`${op.path}\` 경로 탈출 시도 차단됨 (보안 정책)`);
+              continue;
+            }
+            try {
+              fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+              fs.writeFileSync(absolutePath, op.content || '', 'utf-8');
+              ioLogs.push(`- 💾 \`${targetFolder}/${safePath}\` 저장 완료`);
+            } catch(e) {
+              ioLogs.push(`- ❌ \`${targetFolder}/${safePath}\` 저장 실패: ${e.message}`);
+            }
+          }
+        }
+        if (ioLogs.length > 0) {
+          parsed.finalText = parsed.finalText + '\n\n**[File I/O System Result]**\n' + ioLogs.join('\n');
+        }
+      }
+    }
 
     return {
       text: parsed.finalText,

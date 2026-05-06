@@ -126,6 +126,13 @@ export const ROLE_REGISTRY = {
     team:        'mkt',
   },
 
+  mkt_advisor: {
+    mainRole:    '마케팅 어드바이저',
+    description: '마케팅 전략 자문 · 리스크 평가 · 고난도 의사결정',
+    subTags:     ['Marketing Strategy', 'Advisory', 'Risk Assessment'],
+    team:        'mkt',
+  },
+
   // ════════════════════════════════════════════════════════════
   //  확장 예약 — 추가 팀은 팀코드_ 접두사만 붙여 확장
   //  예: sales_closer, ops_analyst, hr_recruiter

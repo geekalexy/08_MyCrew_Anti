@@ -1,9 +1,9 @@
 # Phase 36 — `/run` 자율 릴레이 파이프라인 기획서
 
-**문서 버전**: v2.0  
-**작성일**: 2026-05-04  
+**문서 버전**: v3.0  
+**작성일**: 2026-05-05  
 **작성자**: 소넷 (Sonnet, Claude Sonnet 4.6)  
-**상태**: ✅ CEO 확정 (구현 승인 대기)
+**상태**: ✅ Prime A등급 승인 · 구현 착수 확정
 
 ---
 
@@ -13,6 +13,7 @@
 |------|------|---------|
 | v1.0 | 2026-05-04 | 초안 작성 |
 | v2.0 | 2026-05-04 | Advisor 별도 카드 확정, PASS/FAIL 루프 추가, Ari 보완 트리거 추가, Level 2 허용 확정 |
+| v3.0 | 2026-05-05 | **[Prime A등급 승격]** dev_ux→dev_fullstack 흡수, triggerPipelineRelay 폐기 계획, sprint_no 체계 도입, 워치독 v3 신규 시나리오 추가, CEO 확정 3건 반영 |
 
 ---
 
@@ -148,12 +149,12 @@ CEO: 타임라인/채팅에 "/run-b" 입력 (1회)
 ```
 #1  PRD 기능정의서        assigned: dev_senior    status: TODO (활성)
 #2  개발 계획서            assigned: dev_fullstack  status: PLANNED (대기)
-#3  와이어프레임 설계      assigned: dev_ux         status: PLANNED (대기)
+#3  와이어프레임+프론트 설계  assigned: dev_fullstack  status: PLANNED (대기) ← [v3.0] dev_ux 흡수
 #4  Advisor 종합 리뷰     assigned: dev_advisor    status: PLANNED (대기)
 ```
 
-- `PLANNED`: 자동 릴레이 대기 중 — 이전 단계 완료 시 자동 활성화
-- 각 에이전트는 **자기 전용 카드**에서만 작업 (인라인 코멘트 X)
+> **[v3.0 확정]** `dev_ux` 역할은 `dev_fullstack`(Sonnet)이 온전히 흡수합니다.  
+> UI/UX 설계 · 와이어프레임 · 프론트엔드 구현을 단일 역할로 통합.
 
 ### 2.2 `/run` 자율 모드 전체 플로우
 
@@ -203,6 +204,11 @@ Ari가 이를 감지하고 단계적으로 복구한다.
 | STUCK | Advisor 크래시 — in_progress 카드 없음, 파이프라인 미완료 | pipeline_mode='run' + 마지막 상태 변경 후 3분 경과 + 활성 카드 없음 |
 | TIMEOUT | 에이전트 보강 작업 중 AdapterWatcher 10분 Hard Timeout 발동 | adapter:timeout 이벤트 + pipeline 카드 해당 |
 | ORPHAN | 보강 완료 후 Advisor 재할당됐으나 미실행 | Advisor 할당 카드가 TODO 상태로 5분 이상 방치 |
+| **[v3 신규] SKIP** | **에이전트가 `create_next_sprint_task` 미호출 후 DONE 처리** | **DONE 전환 시 동일 sprint_no IN_PROGRESS 카드 부재 + 5분 경과** |
+| **[v3 신규] ORPHAN_NEXT** | **다음 카드가 IN_PROGRESS로 생성됐으나 응답 없음** | **새 카드 생성 후 5분간 코멘트 없음** |
+
+> **[v3.0 Prime 권고]** SKIP 시나리오는 v3 고유 리스크로, `DONE 상태 전환 시 동일 sprint_no의 IN_PROGRESS 카드 존재 여부` 확인 로직을 반드시 추가할 것.  
+> 구현 위치: `server.js` PATCH 핸들러 → DONE 전환 감지 훅
 
 ### 3.3 아리 보완 3단계 대응 (Level 2 허용 — CEO 확정)
 
@@ -285,8 +291,8 @@ if (input.startsWith('/run-b')) {
 
 ```javascript
 SLASH_COMMANDS = [
-  { id: '/run',   label: '자율 릴레이 (PRD → Advisor 승인 자동 완주)', icon: 'play_arrow' },
-  { id: '/run-b', label: '단계별 확인 모드 (매 단계 수동 승인)',        icon: 'step_into'  },
+  { id: '/run', label: '자율 릴레이 (PRD → Advisor 승인 자동 완주)', icon: 'play_arrow' },
+  { id: '/run-b', label: '반자동 릴레이 (중간 1회 수동 승인 후 완주)', icon: 'step_into' },
 ]
 ```
 
@@ -487,10 +493,10 @@ const DEV_PIPELINE = [
   },
   {
     step: 3,
-    title: '와이어프레임 설계',
+    title: '와이어프레임 + 프론트엔드 설계',   // [v3.0] dev_ux → dev_fullstack 흡수
     contentTemplate: () =>
-      `## 작성 지침\n- 핵심 화면 흐름 텍스트 기반 설계\n- 컴포넌트 계층 구조\n- 사용자 인터랙션 정의`,
-    assignedRole: 'dev_ux',
+      `## 작성 지침\n- 핵심 화면 흐름 텍스트 기반 설계\n- 컴포넌트 계층 구조\n- 사용자 인터랙션 정의\n- UI/UX 가이드라인 포함`,
+    assignedRole: 'dev_fullstack',   // ← dev_ux 제거
     isReviewStop: false,
   },
   {
@@ -502,6 +508,9 @@ const DEV_PIPELINE = [
     isReviewStop: true,
   },
 ];
+
+// [v3.0] 허용 역할 ID 사전 — create_next_sprint_task API 서버 검증용
+const ALLOWED_AGENT_ROLES = ['dev_senior', 'dev_fullstack', 'dev_advisor', 'dev_backend', 'dev_qa'];
 ```
 
 ### 6.3 수정 대상 파일 목록
@@ -556,13 +565,42 @@ Step 6. TaskCard.jsx — PLANNED/REVIEW 상태 UI (~30분)
 ## 9. 승인 체크리스트
 
 - [x] CEO 기획서 검토 완료
-- [x] 파이프라인 카드 4개 구성 확인 (dev_senior → dev_fullstack → dev_ux → dev_advisor)
+- [x] 파이프라인 카드 4개 구성 확인 (dev_senior → dev_fullstack → **dev_fullstack** → dev_advisor)
 - [x] Advisor 별도 카드 방식 확정 (각 카드 인라인 리뷰 X)
 - [x] PASS/FAIL 루프 구조 확정
 - [x] Ari Level 2 대리 보완 허용 확정
-- [x] 마케팅 파이프라인 Phase 37로 미룸
-- [ ] 구현 시작 승인 (Step 1부터)
+- [x] 마케팅 파이프라인 Phase 37로 미룸 ← CEO 확정
+- [x] **dev_ux → dev_fullstack 흡수 확정** ← CEO 확정 (v3.0)
+- [x] **triggerPipelineRelay 전면 폐기, create_next_sprint_task 전환** ← Prime A등급 승인
+- [x] **워치독 v3 신규 시나리오(SKIP, ORPHAN_NEXT) 추가** ← Prime 권고 반영
+- [x] **구현 착수 승인** — Prime 🟢 A등급 (v2 A- → v3 A 승격)
 
 ---
 
-*v2.0 — CEO 피드백 전면 반영 | 소넷 작성 | 2026-05-04*
+## 10. v2 → v3 전환 로드맵 (Prime 승인)
+
+```
+[v3 전환 4단계]
+
+Step 1. DB 마이그레이션 ✅ (CEO 직접 완료)
+  └─ Task.sprint_no 컬럼 추가
+  └─ getMaxSprintNo / hasInProgressSprintTask / initDynamicPipeline DB 메서드
+
+Step 2. API 및 Tool 생성 ← 루카 담당
+  └─ server.js: create_next_sprint_task 엔드포인트
+  └─ 서버사이드 안전망: project_id, sprint_no, 상태 강제 주입
+  └─ 자기참조 차단: 부모 작성자 ≠ 리뷰 카드 할당자 검증
+  └─ ALLOWED_AGENT_ROLES 유효성 검증
+
+Step 3. v2 코드 폐기 ← 루카 담당
+  └─ triggerPipelineRelay 비활성화 및 삭제
+  └─ 이벤트 드리븐 dispatch만 잔존
+
+Step 4. 프롬프트/Skill 주입 ← 루카 담당
+  └─ 에이전트 툴 정의 파일 업데이트
+  └─ create_next_sprint_task 호출 가이드라인 주입
+```
+
+---
+
+*v3.0 — Prime 🟢 A등급 승인 | 소넷 문서 업데이트 | 2026-05-05*

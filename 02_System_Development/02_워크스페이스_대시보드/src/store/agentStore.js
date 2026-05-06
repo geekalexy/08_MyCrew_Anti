@@ -139,6 +139,15 @@ const INITIAL_AGENT_META = {
     teamGroup: 'mkt',
     experimentRole: '마케팅팀 — 프로젝트 관리',
   },
+  mkt_advisor: {
+    name: '마케팅 어드바이저',
+    role: '마케팅 어드바이저',
+    skills: ['Marketing Strategy', 'Advisory', 'Risk Assessment'],
+    avatar: '/avatars/lily.png',
+    model: 'anti-claude-opus-4.6-thinking',
+    teamGroup: 'mkt',
+    experimentRole: '마케팅팀 — 마케팅 전략 자문',
+  },
 };
 
 
@@ -411,7 +420,7 @@ export const useAgentStore = create(
 
         // [Phase 33] Role ID 체계 기준
         const DEV_AGENTS = ['dev_fullstack', 'dev_ux', 'dev_senior', 'dev_backend', 'dev_qa', 'dev_advisor'];
-        const MKT_AGENTS = ['mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_pm'];
+        const MKT_AGENTS = ['mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_analyst', 'mkt_video', 'mkt_pm', 'mkt_advisor'];
         const CREW_AGENTS = [...DEV_AGENTS, ...MKT_AGENTS];
 
         // 에이전트별 기본 모델
@@ -431,6 +440,7 @@ export const useAgentStore = create(
           mkt_analyst:   'anti-claude-opus-4.6-thinking',
           mkt_video:     'anti-claude-sonnet-4.6-thinking',
           mkt_pm:        'anti-claude-opus-4.6-thinking',
+          mkt_advisor:   'anti-claude-opus-4.6-thinking',
         };
 
         Object.keys(state.agentMeta || {}).forEach((agentId) => {

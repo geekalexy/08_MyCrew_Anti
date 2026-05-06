@@ -77,6 +77,7 @@ export default function TaskCard({ task, isDragging }) {
       ref={setNodeRef}
       style={style}
       {...attributes}
+      {...listeners}
       onClick={handleCardClick}
       className={[
         'task-card',
@@ -85,19 +86,10 @@ export default function TaskCard({ task, isDragging }) {
         isWorked    ? 'task-card--worked'   : '',
         task.status === 'PAUSED' ? 'task-card--paused' : '',
         isFocused   ? 'task-card--focused'  : '',
+        task.sprint_no != null ? 'task-card--sprint' : '',
       ].filter(Boolean).join(' ')}
       data-task-id={task.id}
     >
-      {/* ── 드래그 핸들 (listeners 분리 — 클릭 이벤트 충돌 방지) ── */}
-      <div
-        {...listeners}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0, height: '12px',
-          cursor: 'grab', borderRadius: '8px 8px 0 0',
-        }}
-        title="드래그하여 이동"
-      />
 
       {/* ── L1. Metadata ───────────────────────────────────── */}
       <div style={{ ...rowStyle, marginBottom: '0.55rem' }}>
@@ -128,11 +120,11 @@ export default function TaskCard({ task, isDragging }) {
             }
           }}
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
             {isFocused ? 'target' : 'adjust'}
           </span>
           <span style={{
-            fontSize: '0.72rem', fontWeight: 500,
+            fontSize: '0.85rem', fontWeight: 600,
             fontFamily: 'Space Grotesk, sans-serif',
             letterSpacing: '0.03em',
           }}
@@ -142,6 +134,24 @@ export default function TaskCard({ task, isDragging }) {
             {task.project_task_num != null ? `#${task.project_task_num}` : (task.id ? `#${String(task.id).slice(-6)}` : '#—')}
           </span>
         </button>
+
+        {/* [Phase 36-B] /run 스프린트 뱃지 — sprint_no 있을 때만 표시 */}
+        {task.sprint_no != null && (
+          <span
+            title={`자율 릴레이 파이프라인 Sprint #${task.sprint_no}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
+              fontSize: '0.58rem', fontWeight: 600,
+              fontFamily: 'Space Grotesk, sans-serif',
+              color: 'rgba(180,197,255,0.45)',
+              letterSpacing: '0.04em',
+              userSelect: 'none',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '0.65rem', opacity: 0.6 }}>bolt</span>
+            S{task.sprint_no}
+          </span>
+        )}
 
         {/* 우선순위 Dot + 레이블 — FAILED/PAUSED 시에는 숨기고 상태 배지로 대체 */}
         {task.priority && !statusBadge && (

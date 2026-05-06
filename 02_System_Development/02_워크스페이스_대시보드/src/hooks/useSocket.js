@@ -61,7 +61,8 @@ export function useSocket() {
         useAgentStore.getState().syncAgentStates(stateMap);
       });
 
-      socketInstance.on('task:created', ({ taskId, title, content, column, agentId, priority }) => {
+      socketInstance.on('task:created', (payload) => {
+        const { taskId, title, content, column, agentId, priority, projectId, project_task_num } = payload;
         useKanbanStore.getState().addTask({
           id: String(taskId),
           content: content || '',
@@ -74,6 +75,7 @@ export function useSocket() {
           status: column === 'in_progress' ? 'in_progress' : 'PENDING',
           latestComment: null,
           projectId: projectId || useProjectStore.getState().selectedProjectId || 'proj-1',
+          project_task_num: project_task_num,
         });
       });
 
@@ -140,6 +142,16 @@ export function useSocket() {
         await useProjectStore.getState().fetchAllProjectCrews();
         useProjectStore.getState().selectProject(projectId);
         window.dispatchEvent(new CustomEvent('closeNewProjectModal'));
+        // [Phase 37] 5초 자동 실행 제거 → CEO 선택 프롬프트로 대체
+        window.dispatchEvent(new CustomEvent('pipelineStartPrompt', { detail: { projectId } }));
+      });
+
+      socketInstance.on('project:crew_updated', async ({ projectId }) => {
+        const { selectedProjectId, fetchProjectCrew, fetchAllProjectCrews } = useProjectStore.getState();
+        if (selectedProjectId === projectId) {
+          fetchProjectCrew(projectId);
+        }
+        fetchAllProjectCrews();
       });
 
       socketInstance.on('project:error', ({ error }) => {

@@ -144,6 +144,71 @@ export default function AgentDetailView() {
     if (e.key === 'Escape') setIsEditingName(false);
   };
 
+  // ─── [Phase 37] 팀원 관리 기능 (추가/해고/교체) ────────────────
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
+  
+  const handleAddAgent = async () => {
+    if (!selectedProjectId) return alert('프로젝트가 선택되지 않았습니다.');
+    const roleId = baseRoleId;
+    const modelId = resolvedModel;
+    const nickname = meta?.name || roleTitle || 'New Agent';
+    const avatar = meta?.avatar || '';
+    const roleDesc = meta?.role || '';
+    
+    try {
+      const res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/crew/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId, modelId, nickname, avatar, roleDesc })
+      });
+      if (res.ok) alert(`${nickname} 님이 팀에 합류했습니다!`);
+      else alert('팀원 추가에 실패했습니다.');
+    } catch(err) {
+      alert('오류 발생: ' + err.message);
+    }
+  };
+
+  const handleRemoveAgent = async () => {
+    if (!selectedProjectId) return;
+    if (!window.confirm(`${displayName} 님을 현재 프로젝트에서 해고(제외)하시겠습니까?`)) return;
+    
+    try {
+      const res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/crew/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId: baseRoleId })
+      });
+      if (res.ok) alert(`${displayName} 님이 팀에서 제외되었습니다.`);
+      else alert('팀원 해고에 실패했습니다.');
+    } catch(err) {
+      alert('오류 발생: ' + err.message);
+    }
+  };
+
+  const handleSwapAgent = async () => {
+    if (!selectedProjectId) return;
+    const newRoleId = window.prompt("교체할 새로운 역할 코드(roleId)를 입력하세요.\\n예: mkt_advisor, dev_senior", "");
+    if (!newRoleId || newRoleId.trim() === '') return;
+    
+    try {
+      await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/crew/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId: baseRoleId })
+      });
+      const res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/crew/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId: newRoleId.trim(), modelId: 'anti-claude-opus-4.6-thinking', nickname: null, avatar: '', roleDesc: '' })
+      });
+      if (res.ok) alert(`팀원이 ${newRoleId} 역할로 성공적으로 교체되었습니다.`);
+      else alert('교체에 실패했습니다.');
+    } catch(err) {
+      alert('오류 발생: ' + err.message);
+    }
+  };
+
+
   // [#3 Fix] agentId 기반 기본 모델 fallback 맵 (modelRegistry CORRECT_DEFAULTS 미러)
   const DEFAULT_MODEL_BY_AGENT = {
     assistant:     'gemini-2.5-pro',
@@ -247,6 +312,9 @@ export default function AgentDetailView() {
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
             <span className="material-symbols-outlined" style={{ fontSize: '2rem', display: 'block', marginBottom: '0.5rem' }}>info</span>
             에이전트 프로필이 아직 동기화되지 않았습니다.
+            <div style={{ marginTop: '1rem' }}>
+              <button className="btn btn--danger btn--sm" onClick={handleRemoveAgent}>팀에서 제외 (해고)</button>
+            </div>
           </div>
         </div>
       );
@@ -369,6 +437,21 @@ export default function AgentDetailView() {
           </button>
         </div>
       </div>
+
+      {/* ── 1.5. 팀원 관리 패널 (프로젝트 선택 상태일 때만 노출) ───────────────── */}
+      {selectedProjectId && (
+        <div style={{ padding: '0.8rem 1.5rem', background: 'var(--bg-surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>인사 관리</span>
+          {projectCrewEntry ? (
+            <>
+              <button className="btn btn--secondary btn--sm" onClick={handleSwapAgent}>팀원 교체</button>
+              <button className="btn btn--danger btn--sm" onClick={handleRemoveAgent}>팀원 해고</button>
+            </>
+          ) : (
+            <button className="btn btn--primary btn--sm" onClick={handleAddAgent}>이 팀에 합류시키기 (추가)</button>
+          )}
+        </div>
+      )}
 
       {/* ── 2. 탭 네비게이션 ──────────────────────────────── */}
       <div className="agent-detail-tabs">

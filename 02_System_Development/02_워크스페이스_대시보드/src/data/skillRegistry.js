@@ -104,6 +104,16 @@ export const SKILL_REGISTRY = {
     skillMdPath: "skill-library/socian/SKILL.md",
   },
 
+  "instagram-analysis": {
+    id: "instagram-analysis", layer: 1, layerLabel: "ENGINE",
+    agentOnly: "assistant",
+    name: "Instagram 프로필 분석", icon: "photo_camera", color: "#e1306c",
+    description: "경쟁사·레퍼런스 Instagram 공개 계정을 수집·분석합니다.",
+    fullDescription: "Puppeteer 기반 브라우저 자동화로 Instagram 공개 계정의 팔로워·팔로잉·게시물 수·바이오·최근 게시물 캡션을 수집합니다.\n계정 1개는 instagramAnalyze, 2개 이상(최대 10개)은 instagramBatchAnalyze로 자동 전환됩니다.\n세션은 outputs/ig_session/에 영구 저장되어 반복 로그인 불필요.",
+    rules: ["계정 2개↑ 시 배치 분석 자동 전환", "비공개 계정 수집 불가 안내", "세션 만료 시 재로그인 안내"],
+    skillMdPath: "skill-library/instagram-analysis/SKILL.md",
+  },
+
 
   // ─── Layer 4: Workflow Skills (A팀 — 초안·검증 라인) ───
   "draft": {
@@ -253,6 +263,15 @@ export const SKILL_REGISTRY = {
     fullDescription: "1주일 단위 스프린트 관리. 에이전트별 태스크 적절성 판단 및 할당. 블로커 발생 시 즉각 CEO에게 브리핑 리포트를 발송합니다.",
     rules: ["지연 태스크 리포팅", "병목 원인 분석", "자율 할당 제안"],
     skillMdPath: "skill-library/dev_sprint_pm/SKILL.md",
+  },
+  "autonomous-relay": {
+    id: "autonomous-relay", layer: 4, layerLabel: "WORKFLOW",
+    defaultFor: ["dev_advisor", "dev_senior", "dev_fullstack", "dev_backend", "dev_qa", "dev_ux"],
+    name: "Autonomous Relay", icon: "route", color: "#8b5cf6",
+    description: "작업 완료 후 다음 작업자에게 자율적으로 바통을 터치하거나 코드 리뷰를 요청합니다.",
+    fullDescription: "완전 자율 주행 릴레이 파이프라인의 핵심 스킬입니다. <next_sprint>를 이용해 후속 작업을 생성하고, <review_request>를 이용해 핑퐁 리뷰를 수행합니다.",
+    rules: ["<next_sprint>로 신규 카드 생성", "<review_request>로 상태 전이", "자기 참조 절대 금지"],
+    skillMdPath: "skill-library/dev_autonomous_relay/SKILL.md",
   }
 
 };

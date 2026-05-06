@@ -413,14 +413,13 @@ router.post('/learn', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // [Phase 25] AI 에이전트 판정 연동 엔드포인트
 //
-// 사용법:
-//   Antigravity(Sonnet/Prime/Luca) 또는 Gemini 멀티페르소나가
+//   Antigravity 역할(Role) 에이전트 또는 Gemini 멀티페르소나가
 //   POST /api/videolab/review/agent-verdict 를 호출하면
 //   판정 내용을 파일로 저장 후 Socket.io로 VideoLab UI에 실시간 전달합니다.
 //
 // Request Body:
 //   {
-//     agent:      "Sonnet" | "Prime" | "Luca",
+//     agent:      "mkt_planner" | "mkt_designer" | "dev_senior",
 //     sessionId:  string,             // 어떤 리뷰 세션인지 식별
 //     focusedCard: number | null,     // 포커스된 씬/카드 인덱스 (null = 전체)
 //     verdict:    "PASS" | "FAIL" | "COMMENT",
@@ -440,7 +439,7 @@ export function setIoForVideoLabRouter(io) { _ioInstance = io; }
 router.post('/review/agent-verdict', async (req, res) => {
     try {
         const {
-            agent     = 'Sonnet',
+            agent     = 'mkt_planner',
             sessionId = `session_${Date.now()}`,
             focusedCard = null,
             verdict   = 'COMMENT',        // PASS | FAIL | COMMENT
@@ -566,24 +565,24 @@ router.post('/review/auto-analyze', async (req, res) => {
               ).join('\n')}`
             : '';
 
-        const systemPrompt = `당신은 모델 gemini-2.5-flash로서 Prime(전략), Sonnet(비주얼), Luca(기술)의 3인 전문가 그룹 역할을 수행합니다.
+        const systemPrompt = `당신은 유튜브 쇼츠 검수를 위한 기획자, 디자이너, 기술 총괄 3인 전문가 그룹 역할을 수행합니다.
 
-[페르소나 1: Prime - 콘텐츠 전략 총괄]
+[페르소나 1: mkt_planner - 콘텐츠 전략 총괄]
 - Hook 씬 텍스트 15자 이내 확인 (초과 시 FAIL)
 - 5단계 시나리오 흐름(Hook→Problem→Proof→Climax→CTA) 완성도
 - CTA의 시리즈 연결 후킹 파워
 
-[페르소나 2: Sonnet - 비주얼 아트 디렉터]
+[페르소나 2: mkt_designer - 비주얼 아트 디렉터]
 - Vision 이미지 검수 결과를 반드시 반영하여 코멘트 (이미지가 없으면 텍스트 기반 예측)
 - 시각적 품질 FAIL이 있으면 해당 씬 인덱스를 focusedCard에 명시하고 FAIL 판정
 - 가독성, 대비율, 브랜드 일관성 평가
 
-[페르소나 3: Luca - 파이프라인 엔지니어]
+[페르소나 3: dev_senior - 파이프라인 엔지니어]
 - 오디오 프레임 총합 → 초 단위 확인 (60초 이내 쇼츠 규격)
 - 씬 수 5개 확인
 
 반드시 JSON 배열로만 반환 (백틱 없이):
-[{ "agent": "Prime"|"Sonnet"|"Luca", "verdict": "PASS"|"FAIL"|"COMMENT", "content": "코멘트", "focusedCard": null|number }]`;
+[{ "agent": "mkt_planner"|"mkt_designer"|"dev_senior", "verdict": "PASS"|"FAIL"|"COMMENT", "content": "코멘트", "focusedCard": null|number }]`;
 
         const userPrompt = `[대본 시나리오]\n${JSON.stringify(scriptScenes, null, 2)}\n\n[TTS 메타데이터]\n${JSON.stringify(ttsMetadata || {}, null, 2)}${visionSummary}`;
 

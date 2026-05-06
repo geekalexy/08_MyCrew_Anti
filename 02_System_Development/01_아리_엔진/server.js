@@ -55,6 +55,35 @@ app.use('/api/imagelab', imageLabRouter);
 app.use('/api/videolab', videoLabRouter);
 app.use('/lab-assets', express.static(path.join(process.cwd(), 'skill-library/05_design/lab-assets')));
 
+// ─── [Phase 37] Live Split Preview 정적 서빙 라우트 (Multi-tenant & I/O 통합) ───
+app.use('/preview/:projectId', async (req, res, next) => {
+  try {
+    const projectId = req.params.projectId;
+    
+    // [TODO: 보안/격리 및 확장성(Phase 29)] 
+    // 수백 개 회사/수천 개 프로젝트 환경을 위한 검증 로직 진입점
+    // 1. Company 격리: req.user.company_id === projectRow.company_id 확인
+    // 2. 프로젝트 격리 타입(Type A/B/C) 검증:
+    //    - Type A (Private): req.user.id가 소유자이거나 초대된 멤버인가? (단, 작업에 투입된 AI 에이전트는 접근 허용)
+    //    - Type B (Limited): 비공개 원칙. 단, 단방향 '지정 참조' 가능 (A가 B를 지정하면 A는 B 참조 가능, B는 A 참조 불가. 상호 지정 시 양방향 가능)
+    //    - Type C (Public): 사내 전사 공개 (company_id만 일치하면 통과)
+    const projectRow = await dbManager.getProjectById(projectId).catch(()=>null);
+    if (!projectRow) return res.status(404).send('Project not found');
+
+    // [TODO: 물리적 디스크 파티셔닝] 
+    // 향후 확장을 위해 '01_Company' 대신 동적으로 \`04_Users/\${projectRow.company_id}/01_Projects\` 로 라우팅
+    const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
+    const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+    
+    // 아웃풋(outputs)만 서빙하면 인풋(inputs) 경로(이미지 등)를 불러올 수 없는 문제 해결
+    // 프로젝트 루트 전체를 서빙하되, 프론트엔드 Iframe은 /preview/ID/outputs/index.html 로 접근하도록 설계
+    express.static(projectRoot)(req, res, next);
+  } catch (err) {
+    console.error('[Preview Route] 정적 파일 서빙 오류:', err);
+    next(err);
+  }
+});
+
 // ─── Socket.io 서버 (Opus 지적: Express CORS와 별도로 옵션 지정 필수) ────────
 export const io = new Server(httpServer, {
   cors: {
@@ -146,55 +175,112 @@ async function dispatchNextTaskForAgent(agentId) {
       const fullTask = await dbManager.getTaskById(pendingTask.id);
       if (fullTask) {
         broadcastLog('info', `> [${fullTask.assigned_agent}] 작업을 수신했습니다. 사고과정을 시작합니다...`, 'system', pendingTask.id);
+        agentStates.set(agentId, { status: 'active', lastHeartbeat: Date.now() });
+        io.emit('agent:status_change', { agentId, status: 'active' });
 
-        // ── [Fix] filePollingAdapter 대신 executor.runDirect() 직접 호출 ──
-        // fire-and-forget: 서버 블로킹 없이 백그라운드에서 AI API 호출
         setImmediate(async () => {
           try {
             const result = await executor.runDirect(fullTask.content, agentId, fullTask.id);
 
-            const status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED' : 'REVIEW';
-            const column  = status === 'FAILED' ? 'todo' : 'review';
+            const hasReviewRequest = result._meta?.review_request && fullTask.sprint_no != null;
+            const hasNextSprint = result._meta?.next_sprint && fullTask.sprint_no != null && !hasReviewRequest;
+            
+            let isBatonPassed = false;
+            let batonErrorMsg = null;
+            let finalOutputText = result.text || '작업이 완료되었습니다.';
+
+            // [1순위 픽스] 상태를 성급하게 변경하기 전에 바톤 터치(다음 카드 생성)를 먼저 시도 (await)
+            if (hasNextSprint) {
+              const ns = result._meta.next_sprint;
+              broadcastLog('info', `> [${agentId}] 바통 터치 준비 중: 다음 작업자(${ns.assignee})에게 전달...`, 'system', fullTask.id, 'DASHBOARD', fullTask.project_id);
+              try {
+                const res = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${fullTask.id}/sprint/next`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ title: ns.title, content: ns.content, assignee: ns.assignee })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || '알 수 없는 서버 에러');
+                isBatonPassed = true;
+              } catch (e) {
+                console.error('[Relay Parser] 다음 카드 생성 에러:', e.message);
+                batonErrorMsg = `[시스템 에러] 다음 릴레이 카드 생성에 실패했습니다. 사유: ${e.message}`;
+                finalOutputText = finalOutputText + '\n\n' + batonErrorMsg;
+              }
+            }
+
+            let status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED'
+              : (hasNextSprint && !isBatonPassed) ? 'FAILED' // 바톤 터치 실패 시 STUCK 방지를 위해 FAILED 처리
+              : hasNextSprint ? 'COMPLETED' : hasReviewRequest ? 'IN_PROGRESS' : 'REVIEW';
+            let column = status === 'FAILED' ? 'todo' : status === 'COMPLETED' ? 'done' : status === 'IN_PROGRESS' ? 'in_progress' : 'review';
+
+            // <pipeline_end> 파싱 (Phase 37)
+            const hasPipelineEnd = result._meta?.pipeline_end === true;
+            if (hasPipelineEnd && status !== 'FAILED') {
+              status = 'REVIEW';
+              column = 'review';
+            }
 
             await dbManager.updateTaskStatus(fullTask.id, status);
             const thoughtProcess = result._meta?.thought_process || null;
-            await dbManager.createComment(fullTask.id, agentId, result.text || '작업이 완료되었습니다.', thoughtProcess);
-
+            await dbManager.createComment(fullTask.id, agentId, finalOutputText, thoughtProcess);
             io.emit('task:moved', { taskId: String(fullTask.id), toColumn: column });
-            io.emit('task:comment_added', {
-              taskId: String(fullTask.id), author: agentId,
-              text: result.text, thought_process: thoughtProcess, createdAt: new Date().toISOString()
-            });
+            io.emit('task:comment_added', { taskId: String(fullTask.id), author: agentId, text: finalOutputText, thought_process: thoughtProcess, createdAt: new Date().toISOString() });
 
             if (status === 'FAILED') {
-              // [S1-5] FAILED 전환 시 에스컬레이션 알림
-              const failReason = result.text ? result.text.slice(0, 120) + (result.text.length > 120 ? '...' : '') : '알 수 없는 오류';
-              const failMsg = `⚠️ [Task 실패 알림]\nTask #${fullTask.id}: ${fullTask.title}\n담당: ${agentId.toUpperCase()}\n원인: ${failReason}\n\n워크스페이스에서 재시도 또는 재할당이 필요합니다.`;
-              if (bot && process.env.TELEGRAM_CHAT_ID) {
-                bot.sendMessage(process.env.TELEGRAM_CHAT_ID, failMsg).catch(() => {});
-              }
-              // [S4-3] 실패 카운터 증가
+              const failReason = batonErrorMsg ? batonErrorMsg : (result.text ? result.text.slice(0, 120) + '...' : '알 수 없는 오류');
+              if (bot && process.env.TELEGRAM_CHAT_ID) bot.sendMessage(process.env.TELEGRAM_CHAT_ID, `⚠️ Task #${fullTask.id} 실패: ${failReason}`).catch(() => {});
               await dbManager.incrementFailureCount(fullTask.id).catch(() => null);
-              io.emit('task:failed', {
-                taskId: String(fullTask.id),
-                agentId,
-                reason: result.text || '에이전트 응답 오류',
-                failedAt: new Date().toISOString(),
-                failureCount: (fullTask.failure_count || 0) + 1,
-              });
-              broadcastLog('error', `> [${agentId}] Task #${fullTask.id} 실패 — 재시도 또는 재할당 필요`, agentId, fullTask.id);
+              io.emit('task:failed', { taskId: String(fullTask.id), agentId, reason: failReason, failedAt: new Date().toISOString(), failureCount: (fullTask.failure_count || 0) + 1 });
+              broadcastLog('error', `> [${agentId}] Task #${fullTask.id} 실패 — 재시도 또는 관리자 개입 필요`, agentId, fullTask.id);
+            } else if (hasReviewRequest) {
+              // [Phase 36-B] 핑퐁
+              await handleReviewRequest(fullTask, agentId, result._meta.review_request);
             } else {
-              broadcastLog('success', `> [${agentId}] Task #${fullTask.id} 완료 — 승인 대기 중`, agentId, fullTask.id);
-              // [Phase 36] 파이프라인 릴레이 훅 — REVIEW 완료 후 다음 단계 자동 시작
-              if (fullTask.pipeline_step != null) {
-                setImmediate(() => triggerPipelineRelay(fullTask, fullTask.project_id).catch(e =>
-                  console.error('[Pipeline Relay] 훅 오류:', e.message)
-                ));
+              if (status === 'COMPLETED') {
+                 broadcastLog('success', `> [${agentId}] Task #${fullTask.id} 완료 (바톤 터치 성공)`, agentId, fullTask.id);
+              } else {
+                 broadcastLog('success', `> [${agentId}] Task #${fullTask.id} 완료 — 승인 대기 중`, agentId, fullTask.id);
+              }
+
+              const currentPipelineMode = await dbManager.getProjectPipelineMode(fullTask.project_id);
+
+              // [Phase 37] isReviewStop 혹은 run-b 모드(어드바이저 컨펌 완료 시), 혹은 pipeline_end 태그 시 파이프라인 일시 중단
+              if (
+                (status === 'REVIEW' && fullTask.pipeline_is_review_stop) ||
+                (currentPipelineMode === 'run-b' && agentId === 'dev_advisor') ||
+                hasPipelineEnd
+              ) {
+                const pId = fullTask.project_id;
+                await dbManager.setPipelineMode(pId, 'none');
+                stopPipelineWatchdog(pId);
+                
+                let pauseReasonText = '단계별 확인 (run-b 모드)';
+                let pauseReasonCode = 'run_b_stop';
+                if (hasPipelineEnd) {
+                  pauseReasonText = '프로젝트/스프린트 자연 종료 (<pipeline_end>)';
+                  pauseReasonCode = 'pipeline_end';
+                } else if (fullTask.pipeline_is_review_stop) {
+                  pauseReasonText = '기획 파이프라인 리뷰 완료 (isReviewStop)';
+                  pauseReasonCode = 'review_stop';
+                }
+                
+                broadcastLog('warn',
+                  `⛳ [파이프라인 일시 중단] 사유: ${pauseReasonText}\n` +
+                  `CEO님의 검토 및 승인 후, 다음 지시를 내려주세요.`,
+                  'system', fullTask.id, 'DASHBOARD', pId
+                );
+                io.to(`project_${pId}`).emit('pipeline:paused', { projectId: pId, reason: pauseReasonCode, taskId: String(fullTask.id) });
+              } else if (fullTask.sprint_no != null && status === 'REVIEW') {
+                // pipeline_end가 없는 일반적인 REVIEW 상태 종결 시에만 Watchdog (바톤 터치 누락 감지)
+                setImmediate(() => checkV3RelayWatchdog(fullTask, fullTask.project_id).catch(e => console.error('[Relay Watchdog] 훅 오류:', e.message)));
               }
             }
 
             // Case 3: 완료 후 다음 대기 카드 자동 Pull
             setTimeout(() => dispatchNextTaskForAgent(agentId), 1000);
+            
+            agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
+            io.emit('agent:status_change', { agentId, status: 'idle' });
           } catch (err) {
             console.error(`[Dispatcher] runDirect 실패 Task #${fullTask.id}:`, err.message);
             broadcastLog('error', `> [${agentId}] Task #${fullTask.id} 실행 중 오류: ${err.message}`, agentId, fullTask.id);
@@ -213,6 +299,9 @@ async function dispatchNextTaskForAgent(agentId) {
               failedAt: new Date().toISOString(),
               failureCount: (fullTask.failure_count || 0) + 1,
             });
+            
+            agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
+            io.emit('agent:status_change', { agentId, status: 'idle' });
           }
         });
       }
@@ -222,8 +311,99 @@ async function dispatchNextTaskForAgent(agentId) {
   }
 }
 
+// ── [Phase 36b] 카드링크 컨텍스트 주입 ──────────────────────────────────────
+// Q1: 가변 자릿수 정규식 (#1, #12, #123 모두 지원)
+const CARD_TAG_REGEX = /#(\d+)(C|F)(\d+)/g;
+
+async function buildLinkedContext(taskContent, projectId) {
+  if (!taskContent || !projectId) return '';
+  CARD_TAG_REGEX.lastIndex = 0;
+  const tags = [...taskContent.matchAll(CARD_TAG_REGEX)];
+  if (tags.length === 0) return '';
+
+  let currentProject = null;
+  try { currentProject = await dbManager.getProjectById(projectId); } catch (e) {}
+
+  const sections = [];
+  for (const [fullTag, cardNumStr, type, idxStr] of tags) {
+    const cardNum = parseInt(cardNumStr, 10);
+    const idx = parseInt(idxStr, 10);
+    let refTask = null;
+    try {
+      const isolationType = (() => {
+        try { return JSON.parse(currentProject?.isolation_scope || '{}').type || ''; } catch(e) { return ''; }
+      })();
+      // Q3: A타입(strict_isolation) → 동일 프로젝트만, B/C → 범위 탐색
+      if (isolationType === 'strict_isolation') {
+        refTask = await dbManager.getTaskByProjectNum(projectId, cardNum);
+      } else {
+        refTask = await dbManager.getTaskByProjectNum(projectId, cardNum)
+          || await dbManager.getTaskByProjectNumAcrossScopes(projectId, cardNum, isolationType);
+      }
+    } catch (e) { continue; }
+    if (!refTask) continue;
+
+    if (type === 'C') {
+      let comment = null;
+      try { comment = await dbManager.getTaskCommentByIndex(refTask.id, idx); } catch(e) {}
+      if (!comment) continue;
+      sections.push(`<!-- [CARD LINK: ${fullTag}] -->\n## 📎 참조: ${refTask.title || `카드 #${cardNum}`} (#${cardNum}) / 코멘트 ${idx}번\n작성: ${comment.author} | ${comment.created_at}\n\n${(comment.content || '').slice(0, 3000)}\n---`);
+    } else if (type === 'F') {
+      let attachment = null;
+      try { attachment = await dbManager.getTaskAttachmentByIndex(refTask.id, idx); } catch(e) {}
+      if (!attachment) continue;
+      // Q2: 이미지 → Vision 분석, 텍스트 → 직접 읽기
+      let fileContent = '';
+      try {
+        const ext = (attachment.file_type || attachment.file_path.split('.').pop() || '').toLowerCase();
+        if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+          const svcModule = await import('./ai-engine/services/imageAnalysisService.js').catch(() => null);
+          if (svcModule?.default?.analyze) {
+            const vision = await svcModule.default.analyze(attachment.file_path);
+            fileContent = `[이미지 Vision 분석 결과]\n${vision}`;
+          } else {
+            fileContent = `[이미지 파일: ${attachment.file_label}]`;
+          }
+        } else {
+          const raw = await fs.promises.readFile(attachment.file_path, 'utf-8').catch(() => '[파일 읽기 실패]');
+          fileContent = raw.slice(0, 5000);
+        }
+      } catch (e) { fileContent = `[파일 오류: ${e.message}]`; }
+      sections.push(`<!-- [FILE LINK: ${fullTag}] -->\n## 📄 참조 파일: ${attachment.file_label} (#${cardNum} / F${idx})\n\n${fileContent}\n---`);
+    }
+  }
+  if (sections.length === 0) return '';
+  return `<!-- [LINKED CONTEXT] -->\n${sections.join('\n')}\n`;
+}
+
 // ── [isFinal: false 재착수] 중간 보고 수신 후 동일 태스크 즉시 재투입 ──────
 // dispatchNextTaskForAgent와 달리 busy 체크를 우회하고 특정 taskId를 강제 재실행
+/**
+ * [Phase 36-B] 핑퐁 핸들러 — 같은 카드에서 다른 에이전트로 재할당 후 즉시 디스패치
+ */
+async function handleReviewRequest(taskRow, fromAgentId, reviewRequest) {
+  const { assignee, message } = reviewRequest;
+  if (!assignee || assignee.toLowerCase() === fromAgentId.toLowerCase()) {
+    console.warn('[ReviewRequest] 잘못된 assignee(동일 에이전트 또는 누락):', assignee);
+    return;
+  }
+  try {
+    broadcastLog('info',
+      `> [${fromAgentId}] 🔄 핑퐁 전달 (Task #${taskRow.id}) → [${assignee}]에게 인계`,
+      'system', String(taskRow.id), 'DASHBOARD', taskRow.project_id);
+    // 1. 담당자 변경
+    await dbManager.updateTaskDetails(taskRow.id, taskRow.title, taskRow.content, assignee, taskRow.model);
+    io.emit('task:updated', { taskId: String(taskRow.id), assignee });
+    // 2. 상태 IN_PROGRESS 유지
+    await dbManager.updateTaskStatus(taskRow.id, 'IN_PROGRESS');
+    io.emit('task:moved', { taskId: String(taskRow.id), toColumn: 'in_progress' });
+    // 3. 새 에이전트 디스패치
+    setTimeout(() => forceRedispatchTask(taskRow.id, assignee, message || '', 'PINGPONG'), 800);
+  } catch (e) {
+    console.error('[ReviewRequest] 처리 오류:', e.message);
+  }
+}
+
 async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM') {
   if (!dbManager || !executor) return;
   try {
@@ -232,12 +412,18 @@ async function forceRedispatchTask(taskId, agentId, additionalContext = '', cont
       console.warn(`[ForceRedispatch] Task #${taskId} 없음 — 재착수 취소`);
       return;
     }
-    
-    // 추가 컨텍스트 주입 (재작업 지시 vs 중간 착수 보고)
-    let enrichedContent = fullTask.content;
+
+    // [Phase 36b] 카드링크 컨텍스트 자동 주입
+    let linkedCtx = '';
+    try { linkedCtx = await buildLinkedContext(fullTask.content, fullTask.project_id); } catch(e) {}
+
+    // 추가 컨텍스트 주입
+    let enrichedContent = linkedCtx ? linkedCtx + '\n' + fullTask.content : fullTask.content;
     if (additionalContext) {
       if (contextType === 'REWORK') {
         enrichedContent += `\n\n---\n[대표님 피드백 및 재작업 지시사항]\n${additionalContext}\n\n위 피드백을 철저히 반영하여 기존 결과물을 수정/보완하고 최종 결과물을 다시 제출하라.`;
+      } else if (contextType === 'PINGPONG') {
+        enrichedContent += `\n\n---\n[핑퐁 인계 지시 — 이전 담당자 완료]\n${additionalContext}\n\n위 인계 지시에 따라 이 카드의 후속 작업을 즉시 수행하고 결과물을 제출하라.`;
       } else {
         enrichedContent += `\n\n---\n[이전 착수 보고]\n${additionalContext}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`;
       }
@@ -248,51 +434,156 @@ async function forceRedispatchTask(taskId, agentId, additionalContext = '', cont
       logMsg = `> [${agentId}] 대표님 재작업 지시 수신 → 재착수 트리거 (Task #${taskId})`;
     } else if (contextType === 'INTERIM') {
       logMsg = `> [${agentId}] isFinal:false 수신 → 본작업 재착수 트리거 (Task #${taskId})`;
+    } else if (contextType === 'PINGPONG') {
+      logMsg = `> [${agentId}] 핑퐁 수신 (Task #${taskId}): 이전 담당자로부터 인계됨`;
     } else if (contextType === 'START') {
       logMsg = `> [${agentId}] 작업을 수신했습니다. 사고과정을 시작합니다...`;
     }
+    if (linkedCtx) logMsg += ` [카드링크 주입됨]`;
 
     broadcastLog('info', logMsg, 'system', taskId);
+    
+    // [BugFix] 상태 보호
+    if (agentStates.get(agentId)?.status === 'active') {
+      console.log(`[ForceRedispatch] ${agentId} is already active. Skipping duplicate trigger.`);
+      return;
+    }
 
     setImmediate(async () => {
+      agentStates.set(agentId, { status: 'active', lastHeartbeat: Date.now() });
+      io.emit('agent:status_change', { agentId, status: 'active' });
       try {
         const result = await executor.runDirect(enrichedContent, agentId, taskId);
-        const status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED' : 'REVIEW';
-        const column  = status === 'FAILED' ? 'todo' : 'review';
+        
+        const hasReviewRequest2 = result._meta?.review_request && fullTask?.sprint_no != null;
+        const hasNextSprint2 = result._meta?.next_sprint && fullTask?.sprint_no != null && !hasReviewRequest2;
+
+        let isBatonPassed = false;
+        let batonErrorMsg = null;
+        let finalOutputText = result.text || '작업이 완료되었습니다.';
+
+        // [1순위 픽스] 상태를 성급하게 변경하기 전에 바톤 터치(다음 카드 생성)를 먼저 시도 (await)
+        if (hasNextSprint2) {
+          const ns = result._meta.next_sprint;
+          broadcastLog('info', `> [${agentId}] 바통 터치 준비 중: 다음 작업자(${ns.assignee})에게 전달...`, 'system', taskId, 'DASHBOARD', fullTask.project_id);
+          try {
+            const res = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}/sprint/next`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: ns.title, content: ns.content, assignee: ns.assignee })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '알 수 없는 서버 에러');
+            isBatonPassed = true;
+          } catch (e) {
+            console.error('[Relay Parser] 다음 카드 생성 에러:', e.message);
+            batonErrorMsg = `[시스템 에러] 다음 릴레이 카드 생성에 실패했습니다. 사유: ${e.message}`;
+            finalOutputText = finalOutputText + '\n\n' + batonErrorMsg;
+          }
+        }
+
+        let status = (result.category === 'ERROR' || result.category === 'ACCESS_DENIED') ? 'FAILED'
+          : (hasNextSprint2 && !isBatonPassed) ? 'FAILED' // 바톤 터치 실패 시 STUCK 방지를 위해 FAILED 처리
+          : hasNextSprint2 ? 'COMPLETED'
+          : hasReviewRequest2 ? 'IN_PROGRESS'
+          : 'REVIEW';
+        let column  = status === 'FAILED' ? 'todo' : status === 'COMPLETED' ? 'done' : status === 'IN_PROGRESS' ? 'in_progress' : 'review';
 
         await dbManager.updateTaskStatus(taskId, status);
-        
-        // 실제 수행된 모델과 카테고리 정보 업데이트 (UI 반영용)
         if (result.model) {
           await dbManager.updateTaskModel(taskId, result.model, result.category);
           io.emit('task:updated', { taskId: String(taskId), model: result.model, category: result.category });
         }
-
         const thoughtProcess = result._meta?.thought_process || null;
-        await dbManager.createComment(taskId, agentId, result.text || '작업이 완료되었습니다.', thoughtProcess);
-
+        await dbManager.createComment(taskId, agentId, finalOutputText, thoughtProcess);
         io.emit('task:moved', { taskId: String(taskId), toColumn: column });
-        io.emit('task:comment_added', {
-          taskId: String(taskId), author: agentId,
-          text: result.text, thought_process: thoughtProcess, createdAt: new Date().toISOString()
-        });
+        io.emit('task:comment_added', { taskId: String(taskId), author: agentId, text: finalOutputText, thought_process: thoughtProcess, createdAt: new Date().toISOString() });
 
         if (status === 'FAILED') {
+          const failReason = batonErrorMsg ? batonErrorMsg : (result.text || '알 수 없는 오류');
           broadcastLog('error', `> [${agentId}] Task #${taskId} 재착수 실패`, agentId, taskId);
-          io.emit('task:failed', { taskId: String(taskId), agentId, reason: result.text, failedAt: new Date().toISOString() });
+          io.emit('task:failed', { taskId: String(taskId), agentId, reason: failReason, failedAt: new Date().toISOString() });
+        } else if (hasReviewRequest2) {
+          // [Phase 36-B] 핑퐁
+          await handleReviewRequest(fullTask, agentId, result._meta.review_request);
         } else {
-          broadcastLog('success', `> [${agentId}] Task #${taskId} 재착수 완료 — 승인 대기 중`, agentId, taskId);
+          if (status === 'COMPLETED') {
+             broadcastLog('success', `> [${agentId}] Task #${taskId} 완료 (바톤 터치 성공)`, agentId, taskId);
+          } else {
+             broadcastLog('success', `> [${agentId}] Task #${taskId} 재착수 완료 — 승인 대기 중`, agentId, taskId);
+          }
+          // [Phase 37] isReviewStop 자동 파이프라인 중단
+          if (status === 'REVIEW' && fullTask?.pipeline_is_review_stop) {
+            const pId = fullTask.project_id;
+            await dbManager.setPipelineMode(pId, 'none');
+            stopPipelineWatchdog(pId);
+            broadcastLog('warn',
+              `⛳ [Advisor 리뷰 완료] 기획 파이프라인이 완료되어 파이프라인이 일시 중단되었습니다.\n` +
+              `CEO님의 검토 및 승인 후, /run 또는 /run-b 으로 다음 개발 스프린트를 시작하세요.`,
+              'system', taskId, 'DASHBOARD', fullTask.project_id
+            );
+            io.to(`project_${pId}`).emit('pipeline:paused', { projectId: pId, reason: 'review_stop', taskId: String(taskId) });
+          } else if (fullTask?.sprint_no != null) {
+            setImmediate(() => checkV3RelayWatchdog(fullTask, fullTask.project_id).catch(e =>
+              console.error('[Relay Watchdog] 훅 오류:', e.message)
+            ));
+          }
         }
+        
+        agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
+        io.emit('agent:status_change', { agentId, status: 'idle' });
       } catch (err) {
         console.error(`[ForceRedispatch] runDirect 오류 Task #${taskId}:`, err.message);
         broadcastLog('error', `> [${agentId}] Task #${taskId} 재착수 오류: ${err.message}`, agentId, taskId);
         await dbManager.updateTaskStatus(taskId, 'FAILED').catch(() => {});
+        
+        agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
+        io.emit('agent:status_change', { agentId, status: 'idle' });
       }
     });
   } catch (err) {
     console.error(`[ForceRedispatch Error]`, err.message);
   }
 }
+
+// ariDaemon 등 외부 프로세스에서 할당 이벤트를 트리거할 수 있는 엔드포인트
+app.post('/api/tasks', async (req, res) => {
+  try {
+    const { title, content, assignee, priority, column, category, projectId } = req.body;
+    const requester = 'CEO';
+    const targetProjectId = projectId || 'proj-1';
+    let targetModel = 'gemini-2.5-flash';
+    if (assignee && assignee !== '미할당') {
+      const roleId = assignee.startsWith(targetProjectId + '-') ? assignee.replace(targetProjectId + '-', '') : assignee;
+      targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
+    }
+    
+    const taskId = await dbManager.createTask(
+      title || content.slice(0, 30), 
+      content, 
+      requester, 
+      targetModel, 
+      assignee && assignee !== '미할당' ? assignee : null, 
+      category || 'QUICK_CHAT', 
+      targetProjectId
+    );
+    
+    broadcastLog('info', `수동 태스크 생성됨: ${title}`, 'system', taskId);
+    io.emit('task:created', {
+      taskId: String(taskId),
+      title: title || content.slice(0, 30),
+      content,
+      column: column || 'todo',
+      agentId: assignee !== '미할당' ? assignee : null,
+      priority: priority || 'medium',
+      projectId: targetProjectId,
+    });
+    
+    res.json({ status: 'ok', taskId: String(taskId) });
+  } catch (err) {
+    console.error('[API] /api/tasks 생성 오류:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ariDaemon 등 외부 프로세스에서 할당 이벤트를 트리거할 수 있는 엔드포인트
 app.post('/api/tasks/dispatch', async (req, res) => {
@@ -409,10 +700,12 @@ io.on('connection', (socket) => {
   socket.on('task:create', async ({ title, content, assignee, priority, column, projectId }) => {
     try {
       const requester = 'CEO';
-      const targetModel = (assignee && assignee !== '미할당')
-        ? (getAgentSignatureModel(assignee) || 'gemini-2.5-flash')
-        : 'gemini-2.5-flash';
       const targetProjectId = projectId || 'proj-1';
+      let targetModel = 'gemini-2.5-flash';
+      if (assignee && assignee !== '미할당') {
+        const roleId = assignee.startsWith(targetProjectId + '-') ? assignee.replace(targetProjectId + '-', '') : assignee;
+        targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
+      }
       const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null, 'QUICK_CHAT', targetProjectId);
       broadcastLog('info', `태스크 생성됨: ${title}`, 'system', taskId);
       io.emit('task:created', {
@@ -577,230 +870,70 @@ executor.setBroadcastLog(broadcastLog);
 // ─── [Phase 36] 파이프라인 워치독 맵 (projectId → intervalTimer) ──────────────
 const pipelineWatchdogs = new Map();
 
-// ─── [Phase 36] 파이프라인 릴레이 함수 ──────────────────────────────────────────
-// 컨도 Done 시 다음 pipeline_step 카드를 자동으로 순서 실행
-async function triggerPipelineRelay(completedTask, projectId) {
-  if (!completedTask?.pipeline_step || !projectId) return;
+// ─── [Phase 36-A] V3 에이전트 자율 릴레이 워치독 (구 triggerPipelineRelay 대체) ─────────
+// 카드가 Done 될 때, 바통을 무사히 넘겼는지 3초 뒤에 확인합니다.
+async function checkV3RelayWatchdog(completedTask, projectId) {
+  if (!completedTask?.sprint_no || !projectId) return;
 
   const mode = await dbManager.getProjectPipelineMode(projectId);
-  if (mode === 'none') return; // 파이프라인 비활성 상태
+  if (mode !== 'run') return; // 파이프라인 비활성 상태면 무시
 
-  const nextTask = await dbManager.getNextPipelineTask(projectId, completedTask.pipeline_step);
+  // V3 고유 리스크: 에이전트가 바통(create_next_sprint_task)을 안 넘기고 끝냈는지 검증
+  // 3초 대기 (에이전트가 툴 호출 후 DONE 처리하는 시간차 고려)
+  setTimeout(async () => {
+    try {
+      const hasNext = await dbManager.hasInProgressSprintTask(projectId, completedTask.sprint_no);
+      if (!hasNext) {
+        // 끊어짐 감지! (고아 상태)
+        broadcastLog('error', `⚠️ [Watchdog] 에이전트가 다음 카드를 생성하지 않고 종료했습니다. (Sprint #${completedTask.sprint_no} 단절)`, 'system', completedTask.id, 'DASHBOARD', projectId);
+        
+        // [Phase 37 FIX] 무한 복구 루프 방지: 만약 이 태스크가 이미 '복구' 태스크였다면, 더 이상 복구하지 않고 파이프라인 종료
+        if (completedTask.title.includes('[긴급 복구]') || completedTask.title.includes('[Ari 개입]')) {
+           broadcastLog('warn', `🛑 복구 태스크에서도 후속 작업이 지정되지 않았습니다. 릴레이를 자연 종료(STOP) 처리합니다.`, 'system', completedTask.id, 'DASHBOARD', projectId);
+           await dbManager.setPipelineMode(projectId, 'none');
+           stopPipelineWatchdog(projectId);
+           io.to(`project_${projectId}`).emit('pipeline:paused', { projectId, reason: 'natural_stop', taskId: String(completedTask.id) });
+           return;
+        }
 
-  // 파이프라인 완료 체크 (reviewer 마지막 step)
-  if (!nextTask) {
-    await dbManager.setPipelineMode(projectId, 'none');
-    const doneMsg = '파이프라인 전체 단계 완료 — 다음 프로젝트를 시작하세요.';
-    broadcastLog('info', doneMsg, 'system', null, 'DASHBOARD', projectId);
-    io.emit('pipeline:complete', { projectId });
-    return;
-  }
-
-  // [Phase 36 v2] Advisor 리뷰 카드 완료 → PASS/FAIL 루프 처리
-  if (completedTask.pipeline_is_review_stop) {
-    await triggerAdvisorPassFail(completedTask, projectId);
-    return;
-  }
-
-  // [Phase 36 v2] rework 모드: FAIL 카드 재작업 완료 → 전체 체크 후 Advisor 재트리거
-  if (mode === 'rework') {
-    await handleReworkCompletion(completedTask, projectId);
-    return;
-  }
-
-  // [V2] 이전 카드 산출물 컨텍스트 주입
-  let enrichedContent = nextTask.content || '';
-  try {
-    const prevOutput = await dbManager.getLastAgentComment(completedTask.id);
-    if (prevOutput) {
-      const MAX_CHARS = 3000;
-      const truncated = prevOutput.length > MAX_CHARS
-        ? prevOutput.slice(0, 2900) + '\n...[이하 생략]'
-        : prevOutput;
-      const contextBlock = `\n\n---\n## 📎 이전 단계 산출물: ${completedTask.title} (#${completedTask.pipeline_step})\n\n${truncated}\n\n---\n`;
-      // <!-- [PIPELINE CONTEXT] --> 자리표시 대체
-      if (enrichedContent.includes('<!-- [PIPELINE CONTEXT]')) {
-        enrichedContent = enrichedContent.replace(/<!--\s*\[PIPELINE CONTEXT\][\s\S]*?-->/, contextBlock);
-      } else {
-        enrichedContent = contextBlock + enrichedContent;
+        // 해결사(dev_advisor)에게 복구 카드 강제 할당
+        const rescueTaskId = await dbManager.createTask(
+          `[긴급 복구] Sprint #${completedTask.sprint_no} 릴레이 단절 복구`,
+          `이전 작업자(${completedTask.assigned_agent})가 다음 단계를 지정하지 않고 종료했습니다.\n[참조: #${completedTask.project_task_num}C1]\n어드바이저가 판단하여 다음 단계를 진행하십시오.`,
+          'system',
+          null,
+          'dev_advisor',
+          'QUICK_CHAT',
+          projectId,
+          null,
+          0,
+          completedTask.sprint_no
+        );
+        await dbManager.updateTaskStatus(rescueTaskId, 'IN_PROGRESS');
+        const rescueTaskObj = await dbManager.getTaskById(rescueTaskId);
+        io.emit('task:created', { 
+          projectId, 
+          taskId: String(rescueTaskId), 
+          title: rescueTaskObj.title,
+          content: rescueTaskObj.content,
+          agentId: rescueTaskObj.assigned_agent,
+          project_task_num: rescueTaskObj.project_task_num,
+          status: 'IN_PROGRESS', 
+          column: 'in_progress' 
+        });
+        broadcastLog('info', `> [dev_advisor] 긴급 복구 카드가 생성되어 파이프라인을 재가동합니다.`, 'system', rescueTaskId, 'DASHBOARD', projectId);
+        
+        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START'));
+        startPipelineWatchdog(projectId); // 워치독 타이머 재시작 보장
       }
-      await dbManager.updateTaskContent(nextTask.id, enrichedContent).catch(() => {});
+    } catch (e) {
+      console.error('[V3 Relay Watchdog Error]', e.message);
     }
-  } catch (e) {
-    console.warn('[Pipeline Relay] V2 컨텍스트 주입 실패 (무시하고 계속):', e.message);
-  }
-
-  // 다음 카드 잠금 해제
-  await dbManager.updateTaskStatus(nextTask.id, 'PENDING');
-  io.emit('task:updated', { taskId: String(nextTask.id), status: 'PENDING', column: 'todo' });
-
-  const relayMsg = `✅ #${completedTask.pipeline_step} ${completedTask.title} 완료 → 다음 단계: ${nextTask.title} 릴레이 시작`;
-  broadcastLog('info', relayMsg, 'system', null, 'DASHBOARD', projectId);
-  io.to(`project_${projectId}`).emit('pipeline:relay', {
-    fromTaskId: String(completedTask.id),
-    toTaskId:   String(nextTask.id),
-    step:       nextTask.pipeline_step,
-    title:      nextTask.title,
-  });
-
-  // run 모드면 다음 카드 즉시 실행
-  if (mode === 'run') {
-    const fullNextTask = await dbManager.getTaskById(nextTask.id);
-    if (fullNextTask?.assigned_agent) {
-      await dbManager.updateTaskStatus(nextTask.id, 'IN_PROGRESS');
-      io.emit('task:moved', { taskId: String(nextTask.id), toColumn: 'in_progress' });
-      io.emit('task:updated', { taskId: String(nextTask.id), status: 'IN_PROGRESS', column: 'in_progress' });
-      broadcastLog('info', `> [${fullNextTask.assigned_agent}] 파이프라인 Step ${nextTask.pipeline_step} 시작: ${nextTask.title}`, 'system', nextTask.id, 'DASHBOARD', projectId);
-      setImmediate(() => forceRedispatchTask(nextTask.id, fullNextTask.assigned_agent, '', 'START'));
-    }
-  }
-  // run-b 모드면 PENDING 표시만 (CEO 트리거 대기)
+  }, 3000);
 }
 
-// ─── [Phase 36 v2] Advisor PASS/FAIL 파싱 및 처리 ──────────────────────────────
-async function triggerAdvisorPassFail(advisorTask, projectId) {
-  const advisorComment = await dbManager.getLastAgentComment(advisorTask.id);
-  const stepTasks = await dbManager.getPipelineStepTasks(projectId, 3);
 
-  let anyFail = false;
-
-  for (const stepTask of stepTasks) {
-    const stepNum = stepTask.pipeline_step;
-    // 판정 파싱: 해당 step 섹션에서 PASS/FAIL 찾기
-    const sectionRegex = new RegExp(`#${stepNum}[\\s\\S]*?판정\\s*:\\s*(✅\\s*PASS|🔴\\s*FAIL)`, 'i');
-    const match = advisorComment ? advisorComment.match(sectionRegex) : null;
-    const isPass = !match || match[1].includes('PASS'); // 파싱 실패 시 PASS로 간주
-
-    if (isPass) {
-      // PASS → REVIEW 컬럼 + CEO 할당
-      await dbManager.updateTaskStatus(stepTask.id, 'REVIEW');
-      await dbManager.updateTaskAssignedAgent(stepTask.id, 'CEO');
-      io.emit('task:moved', { taskId: String(stepTask.id), toColumn: 'review' });
-      io.emit('task:updated', { taskId: String(stepTask.id), status: 'REVIEW', column: 'review', assigned_agent: 'CEO' });
-      broadcastLog('success', `✅ #${stepNum} ${stepTask.title} — Advisor PASS → CEO 검토 대기`, 'system', stepTask.id, 'DASHBOARD', projectId);
-    } else {
-      // FAIL → 보강 지시 코멘트 + 재작업
-      anyFail = true;
-      const reworkCount = stepTask.failure_count || 0;
-
-      if (reworkCount >= 3) {
-        // 최대 3회 초과 → REVIEW + CEO 직접 판단
-        broadcastLog('warn', `⚠️ #${stepNum} ${stepTask.title} 보강 3회 초과 — CEO 직접 검토`, 'system', stepTask.id, 'DASHBOARD', projectId);
-        await dbManager.updateTaskStatus(stepTask.id, 'REVIEW');
-        await dbManager.updateTaskAssignedAgent(stepTask.id, 'CEO');
-        io.emit('task:moved', { taskId: String(stepTask.id), toColumn: 'review' });
-        continue;
-      }
-
-      // 보강 지시 텍스트 추출
-      const reworkRegex = new RegExp(`#${stepNum}[\\s\\S]*?보강\\s*지시\\s*:\\s*([\\s\\S]*?)(?=###|$)`, 'i');
-      const reworkMatch = advisorComment ? advisorComment.match(reworkRegex) : null;
-      const reworkInstruction = reworkMatch ? reworkMatch[1].trim() : '품질 보강 후 재제출 필요';
-
-      // 보강 지시 코멘트 생성
-      const reworkComment = `[Advisor 보강 지시 #${reworkCount + 1}]\n\n${reworkInstruction}\n\n위 사항을 보완하여 재제출해주세요.`;
-      await dbManager.createComment(stepTask.id, 'dev_advisor', reworkComment, null);
-      io.emit('task:comment_added', { taskId: String(stepTask.id), author: 'dev_advisor', text: reworkComment, createdAt: new Date().toISOString() });
-
-      // failure_count 증가 (rework 횟수 추적)
-      await dbManager.incrementFailureCount(stepTask.id).catch(() => null);
-
-      // IN_PROGRESS 전환 + 원래 에이전트 재실행
-      await dbManager.updateTaskStatus(stepTask.id, 'IN_PROGRESS');
-      io.emit('task:moved', { taskId: String(stepTask.id), toColumn: 'in_progress' });
-      broadcastLog('warn', `🔴 #${stepNum} ${stepTask.title} — Advisor FAIL → ${stepTask.assigned_agent} 보강 재작업`, 'system', stepTask.id, 'DASHBOARD', projectId);
-      setImmediate(() => forceRedispatchTask(stepTask.id, stepTask.assigned_agent, reworkInstruction, 'REWORK'));
-    }
-  }
-
-  if (!anyFail) {
-    // 모든 카드 PASS → 파이프라인 완료
-    await dbManager.setPipelineMode(projectId, 'none');
-    stopPipelineWatchdog(projectId);
-    const doneMsg = '🔴 Advisor 리뷰 완료 — 모든 카드 PASS. CEO 최종 판단이 필요합니다.';
-    broadcastLog('info', doneMsg, 'system', null, 'DASHBOARD', projectId);
-    io.to(`project_${projectId}`).emit('pipeline:review_ready', { projectId, taskId: String(advisorTask.id), message: doneMsg });
-  } else {
-    // FAIL 카드 있음 → rework 모드 전환 + 워치독 시작
-    await dbManager.setPipelineMode(projectId, 'rework');
-    broadcastLog('info', '🔄 보강 지시 발령 — 에이전트 재작업 중...', 'system', null, 'DASHBOARD', projectId);
-    startPipelineWatchdog(projectId);
-  }
-}
-
-// ─── [Phase 36 v2] rework 카드 완료 처리 — 모두 REVIEW면 Advisor 재트리거 ────
-async function handleReworkCompletion(completedTask, projectId) {
-  const stepTasks = await dbManager.getPipelineStepTasks(projectId, 3);
-  const allReview = stepTasks.every(t => ['REVIEW', 'review'].includes(t.status));
-
-  if (!allReview) {
-    broadcastLog('info', `🔄 #${completedTask.pipeline_step} ${completedTask.title} 보강 완료 — 다른 카드 재작업 대기 중`, 'system', completedTask.id, 'DASHBOARD', projectId);
-    return;
-  }
-
-  // 모든 카드 REVIEW → Advisor (#4) 재트리거
-  broadcastLog('info', '🔁 모든 보강 완료 — Advisor 재검토 시작', 'system', null, 'DASHBOARD', projectId);
-  const advisorTask = await dbManager.getNextPipelineTask(projectId, 3); // step 4 조회
-  if (!advisorTask) {
-    await dbManager.setPipelineMode(projectId, 'none');
-    return;
-  }
-
-  // Advisor 카드에 모든 step 산출물 재주입
-  let allOutputs = '';
-  for (const st of stepTasks) {
-    const output = await dbManager.getLastAgentComment(st.id).catch(() => null);
-    if (output) {
-      allOutputs += `\n\n---\n## 📎 재검토 대상: ${st.title} (#${st.pipeline_step})\n\n${output.slice(0, 2000)}\n`;
-    }
-  }
-  const newContent = (advisorTask.content || '') + `\n\n<!-- [REWORK CONTEXT: 보강 후 전체 산출물] -->${allOutputs}`;
-  await dbManager.updateTaskContent(advisorTask.id, newContent).catch(() => {});
-
-  // Advisor 카드 IN_PROGRESS + 재실행
-  await dbManager.updateTaskStatus(advisorTask.id, 'IN_PROGRESS');
-  await dbManager.setPipelineMode(projectId, 'run');
-  io.emit('task:moved', { taskId: String(advisorTask.id), toColumn: 'in_progress' });
-  stopPipelineWatchdog(projectId);
-  setImmediate(() => forceRedispatchTask(advisorTask.id, advisorTask.assigned_agent, '', 'START'));
-}
-
-// ─── [Phase 36 v2] Ari 대리 보완 (Level 2) — Advisor 중단 시 임시 요약 리뷰 ──
-async function ariProxyReview(projectId) {
-  try {
-    const stepTasks = await dbManager.getPipelineStepTasks(projectId, 3);
-    const advisorTask = await dbManager.getNextPipelineTask(projectId, 3);
-    if (!advisorTask) return;
-
-    // 각 카드 마지막 산출물 수집
-    const summaries = [];
-    for (const st of stepTasks) {
-      const out = await dbManager.getLastAgentComment(st.id).catch(() => null);
-      summaries.push(`### #${st.pipeline_step} ${st.title}\n판정: ✅ PASS\n코멘트: ${out ? out.slice(0, 300) + '...' : '(산출물 없음)'}`);
-    }
-
-    const ariComment = `[Ari 대리 리뷰] Advisor 중단으로 Ari가 임시 요약 리뷰를 작성합니다.\nCEO 최종 판단이 필요합니다.\n\n${summaries.join('\n\n')}`;
-    await dbManager.createComment(advisorTask.id, 'ari', ariComment, null);
-    io.emit('task:comment_added', { taskId: String(advisorTask.id), author: 'ari', text: ariComment, createdAt: new Date().toISOString() });
-
-    // 모든 step 카드 → REVIEW + CEO 할당
-    for (const st of stepTasks) {
-      await dbManager.updateTaskStatus(st.id, 'REVIEW');
-      await dbManager.updateTaskAssignedAgent(st.id, 'CEO');
-      io.emit('task:moved', { taskId: String(st.id), toColumn: 'review' });
-    }
-
-    await dbManager.setPipelineMode(projectId, 'none');
-    stopPipelineWatchdog(projectId);
-    const msg = '🤖 Ari 대리 리뷰 완료 — CEO 검토를 기다립니다';
-    broadcastLog('warn', msg, 'system', null, 'DASHBOARD', projectId);
-    io.to(`project_${projectId}`).emit('pipeline:review_ready', { projectId, taskId: String(advisorTask.id), message: msg });
-  } catch (e) {
-    console.error('[Ari Proxy Review] 실패:', e.message);
-  }
-}
-
-// ─── [Phase 36 v2] 파이프라인 워치독 (3분 주기, Level 1→2→3) ─────────────────
+// ─── [Phase 36-A] V3 파이프라인 장기 워치독 (3분 주기, Level 1→2→3) ─────────
 function startPipelineWatchdog(projectId) {
   if (pipelineWatchdogs.has(projectId)) return;
   let retryCount = 0;
@@ -810,35 +943,64 @@ function startPipelineWatchdog(projectId) {
       const mode = await dbManager.getProjectPipelineMode(projectId).catch(() => 'none');
       if (mode === 'none') { stopPipelineWatchdog(projectId); return; }
 
-      const stepTasks = await dbManager.getPipelineStepTasks(projectId, 3).catch(() => []);
-      const hasActive = stepTasks.some(t => ['IN_PROGRESS', 'in_progress'].includes(t.status));
-      if (hasActive) { retryCount = 0; return; } // 활성 카드 있으면 정상
+      // 현재 진행중인 가장 높은 sprint_no의 카드를 조회 (우선 단순화하여 IN_PROGRESS 여부만 확인)
+      const sprintNo = await dbManager.getMaxSprintNo(projectId);
+      const hasActive = await dbManager.hasInProgressSprintTask(projectId, sprintNo);
+
+      if (hasActive) { retryCount = 0; return; } // 활성 카드가 있으면 정상(에이전트가 생각 중이거나 실행 중)
 
       retryCount++;
-      console.warn(`[Pipeline Watchdog] STUCK #${retryCount}: ${projectId}`);
+      console.warn(`[V3 Watchdog] STUCK #${retryCount} detected in Project: ${projectId}`);
 
       if (retryCount <= 2) {
-        // Level 1: 자동 재개
-        const stuckTask = stepTasks.find(t => !['REVIEW', 'review'].includes(t.status));
-        if (stuckTask) {
-          broadcastLog('warn', `⚠️ 파이프라인 재개 시도 중... (${retryCount}/2)`, 'system', stuckTask.id, 'DASHBOARD', projectId);
-          await dbManager.updateTaskStatus(stuckTask.id, 'IN_PROGRESS');
-          io.emit('task:moved', { taskId: String(stuckTask.id), toColumn: 'in_progress' });
-          setImmediate(() => forceRedispatchTask(stuckTask.id, stuckTask.assigned_agent, '', 'START'));
+        // Level 1: 해당 스프린트의 PENDING 카드를 찾아 dispatch (바통은 넘어왔는데 자동실행이 안 된 경우 복구)
+        broadcastLog('warn', `⚠️ 파이프라인 정체 감지. 자동 재개 시도 중... (${retryCount}/2)`, 'system', null, 'DASHBOARD', projectId);
+        try {
+          const allTasks = await dbManager.getAllTasks(projectId);
+          const stuckTask = allTasks.find(t =>
+            t.sprint_no === sprintNo &&
+            (t.status === 'PENDING' || t.status === 'todo') &&
+            t.assigned_agent && t.assigned_agent !== 'CEO'
+          );
+          if (stuckTask) {
+            broadcastLog('info', `> [Watchdog L1] PENDING 상태 단절 카드 감지 → Task #${stuckTask.project_task_num || stuckTask.id} 자동 재개`, 'system', stuckTask.id, 'DASHBOARD', projectId);
+            await dbManager.updateTaskStatus(stuckTask.id, 'IN_PROGRESS');
+            io.emit('task:moved', { taskId: String(stuckTask.id), toColumn: 'in_progress' });
+            setImmediate(() => forceRedispatchTask(stuckTask.id, stuckTask.assigned_agent, '', 'START'));
+          }
+        } catch (recoverErr) {
+          console.error('[V3 Watchdog L1] 재개 시도 오류:', recoverErr.message);
         }
       } else if (retryCount === 3) {
-        // Level 2: Ari 대리 보완
-        broadcastLog('warn', '🤖 Ari 대리 보완 시작 — Advisor 중단 복구 중', 'system', null, 'DASHBOARD', projectId);
-        await ariProxyReview(projectId);
+        // Level 2: 파이프라인 단절. 해결사 (Opus / dev_advisor) 호출
+        broadcastLog('warn', '🤖 Ari 대리 보완 시작 — 어드바이저 강제 소환', 'system', null, 'DASHBOARD', projectId);
+        const rescueTaskId = await dbManager.createTask(
+          `[Ari 개입] Sprint #${sprintNo} 장기 단절 복구`,
+          `시스템 워치독이 파이프라인의 장기 중단(STUCK)을 감지했습니다.\n어드바이저가 판단하여 다음 단계를 지시하십시오.`,
+          'system', null, 'dev_advisor', 'QUICK_CHAT', projectId, null, 0, sprintNo
+        );
+        await dbManager.updateTaskStatus(rescueTaskId, 'IN_PROGRESS');
+        const rescueTaskObj2 = await dbManager.getTaskById(rescueTaskId);
+        io.emit('task:created', { 
+          projectId, 
+          taskId: String(rescueTaskId), 
+          title: rescueTaskObj2.title,
+          content: rescueTaskObj2.content,
+          agentId: rescueTaskObj2.assigned_agent,
+          project_task_num: rescueTaskObj2.project_task_num,
+          status: 'IN_PROGRESS', 
+          column: 'in_progress' 
+        });
+        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START'));
       } else {
-        // Level 3: CEO 직접 알림
+        // Level 3: CEO 호출
         stopPipelineWatchdog(projectId);
         await dbManager.setPipelineMode(projectId, 'none');
-        broadcastLog('error', '🔴 파이프라인 장기 중단 — CEO 직접 판단 필요 (/run으로 재개 가능)', 'system', null, 'DASHBOARD', projectId);
-        io.to(`project_${projectId}`).emit('pipeline:stuck', { projectId, message: '파이프라인이 중단되었습니다. 수동 재개가 필요합니다.' });
+        broadcastLog('error', '🔴 파이프라인 장기 중단 — 복구 실패. CEO 직접 판단 필요 (/run으로 재개 가능)', 'system', null, 'DASHBOARD', projectId);
+        io.to(`project_${projectId}`).emit('pipeline:stuck', { projectId, message: '파이프라인이 완전히 중단되었습니다. 수동 확인이 필요합니다.' });
       }
     } catch (e) {
-      console.error('[Pipeline Watchdog] 오류:', e.message);
+      console.error('[V3 Watchdog] 오류:', e.message);
     }
   }, 3 * 60 * 1000); // 3분 주기
 
@@ -951,7 +1113,7 @@ ariNs.on('connection', (socket) => {
       // [Phase 22.5 버그 픽스] 직접 변수 접근 시 만료된 토큰이 전달되어 401/400 에러 발생.
       // 반드시 getGoogleOAuthToken()을 호출하여 만료 시 자동 갱신된 토큰을 받아와야 함.
       const currentToken = await getGoogleOAuthToken();
-      const postData = JSON.stringify({ content, author, oauthToken: currentToken, preferredModel });
+      const postData = JSON.stringify({ content, author, oauthToken: currentToken, preferredModel, projectId });
 
       const reqDaemon = http.request({
         hostname: 'localhost',
@@ -1244,49 +1406,116 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'mycrew-bridge-server', version: '2.0.0' });
 });
 
-// ─── [Phase 21] Onboarding Pipeline: URL Scan & Context Extraction ────────
-app.post('/api/onboarding/scan-url', async (req, res) => {
-  const { url } = req.body;
-  if (!url) return res.status(400).json({ status: 'error', message: 'URL이 필요합니다.' });
+/**
+ * [Phase 36] 파이프라인 내부 실행함수 — REST 엔드포인트와 자동 시작 공유
+ */
+async function startPipelineInternal(projectId, mode) {
+  const currentMode = await dbManager.getProjectPipelineMode(projectId);
+  if (currentMode !== 'none') throw new Error(`이미 파이프라인이 실행 중입니다 (${currentMode}).`);
 
+  // [Phase 36-A V3] PENDING/PLANNED 카드 전체에 다음 sprint_no 일괄 할당
+  const taskCount = await dbManager.initDynamicPipeline(projectId);
+  if (taskCount === 0) throw new Error('실행할 할 일(PENDING/PLANNED) 카드가 없습니다.');
+
+  // [V3] sprint_no 조회 후, 해당 스프린트의 가장 앞 카드(project_task_num 오름차순)를 첫 주자로 선정
+  const sprintNo = await dbManager.getMaxSprintNo(projectId);
+  const allTasks = await dbManager.getAllTasks(projectId);
+  let firstTask = allTasks
+    .filter(t => t.sprint_no === sprintNo && t.assigned_agent !== 'CEO')
+    .sort((a, b) => (a.project_task_num ?? a.id) - (b.project_task_num ?? b.id))[0] || null;
+
+  if (!firstTask) throw new Error('파이프라인 첫 번째 카드를 찾을 수 없습니다. (대기 카드가 없거나 모두 CEO 할당 상태입니다)');
+
+  // [Phase 36-A] 첫 카드가 미할당(null)인 경우, 릴레이 시작을 위해 CTO(dev_senior)에게 자동 배정
+  if (!firstTask.assigned_agent || firstTask.assigned_agent === '미할당') {
+    firstTask.assigned_agent = 'dev_senior';
+    await dbManager.updateTaskAssignedAgent(firstTask.id, 'dev_senior');
+  }
+
+  await dbManager.setPipelineMode(projectId, mode);
+
+  const startMsg = mode === 'run'
+    ? `🚀 /run 파이프라인 시작 — Sprint #${sprintNo} 자율 완주 모드`
+    : `⏸ /run-b 중간 점검 모드 시작 — Sprint #${sprintNo} 단계별 확인`;
+  broadcastLog('info', startMsg, 'system', null, 'DASHBOARD', projectId);
+  io.to(`project_${projectId}`).emit('pipeline:started', { projectId, mode, firstTaskId: String(firstTask.id), sprintNo });
+
+  // 첫 카드 IN_PROGRESS 전환 + dispatch
+  await dbManager.updateTaskStatus(firstTask.id, 'IN_PROGRESS');
+  io.emit('task:moved', { taskId: String(firstTask.id), toColumn: 'in_progress' });
+  io.emit('task:updated', { taskId: String(firstTask.id), status: 'IN_PROGRESS', column: 'in_progress', sprint_no: sprintNo });
+  broadcastLog('info', `> [${firstTask.assigned_agent}] Sprint #${sprintNo} 시작: ${firstTask.title}`, 'system', firstTask.id, 'DASHBOARD', projectId);
+  setImmediate(() => forceRedispatchTask(firstTask.id, firstTask.assigned_agent, '', 'START'));
+
+  startPipelineWatchdog(projectId);
+
+  return { mode, sprintNo, startedTaskId: firstTask.id, title: firstTask.title };
+}
+
+/**
+ * [Phase 36] POST /api/projects/:id/pipeline/run  — 자율 릴레이 모드 시작
+ * [Phase 36] POST /api/projects/:id/pipeline/run-b — 단계별 확인 모드 시작
+ */
+app.post('/api/projects/:id/pipeline/:mode', async (req, res) => {
+  const { id: projectId, mode } = req.params;
+
+  if (mode === 'stop' || mode === 'pause') {
+    try {
+      await dbManager.setPipelineMode(projectId, 'none');
+      stopPipelineWatchdog(projectId);
+      io.emit('pipeline:paused', { projectId });
+      broadcastLog('warn', `파이프라인이 강제 종료/정지되었습니다. (락 해제)`, 'system', null, 'DASHBOARD', projectId);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error(`[API] 파이프라인 정지 중 오류:`, err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  if (!['run', 'run-b'].includes(mode)) {
+    return res.status(400).json({ error: '허용된 모드: run | run-b | stop' });
+  }
   try {
-    broadcastLog('info', `[Onboarding] ${url} 웹사이트 스캔 및 팀 컨텍스트 추출을 시작합니다...`, 'system');
-    
-    // 비동기 파이프라인 실행
-    const files = await processOnboardingUrl(url);
-    
-    broadcastLog('success', `[Onboarding] 스캔 완료 및 컨텍스트 파일 자동 생성 완료!`, 'system');
-    res.json({ status: 'ok', message: '컨텍스트 추출이 완료되었습니다.', files });
-  } catch (error) {
-    console.error('[API] /api/onboarding/scan-url 에러:', error.message);
-    broadcastLog('error', `[Onboarding] 추출 에러 발생: ${error.message}`, 'system');
-    res.status(500).json({ status: 'error', message: error.message });
+    const result = await startPipelineInternal(projectId, mode);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const status = err.message.includes('이미') ? 409 : err.message.includes('없습') ? 404 : 500;
+    console.error(`[API] /pipeline/${mode} 오류:`, err.message);
+    res.status(status).json({ error: err.message });
   }
 });
 
-// ─── [Phase 21] Settings & Integration Vault API ─────────────────────────────
-app.get('/api/settings', async (req, res) => {
+/**
+ * [Phase 37] POST /api/projects/:id/pipeline/pause — 파이프라인 일시정지 (Pull 차단)
+ */
+app.post('/api/projects/:id/pipeline/pause', async (req, res) => {
   try {
-    const settings = await dbManager.getAllSettings();
-    // 보안을 위해 일부 키는 마스킹 처리해서 보낼 수도 있으나, 현재는 어드민 단독 사용이므로 전체 반환
-    res.json({ status: 'ok', settings });
-  } catch (error) {
-    res.status(500).json({ status: 'error', message: error.message });
+    const { id: projectId } = req.params;
+    await dbManager.setPipelineMode(projectId, 'none');
+    stopPipelineWatchdog(projectId);
+    io.emit('pipeline:paused', { projectId });
+    broadcastLog('warn', `파이프라인이 일시정지되었습니다. (새로운 작업 예약 차단)`, 'system', null, 'DASHBOARD', projectId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[API] /pipeline/pause 오류:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/settings', async (req, res) => {
+/**
+ * [Phase 37] POST /api/projects/:id/pipeline/stop — 파이프라인 완전 중지
+ */
+app.post('/api/projects/:id/pipeline/stop', async (req, res) => {
   try {
-    const { key, value } = req.body;
-    if (!key) return res.status(400).json({ status: 'error', message: '키 값이 필요합니다.' });
-    
-    // KeyProvider를 통해 저장 시, DB 저장과 함께 앱 메모리 캐시도 즉시 갱신됨
-    await keyProvider.setKey(key, value);
-    broadcastLog('info', `[Settings] ${key} 설정이 업데이트 되었습니다.`, 'system');
-    res.json({ status: 'ok', message: '설정이 성공적으로 저장되었습니다.' });
-  } catch (error) {
-    console.error('[API] /api/settings 저장 에러:', error.message);
-    res.status(500).json({ status: 'error', message: error.message });
+    const { id: projectId } = req.params;
+    await dbManager.setPipelineMode(projectId, 'none');
+    stopPipelineWatchdog(projectId);
+    io.emit('pipeline:stopped', { projectId });
+    broadcastLog('error', `파이프라인이 강제 중단되었습니다. 진행 중이던 작업은 고아 상태로 남을 수 있습니다.`, 'system', null, 'DASHBOARD', projectId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[API] /pipeline/stop 오류:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -1397,6 +1626,36 @@ app.patch('/api/agents/:agentId/profile', async (req, res) => {
 });
 
 /**
+ * [Phase 37] POST /api/projects/:id/crew/add — 프로젝트에 에이전트 추가
+ */
+app.post('/api/projects/:id/crew/add', async (req, res) => {
+  try {
+    const { roleId, modelId, nickname, avatar, roleDesc } = req.body;
+    await dbManager.addProjectAgent(req.params.id, roleId, modelId, nickname, avatar, roleDesc);
+    io.emit('project:crew_updated', { projectId: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] POST /api/projects/:id/crew/add 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
+ * [Phase 37] POST /api/projects/:id/crew/remove — 프로젝트에서 에이전트 제거
+ */
+app.post('/api/projects/:id/crew/remove', async (req, res) => {
+  try {
+    const { roleId } = req.body;
+    await dbManager.removeProjectAgent(req.params.id, roleId);
+    io.emit('project:crew_updated', { projectId: req.params.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] POST /api/projects/:id/crew/remove 에러:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+/**
  * POST /api/projects — 새 프로젝트(워크스페이스) 생성
  */
 app.post('/api/projects', async (req, res) => {
@@ -1428,9 +1687,14 @@ app.post('/api/projects/zero-config', async (req, res) => {
 
     // ZeroConfigService에 빌딩 위임 (Background 처리)
     zeroConfigService.buildProject({ name, objective, isolation_scope }, projectBroadcast)
-      .then(projectId => {
+      .then(async projectId => {
         broadcastLog('success', `✅ [${name}] 프로젝트 세팅 완료! 크루 배치가 완료되었으며 워크스페이스가 자동 전환됩니다.`, 'system', null, 'DASHBOARD', projectId);
         io.emit('project:ready', { projectId });
+
+        // ── [Phase 37] 팀빌딩 완료 후 자동 실행 제거 ─────────────────────
+        // 이전: 5초 후 /run-b 자동 시작 → CEO 확인 없이 에이전트가 기획 카드 실행
+        // 변경: project:ready 이벤트로 UI에 "준비 완료" 알림만 → CEO가 /run 또는 /run-b 선택
+        broadcastLog('info', `🎯 [${name}] 팀 구성 완료! 대시보드에서 /run 또는 /run-b 버튼으로 파이프라인을 시작하세요.`, 'system', null, 'DASHBOARD', projectId);
       })
       .catch(err => {
         broadcastLog('error', `❌ [${name}] 프로젝트 세팅 실패: ${err.message}`, 'system', null, 'DASHBOARD');
@@ -1477,60 +1741,6 @@ app.delete('/api/projects/:id', async (req, res) => {
 });
 
 /**
- * [Phase 36] POST /api/projects/:id/pipeline/run  — 자율 릴레이 모드 시작
- * [Phase 36] POST /api/projects/:id/pipeline/run-b — 단계별 확인 모드 시작
- */
-app.post('/api/projects/:id/pipeline/:mode', async (req, res) => {
-  const { id: projectId, mode } = req.params;
-  if (!['run', 'run-b'].includes(mode)) {
-    return res.status(400).json({ error: '허용된 모드: run | run-b' });
-  }
-  try {
-    // pipeline_step = 1인 첫 번째 카드 조회
-    const firstTask = await dbManager.getNextPipelineTask(projectId, 0);
-    if (!firstTask) {
-      return res.status(404).json({ error: '파이프라인 커드를 사랍을 수 없습니다. 프로젝트를 확인하세요.' });
-    }
-
-    // 이미 실행 중인 파이프라인 없는지 확인
-    const currentMode = await dbManager.getProjectPipelineMode(projectId);
-    if (currentMode !== 'none') {
-      return res.status(409).json({ error: `이미 파이프라인이 실행 중입니다 (${currentMode}). 중단 후 다시 시도하세요.` });
-    }
-
-    // 모드 저장
-    await dbManager.setPipelineMode(projectId, mode);
-
-    // step 1 카드 잠금 해제 (PLANNED → PENDING)
-    await dbManager.updateTaskStatus(firstTask.id, 'PENDING');
-    io.emit('task:updated', { taskId: String(firstTask.id), status: 'PENDING', column: 'todo' });
-
-    const startMsg = mode === 'run'
-      ? `🚀 /run 파이프라인 시작 — PRD부터 Advisor 리뷰까지 자율 완주`
-      : `⏸ /run-b 단계별 확인 모드 시작 — 매 단계마다 수동 트리거`;
-    broadcastLog('info', startMsg, 'system', null, 'DASHBOARD', projectId);
-    io.to(`project_${projectId}`).emit('pipeline:started', { projectId, mode, firstTaskId: String(firstTask.id) });
-
-    // run 모드: step 1 카드 즉시 실행
-    if (mode === 'run') {
-      const fullFirst = await dbManager.getTaskById(firstTask.id);
-      if (fullFirst?.assigned_agent) {
-        await dbManager.updateTaskStatus(firstTask.id, 'IN_PROGRESS');
-        io.emit('task:moved', { taskId: String(firstTask.id), toColumn: 'in_progress' });
-        io.emit('task:updated', { taskId: String(firstTask.id), status: 'IN_PROGRESS', column: 'in_progress' });
-        broadcastLog('info', `> [${fullFirst.assigned_agent}] 파이프라인 Step 1 시작: ${firstTask.title}`, 'system', firstTask.id, 'DASHBOARD', projectId);
-        setImmediate(() => forceRedispatchTask(firstTask.id, fullFirst.assigned_agent, '', 'START'));
-      }
-    }
-
-    res.json({ ok: true, mode, startedTaskId: firstTask.id, title: firstTask.title });
-  } catch (err) {
-    console.error(`[API] /pipeline/${mode} 오류:`, err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-/**
  * [Phase 36] GET /api/projects/:id/project_md — PROJECT.md 읽기
  */
 app.get('/api/projects/:id/project_md', async (req, res) => {
@@ -1541,7 +1751,7 @@ app.get('/api/projects/:id/project_md', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Projects');
+      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -1577,7 +1787,7 @@ app.get('/api/projects/:id/project_md/versions', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Projects');
+      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -1625,7 +1835,7 @@ app.put('/api/projects/:id/project_md', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Projects');
+      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -1874,6 +2084,139 @@ app.get('/api/tasks/:id/comments', async (req, res) => {
   }
 });
 
+// ── [Phase 36b] 카드링크 첨부파일 API ────────────────────────────────────────
+
+/** GET /api/tasks/:id/attachments — 첨부파일 목록 조회 */
+app.get('/api/tasks/:id/attachments', async (req, res) => {
+  try {
+    const attachments = await dbManager.getTaskAttachments(req.params.id);
+    res.json({ status: 'ok', attachments });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** POST /api/tasks/:id/attachments — 첨부파일 등록 */
+app.post('/api/tasks/:id/attachments', async (req, res) => {
+  try {
+    const { file_path, file_label, comment_id, file_type, file_size } = req.body;
+    if (!file_path || !file_label) {
+      return res.status(400).json({ status: 'error', message: 'file_path, file_label 필수' });
+    }
+    const result = await dbManager.createTaskAttachment(
+      req.params.id, comment_id || null, file_label, file_path, file_type || null, file_size || null
+    );
+    res.json({ status: 'ok', id: result.id });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** DELETE /api/tasks/:id/attachments/:attachmentId — 첨부파일 삭제 */
+app.delete('/api/tasks/:id/attachments/:attachmentId', async (req, res) => {
+  try {
+    const changes = await dbManager.deleteTaskAttachment(req.params.attachmentId);
+    if (changes === 0) return res.status(404).json({ status: 'error', message: '첨부파일을 찾을 수 없습니다.' });
+    res.json({ status: 'ok', message: '첨부파일 삭제 완료' });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** GET /api/tasks/:id/comments/:idx — 특정 순번 코멘트 조회 (복사 아이콘용) */
+app.get('/api/tasks/:id/comments/:idx', async (req, res) => {
+  try {
+    const commentIdx = parseInt(req.params.idx, 10);
+    if (isNaN(commentIdx) || commentIdx < 1) {
+      return res.status(400).json({ status: 'error', message: '유효한 순번이 아닙니다.' });
+    }
+    const comment = await dbManager.getTaskCommentByIndex(req.params.id, commentIdx);
+    if (!comment) return res.status(404).json({ status: 'error', message: '코멘트를 찾을 수 없습니다.' });
+    res.json({ status: 'ok', comment, tag: `#${req.params.id}C${commentIdx}` });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * [Phase 36-A] POST /api/tasks/:id/sprint/next — 자율 릴레이 다음 카드 생성 (create_next_sprint_task 툴 역할)
+ * 에이전트는 title, content, assignee 세 가지만 보냄. 서버가 나머지를 강제 주입.
+ */
+app.post('/api/tasks/:id/sprint/next', async (req, res) => {
+  try {
+    const parentId = req.params.id;
+    const { title, content, assignee } = req.body;
+    
+    if (!title || !content || !assignee) {
+      return res.status(400).json({ error: 'title, content, assignee는 필수입니다.' });
+    }
+
+    const parentTask = await dbManager.getTaskById(parentId);
+    if (!parentTask) return res.status(404).json({ error: '부모 카드를 찾을 수 없습니다.' });
+
+    // 유효성 검증 및 자기 참조 방지
+    const ALLOWED_IDS = ['dev_senior', 'dev_fullstack', 'dev_advisor', 'dev_qa', 'dev_ux', 'dev_pm', 'mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_video', 'mkt_analyst', 'mkt_advisor'];
+    let finalAssignee = assignee;
+    
+    // 자기 참조 차단 룰: CTO가 코딩 리뷰 요청 시 자기 자신에게 할당 불가
+    if (parentTask.assigned_agent === 'dev_senior' && finalAssignee === 'dev_senior') {
+      finalAssignee = 'dev_advisor'; // 강제 폴백
+      console.log(`[Sprint Validation] CTO 자기 참조 감지. 할당자를 ${finalAssignee}로 강제 변경합니다.`);
+    } else if (!ALLOWED_IDS.includes(finalAssignee)) {
+      finalAssignee = 'dev_advisor';
+      console.log(`[Sprint Validation] 유효하지 않은 할당자(${assignee}). 할당자를 ${finalAssignee}로 강제 변경합니다.`);
+    }
+
+    const contextInjectedContent = content + `\n\n> 🔗 **이전 릴레이 산출물 참조:** #${parentTask.project_task_num || parentId}`;
+
+    // 새 카드 생성. sprintNo, projectId는 서버가 부모로부터 무조건 상속
+    const newTaskId = await dbManager.createTask(
+      title,
+      contextInjectedContent,
+      parentTask.assigned_agent, // requester는 부모 카드의 작업자
+      null, // model
+      finalAssignee,
+      'QUICK_CHAT',
+      parentTask.project_id,
+      null, // pipelineStep (이제 사용 안 함)
+      0,
+      parentTask.sprint_no // sprintNo 상속
+    );
+
+    // 방금 생성된 태스크 전체 조회 (project_task_num 등)
+    const newTaskObj = await dbManager.getTaskById(newTaskId);
+    
+    // 즉시 IN_PROGRESS 전환 (릴레이 바통 터치)
+    await dbManager.updateTaskStatus(newTaskId, 'IN_PROGRESS');
+    
+    io.emit('task:created', { 
+      projectId: parentTask.project_id, 
+      taskId: String(newTaskId), 
+      title: newTaskObj.title,
+      content: newTaskObj.content,
+      agentId: newTaskObj.assigned_agent,
+      project_task_num: newTaskObj.project_task_num,
+      status: 'IN_PROGRESS', 
+      column: 'in_progress' 
+    });
+    io.emit('task:moved', { taskId: String(newTaskId), toColumn: 'in_progress' });
+    
+    broadcastLog('info', `> [${finalAssignee}] 바통 터치: ${title}`, 'system', newTaskId, 'DASHBOARD', parentTask.project_id);
+
+    // 새로 생성된 카드를 담당자에게 dispatch (이벤트 드리븐)
+    setImmediate(() => forceRedispatchTask(newTaskId, finalAssignee, '', 'START'));
+
+    res.json({ status: 'ok', id: newTaskId, assignee: finalAssignee });
+  } catch (err) {
+    console.error('[API] /api/tasks/:id/sprint/next 에러:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 /** POST /api/tasks/:id/comments — 댓글 추가 */
 app.post('/api/tasks/:id/comments', async (req, res) => {
   try {
@@ -2034,6 +2377,42 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
           let reassignTarget = null;
           let removeCard = false;
 
+          const hasReviewRequest3 = result._meta?.review_request && task?.sprint_no != null;
+          const isNextSprintTriggered = result._meta?.next_sprint && task?.sprint_no != null && !hasReviewRequest3;
+          const hasPipelineEnd3 = result._meta?.pipeline_end === true;
+          let isBatonPassed = false;
+          let batonErrorMsg = null;
+
+          // [1순위 픽스] 상태를 덮어쓰기 전에 바톤 터치 생성 시도
+          if (isNextSprintTriggered) {
+            const ns = result._meta.next_sprint;
+            broadcastLog('info', `> [${agentToTrigger}] 바통 터치 준비 중: 다음 작업자(${ns.assignee})에게 전달...`, 'system', sid, 'DASHBOARD', task.project_id);
+            try {
+              const res = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${sid}/sprint/next`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: ns.title, content: ns.content, assignee: ns.assignee })
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || '알 수 없는 서버 에러');
+              isBatonPassed = true;
+            } catch (e) {
+              console.error('[Relay Parser] 다음 카드 생성 에러:', e.message);
+              batonErrorMsg = `[시스템 에러] 다음 릴레이 카드 생성에 실패했습니다. 사유: ${e.message}`;
+              cleanText = cleanText + '\n\n' + batonErrorMsg;
+            }
+          }
+
+          if (isNextSprintTriggered && !isBatonPassed) {
+            nextState = 'FAILED';
+            nextColumn = 'todo';
+          } else if (isNextSprintTriggered) {
+            nextState = 'COMPLETED';
+            nextColumn = 'done';
+          } else if (hasReviewRequest3) {
+            nextState = 'IN_PROGRESS';
+            nextColumn = 'in_progress';
+          }
+
           // [Phase 23] MyCrew Operating Protocol JSON 블록 파싱
           const jsonMatch = cleanText.match(/```json\s*(\{[\s\S]*?"system_action"[\s\S]*?\})\s*```/);
           if (jsonMatch) {
@@ -2087,6 +2466,46 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
             broadcastLog('info', cleanText, agentToTrigger, sid);
           }
           
+          if (hasReviewRequest3) {
+            // [Phase 36-B] 핑퐁: 같은 카드 다른 에이전트에게 인계
+            await handleReviewRequest(task, agentToTrigger, result._meta.review_request);
+          } else if (isNextSprintTriggered && isBatonPassed) {
+            broadcastLog('success', `> [${agentToTrigger}] Task #${sid} 완료 (바톤 터치 성공)`, agentToTrigger, sid);
+          }
+
+          // [Phase 37] 핑퐁 사이클 종료 시 파이프라인 정지 검사 (run-b 모드 마일스톤 또는 pipeline_end)
+          if (!hasReviewRequest3) {
+            const currentPipelineMode = await dbManager.getProjectPipelineMode(task.project_id);
+            if (
+              (nextState === 'REVIEW' && task.pipeline_is_review_stop) ||
+              (currentPipelineMode === 'run-b' && agentToTrigger === 'dev_advisor') ||
+              hasPipelineEnd3
+            ) {
+              await dbManager.setPipelineMode(task.project_id, 'none');
+              stopPipelineWatchdog(task.project_id);
+              
+              let pauseReasonText = '단계별 확인 (run-b 모드)';
+              let pauseReasonCode = 'run_b_stop';
+              if (hasPipelineEnd3) {
+                pauseReasonText = '프로젝트/스프린트 자연 종료 (<pipeline_end>)';
+                pauseReasonCode = 'pipeline_end';
+              } else if (task.pipeline_is_review_stop) {
+                pauseReasonText = '기획 파이프라인 리뷰 완료 (isReviewStop)';
+                pauseReasonCode = 'review_stop';
+              }
+              
+              broadcastLog('warn',
+                `⛳ [파이프라인 일시 중단] 사유: ${pauseReasonText}\n` +
+                `CEO님의 검토 및 승인 후, 다음 지시를 내려주세요.`,
+                'system', sid, 'DASHBOARD', task.project_id
+              );
+              io.to(`project_${task.project_id}`).emit('pipeline:paused', { projectId: task.project_id, reason: pauseReasonCode, taskId: String(sid) });
+            } else if (task.sprint_no != null && nextState === 'REVIEW') {
+              // 자연 종료나 핑퐁이 아닌데 멈춘 경우에만 워치독 트리거
+              setImmediate(() => checkV3RelayWatchdog(task, task.project_id).catch(e => console.error('[Relay Watchdog] 훅 오류:', e.message)));
+            }
+          }
+
           agentStates.set(agentToTrigger, { status: 'idle', lastHeartbeat: Date.now() });
           io.emit('agent:status_change', { agentId: agentToTrigger, status: 'idle' });
         } catch (err) {

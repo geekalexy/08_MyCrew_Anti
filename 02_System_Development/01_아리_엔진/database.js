@@ -125,6 +125,18 @@ db.serialize(() => {
       db.run(`ALTER TABLE TaskComment ADD COLUMN meta_data TEXT DEFAULT NULL`);
       console.log('[DB] Phase 22.6 마이그레이션: TaskComment meta_data 컬럼 추가 완료');
     }
+    // [Phase 36b] 카드 링크: 코멘트 순번 컬럼 추가
+    if (!names.includes('comment_idx')) {
+      db.run(`ALTER TABLE TaskComment ADD COLUMN comment_idx INTEGER DEFAULT NULL`);
+      // 소급: 카드별 생성 순서대로 순번 부여
+      db.run(`
+        UPDATE TaskComment SET comment_idx = (
+          SELECT COUNT(*) FROM TaskComment t2
+          WHERE t2.task_id = TaskComment.task_id AND t2.id <= TaskComment.id
+        ) WHERE comment_idx IS NULL
+      `);
+      console.log('[DB] Phase 36b 마이그레이션: TaskComment.comment_idx 컬럼 추가 및 소급 완료');
+    }
   });
 
   // Log 테이블 생성 (Phase 12: 1시간 배치 보고용 데이터 저장)
@@ -148,6 +160,19 @@ db.serialize(() => {
     FOREIGN KEY (task_id) REFERENCES Task(id) ON DELETE CASCADE
   )`);
 
+  // [Phase 36b] 카드링크 첨부 파일 테이블
+  db.run(`CREATE TABLE IF NOT EXISTS task_attachments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id      INTEGER NOT NULL REFERENCES Task(id) ON DELETE CASCADE,
+    comment_id   INTEGER DEFAULT NULL REFERENCES TaskComment(id) ON DELETE SET NULL,
+    file_idx     INTEGER NOT NULL,
+    file_label   TEXT NOT NULL,
+    file_path    TEXT NOT NULL,
+    file_type    TEXT,
+    file_size    INTEGER,
+    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_attachments_task ON task_attachments(task_id, file_idx)`);
 
   // 사용자 설정 테이블 (Active Heartbeat 2.0 설정 저장소)
   db.run(`CREATE TABLE IF NOT EXISTS user_settings (
@@ -372,6 +397,10 @@ db.serialize(() => {
         if (!taskNames.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
         if (!taskNames.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
         if (!taskNames.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
+        if (!taskNames.includes('sprint_no')) {
+          db.run(`ALTER TABLE Task ADD COLUMN sprint_no INTEGER DEFAULT NULL`);
+          console.log('[DB] Phase 36-A 마이그레이션: Task.sprint_no 컬럼 추가 완료');
+        }
         
         const alterTask = !taskNames.includes('project_id');
         const alterLog = !logNames.includes('project_id');
@@ -503,18 +532,17 @@ db.serialize(() => {
 
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
-  // [Phase 14 W1] assignedAgent 파라미터 추가 — model과 에이전트 ID 완전 분리
-  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0) {
+  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0, sprintNo = null) {
     const riskLevel = classifyRiskLevel(content || '');
     const initialStatus = pipelineStep != null && pipelineStep > 1 ? 'PLANNED' : 'PENDING';
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num, pipeline_step, pipeline_is_review_stop)
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num, pipeline_step, pipeline_is_review_stop, sprint_no)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
            (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL),
-           ?, ?
+           ?, ?, ?
          )`,
-        [title || '', content || '', initialStatus, requester, model, riskLevel, assignedAgent, category, projectId, projectId, pipelineStep, pipelineIsReviewStop ? 1 : 0],
+        [title || '', content || '', initialStatus, requester, model, riskLevel, assignedAgent, category, projectId, projectId, pipelineStep, pipelineIsReviewStop ? 1 : 0, sprintNo],
         function(err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -677,10 +705,11 @@ class DatabaseManager {
         // 3. Project Agents Insert (Phase 35: 동적 인스턴스 패러다임)
         // [ROLE-FIX] 백엔드 역할 사전 — 프론트엔드 roleRegistry와 동일한 한국어 표기명
         const ROLE_DISPLAY_NAMES = {
-          dev_fullstack: '풀스택 엔지니어', dev_ux: 'UI/UX 디자이너', dev_senior: '시니어 엔지니어',
-          dev_backend: '백엔드 엔지니어', dev_qa: 'QA 엔지니어', dev_advisor: '테크 어드바이저',
+          dev_fullstack: '풀스택 엔지니어', dev_ux: 'UI/UX 디자이너', dev_senior: 'CTO',
+          dev_qa: 'QA 엔지니어', dev_advisor: '테크 어드바이저',
+          dev_pm: '기술 PM',
           mkt_lead: '마케팅 리더', mkt_planner: '기획자', mkt_designer: '디자이너',
-          mkt_analyst: '분석가', mkt_video: '영상 디렉터', mkt_pm: 'PM',
+          mkt_analyst: '분석가', mkt_video: '영상 디렉터', mkt_advisor: '마케팅 어드바이저',
           assistant: 'ARI',
         };
 
@@ -692,16 +721,15 @@ class DatabaseManager {
 
         // [MODEL-FIX] 역할별 기본 모델 맵 — crew/task 루프 공통 참조 (스코프 수정)
         const ROLE_DEFAULT_MODELS = {
-          dev_advisor:  MODEL.ANTI_OPUS_THINK,
-          dev_qa:       MODEL.ANTI_SONNET_THINK,    // [비용최적화] Opus 중복 방지 → Sonnet
-          dev_senior:   MODEL.ANTI_SONNET_THINK,
-          dev_backend:  MODEL.ANTI_SONNET_THINK,
-          dev_fullstack: MODEL.ANTI_GEMINI_PRO_HIGH,
+          dev_advisor:  MODEL.ANTI_OPUS_THINK,       // 테크 어드바이저 - Opus
+          dev_qa:       MODEL.ANTI_GEMINI_FLASH,     // QA 엔지니어 - 3 Flash
+          dev_senior:   MODEL.ANTI_GEMINI_PRO_HIGH,  // CTO - 3.1 Pro High
+          dev_fullstack: MODEL.ANTI_SONNET_THINK,    // 풀스택 엔지니어 - Sonnet
           dev_ux:       MODEL.ANTI_GEMINI_PRO_HIGH,
           mkt_lead:     MODEL.ANTI_GEMINI_PRO_HIGH,
           mkt_planner:  MODEL.ANTI_SONNET_THINK,
           mkt_analyst:  MODEL.ANTI_OPUS_THINK,
-          mkt_pm:       MODEL.ANTI_OPUS_THINK,
+          mkt_advisor:  MODEL.ANTI_OPUS_THINK,
           mkt_designer: MODEL.ANTI_GEMINI_PRO_HIGH,
           mkt_video:    MODEL.ANTI_SONNET_THINK,
         };
@@ -792,6 +820,10 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 36-A V3] 구 V2 initDynamicPipeline — 중복 제거됨 (V3로 대체)
+  // 아래 V3 버전이 클래스 L946에 정의되어 있으며 sprint_no 기반으로 동작합니다.
+  // V2 코드(pipeline_step 기반)는 2026-05-05 소넷에 의해 제거되었습니다.
+
   // ─── [Phase 36] 다음 파이프라인 스텝 카드 조회 ─────────────────────────────
   getNextPipelineTask(projectId, currentStep) {
     return new Promise((resolve, reject) => {
@@ -855,6 +887,66 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 36-A] 최대 스프린트 번호 조회 ──────────────────────────────────
+  getMaxSprintNo(projectId) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT COALESCE(MAX(sprint_no), 0) as max_sprint FROM Task WHERE project_id = ?`, [projectId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? row.max_sprint : 0);
+      });
+    });
+  }
+
+  // ─── [Phase 36-A] 특정 스프린트의 진행 중인 카드 존재 여부 조회 (워치독용) ──
+  hasInProgressSprintTask(projectId, sprintNo) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id FROM Task WHERE project_id = ? AND sprint_no = ? AND status IN ('IN_PROGRESS', 'REVIEW', 'PENDING') AND deleted_at IS NULL LIMIT 1`,
+        [projectId, sprintNo],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(!!row);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36-A] 동적 파이프라인 시작 시 스프린트 번호 할당 ────────────────
+  initDynamicPipeline(projectId) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT COALESCE(MAX(sprint_no), 0) + 1 as next_sprint FROM Task WHERE project_id = ?`, [projectId], (err, row) => {
+        if (err) return reject(err);
+        const nextSprint = row.next_sprint;
+
+        db.all(
+          `SELECT id FROM Task WHERE project_id = ? AND status IN ('PENDING', 'PLANNED', 'TODO') AND deleted_at IS NULL ORDER BY project_task_num ASC, id ASC`,
+          [projectId],
+          (err, rows) => {
+            if (err) return reject(err);
+            if (!rows || rows.length === 0) return resolve(0);
+            
+            db.serialize(() => {
+              db.run('BEGIN TRANSACTION');
+              const stmt = db.prepare(`UPDATE Task SET sprint_no = ? WHERE id = ?`);
+              rows.forEach((r) => {
+                stmt.run(nextSprint, r.id);
+              });
+              stmt.finalize();
+              db.run('COMMIT', (err2) => {
+                if (err2) {
+                  db.run('ROLLBACK');
+                  reject(err2);
+                } else {
+                  resolve(rows.length);
+                }
+              });
+            });
+          }
+        );
+      });
+    });
+  }
+
   // ─── [Phase 36] 카드 담당 에이전트 재할당 (PASS → CEO, FAIL → 원래 에이전트) ──
   updateTaskAssignedAgent(taskId, agentId) {
     return new Promise((resolve, reject) => {
@@ -903,7 +995,7 @@ class DatabaseManager {
       return new Promise((resolve, reject) => {
         let query = `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                   risk_level, execution_mode, has_artifact, artifact_url, failure_count,
-                  created_at, updated_at, project_id, project_task_num
+                  created_at, updated_at, project_id, project_task_num, sprint_no
            FROM Task 
            WHERE deleted_at IS NULL`;
         const params = [];
@@ -944,7 +1036,7 @@ class DatabaseManager {
   getTaskById(id) {
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT id, title, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at, project_id
+        `SELECT id, title, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at, project_id, project_task_num, sprint_no
          FROM Task WHERE id = ? AND deleted_at IS NULL`,
         [id],
         (err, row) => {
@@ -1455,7 +1547,7 @@ class DatabaseManager {
       }
       return new Promise((resolve, reject) => {
         let query = `SELECT id, title, content, status, assigned_agent, priority, risk_level,
-                has_artifact, created_at, updated_at, project_id
+                has_artifact, created_at, updated_at, project_id, project_task_num
          FROM Task
          WHERE deleted_at IS NULL
            AND (status IS NULL OR status != 'ARCHIVED')`;
@@ -1488,12 +1580,27 @@ class DatabaseManager {
     }
   }
 
+  // ─── [Phase 36] 프로젝트 내 태스크 번호로 글로벌 ID 찾기 ─────────────
+  getTaskIdByProjectNum(projectId, projectTaskNum) {
+    return new Promise((resolve, reject) => {
+      if (!projectId) return resolve(null);
+      db.get(
+        `SELECT id FROM Task WHERE project_id = ? AND project_task_num = ? AND deleted_at IS NULL`,
+        [projectId, projectTaskNum],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row ? row.id : null);
+        }
+      );
+    });
+  }
+
   // ─── [v2.0] Task 단건 전체 조회 (TaskDetailModal lazy-load용) ─────────────
   getTaskByIdFull(id) {
     return new Promise((resolve, reject) => {
       db.get(
         `SELECT id, title, content, status, requester, model, assigned_agent, priority,
-                risk_level, execution_mode, has_artifact, created_at, updated_at
+                risk_level, execution_mode, has_artifact, created_at, updated_at, project_id, project_task_num
          FROM Task WHERE id = ? AND deleted_at IS NULL`,
         [id],
         (err, row) => {
@@ -1857,6 +1964,35 @@ class DatabaseManager {
     });
   }
 
+  addProjectAgent(projectId, roleId, modelId, nickname, avatar, roleDesc) {
+    return new Promise((resolve, reject) => {
+      const projAgentId = `${projectId}-${roleId}`;
+      db.run(
+        `INSERT OR REPLACE INTO project_agents (id, project_id, role_id, model_id, nickname, avatar, role_description)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [projAgentId, projectId, roleId, modelId, nickname, avatar, roleDesc],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  removeProjectAgent(projectId, roleId) {
+    return new Promise((resolve, reject) => {
+      const projAgentId = `${projectId}-${roleId}`;
+      db.run(
+        `DELETE FROM project_agents WHERE id = ?`,
+        [projAgentId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
   // ─── [Phase 30] 프로젝트별 에이전트 페르소나 (역할) 조회 ──────────────────
   getAgentRoleInProject(agentId, projectId) {
     return new Promise((resolve, reject) => {
@@ -1870,6 +2006,147 @@ class DatabaseManager {
         (err, row) => {
           if (err) reject(err);
           else resolve(row ? row.experiment_role : null);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 36b] 카드 링크 — DB 메서드 ────────────────────────────────────
+
+  /**
+   * 프로젝트 내 project_task_num으로 카드 조회 (Q1: 가변 자릿수)
+   * 태그 #1C3, #12F1 등에서 카드번호를 파싱해 사용
+   */
+  getTaskByProjectNum(projectId, taskNum) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, title, content, status, assigned_agent, project_id, project_task_num
+         FROM Task
+         WHERE project_id = ? AND project_task_num = ? AND deleted_at IS NULL
+         LIMIT 1`,
+        [projectId, taskNum],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  /**
+   * Q3: isolation_scope 기반 타 프로젝트 카드 조회
+   * - isolation_type A → 동일 프로젝트만 (이 메서드 호출 안 됨)
+   * - isolation_type B/C → 접근 가능한 프로젝트 범위 내 탐색
+   */
+  async getTaskByProjectNumAcrossScopes(requestingProjectId, taskNum, isolationType) {
+    const accessibleIds = await this.getAccessibleProjectIds(requestingProjectId);
+    return new Promise((resolve, reject) => {
+      if (!accessibleIds || accessibleIds.length === 0) return resolve(null);
+      const placeholders = accessibleIds.map(() => '?').join(',');
+      db.get(
+        `SELECT id, title, content, status, assigned_agent, project_id, project_task_num
+         FROM Task
+         WHERE project_id IN (${placeholders}) AND project_task_num = ? AND deleted_at IS NULL
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [...accessibleIds, taskNum],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  /**
+   * 카드의 N번째 코멘트 조회 (#01C3 → commentIdx=3)
+   */
+  getTaskCommentByIndex(taskId, commentIdx) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, task_id, author, content, meta_data, comment_idx, created_at
+         FROM TaskComment
+         WHERE task_id = ? AND comment_idx = ?
+         LIMIT 1`,
+        [taskId, commentIdx],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  /**
+   * 카드의 N번째 첨부파일 조회 (#01F1 → fileIdx=1)
+   */
+  getTaskAttachmentByIndex(taskId, fileIdx) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, task_id, comment_id, file_idx, file_label, file_path, file_type, file_size, created_at
+         FROM task_attachments
+         WHERE task_id = ? AND file_idx = ?
+         LIMIT 1`,
+        [taskId, fileIdx],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row || null);
+        }
+      );
+    });
+  }
+
+  /**
+   * 첨부파일 등록: file_idx는 카드 내 자동 순번 부여
+   */
+  createTaskAttachment(taskId, commentId, fileLabel, filePath, fileType, fileSize) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO task_attachments (task_id, comment_id, file_idx, file_label, file_path, file_type, file_size)
+         VALUES (?,
+           ?,
+           (SELECT COALESCE(MAX(file_idx), 0) + 1 FROM task_attachments WHERE task_id = ?),
+           ?, ?, ?, ?
+         )`,
+        [taskId, commentId || null, taskId, fileLabel, filePath, fileType || null, fileSize || null],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ id: this.lastID });
+        }
+      );
+    });
+  }
+
+  /**
+   * 카드의 전체 첨부파일 목록 (file_idx 오름차순)
+   */
+  getTaskAttachments(taskId) {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, task_id, comment_id, file_idx, file_label, file_path, file_type, file_size, created_at
+         FROM task_attachments
+         WHERE task_id = ?
+         ORDER BY file_idx ASC`,
+        [taskId],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
+  /**
+   * 첨부파일 삭제 (ID 단위)
+   */
+  deleteTaskAttachment(attachmentId) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `DELETE FROM task_attachments WHERE id = ?`,
+        [attachmentId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.changes);
         }
       );
     });

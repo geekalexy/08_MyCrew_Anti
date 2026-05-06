@@ -14,23 +14,29 @@ import { SKILL_REGISTRY } from '../../data/skillRegistry';
  *   agentId          — 현재 에이전트 ID
  */
 export default function SkillAddDrawer({ isOpen, onClose, agentId }) {
-  const { agentMeta, toggleAgentSkill } = useAgentStore();
+  const { agentMeta, toggleAgentSkill, fetchAgentSkills } = useAgentStore();
   const bodyRef = useRef(null);
 
-  // 드로어가 열릴 때 스킬 리스트 최상단으로 자동 스크롤
+  // 드로어가 열릴 때 DB 최신 스킬 상태 로드 + 스킬 리스트 최상단으로 자동 스크롤
   useEffect(() => {
-    if (isOpen && bodyRef.current) {
-      bodyRef.current.scrollTop = 0;
+    if (isOpen && agentId) {
+      fetchAgentSkills(agentId);
+      if (bodyRef.current) bodyRef.current.scrollTop = 0;
     }
-  }, [isOpen]);
-  const skillConfig = agentMeta[agentId]?.skillConfig || {};
+  }, [isOpen, agentId]);
+
+  const skillConfig = agentMeta[agentId]?.skillConfig;
+  // skillConfig가 아직 로드 안 된 경우 로딩 중으로 처리
+  const isLoading = !skillConfig;
 
   // non-Builtin 스킬 전체 + 활성 여부 판단 (agentOnly 필터 적용)
-  const allSkills = Object.values(SKILL_REGISTRY)
+  // skillConfig가 없으면 빈 배열 (로딩 완료 후 표시)
+  const allSkills = isLoading ? [] : Object.values(SKILL_REGISTRY)
     .filter((s) => !s.isBuiltin && (!s.agentOnly || s.agentOnly === agentId))
     .map((skill) => ({
       ...skill,
-      isActive: skill.isRequired ? true : skillConfig[skill.id]?.active !== false,
+      // DB에 명시적 active 값이 있으면 그것을 사용, 없으면 false (미장착)
+      isActive: skill.isRequired ? true : (skillConfig[skill.id]?.active === true),
     }));
 
   const equippedSkills  = allSkills.filter((s) => s.isActive);
@@ -202,6 +208,14 @@ export default function SkillAddDrawer({ isOpen, onClose, agentId }) {
             <span className="material-symbols-outlined" style={{ fontSize: '0.95rem', verticalAlign: 'middle', marginRight: '0.3rem', color: 'var(--brand)' }}>info</span>
             장착/해제는 즉시 반영됩니다. 다음 태스크부터 적용됩니다.
           </p>
+
+          {/* 로딩 중 */}
+          {isLoading && (
+            <div style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.5rem', display: 'block', marginBottom: '0.5rem', opacity: 0.5 }}>sync</span>
+              스킬 목록 불러오는 중...
+            </div>
+          )}
 
           {/* ── 장착됨 섹션 ── */}
           {equippedSkills.length > 0 && (

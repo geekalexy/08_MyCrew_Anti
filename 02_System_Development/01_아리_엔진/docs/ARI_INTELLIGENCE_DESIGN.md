@@ -84,7 +84,7 @@ Gemini 2.5 Flash는 이를 완전히 지원합니다.
   description: "특정 크루원에게 업무를 위임하는 칸반 태스크를 생성합니다. 사용자가 '루카한테 시켜', '이거 태스크로 만들어줘'라고 하면 호출합니다.",
   parameters: {
     title: String,        // 태스크 제목
-    assigneeId: String,   // 담당자 (luca, nova, pico 등)
+    assigneeId: String,   // 담당자 (닉네임이 있으면 닉네임, 없으면 역할명 등)
     description: String,  // 태스크 상세 내용
     priority: String,     // high / medium / low
     taskType: String      // DEEP_WORK / CONTENT / MEDIA / RESEARCH
@@ -97,7 +97,7 @@ Gemini 2.5 Flash는 이를 완전히 지원합니다.
 // 아리가 현재 크루원들의 업무 상태를 실시간으로 파악
 {
   name: "getCrewStatus",
-  description: "크루원의 현재 진행 중인 태스크와 상태를 조회합니다. '루카 지금 뭐 해?', '대기 중인 태스크 있어?' 등에 호출합니다.",
+  description: "크루원의 현재 진행 중인 태스크와 상태를 조회합니다. '지금 뭐 해?', '대기 중인 태스크 있어?' 등에 호출합니다.",
   parameters: {
     agentId: String   // 선택적. 없으면 전체 크루 조회
   }

@@ -1,7 +1,7 @@
 # MyCrew POLICY_INDEX v1.0
 > **상태**: ✅ 확정 | **작성일**: 2026-05-03 | **Prime 리뷰 등급**: 🟢 A  
-> **last_updated**: 2026-05-03T22:30  
-> **정책 수**: STRICT 11건 + WARN 7건 = 총 18건
+> **last_updated**: 2026-05-05T21:10  
+> **정책 수**: STRICT 13건 + WARN 7건 = 총 20건
 
 ---
 
@@ -25,6 +25,8 @@
 | P-016 | code_safety | 데이터 파괴적 함수(삭제, 초기화, 전체 삭제 등)에는 `dangerously` 접두사 필수 | `리뷰_아카이브/clearLogs_사건` | 2026-05-03 |
 | P-017 | code_safety | 프로젝트 전환 시 이전 프로젝트의 비동기 작업을 `AbortController`로 정리 필수 | `리뷰_아카이브/30th_Review` | 2026-05-03 |
 | P-018 | code_safety | 시스템 에이전트 제외 로직은 하드코딩 금지 — 반드시 ID 배열 기반으로 처리 | `리뷰_아카이브/30th_31st_Review` | 2026-05-03 |
+| P-019 | data_safety | CEO의 명시적 승인 없이 원본 데이터를 무단 삭제(DB Delete, Drop 등)하는 파괴적 행위 절대 금지 | `리뷰_아카이브/Data_Deletion_사건` | 2026-05-05 |
+| P-020 | code_safety | **명시적 허가 없는 무단 코딩 절대 금지.** 원인 분석 및 해결 방안 문서화 후 CEO 컨펌 득하기 전 시스템 코드 수정 불가 | `리뷰_아카이브/37_Phase37_Pipeline_Bug_Analysis.md` | 2026-05-05 |
 
 ---
 

@@ -48,17 +48,17 @@ export default function TaskCreateModal({ isOpen, onClose }) {
 
     try {
       const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
-      const res = await fetch(`${SERVER_URL}/webhook/antigravity/command`, {
+      const projectId = useProjectStore.getState().selectedProjectId;
+      const res = await fetch(`${SERVER_URL}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'ISSUE_CREATE',
-          payload: {
-            title:    content.trim(),
-            assignee: assignee || 'CEO',
-            priority: priority || 'medium',
-            category: category || 'QUICK_CHAT',
-          },
+          title:    content.trim(),
+          content:  content.trim(),
+          assignee: assignee || 'CEO',
+          priority: priority || 'medium',
+          category: category || 'QUICK_CHAT',
+          projectId: projectId
         }),
       });
       if (res.ok) {

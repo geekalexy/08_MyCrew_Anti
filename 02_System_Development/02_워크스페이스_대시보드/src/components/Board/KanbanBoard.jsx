@@ -27,6 +27,18 @@ export default function KanbanBoard() {
   const { emitTaskMove } = useSocket();
   const [activeTask, setActiveTask] = useState(null);
   const [archivedTasks, setArchivedTasks] = useState([]); // [아카이브] 아카이브된 태스크 상태 추가
+  const [selectedSprint, setSelectedSprint] = useState('ALL'); // [Sprint 필터] 선택된 스프린트
+
+  // [Sprint 단위 보기] 현재 프로젝트의 유효한 스프린트 번호 목록 추출 (내림차순)
+  const availableSprints = useMemo(() => {
+    const sprints = new Set();
+    Object.values(tasks).forEach(t => {
+      if ((!t.projectId || t.projectId === selectedProjectId) && t.sprint_no) {
+        sprints.add(t.sprint_no);
+      }
+    });
+    return Array.from(sprints).sort((a,b) => b - a);
+  }, [tasks, selectedProjectId]);
 
   // ── 초기 Hydration: 서버 DB 기준으로 스토어 완전 동기화 ─────────────────
   useEffect(() => {
@@ -90,7 +102,10 @@ export default function KanbanBoard() {
       if (task.status === 'ARCHIVED') return;
       // 프로젝트 필터링: projectId가 일치하거나 없는(호환성) 경우만 추가
       if (!task.projectId || task.projectId === selectedProjectId) {
-        if (grouped[task.column]) grouped[task.column].push(task);
+        // [Sprint 필터] 선택된 스프린트에 해당하는 카드만 보이도록 필터링
+        if (selectedSprint === 'ALL' || String(task.sprint_no) === String(selectedSprint)) {
+          if (grouped[task.column]) grouped[task.column].push(task);
+        }
       }
     });
     return grouped;
@@ -106,8 +121,15 @@ export default function KanbanBoard() {
     if (!over || isBoardReadOnly) return;
 
     const taskId = String(active.id);
-    const toColumn = String(over.id);
+    let toColumn = String(over.id);
     const fromColumn = tasks[taskId]?.column;
+
+    // 만약 over.id가 컬럼 ID가 아니라 다른 태스크의 ID라면, 해당 태스크의 컬럼으로 인식
+    if (!COLUMNS.includes(toColumn)) {
+      if (tasks[toColumn]) {
+        toColumn = tasks[toColumn].column;
+      }
+    }
 
     if (fromColumn && fromColumn !== toColumn && COLUMNS.includes(toColumn)) {
       emitTaskMove(taskId, fromColumn, toColumn);
@@ -118,15 +140,70 @@ export default function KanbanBoard() {
     setActiveTask(null);
   };
 
+  // [일괄 아카이브] 선택된 스프린트의 모든 완료된(done) 카드를 아카이브 처리
+  const handleBatchArchive = async () => {
+    if (selectedSprint === 'ALL') {
+      alert('일괄 아카이빙할 특정 스프린트를 선택해주세요.');
+      return;
+    }
+    const doneTasksInSprint = tasksByColumn['done'];
+    if (doneTasksInSprint.length === 0) {
+      alert(`Sprint #${selectedSprint}에 완료된(Done) 카드가 없습니다.`);
+      return;
+    }
+
+    if (!window.confirm(`Sprint #${selectedSprint}의 완료된 카드 ${doneTasksInSprint.length}개를 일괄 아카이빙 하시겠습니까?`)) return;
+
+    for (const task of doneTasksInSprint) {
+      try {
+        await fetch(`${SERVER_URL}/api/tasks/${task.id}/archive`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archivedBy: 'CEO (Batch Archive)' })
+        });
+      } catch (err) {
+        console.error(`[BatchArchive] Task #${task.id} 보관 실패:`, err);
+      }
+    }
+  };
+
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className={`kanban-board${isBoardReadOnly ? ' kanban-board--readonly' : ''}`}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Sprint 필터 툴바 */}
+      {availableSprints.length > 0 && (
+        <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--surface-50)', borderBottom: '1px solid var(--border)', marginBottom: '1rem', borderRadius: '8px' }}>
+          <select 
+            value={selectedSprint} 
+            onChange={(e) => setSelectedSprint(e.target.value)}
+            style={{ padding: '0.3rem 0.5rem', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+          >
+            <option value="ALL">모든 스프린트 보기</option>
+            {availableSprints.map(s => (
+              <option key={s} value={s}>Sprint #{s}</option>
+            ))}
+          </select>
+          {selectedSprint !== 'ALL' && (
+            <button 
+              onClick={handleBatchArchive}
+              style={{ padding: '0.3rem 0.8rem', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+            >
+              종료된 Sprint 일괄 아카이브
+            </button>
+          )}
+        </div>
+      )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        <div 
+          className={`kanban-board${isBoardReadOnly ? ' kanban-board--readonly' : ''}`}
+          style={{ flex: 1, minHeight: 0 }}
+        >
         {COLUMNS.map((columnId) => (
           <SortableContext
             key={columnId}
@@ -152,7 +229,14 @@ export default function KanbanBoard() {
           </div>
           <div className="column__cards">
             {archivedTasks.slice(0, 5).map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <div key={task.id} className="task-card" style={{ opacity: 0.7, pointerEvents: 'none' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  #{String(task.id).slice(-6)} {task.sprint_no ? `(S${task.sprint_no})` : ''}
+                </div>
+                <p className="task-card__title line-clamp-2" style={{ margin: '0.35rem 0 0', padding: 0 }}>
+                  {task.title}
+                </p>
+              </div>
             ))}
             {archivedTasks.length > 5 && (
               <div 
@@ -174,5 +258,6 @@ export default function KanbanBoard() {
         {activeTask ? <TaskCard task={activeTask} isDragging /> : null}
       </DragOverlay>
     </DndContext>
+    </div>
   );
 }

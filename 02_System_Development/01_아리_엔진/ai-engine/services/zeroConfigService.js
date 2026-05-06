@@ -5,15 +5,10 @@ import dbManager from '../../database.js';
 import teamActivator from '../teamActivator.js';
 import { MODEL } from '../modelRegistry.js';
 
-// [C-01] 구 ID → 허용 ID 보정 맵 (P-001 준수)
-const LEGACY_ID_MAP = {
-  'luca': 'dev_advisor',    'sonnet': 'dev_senior',  'opus': 'dev_advisor',
-  'lumi': 'dev_ux',         'nova': 'mkt_designer',  'dev_lead': 'dev_fullstack',
-  'visual_director': 'mkt_designer', 'marketing_lead': 'mkt_lead',
-};
+// (삭제됨: 더 이상 닉네임 번역을 수행하지 않음)
 const ALLOWED_IDS = new Set([
-  'dev_senior','dev_fullstack','dev_backend','dev_ux','dev_qa','dev_advisor','dev_pm',
-  'mkt_lead','mkt_planner','mkt_designer','mkt_video','mkt_pm','mkt_analyst','assistant',
+  'dev_senior','dev_fullstack','dev_ux','dev_qa','dev_advisor',
+  'mkt_lead','mkt_planner','mkt_designer','mkt_video','mkt_analyst','mkt_advisor','assistant',
 ]);
 
 // ─── [Phase 36] 파이프라인 정의 상수 ────────────────────────────────────────
@@ -103,25 +98,23 @@ class ZeroConfigService {
 
 [4-Tier 모델 배정 전략 (MANDATORY)]
 🔴 Tier 1 — Opus (깊은 전략·아키텍처, 프로젝트 1인 절대 제한)
-- dev_advisor   : anti-claude-opus-4.6-thinking   ← 유일한 Opus 허용 역할
+- dev_advisor   : anti-claude-opus-4.6-thinking   ← 개발 프로젝트: 유일한 Opus 허용 역할
+- mkt_advisor   : anti-claude-opus-4.6-thinking   ← 마케팅 프로젝트: 마케팅 전략 자문, 유일한 Opus 허용 역할
 
 🟡 Tier 2 — Sonnet (기술 정밀성, 코드 품질 중심 실무자)
-- dev_senior    : anti-claude-sonnet-4.6-thinking ← 시니어 코드 품질, 아키텍처 설계
-- dev_backend   : anti-claude-sonnet-4.6-thinking ← API·DB 설계 정밀성
-- dev_qa        : anti-claude-sonnet-4.6-thinking ← 품질 검증·테스트 설계
+- dev_fullstack : anti-claude-sonnet-4.6-thinking ← 풀스택 실행, 정밀한 아키텍처 및 구현
 
 🟢 Tier 3 — Gemini Pro High (빈번한 대화, 중간 복잡도 — 토큰 리밋 없음)
-- dev_pm        : anti-gemini-3.1-pro-high        ← 기술 PM, 빈번한 커뮤니케이션
-- dev_fullstack : anti-gemini-3.1-pro-high        ← 풀스택 실행, 고속·다목적
+- dev_senior    : anti-gemini-3.1-pro-high        ← 시니어 엔지니어 — 아키텍처 설계, PRD 작성
 - dev_ux        : anti-gemini-3.1-pro-high        ← UI/UX 설계, 시각적 실행
 - mkt_lead      : anti-gemini-3.1-pro-high        ← 마케팅 전략 리더
 - mkt_planner   : anti-gemini-3.1-pro-high        ← 콘텐츠 기획, 빈번한 대화
 - mkt_analyst   : anti-gemini-3.1-pro-high        ← 데이터 분석, 빈번한 리포팅
-- mkt_pm        : anti-gemini-3.1-pro-high        ← 마케팅 PM, 빈번한 커뮤니케이션
 
 ⚡ Tier 4 — Gemini Flash (초고속·저비용, 단순 반복·리서치·초안 작업)
 - mkt_designer  : anti-gemini-3-flash             ← 디자인 레퍼런스 수집, 반복 시각화
 - mkt_video     : anti-gemini-3-flash             ← 영상 스크립트 초안, 반복 콘텐츠
+- dev_qa        : anti-gemini-3-flash             ← 품질 검증·단순 테스트 실행
 - assistant     : anti-gemini-3-flash             ← 라우팅·조율, 초고속 응답
 
 [모델 선택 판단 기준 (자율 배정 시 참고)]
@@ -145,22 +138,24 @@ class ZeroConfigService {
 [기획 가이드라인 (MANDATORY)]
 1. 팀원 구성: 비서(assistant) 외 최소 3명, 프로젝트 특성에 맞게 4~5명으로 자율 확장.
    - 🔴 개발(IT) 프로젝트 → assigned_crew 첫 번째에 'dev_advisor' 반드시 포함 (Opus 배정 필수).
+   - 🔴 마케팅 프로젝트 → assigned_crew 첫 번째에 'mkt_advisor' 반드시 포함 (Opus 배정 필수). 이후 프로젝트 성격에 따라 mkt_lead, mkt_planner, mkt_designer, mkt_analyst 등을 조합하여 4~5명으로 구성.
    - 아래 [역할별 배정 모델] 기준을 반드시 따라 다양한 모델 조합 구성.
 2. 커스텀 스킬: 이 프로젝트에 특화된 스킬 3~5개를 설계하고 YAML Frontmatter 포함 마크다운으로 작성.
 3. 초기 태스크 (CRITICAL — 아래 규칙 엄수):
    - initial_tasks는 반드시 1개만 생성한다. PRD, 아키텍처, UX 태스크를 미리 만들지 말 것.
-   - 단 1개의 태스크: "[기획] 핵심 기능 요구사항 도출"
-   - 이 태스크의 목적: CEO와 대화하여 원하는 핵심 기능 3~5개를 확정받는 것.
-   - 담당자: dev_advisor (개발 프로젝트) 또는 가장 적합한 기획 담당자 1명.
-   - 태스크 content에 프로젝트 목적 기반 기능 후보 3~5개를 포함하여 CEO에게 선택지를 제시할 것.
-   - ⚠️ 이유: 기능이 확정되지 않은 상태에서 PRD·아키텍처·UX를 생성하면 잘못된 방향을 유도함.
-   - PRD, 아키텍처 설계, UX 와이어프레임 등 후속 태스크는 이 카드 완료 후 팀이 자율 생성한다.
+   - 단 1개의 태스크: "[기획] 핵심 요구사항 도출"
+   - 이 태스크의 목적: CEO와 대화하여 원하는 핵심 요구사항을 확정받는 것.
+   - 담당자: 개발 프로젝트는 dev_senior, 마케팅 프로젝트는 mkt_lead 또는 mkt_planner 등 실무 기획 담당자 1명.
+   - 🚫 어드바이저(dev_advisor, mkt_advisor)는 절대 초기 실무 태스크에 배정하지 않는다. 어드바이저는 최종 산출물 리뷰 및 전략 검수 전담이다.
+   - 태스크 content에 프로젝트 목적 기반 후보 3~5개를 포함하여 CEO에게 선택지를 제시할 것.
+   - ⚠️ 이유: 요구사항이 확정되지 않은 상태에서 PRD나 기획서를 생성하면 잘못된 방향을 유도함.
+   - 후속 태스크는 이 카드 완료 후 팀이 자율 생성한다.
 4. 업무 프로세스: R&R, /run 명령 스프린트 자율 완주 흐름 명시.
 
 [⚠️ CRITICAL: 허용된 에이전트 ID (STRICT 정책)]
-- 개발/IT: dev_senior, dev_fullstack, dev_backend, dev_ux, dev_qa, dev_advisor, dev_pm
-- 마케팅/기획: mkt_lead, mkt_planner, mkt_designer, mkt_video, mkt_pm, mkt_analyst
-- ⚠️ dev_pm(기술 PM)과 mkt_pm(마케팅 PM)은 완전히 다른 역할 — 프로젝트 성격에 맞게 선택
+- 개발/IT: dev_senior, dev_fullstack, dev_ux, dev_qa, dev_advisor
+- 마케팅/기획: mkt_lead, mkt_planner, mkt_designer, mkt_video, mkt_analyst, mkt_advisor
+- ⚠️ 기술 PM 역할은 불필요하며, PRD 작성 및 기획은 시니어 엔지니어(dev_senior) 또는 풀스택(dev_fullstack)이 직접 수행합니다. 마케팅 기획은 mkt_planner 또는 mkt_lead가 수행합니다.
 - 위 목록 외 임의 ID 생성 시 시스템 치명적 오류 발생
 ${MODEL_GUIDE}
 
@@ -186,9 +181,9 @@ ${MODEL_GUIDE}
   ],
   "initial_tasks": [
     {
-      "title": "[기획] 핵심 기능 요구사항 도출",
-      "content": "CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 기능을 확정합니다.\n\n**[기능 후보 제안 — 프로젝트 목적 기반]**\n아래는 '${name}' 프로젝트 목적을 분석하여 제안드리는 기능 후보입니다. 원하시는 기능을 선택하거나 직접 말씀해주세요:\n\n① (프로젝트에 맞는 핵심 기능 후보 1)\n② (프로젝트에 맞는 핵심 기능 후보 2)\n③ (프로젝트에 맞는 핵심 기능 후보 3)\n④ (선택적 기능 후보 4)\n⑤ (선택적 기능 후보 5)\n\n**[다음 단계]**\n기능이 확정되면 PRD 작성 → 아키텍처 설계 → UX 와이어프레임 순서로 태스크를 생성합니다.",
-      "assignee": "dev_advisor"
+      "title": "[기획] 핵심 요구사항 도출",
+      "content": "CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 요구사항을 확정합니다.\\n\\n**[후보 제안 — 프로젝트 목적 기반]**\\n아래는 '${name}' 프로젝트 목적을 분석하여 제안드리는 후보입니다. 원하시는 것을 선택하거나 직접 말씀해주세요:\\n\\n① (프로젝트에 맞는 핵심 기능/목표 후보 1)\\n② (프로젝트에 맞는 핵심 기능/목표 후보 2)\\n③ (프로젝트에 맞는 핵심 기능/목표 후보 3)\\n④ (선택적 기능/목표 후보 4)\\n⑤ (선택적 기능/목표 후보 5)\\n\\n**[다음 단계]**\\n요구사항이 확정되면 이에 맞는 세부 기획 태스크를 생성하여 진행합니다.",
+      "assignee": "dev_senior 또는 mkt_lead"
     }
   ]
 }
@@ -241,21 +236,19 @@ ${MODEL_GUIDE}
       throw new Error('기획된 데이터 형식이 올바르지 않습니다.');
     }
 
-    // ─── [C-01 FIX] 구 ID 강제 보정 (P-001) ──────────────────────────────
+    // ─── [C-01 FIX] ID 유효성 검증 (P-001) ──────────────────────────────
     broadcast(`[3/5] 정책 검증 중: 팀원 ID 확인 및 어드바이저 자동 배정...`);
     planData.assigned_crew = planData.assigned_crew.map(c => {
       const rawId = (c.agent_id || '').toLowerCase();
-      const normalizedId = LEGACY_ID_MAP[rawId] || rawId;
-      if (!ALLOWED_IDS.has(normalizedId)) {
+      if (!ALLOWED_IDS.has(rawId)) {
         console.warn(`[Zero-Config] ⚠️ 허용되지 않은 agent_id: "${rawId}" → dev_fullstack 보정`);
         return { ...c, agent_id: 'dev_fullstack' };
       }
-      return { ...c, agent_id: normalizedId };
+      return { ...c, agent_id: rawId };
     });
     planData.initial_tasks = planData.initial_tasks.map(t => {
       const rawId = (t.assignee || '').toLowerCase();
-      const normalizedId = LEGACY_ID_MAP[rawId] || rawId;
-      return { ...t, assignee: ALLOWED_IDS.has(normalizedId) ? normalizedId : 'assistant' };
+      return { ...t, assignee: ALLOWED_IDS.has(rawId) ? rawId : 'assistant' };
     });
 
     // ─── [ADVISOR-FIX] 개발 프로젝트 dev_advisor 강제 포함 ──────────────
@@ -305,52 +298,26 @@ ${MODEL_GUIDE}
       }
     }
 
-    // ─── [TASK-GATE] initial_tasks 강제 교체 ────────────────────────────
-    // 기능 목록이 있으면: [기능 도출 확인] + [PRD 기획서] 2개
-    // 기능 목록 없으면: [기능 도출] 1개만
+    // ─── [TASK-GATE] initial_tasks 강제 교체 (V3 자율 릴레이) ─────────────────
+    // 기존 V2의 하드코딩된 4개 카드 또는 조건부 2개 카드 형식을 전면 폐기하고,
+    // [킥오프] 단일 카드 1장만 생성하여 V3 자율 릴레이가 알아서 후속 카드를 파생하도록 수정합니다.
     {
-      const llmTasks = planData.initial_tasks || [];
-      const hasFeaturesInObjective = objective && objective.includes('[원하는 기능 목록]');
-
-      // LLM 태스크 제목에서 기능 힌트 추출 (기능 목록 없을 때 활용)
-      const featureHints = llmTasks
-        .slice(0, 5)
-        .map((t, i) => {
-          const circled = ['①','②','③','④','⑤'];
-          const cleanTitle = (t.title || '').replace(/^\[.*?\]\s*/, '').trim();
-          return `${circled[i]} ${cleanTitle}`;
-        })
-        .join('\n');
-
-      const advisorId = planData.assigned_crew.find(c => c.agent_id === 'dev_advisor')?.agent_id
-        || planData.assigned_crew.find(c => c.agent_id === 'dev_pm')?.agent_id
+      const firstExecutorId =
+        planData.assigned_crew.find(c => c.agent_id === 'dev_senior')?.agent_id
+        || planData.assigned_crew.find(c => c.agent_id === 'mkt_lead')?.agent_id
+        || planData.assigned_crew.find(c => c.agent_id === 'mkt_planner')?.agent_id
+        || planData.assigned_crew.find(c => c.agent_id === 'dev_fullstack')?.agent_id
+        || planData.assigned_crew.find(c => c.agent_id !== 'dev_advisor' && c.agent_id !== 'mkt_advisor' && c.agent_id !== 'assistant')?.agent_id
         || planData.assigned_crew[0]?.agent_id
-        || 'dev_advisor';
+        || 'assistant';
 
-      if (hasFeaturesInObjective) {
-        // 기능이 이미 명확 → PRD 카드 포함 2개 생성
-        planData.initial_tasks = [
-          {
-            title: '[기획] 핵심 기능 명세 PRD 기획서',
-            content: `입력받은 기능 목록을 바탕으로 정식 PRD(Product Requirements Document)를 작성합니다.\n\n**[기반 정보]**\n${objective}\n\n**[작성 항목]**\n1. 개요 (Overview) — 프로젝트 목적 및 범위\n2. 핵심 기능 정의 (Core Feature Definitions) — 각 기능의 유저 스토리·기능 요구사항·성공 기준\n3. 비기능 요구사항 — 성능, 보안, 확장성\n4. 후속 고려사항 — 향후 추가 기능 로드맵\n\n**[다음 단계]**\nPRD 완료 후 → 아키텍처 설계 → UX 와이어프레임 → 개발 착수`,
-            assignee: advisorId,
-          },
-          {
-            title: '[기획] 추가 기능 요구사항 보완',
-            content: `PRD 작성 전 CEO님과 확인이 필요한 추가 사항을 점검합니다.\n\n빠진 기능이 있거나 우선순위 조정이 필요하면 말씀해주세요.\n기능 목록이 확정되면 PRD 태스크를 시작합니다.`,
-            assignee: advisorId,
-          },
-        ];
-        console.log(`[Zero-Config][TASK-GATE] 기능 명세 확인 — PRD 포함 2개 태스크 생성`);
-      } else {
-        // 기능 미입력 → 도출 카드 1개만
-        planData.initial_tasks = [{
-          title: '[기획] 핵심 기능 요구사항 도출',
-          content: `CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 기능을 확정합니다.\n\n**[기능 후보 제안]**\n${featureHints || '① 기능 후보를 직접 말씀해주세요\n② ...\n③ ...'}\n\n**[다음 단계]**\n기능이 확정되면: PRD 작성 → 아키텍처 설계 → UX 와이어프레임 → 개발 착수`,
-          assignee: advisorId,
-        }];
-        console.log(`[Zero-Config][TASK-GATE] 기능 미입력 — 기능 도출 카드 1개 생성`);
-      }
+      console.log(`[Zero-Config][TASK-GATE] V3 자율 릴레이 전환 — 단일 킥오프 카드 1개 생성 (담당: ${firstExecutorId})`);
+
+      planData.initial_tasks = [{
+        title: '[기획] 프로젝트 킥오프 및 V3 자율 릴레이 시작',
+        content: `새로운 프로젝트가 생성되었습니다.\n\n**[프로젝트 초기 목표]**\n${objective}\n\n**[V3 자율 릴레이 지시사항]**\n목표를 분석하고 다음 단계를 판단하세요. PRD 작성이 필요하다면 수행하고, 다음 담당자(예: UX 디자이너 또는 풀스택 엔지니어)에게 넘길 새로운 태스크를 생성하여 바통을 터치하십시오.`,
+        assignee: firstExecutorId,
+      }];
     }
 
     // ─── [C-02] required_skills 미생성 시 기본 스킬 보장 ───────────────
@@ -387,64 +354,26 @@ ${MODEL_GUIDE}
     );
     broadcast(`[4/5] 팀원 ${planData.assigned_crew.length}명 등록 완료. 프로젝트 파일 시스템 구성 중입니다...`);
 
-    // ─── [Phase 36] 파이프라인 카드 자동 생성 ──────────────────────────────
-    // 프로젝트 타입 판별 (dev vs mkt)
-    const isMktProject = planData.assigned_crew.some(c => (c.agent_id || '').startsWith('mkt_'))
-      && !planData.assigned_crew.some(c => (c.agent_id || '').startsWith('dev_'));
-    const pipeline = isMktProject ? MKT_PIPELINE : DEV_PIPELINE;
+    // ─── [Phase 36-A] 자율 릴레이 도입으로 사전 파이프라인 생성 제거 ─────────
+    // 기존에 ZeroConfig가 카드 #2~#6을 강제 생성하던 로직은 
+    // 에이전트의 자율적 <next_sprint> 카드 생성과 충돌하므로 제거합니다.
+    // 프로젝트 생성 시에는 planData.initial_tasks 에 담긴 초기 카드(1~2개)만 생성합니다.
 
-    // 팀에서 실제 배정된 에이전트로 fallback
-    const crewIds = planData.assigned_crew.map(c => c.agent_id);
-    const getActualAgent = (preferredRole) => {
-      if (crewIds.includes(preferredRole)) return preferredRole;
-      // fallback: 같은 prefix(dev_/mkt_) 첫 번째 에이전트
-      const prefix = preferredRole.startsWith('dev_') ? 'dev_' : 'mkt_';
-      return crewIds.find(id => id.startsWith(prefix)) || planData.assigned_crew[0]?.agent_id || 'dev_advisor';
-    };
-
-    // ROLE_DEFAULT_MODELS 참조 (database.js와 동일)
-    const PIPELINE_MODEL_MAP = {
-      dev_advisor: MODEL.ANTI_OPUS_THINK,
-      dev_senior:  MODEL.ANTI_SONNET_THINK,
-      dev_qa:      MODEL.ANTI_SONNET_THINK,
-      dev_fullstack: MODEL.ANTI_GEMINI_PRO_HIGH,
-      dev_ux:      MODEL.ANTI_GEMINI_PRO_HIGH,
-      mkt_lead:    MODEL.ANTI_GEMINI_PRO_HIGH,
-      mkt_planner: MODEL.ANTI_GEMINI_PRO_HIGH,
-      mkt_analyst: MODEL.ANTI_GEMINI_PRO_HIGH,
-    };
-
-    try {
-      for (const pStage of pipeline) {
-        const assignee = getActualAgent(pStage.assignedRole);
-        const model = PIPELINE_MODEL_MAP[assignee] || MODEL.ANTI_GEMINI_PRO_HIGH;
-        const content = pStage.getContent(objective);
-        await dbManager.createTask(
-          pStage.title,
-          content,
-          'PIPELINE',             // requester: 파이프라인 자동 생성 표시
-          model,
-          assignee,
-          'PIPELINE',             // category
-          projectId,
-          pStage.step,            // pipeline_step
-          pStage.isReviewStop ? 1 : 0  // pipeline_is_review_stop
-        );
-        console.log(`[Zero-Config] 파이프라인 카드 생성: step${pStage.step} "${pStage.title}" → ${assignee}`);
-      }
-      console.log(`[Zero-Config] 파이프라인 ${pipeline.length}개 카드 생성 완료 (${isMktProject ? 'MKT' : 'DEV'})`);
-    } catch (pipelineErr) {
-      // 파이프라인 카드 생성 실패 시 프로젝트 자체는 정상 진행 (non-critical)
-      console.error('[Zero-Config] 파이프라인 카드 생성 실패 (프로젝트 생성은 정상):', pipelineErr.message);
-    }
-
-    // strict_isolation → DEV 스킬 자동 장착
+    // strict_isolation → DEV 또는 MKT 스킬 자동 장착
     if (isolation_scope && isolation_scope.type === 'strict_isolation') {
-      console.log('[Zero-Config] strict_isolation 감지 — 개발팀(DEV) 스킬셋 자동 장착...');
       try {
-        await teamActivator.activate('development');
+        if (isDevProject) {
+          console.log('[Zero-Config] strict_isolation 감지 — 개발팀(DEV) 스킬셋 자동 장착...');
+          await teamActivator.activate('development');
+        } else if (isMktProject) {
+          console.log('[Zero-Config] strict_isolation 감지 — 마케팅팀(MKT) 스킬셋 자동 장착...');
+          await teamActivator.activate('marketing');
+        } else {
+          console.log('[Zero-Config] strict_isolation 감지 — 제너럴(General) 스킬셋 자동 장착...');
+          await teamActivator.activate('general');
+        }
       } catch (e) {
-        console.warn('[Zero-Config] DEV 스킬 장착 실패:', e.message);
+        console.warn('[Zero-Config] 스킬 장착 실패:', e.message);
       }
     }
 

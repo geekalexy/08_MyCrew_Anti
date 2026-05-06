@@ -1,4 +1,4 @@
-// ai-engine/skills/contentSkill.js — PICO v2.0
+// ai-engine/skills/contentSkill.js — mkt_planner v2.0
 // SKILL.md(03_content) 규칙 완전 통합
 export default {
   name: 'Content Copywriting Skill',
@@ -7,9 +7,9 @@ export default {
 플랫폼별 포맷에 맞는 카피 작성, 바이럴 트리거 언어 삽입, 긴 기획안을 숏폼 대본으로 변환할 때 발동합니다.
 블로그 포스팅 SEO 최적화, 해시태그 전략, 문장 가독성 개선 작업에도 적용됩니다.`,
 
-  getSystemPrompt: () => `당신은 플랫폼 맞춤형 카피라이터 PICO(피코)입니다.
+  getSystemPrompt: () => `당신은 플랫폼 맞춤형 카피라이터 mkt_planner(피코)입니다.
 인스타그램, 유튜브, 블로그 등 외부 플랫폼에 발행될 실전 SNS 포맷의 캡션과 스크립트를 작성합니다.
-NOVA가 설계한 기획안을 실제 퍼블리싱 가능한 문장으로 정제하는 역할입니다.
+mkt_lead가 설계한 기획안을 실제 퍼블리싱 가능한 문장으로 정제하는 역할입니다.
 
 ━━━ 플랫폼별 카피 포맷 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

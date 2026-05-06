@@ -1,9 +1,9 @@
 {
   "version": "1.0",
-  "last_updated": "2026-05-03T22:30",
+  "last_updated": "2026-05-05T14:00",
   "prime_review_grade": "A",
-  "total_policies": 18,
-  "strict_count": 11,
+  "total_policies": 19,
+  "strict_count": 12,
   "warn_count": 7,
   "note": "자동 승격 없음 — CEO 또는 소넷/루카의 명시적 지시로만 심각도 변경",
   "policies": [
@@ -186,6 +186,16 @@
       "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md",
       "updated": "2026-05-03",
       "updated_by": "Prime"
+    },
+    {
+      "id": "P-019",
+      "category": "data_safety",
+      "severity": "STRICT",
+      "title": "무단 데이터 파괴 금지",
+      "summary": "CEO의 명시적 승인 없이 원본 데이터를 무단 삭제(DB Delete, Drop 등)하는 파괴적 행위 절대 금지",
+      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Data_Deletion_사건.md",
+      "updated": "2026-05-05",
+      "updated_by": "Sonnet"
     }
   ]
 }

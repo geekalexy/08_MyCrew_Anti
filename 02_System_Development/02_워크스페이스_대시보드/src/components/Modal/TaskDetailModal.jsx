@@ -8,6 +8,7 @@ import { useSocket } from '../../hooks/useSocket';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import { renderTaggedText } from '../../utils/TagRenderer';
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -328,6 +329,7 @@ export default function TaskDetailModal() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
+  const [copiedCommentIdx, setCopiedCommentIdx] = useState(null); // [Phase 36b] 복사 피드백 상태
   const textareaRef = useRef(null);
   const editAreaRef = useRef(null);
   const moreMenuRef = useRef(null);
@@ -339,8 +341,11 @@ export default function TaskDetailModal() {
   const slashRef = useRef(null);
   
   const SLASH_COMMANDS = [
+    { id: '/코드',  label: '코드 블록 삽입', icon: 'data_object' },
     { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
-    { id: '/workflow:mini-app-dev', label: '미니앱 자율 개발 파이프라인 가동', icon: 'account_tree' }
+    { id: '/run',   label: '자율 릴레이 — PRD→Advisor 자동 완주', icon: 'play_arrow' },
+    { id: '/run-b', label: '반자동 릴레이 — PRD→승인→Advisor',  icon: 'step_into'  },
+    { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
   ];
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
@@ -454,9 +459,46 @@ export default function TaskDetailModal() {
   const handleSaveEdit = () => {
     if (!editTitle.trim()) return;
     
+    const trimmedContent = editContent.trim();
+
+    // ── [Phase 36/32] 내용 편집 창에서도 커맨드 인터셉트 (내용 저장 대신 실행) ────────────
+    if (trimmedContent.startsWith('/run') || trimmedContent.startsWith('/run-b')) {
+      const pipelineMode = trimmedContent.startsWith('/run-b') ? 'run-b' : 'run';
+      const projectId = task.projectId || task.project_id;
+      if (projectId) {
+        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+          .then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '파이프라인 시작 실패');
+            const msg = pipelineMode === 'run'
+              ? `🚀 /run 파이프라인 시작 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
+              : `⏸ /run-b 단계별 확인 모드 시작`;
+            useTimelineStore.getState().appendTimeline({
+              level: 'info', message: msg, agentId: 'system',
+              timestamp: new Date().toISOString(), projectId,
+              taskId: String(task.id),
+            });
+            fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ author: 'system', content: msg }),
+            }).catch(console.error);
+          })
+          .catch(err => alert(err.message));
+      }
+      setIsEditing(false);
+      return;
+    }
+
+    if (trimmedContent.startsWith('/bugdog기록')) {
+      socket.emit('task:message', { taskId: task.id, text: trimmedContent, author: 'CEO' });
+      setIsEditing(false);
+      return;
+    }
+    
     const payload = {
       title: editTitle.trim(), 
-      content: editContent.trim()
+      content: trimmedContent
     };
     
     patchTask(task.id, payload);
@@ -493,6 +535,80 @@ export default function TaskDetailModal() {
   // 댓글 전송 (REST → 실시간 반영)
   const handleSubmitComment = () => {
     if (!commentText.trim() || !task) return;
+
+    const trimmedText = commentText.trim();
+    
+    // ── [Phase 36] /run, /run-b, /stop 파이프라인 슬래시 커맨드 인터셉트 ────────────
+    if (trimmedText.startsWith('/run') || trimmedText.startsWith('/run-b') || trimmedText.startsWith('/stop')) {
+      const isStop = trimmedText.startsWith('/stop');
+      const pipelineMode = isStop ? 'stop' : (trimmedText.startsWith('/run-b') ? 'run-b' : 'run');
+      const projectId = task.projectId || task.project_id;
+
+      // ① 즉시 activity 탭 시스템 로그 (피드백) 및 DB 저장 (모달 닫혀도 유지되도록)
+      const pendingMsg = isStop
+        ? `🛑 /stop 파이프라인 강제 종료 요청`
+        : (pipelineMode === 'run'
+          ? `🚀 /run 파이프라인 시작 요청 — PRD→Advisor 자율 완주 모드`
+          : `⏸ /run-b 파이프라인 시작 요청 — 단계별 CEO 확인 모드`);
+      
+      const newComment = {
+        author: 'system',
+        source: { id: 'system', name: 'system' },
+        target: { id: 'user-1', name: 'CEO' },
+        content: pendingMsg,
+        created_at: new Date().toISOString(),
+      };
+      setComments(prev => [...prev, newComment]);
+      setActiveCommentTab('activity');
+      
+      // DB 저장은 서버의 broadcastLog에 위임하여 중복 방지 (B-4 수정)
+
+      if (projectId) {
+        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+          .then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '파이프라인 명령 실패');
+            const msg = isStop
+              ? `🛑 /stop 파이프라인이 정상적으로 종료(초기화)되었습니다.`
+              : (pipelineMode === 'run'
+                ? `🚀 /run 파이프라인 시작됨 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
+                : `⏸ /run-b 단계별 확인 모드 시작됨`);
+            useTimelineStore.getState().appendTimeline({
+              level: 'info', message: msg, agentId: 'system',
+              timestamp: new Date().toISOString(), projectId,
+              taskId: String(task.id), // 타임라인에서도 해당 태스크 필터에 걸리도록 taskId 부여
+            });
+            // ② 서버 응답 확인 로그 DB 저장은 서버에서 이미 처리함 (중복 방지)
+            setComments(prev => [...prev, {
+              ...newComment,
+              content: `✅ ${msg}`,
+              created_at: new Date().toISOString(),
+            }]);
+          })
+          .catch((err) => {
+            useTimelineStore.getState().appendTimeline({
+              level: 'error', message: `❌ ${isStop ? '파이프라인 종료 실패' : '파이프라인 시작 실패'}: ${err.message}`,
+              agentId: 'system', timestamp: new Date().toISOString(), projectId,
+              taskId: String(task.id),
+            });
+            fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ author: 'system', content: `❌ 파이프라인 시작 실패: ${err.message}` }),
+            }).catch(console.error);
+            setComments(prev => [...prev, {
+              ...newComment,
+              content: `❌ 파이프라인 시작 실패: ${err.message}`,
+              created_at: new Date().toISOString(),
+            }]);
+          });
+      }
+      setCommentText('');
+      setCommentColumn('NO_CHANGE');
+      setCommentAssignee('NO_CHANGE');
+      setCommentPriority('NO_CHANGE');
+      return;
+    }
 
     let finalColumn = commentColumn === 'NO_CHANGE' ? task.column : commentColumn;
     const finalPriority = commentPriority === 'NO_CHANGE' ? task.priority : commentPriority;
@@ -779,6 +895,22 @@ export default function TaskDetailModal() {
                   }}
                   onKeyDown={(e) => {
                     if (showSlash && slashTarget === 'edit' && e.key === 'Escape') { e.preventDefault(); setShowSlash(false); return; }
+                    
+                    if (showSlash && slashTarget === 'edit' && e.key === 'Enter' && filteredSlash.length > 0) {
+                      e.preventDefault();
+                      const cmd = filteredSlash[0];
+                      if (cmd.id === '/코드') {
+                        const sIdx = editContent.lastIndexOf('/');
+                        const newText = editContent.slice(0, sIdx) + '\n```typescript\n// 여기에 코드를 작성하세요\n\n```\n';
+                        setEditContent(newText);
+                      } else {
+                        const sIdx = editContent.lastIndexOf('/');
+                        const newText = editContent.slice(0, sIdx) + `${cmd.id} `;
+                        setEditContent(newText);
+                      }
+                      setShowSlash(false);
+                      return;
+                    }
                   }}
                   onBlur={() => setTimeout(() => setShowSlash(false), 150)}
                   rows={5}
@@ -801,9 +933,15 @@ export default function TaskDetailModal() {
                         key={cmd.id}
                         onMouseDown={(e) => {
                           e.preventDefault();
-                          const sIdx = editContent.lastIndexOf('/');
-                          const newText = editContent.slice(0, sIdx) + `${cmd.id} `;
-                          setEditContent(newText);
+                          if (cmd.id === '/코드') {
+                            const sIdx = editContent.lastIndexOf('/');
+                            const newText = editContent.slice(0, sIdx) + '\n```typescript\n// 여기에 코드를 작성하세요\n\n```\n';
+                            setEditContent(newText);
+                          } else {
+                            const sIdx = editContent.lastIndexOf('/');
+                            const newText = editContent.slice(0, sIdx) + `${cmd.id} `;
+                            setEditContent(newText);
+                          }
                           setShowSlash(false);
                           setTimeout(() => editAreaRef.current?.focus(), 0);
                         }}
@@ -1034,15 +1172,25 @@ export default function TaskDetailModal() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>상태 (Status)</label>
               <select
-                value={task.column || 'todo'}
+                value={task.status === 'ARCHIVED' ? 'archived' : (task.column || 'todo')}
                 onChange={(e) => {
                   const newColumn = e.target.value;
-                  patchTask(task.id, { column: newColumn });
-                  fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ column: newColumn })
-                  }).catch(console.error);
+                  if (newColumn === 'archived') {
+                    if (!window.confirm('이 태스크를 아카이브(보관)하시겠습니까?')) return;
+                    patchTask(task.id, { status: 'ARCHIVED' });
+                    fetch(`${SERVER_URL}/api/tasks/${task.id}/archive`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ archivedBy: 'CEO (Manual)' })
+                    }).then(() => handleClose()).catch(console.error);
+                  } else {
+                    patchTask(task.id, { column: newColumn });
+                    fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ column: newColumn })
+                    }).catch(console.error);
+                  }
                 }}
                 style={{ 
                   background: 'var(--bg-surface-3)', color: 'var(--text-primary)', 
@@ -1055,6 +1203,7 @@ export default function TaskDetailModal() {
                 <option value="in_progress">In Progress</option>
                 <option value="review">Review</option>
                 <option value="done">Done</option>
+                <option value="archived">Archive</option>
               </select>
             </div>
             
@@ -1200,23 +1349,75 @@ export default function TaskDetailModal() {
                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: srcColor }}>{srcName}</span>
                          )}
                        </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                        {(() => {
-                          const d = new Date(c.created_at);
-                          const yy = String(d.getFullYear()).slice(2);
-                          const mm = String(d.getMonth() + 1).padStart(2, '0');
-                          const dd = String(d.getDate()).padStart(2, '0');
-                          const hh = String(d.getHours()).padStart(2, '0');
-                          const min = String(d.getMinutes()).padStart(2, '0');
-                          return `${yy}.${mm}.${dd} ${hh}:${min}`;
-                        })()}
-                      </span>
-                    </div>
+                       {/* [Phase 36b] 날짜 + 복사 아이콘 그룹 */}
+                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0 }}>
+                         <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                           {(() => {
+                             const d = new Date(c.created_at);
+                             const yy = String(d.getFullYear()).slice(2);
+                             const mm = String(d.getMonth() + 1).padStart(2, '0');
+                             const dd = String(d.getDate()).padStart(2, '0');
+                             const hh = String(d.getHours()).padStart(2, '0');
+                             const min = String(d.getMinutes()).padStart(2, '0');
+                             return `${yy}.${mm}.${dd} ${hh}:${min}`;
+                           })()}
+                         </span>
+                         {/* [Phase 36b] 📋 복사 아이콘 — #카드번호C순번 클립보드 복사 */}
+                         {c.author !== 'system' && task?.project_task_num != null && (
+                           (() => {
+                             const commentIdx = c.comment_idx ?? (i + 1);
+                             const tag = `#${task.project_task_num}C${commentIdx}`;
+                             const isCopied = copiedCommentIdx === tag;
+                             return (
+                               <button
+                                 title={`태그 복사: ${tag}`}
+                                 onClick={() => {
+                                   navigator.clipboard.writeText(tag).then(() => {
+                                     setCopiedCommentIdx(tag);
+                                     setTimeout(() => setCopiedCommentIdx(null), 800);
+                                   });
+                                 }}
+                                 style={{
+                                   background: 'none', border: 'none', cursor: 'pointer',
+                                   display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
+                                   padding: '2px 6px', borderRadius: '4px',
+                                   color: isCopied ? '#4ade80' : 'var(--text-muted)',
+                                   fontSize: '0.8rem', fontFamily: 'Space Grotesk, sans-serif',
+                                   fontWeight: 600, letterSpacing: '0.03em',
+                                   transition: 'color 0.2s',
+                                   opacity: 0.8,
+                                 }}
+                                 onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                                 onMouseLeave={e => e.currentTarget.style.opacity = 0.8}
+                               >
+                                 <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>
+                                   {isCopied ? 'check' : 'content_copy'}
+                                 </span>
+                                 {isCopied ? '복사됨' : tag}
+                               </button>
+                             );
+                           })()
+                         )}
+                       </span>
+                     </div>
                     <div style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
                       <ReactMarkdown
                         className="notion-md"
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
+                        components={{
+                          // [Phase 36b] 카드링크 태그 인라인 렌더링 (언더라인+블루, Q4)
+                          p: ({ children }) => {
+                            const processChild = (child) => {
+                              if (typeof child !== 'string') return child;
+                              return renderTaggedText(child, null);
+                            };
+                            const processed = Array.isArray(children)
+                              ? children.flatMap(processChild)
+                              : processChild(children);
+                            return <p>{processed}</p>;
+                          },
+                        }}
                       >
                         {c.content || ''}
                       </ReactMarkdown>
@@ -1396,6 +1597,69 @@ export default function TaskDetailModal() {
                 placeholder="업무 지시나 피드백을 전달하세요... (/커맨드 호출 가능)"
                 onKeyDown={(e) => { 
                   if (showSlash && slashTarget === 'comment' && e.key === 'Escape') { e.preventDefault(); setShowSlash(false); return; }
+                  
+                  if (showSlash && slashTarget === 'comment' && e.key === 'Enter' && filteredSlash.length > 0) {
+                    e.preventDefault();
+                    const cmd = filteredSlash[0];
+                    setShowSlash(false);
+
+                    // 파이프라인 명령어: 즉시 실행 + activity 로그
+                    if (cmd.id === '/run' || cmd.id === '/run-b') {
+                      const pipelineMode = cmd.id === '/run-b' ? 'run-b' : 'run';
+                      const projectId = task?.project_id;
+                      const pendingMsg = pipelineMode === 'run'
+                        ? `🚀 /run 파이프라인 시작 요청 — PRD→Advisor 자율 완주 모드`
+                        : `⏸ /run-b 파이프라인 시작 요청 — 단계별 CEO 확인 모드`;
+                      setComments(prev => [...prev, {
+                        author: 'system', source: { id: 'system', name: 'system' },
+                        target: { id: 'user-1', name: 'CEO' },
+                        content: pendingMsg, created_at: new Date().toISOString(),
+                      }]);
+                      setActiveCommentTab('activity');
+                      setCommentText('');
+                      if (projectId) {
+                        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+                          .then(async (res) => {
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error || '실패');
+                            const msg = pipelineMode === 'run'
+                              ? `🚀 /run 파이프라인 시작됨 — ${data.title || 'PRD'}부터 자율 완주`
+                              : `⏸ /run-b 단계별 확인 모드 시작됨`;
+                            useTimelineStore.getState().appendTimeline({
+                              level: 'info', message: msg, agentId: 'system',
+                              timestamp: new Date().toISOString(), projectId,
+                            });
+                            setComments(prev => [...prev, {
+                              author: 'system', source: { id: 'system', name: 'system' },
+                              target: { id: 'user-1', name: 'CEO' },
+                              content: `✅ ${msg}`, created_at: new Date().toISOString(),
+                            }]);
+                          })
+                          .catch(err => {
+                            setComments(prev => [...prev, {
+                              author: 'system', source: { id: 'system', name: 'system' },
+                              target: { id: 'user-1', name: 'CEO' },
+                              content: `❌ 파이프라인 실패: ${err.message}`, created_at: new Date().toISOString(),
+                            }]);
+                          });
+                      }
+                      return;
+                    }
+
+                    if (cmd.id === '/코드') {
+                      const sIdx = commentText.lastIndexOf('/');
+                      const newText = commentText.slice(0, sIdx) + '\n```typescript\n// 여기에 코드를 작성하세요\n\n```\n';
+                      setCommentText(newText);
+                      return;
+                    }
+
+                    // 그 외: 자동완성
+                    const sIdx = commentText.lastIndexOf('/');
+                    const newText = commentText.slice(0, sIdx) + `${cmd.id} `;
+                    setCommentText(newText);
+                    return;
+                  }
+
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment(); 
                 }}
                 onBlur={() => setTimeout(() => setShowSlash(false), 150)}
@@ -1425,9 +1689,15 @@ export default function TaskDetailModal() {
                       key={cmd.id}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        const sIdx = commentText.lastIndexOf('/');
-                        const newText = commentText.slice(0, sIdx) + `${cmd.id} `;
-                        setCommentText(newText);
+                        if (cmd.id === '/코드') {
+                          const sIdx = commentText.lastIndexOf('/');
+                          const newText = commentText.slice(0, sIdx) + '\n```typescript\n// 여기에 코드를 작성하세요\n\n```\n';
+                          setCommentText(newText);
+                        } else {
+                          const sIdx = commentText.lastIndexOf('/');
+                          const newText = commentText.slice(0, sIdx) + `${cmd.id} `;
+                          setCommentText(newText);
+                        }
                         setShowSlash(false);
                         setTimeout(() => textareaRef.current?.focus(), 0);
                       }}

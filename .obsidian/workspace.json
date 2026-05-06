@@ -20,8 +20,19 @@
               "icon": "lucide-file",
               "title": "ARI_BRAIN"
             }
+          },
+          {
+            "id": "a3a1e312f28b07b4",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "그래프 뷰"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -181,8 +192,41 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "9f3e127f9bdc6424",
+  "active": "a3a1e312f28b07b4",
   "lastOpenFiles": [
+    "채널분석/with_rije/with_rije_followers_20260326.csv",
+    "채널분석/with_rije/with_rije_data_20260326.csv",
+    "채널분석/with_rije/with_rije_dashboard.html",
+    "채널분석/with_rije/with_rije_ad_report_20260326.md",
+    "채널분석/vitnal_h/vitnal_h_followers_20260326.csv",
+    "채널분석/vitnal_h/vitnal_h_data_20260326.csv",
+    "채널분석/vitnal_h/vitnal_h_dashboard.html",
+    "채널분석/vitnal_h/vitnal_h_ad_report_20260326.md",
+    "채널분석/uknow_yeaji/uknow_yeaji_followers_20260327.csv",
+    "채널분석/uknow_yeaji/uknow_yeaji_data_20260327.csv",
+    "채널분석/uknow_yeaji/uknow_yeaji_dashboard.html",
+    "채널분석/uknow_yeaji/uknow_yeaji_ad_report_20260327.md",
+    "채널분석/tiding_of_joy/tiding_of_joy_followers_20260326.csv",
+    "채널분석/tiding_of_joy/tiding_of_joy_data_20260326.csv",
+    "채널분석/tiding_of_joy/tiding_of_joy_ad_report_20260326.md",
+    "채널분석/ssunyyzzoo/ssunyyzzoo_ad_report_20260327.md",
+    "채널분석/lyj.lpd/lyj.lpd_ad_report_20260326.md",
+    "채널분석/it_tem_ida/it_tem_ida_ad_report_20260319.md",
+    "채널분석/in__hwaa/in__hwaa_ad_report_20260326.md",
+    "채널분석/eden_mom_vely/eden_mom_vely_ad_report_20260327.md",
+    "채널분석/donsmell87/donsmell87_ad_report_20260319.md",
+    "채널분석/comely_nail_beauty/comely_nail_beauty_ad_report_20260326.md",
+    "채널분석/ape_vujade/ape_vujade_ad_report_20260326.md",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778052368882.png",
+    "05_My_history/Prime/01_입문편/1-1_코드_한줄도_몰랐던_내가.md",
+    "05_My_history/Prime/ARTICLE_SERIES_PLAN.md",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778050952157.png",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778050085335.png",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049858883.png",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049839024.png",
+    "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049819073.png",
+    "02_System_Development/01_아리_엔진/outputs/debug_01_login_page.png",
+    "02_System_Development/01_아리_엔진/docs/ARI_BRAIN.md",
     "02_System_Development/SESSION_LOG_2026-04-25_Sonnet.md",
     "02_System_Development/SESSION_LOG_2026-04-25_Luca.md",
     "02_System_Development/00_아키텍처_문서/Phase25_Sonnet_프론트엔드_UI_의뢰서.md",
@@ -193,42 +237,9 @@
     "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_추가요청_Sonnet→Luca.md",
     "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_프론트엔드_PRD_Sonnet.md",
     "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22.5_비디오랩_리팩토링_PRD.md",
-    "02_System_Development/SESSION_LOG_2026-04-22_Luca.md",
-    "02_System_Development/00_아키텍처_문서/Phase22_고성능어댑터_검토의견_Prime.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_어댑터전략_PRD.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터전략_기획서_Nexus.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터_검토의견_Prime.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터",
-    "02_System_Development/SESSION_LOG_2026-04-23_Luca.md",
-    "02_System_Development/SESSION_LOG_2026-04-22_Sonnet.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.0/아키텍처-2.0.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.0/실행계획-2.0.md",
     "무제.canvas",
-    "File indes.base",
-    "01_Company_Operations/FOLDER_STRUCTURE.legacy.md",
-    "02_System_Development/01_아리_엔진/remotion-poc/src/PicoCharacter.tsx",
     "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/pico.png",
     "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/ari.png",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/무제 폴더",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/audio/scene_2_1776873727243.mp3",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/audio/scene_1_1776873727243.mp3",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/audio/scene_0_1776873727243.mp3",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_proof_1776873727223.png.meta.json",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_proof_1776873727223.png",
-    "02_System_Development/01_아리_엔진/outputs/lab_snapshots/snap_1776873726408.png",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_problem_1776873694095.png.meta.json",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_problem_1776873694095.png",
-    "02_System_Development/01_아리_엔진/outputs/lab_snapshots/snap_1776873690831.png",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_hook_1776873642920.png",
-    "02_System_Development/01_아리_엔진/outputs/nanobanana_809d8a4d_1776873642906.jpg",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_hook_1776872257124.png",
-    "02_System_Development/01_아리_엔진/outputs/nanobanana_1bad8e3e_1776872257090.jpg",
-    "02_System_Development/01_아리_엔진/node_modules/googleapis/README.md",
-    "02_System_Development/01_아리_엔진/node_modules/is-wsl/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/is-docker/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/run-applescript/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/bundle-name/readme.md",
-    "02_System_Development/01_아리_엔진/node_modules/wsl-utils/readme.md"
+    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_proof_1776873727223.png"
   ]
 }

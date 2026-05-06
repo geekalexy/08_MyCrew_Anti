@@ -3,11 +3,11 @@ import { useProjectStore } from '../../store/projectStore';
 
 // ── 파이프라인 단계 정의 ─────────────────────────────────────────────────────
 const STAGES = [
-  { id: 'analyze',  label: '프로젝트 목적 및 기능 분석',        estSec: 5  },
+  { id: 'analyze',  label: '프로젝트 목적 및 기능 분석',        estSec: 7  },
   { id: 'team',     label: 'Gemini가 팀 구성 및 스킬 설계 중',  estSec: 20 },
-  { id: 'policy',   label: '정책 검증 및 에이전트 ID 확인',      estSec: 3  },
-  { id: 'db',       label: 'DB 등록 및 프로젝트 초기화',         estSec: 4  },
-  { id: 'scaffold', label: '워크스페이스 파일 구성 완료',         estSec: 3  },
+  { id: 'policy',   label: '정책 검증 및 에이전트 ID 확인',      estSec: 6  },
+  { id: 'db',       label: 'DB 등록 및 프로젝트 초기화',         estSec: 13 },
+  { id: 'scaffold', label: '워크스페이스 파일 구성 완료',         estSec: 23 },
 ];
 const TOTAL_EST_SEC = STAGES.reduce((s, st) => s + st.estSec, 0);
 
@@ -313,6 +313,46 @@ export default function NewProjectModal({ isOpen, onClose, initialValues = null 
                   </label>
                 ))}
               </div>
+
+              {/* 마케팅 선택 시 기본 스킬 미리보기 */}
+              {projectType === 'mkt' && (
+                <div style={{
+                  marginTop: '0.85rem',
+                  padding: '0.75rem 0.9rem',
+                  background: 'rgba(225,48,108,0.04)',
+                  border: '1px dashed rgba(225,48,108,0.22)',
+                  borderRadius: '8px',
+                }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'rgba(225,48,108,0.8)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.55rem' }}>
+                    📦 마케팅팀 기본 스킬 자동 장착
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {[
+                      { icon: 'photo_camera', label: 'Instagram 분석', color: '#e1306c', desc: '경쟁사 계정 수집' },
+                      { icon: 'trending_up',  label: 'Marketing',      color: '#ffb963', desc: '마케팅 전략' },
+                      { icon: 'analytics',    label: 'Data Analytics', color: '#b4c5ff', desc: 'KPI 분석' },
+                      { icon: 'article',      label: 'Content',        color: '#ff8ab4', desc: '콘텐츠 제작' },
+                      { icon: 'palette',      label: 'Visual Design',  color: '#ff8ab4', desc: '디자인' },
+                    ].map((sk) => (
+                      <div key={sk.label} title={sk.desc} style={{
+                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                        padding: '0.28rem 0.6rem',
+                        borderRadius: '99px',
+                        background: `${sk.color}12`,
+                        border: `1px solid ${sk.color}30`,
+                        fontSize: '0.7rem', fontWeight: 600, color: sk.color,
+                        cursor: 'default',
+                      }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '0.8rem' }}>{sk.icon}</span>
+                        {sk.label}
+                      </div>
+                    ))}
+                  </div>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    프로젝트 생성 후 아리 채팅에서 스킬을 추가하거나 해제할 수 있습니다.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* 개발: 핵심 기능 입력 */}

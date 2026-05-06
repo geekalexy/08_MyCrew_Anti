@@ -736,7 +736,7 @@ router.post('/brand-generate', async (req, res) => {
 
     // ── Lumi 크리에이티브 디렉팅: Gemini로 창의적 컨셉 생성 ────────────────
     if (lumiDirecting) {
-      const lumiSystemPrompt = `You are Lumi, the creative art director for Socian brand.
+      const lumiSystemPrompt = `You are a Creative Art Director, the creative art director for Socian brand.
 Given a brief description, create a SPECIFIC, VIVID image prompt that:
 1. STRICTLY PRESERVES the visual style stated in the description.
    - If description says "flat vector illustration" → keep it as flat vector illustration, NEVER substitute with photography.
@@ -832,7 +832,7 @@ RULES:
 5. NO JavaScript — pure HTML+CSS only.
 6. Make it visually stunning: use gradients, shadows, layered backgrounds, bold typography.
 7. Text must be sharp, readable, and properly sized for the format (${contentLabel}).
-8. CRITICAL: Add data-lumi-id="lumi-N" (N=1,2,3...) attribute to EVERY meaningful visible element — headings, paragraphs, buttons, divs with text/image, spans, img tags. Start from N=1 and increment. This enables click-to-code mapping. Every clickable/editable element must have this attribute.
+8. CRITICAL: Add data-element-id="lumi-N" (N=1,2,3...) attribute to EVERY meaningful visible element — headings, paragraphs, buttons, divs with text/image, spans, img tags. Start from N=1 and increment. This enables click-to-code mapping. Every clickable/editable element must have this attribute.
 9. Return ONLY the raw HTML code, no markdown, no explanation, no code fences.`;
 
   const userPrompt = `Create a ${contentLabel} design card (${width}×${height}px) with this concept:

@@ -13,27 +13,28 @@ const SYSTEM_AGENT_IDS = ['assistant'];
 const TEAM_PRESETS = {
   // 1. 마케팅 전문팀 프리셋 (mkt_* ID 체계)
   marketing: {
-    title: '퍼포먼스 마케팅팀',
+    title: '마케팅팀',
     skills: {
-      mkt_lead:     ['marketing', 'branding', 'campaign-lead'],
-      mkt_planner:  ['content', 'campaign-planning'],
-      mkt_analyst:  ['analysis', 'conversion', 'roas'],
+      mkt_advisor: ['strategy-review', 'market-analysis', 'risk-assessment'],
+      mkt_lead: ['marketing', 'strategy', 'branding', 'campaign-lead'],
+      mkt_planner: ['content', 'campaign-planning', 'research'],
+      mkt_analyst: ['analysis', 'conversion', 'roas'],
       mkt_designer: ['design', 'creative', 'sns-visual'],
-      assistant:    ['routing', 'coordination'],
+      assistant: ['routing', 'coordination', 'instagram-analysis'],  // SNS 수집 기본 장착
     }
   },
 
+
   // 2. 개발 전문팀 프리셋 (dev_* ID 체계)
   development: {
-    title: 'AI 프로덕트 개발팀',
+    title: '개발팀',
     skills: {
-      dev_fullstack: ['frontend', 'backend', 'devops', 'ci-cd'],
-      dev_ux:        ['ui-ux-engineering', 'design-system', 'figma'],
-      dev_senior:    ['code-review', 'mentoring', 'full-stack'],
-      dev_backend:   ['api-design', 'nodejs', 'database', 'auth'],
-      dev_qa:        ['test-design', 'bug-tracking', 'e2e-test'],
-      dev_advisor:   ['architecture-review', 'tech-advisory', 'risk-assessment'],
-      assistant:     ['routing', 'coordination'],
+      dev_fullstack: ['frontend', 'backend', 'devops', 'ci-cd', 'architecture'],
+      dev_ux: ['ui-ux-engineering', 'design-system', 'frontend', 'figma'],
+      dev_senior: ['mentoring', 'full-stack', 'api-design', 'nodejs', 'database', 'auth'],
+      dev_qa: ['code-review', 'test-design', 'bug-tracking', 'e2e-test'],
+      dev_advisor: ['architecture-review', 'tech-advisory', 'risk-assessment', 'code-review'],
+      assistant: ['routing', 'coordination'],
     }
   },
 
@@ -41,10 +42,10 @@ const TEAM_PRESETS = {
   general: {
     title: '올라운더 올인원팀',
     skills: {
-      assistant:    ['routing', 'general-support'],
-      mkt_lead:     ['marketing'],
+      assistant: ['routing', 'general-support'],
+      mkt_lead: ['marketing'],
       dev_fullstack: ['development'],
-      mkt_analyst:  ['analysis'],
+      dev_advisor: ['architecture-review', 'tech-advisory', 'risk-assessment', 'code-review']
     }
   }
 };

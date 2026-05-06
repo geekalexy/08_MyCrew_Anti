@@ -1,4 +1,4 @@
-// ai-engine/skills/designSkill.js — LUMI v2.0
+// ai-engine/skills/designSkill.js — mkt_designer v2.0
 // SKILL.md(05_design) 규칙 완전 통합
 export default {
   name: 'Visual Design & Media Skill',
@@ -7,7 +7,7 @@ export default {
 미드저니(Midjourney), Veo, 나노바나나 등 이미지/영상 AI 도구 프롬프트 엔지니어링이 필요할 때 발동합니다.
 플랫폼 비율 규격 확인, 브랜드 컬러/폰트 가이드 적용, 첫 프레임 시각적 임팩트 설계 시에도 적용됩니다.`,
 
-  getSystemPrompt: () => `당신은 수석 디자이너이자 비주얼 크리에이티브 디렉터 LUMI(루미)입니다.
+  getSystemPrompt: () => `당신은 수석 디자이너이자 비주얼 크리에이티브 디렉터 mkt_designer(루미)입니다.
 미드저니(Midjourney), Veo, 나노바나나 등 이미지/영상 AI 도구 프롬프트 엔지니어링과 SNS 콘텐츠 시각 디자인을 총괄합니다.
 "스크롤을 멈추게 하는" 첫 프레임 설계가 핵심 가치입니다.
 

@@ -45,6 +45,7 @@ const PORT = 5050;
 // ─── API 키 관리 (keyProvider 연동) ───────────────────────────────────────────────────────────
 import keyProvider from './tools/keyProvider.js';
 import { naverSearch } from './tools/naverSearchAdapter.js';
+import { instagramAnalyze, instagramBatchAnalyze } from './tools/instagramAdapter.js';
 
 let API_KEYS = [];
 const key1 = await keyProvider.getKey('GEMINI_API_KEY');
@@ -102,15 +103,14 @@ let CREW_INFO = {};
 async function refreshCrewInfo() {
   if (!dbManager) return;
   try {
-    // agents 테이블 또는 project_agents 뷰에서 전체 에이전트 로드
-    const agents = await dbManager.getAllAgents?.();
+    const agents = await dbManager.getAllAgentProfiles?.();
     if (agents && agents.length > 0) {
       const newInfo = {};
       for (const a of agents) {
-        newInfo[a.agent_id] = {
-          name: a.display_name || a.agent_id,
-          role: a.role_description || a.short_role || a.agent_id,
-          model: a.anti_model || a.model || '',
+        newInfo[a.id] = {
+          name: a.id,          // [P-001 Fix] 닉네임 금지 — 항상 역할 ID 사용
+          role: a.role || a.id,
+          model: a.model || '',
           specialties: [],
         };
       }
@@ -244,7 +244,8 @@ function buildAriTools(cols) {
   → status: 'IN_PROGRESS' 로 변경하면 서버가 즉시 해당 에이전트 실행을 트리거합니다.
   → 이것이 UI의 "실행 시작" 버튼과 동일한 동작입니다. 별도 API 없이 이 도구 하나로 처리됩니다.
 - 담당자가 없는 경우: assigneeId도 함께 지정하면 담당자 배정 + 실행 시작이 동시에 처리됩니다.
-- 예시: updateKanbanTask({ taskId: 117, assigneeId: 'nova', status: 'IN_PROGRESS' })`,
+- 예시: updateKanbanTask({ taskId: 117, assigneeId: 'dev_fullstack', status: 'IN_PROGRESS' })`,
+// [P-001] 반드시 DB에 등록된 역할 ID(dev_fullstack, dev_advisor 등)를 사용. 닉네임(루카, 노바 등) 사용 금지.`,
           parameters: {
             type: 'object',
             properties: {
@@ -312,7 +313,8 @@ function buildAriTools(cols) {
         {
           name: 'getCrewStatus',
           description: `크루원의 현재 진행 중인 태스크와 보드 현황을 조회합니다.
-사용자가 '루카 뭐 해?', '지금 진행 중인 태스크?', '크루 상태 알려줘' 등을 말할 때 호출합니다.`,
+사용자가 '크루 상태 알려줘', '지금 진행 중인 태스크?', '누가 뭐 하고 있어?' 등을 말할 때 호출합니다.
+주의: agentId는 반드시 역할 ID(dev_fullstack, dev_advisor 등)를 사용. 닉네임(루카, 노바 등) 사용 금지.`,
           parameters: {
             type: 'object',
             properties: {
@@ -376,7 +378,7 @@ function buildAriTools(cols) {
             properties: {
               agentId: {
                 type: 'string',
-                description: '스킬을 변경할 에이전트 ID (예: "ari", "nova", "lumi")',
+                description: '스킬을 변경할 에이전트 역할 ID (예: "ari", "dev_fullstack", "dev_advisor"). 닉네임(루카, 노바 등) 사용 금지.',
               },
               skillId: {
                 type: 'string',
@@ -503,6 +505,44 @@ function buildAriTools(cols) {
           },
         },
 
+        // ── [도구 14] Instagram 프로필 분석 ──────────────────────────────────
+        {
+          name: 'instagramAnalyze',
+          description: `Instagram 공개 계정의 프로필 데이터(팔로워, 팔로잉, 게시물 수, 바이오, 최근 게시물 캡션)를 수집·분석합니다.
+경쟁사/레퍼런스 계정 분석, SNS 벤치마킹, 마케팅 전략 수립에 사용합니다.
+사용자가 '인스타 분석해줘', '이 계정 팔로워 얼마야', '경쟁사 SNS 파악해줘' 등을 말할 때 호출합니다.
+⚠️ 비공개 계정 및 존재하지 않는 계정은 수집 불가.`,
+          parameters: {
+            type: 'object',
+            properties: {
+              instagram_id: {
+                type: 'string',
+                description: '분석할 Instagram 계정 ID. @ 없이 입력. 예: socian_official, nike, samsung_korea',
+              },
+            },
+            required: ['instagram_id'],
+          },
+        },
+
+        // ── [도구 15] Instagram 배치 분석 (여러 계정 한 번에) ───────────────────
+        {
+          name: 'instagramBatchAnalyze',
+          description: `여러 Instagram 계정을 한 번에 순차 분석합니다 (최대 10개).
+사용자가 '이 5개 계정 한번에 수집해줘', '경쟁사 리스트 분석해', 'SNS 벤치마킹' 등을 말할 때 호출합니다.
+instagramAnalyze를 여러 번 호출하는 것보다 빠릅니다 (브라우저 1회만 실행).`,
+          parameters: {
+            type: 'object',
+            properties: {
+              instagram_ids: {
+                type: 'array',
+                items: { type: 'string' },
+                description: '분석할 Instagram 계정 ID 배열. 예: ["socian_official", "nike", "samsung_korea"]. 최대 10개.',
+              },
+            },
+            required: ['instagram_ids'],
+          },
+        },
+
       ],  // end functionDeclarations
     }];  // end object + return array
 } // end buildAriTools
@@ -599,15 +639,49 @@ async function getActiveTools(agentId = 'ari') {
 async function executeTool(toolName, args, projectId = null) {
   console.log(`[AriDaemon] 🔧 도구 실행: ${toolName}`, JSON.stringify(args), `(Project: ${projectId || 'Global'})`);
 
-  // ── naverSearch: DB 불필요 — 샄수 실행 ────────────────────────────
+  // ── naverSearch: DB 불필요 — 단수 실행 ────────────────────────────
   if (toolName === 'naverSearch') {
     const { query, type = 'news', display = 5 } = args;
     if (!query) return { success: false, message: 'query 파라미터가 없습니다.' };
     return await naverSearch(query, type, display);
   }
 
+  // ── instagramAnalyze: DB 불필요 — Puppeteer 워커 실행 ────────────────
+  if (toolName === 'instagramAnalyze') {
+    const { instagram_id } = args;
+    if (!instagram_id) return { success: false, message: 'instagram_id 파라미터가 없습니다.' };
+    return await instagramAnalyze(instagram_id);
+  }
+
+  // ── instagramBatchAnalyze: 여러 계정 순차 스크래핑 ────────────────
+  if (toolName === 'instagramBatchAnalyze') {
+    const { instagram_ids } = args;
+    if (!instagram_ids || !Array.isArray(instagram_ids)) return { success: false, message: 'instagram_ids 배열이 필요합니다.' };
+    return await instagramBatchAnalyze(instagram_ids);
+  }
+
   if (!dbManager) {
     return { success: false, message: 'DB 연결 없음. 칸반 기능 사용 불가.' };
+  }
+
+  // ── [Phase 36] 프로젝트 단위 Task 번호를 글로벌 DB ID로 매핑 ──
+  async function resolveTaskId(inputTaskId) {
+    if (!projectId || !inputTaskId) return inputTaskId;
+    try {
+      const globalId = await dbManager.getTaskIdByProjectNum(projectId, inputTaskId);
+      return globalId || inputTaskId;
+    } catch(e) {
+      return inputTaskId;
+    }
+  }
+
+  // [Fix] 실제 생성된 물리적 프로젝트 폴더명 계산 로직 추가
+  let projectDirName = projectId;
+  if (projectId && dbManager) {
+    const projectRow = await dbManager.getProjectById(projectId).catch(() => null);
+    if (projectRow) {
+      projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
+    }
   }
 
   try {
@@ -625,7 +699,8 @@ async function executeTool(toolName, args, projectId = null) {
         'ARI(위임)',   // requester: 대표님 지시를 위임받아 ARI가 생성
         MODEL.FLASH,       // model
         assigneeId,        // assigned_agent
-        category           // category
+        category,          // category
+        projectId || 'proj-1' // projectId
       );
 
       // priority 업데이트 (updateTaskDetails 활용)
@@ -637,7 +712,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // [Phase 25] 할당 이벤트 발생 (서버의 Dispatcher 트리거)
       try {
-        fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/dispatch`, {
+        fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/dispatch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId: assigneeId })
@@ -646,7 +721,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // [버그 패치] 실시간 UI 갱신을 위한 socket.io 브로드캐스트 트리거
       try {
-        fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/notify-created`, {
+        fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/notify-created`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -663,13 +738,14 @@ async function executeTool(toolName, args, projectId = null) {
       return {
         success: true,
         taskId,
-        message: `✅ 태스크 카드 생성 완료!\n\n**#${taskId} — ${title}**\n- 담당: ${crewMember.name}\n- 카테고리: ${category}\n- 우선순위: ${priority}\n\n칸반 보드에서 확인하세요.`,
+        message: `✅ 태스크 카드 생성 완료!\n\n**#${taskId} — ${title}**\n- 담당: ${assigneeId}\n- 카테고리: ${category}\n- 우선순위: ${priority}\n\n칸반 보드에서 확인하세요.`,
       };
     }
 
     // ── updateKanbanTask ──────────────────────────────────────────────────
     if (toolName === 'updateKanbanTask') {
-      const { taskId, content, assigneeId, status } = args;
+      const { taskId: inputTaskId, content, assigneeId, status } = args;
+      const taskId = await resolveTaskId(inputTaskId);
 
       if (assigneeId && !CREW_INFO[assigneeId]) {
         return { success: false, message: `수정 실패: '${assigneeId}'는 존재하지 않는 크루원입니다. 유효한 담당자 목록: ${Object.keys(CREW_INFO).join(', ')}` };
@@ -690,7 +766,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [아카이빙] COMPLETED 또는 ARCHIVED로 변경되는 경우 /archive API 호출
       if (column === 'done' || column === 'archive') {
         try {
-          const archiveResp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}/archive`, {
+          const archiveResp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}/archive`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ archivedBy: 'ARI(위임)' }),
@@ -709,7 +785,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // 일반 수정 (done 아닌 경우)
       try {
-        const resp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatePayload)
@@ -726,15 +802,16 @@ async function executeTool(toolName, args, projectId = null) {
       return {
         success: true,
         taskId,
-        message: `✅ #${taskId} 태스크 수정 완료!\n${status ? `- 상태: ${status}\n` : ''}${assigneeId ? `- 담당자: ${CREW_INFO[assigneeId]?.name || assigneeId}\n` : ''}${content ? '- 내용 업데이트됨\n' : ''}`,
+        message: `✅ #${taskId} 태스크 수정 완료!\n${status ? `- 상태: ${status}\n` : ''}${assigneeId ? `- 담당자: ${assigneeId}\n` : ''}${content ? '- 내용 업데이트됨\n' : ''}`,
       };
     }
 
     // ── deleteKanbanTask ──────────────────────────────────────────────────
     if (toolName === 'deleteKanbanTask') {
-      const { taskId, reason } = args;
+      const { taskId: inputTaskId, reason } = args;
+      const taskId = await resolveTaskId(inputTaskId);
       try {
-        const resp = await fetch(`http://localhost:${process.env.PORT || 4005}/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}`, {
           method: 'DELETE'
         });
         if (!resp.ok) {
@@ -753,7 +830,8 @@ async function executeTool(toolName, args, projectId = null) {
 
     // ── getTaskDetails ─────────────────────────────────────────────────────
     if (toolName === 'getTaskDetails') {
-      const { taskId } = args;
+      const { taskId: inputTaskId } = args;
+      const taskId = await resolveTaskId(inputTaskId);
       const task = await dbManager.getTaskByIdFull(taskId);
       if (!task) {
         return { success: false, message: `#${taskId} 태스크를 찾을 수 없습니다.` };
@@ -761,16 +839,17 @@ async function executeTool(toolName, args, projectId = null) {
       // status → label 변환 (Ari의 혼동 방지: COMPLETED=Done열, ARCHIVED=보관열)
       const colDef = _kanbanCols.find(c => c.status === task.status);
       const statusLabel = colDef ? `${task.status} (${colDef.label} 열)` : task.status;
+      const displayId = task.project_task_num ? `#${task.project_task_num}` : `#${task.id}`;
       return {
         success: true,
-        message: `📋 **[Task #${task.id}] 상세 내용**\n- 상태: ${statusLabel}\n- 담당: ${task.assigned_agent || '미할당'}\n- 카테고리: ${task.category || 'N/A'}\n\n**내용**:\n${task.content}`
+        message: `📋 **[Task ${displayId}] 상세 내용**\n- 상태: ${statusLabel}\n- 담당: ${task.assigned_agent || '미할당'}\n- 카테고리: ${task.category || 'N/A'}\n\n**내용**:\n${task.content}`
       };
     }
 
     // ── getCrewStatus ─────────────────────────────────────────────────────
     if (toolName === 'getCrewStatus') {
       const { agentId, statusFilter = 'all' } = args;
-      const allTasks = await dbManager.getAllTasksLight();
+      const allTasks = await dbManager.getAllTasksLight(projectId);
 
       // status 정규화 (칼럼 정의에서 동적 생성 — alias 포함)
       const aliasMap = buildAliasMap(_kanbanCols);
@@ -788,7 +867,7 @@ async function executeTool(toolName, args, projectId = null) {
         return {
           success: true,
           message: agentId
-            ? `${CREW_INFO[agentId]?.name || agentId}의 ${statusFilter === 'all' ? '활성' : statusFilter} 태스크가 없습니다.`
+            ? `${agentId}의 ${statusFilter === 'all' ? '활성' : statusFilter} 태스크가 없습니다.`
             : '현재 활성 태스크가 없습니다.',
           tasks: [],
         };
@@ -804,14 +883,15 @@ async function executeTool(toolName, args, projectId = null) {
 
       let summary = `📋 **크루 현황** (총 ${filtered.length}건)\n\n`;
       for (const [agent, tasks] of Object.entries(grouped)) {
-        const crewName = CREW_INFO[agent]?.name || agent;
+        const crewName = agent; // [P-001 Fix] 역할 ID 직접 사용 — 닉네임 금지
         summary += `**${crewName}** (${tasks.length}건)\n`;
         tasks.slice(0, 3).forEach(t => {
-          const title = t.title || `Task #${t.id}`;
+          const displayId = t.project_task_num ? `#${t.project_task_num}` : `#${t.id}`;
+          const title = t.title || `Task ${displayId}`;
           // status → label 변환 (Ari 혼동 방지)
           const colDef = _kanbanCols.find(c => c.status === t.status);
           const statusLabel = colDef ? `${t.status}(${colDef.label})` : t.status;
-          summary += `  - #${t.id} [${statusLabel}] ${title.slice(0, 40)}${title.length > 40 ? '...' : ''}\n`;
+          summary += `  - ${displayId} [${statusLabel}] ${title.slice(0, 40)}${title.length > 40 ? '...' : ''}\n`;
         });
         if (tasks.length > 3) summary += `  ...외 ${tasks.length - 3}건\n`;
         summary += '\n';
@@ -826,14 +906,14 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역(플랫폼 메타) 접근을 허용합니다. (메타 에이전트 dev_lead 등 전용)
       // 향후 일반 유저 에이전트의 전역 접근을 원천 차단하기 위한 플래그 추가를 권고합니다.
       const workspaceRoot = projectId
-        ? path.resolve(process.cwd(), '../../04_Projects', projectId)
+        ? path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(dirPath) ? dirPath : path.resolve(workspaceRoot, dirPath);
 
       const allowedPaths = [
         path.resolve(workspaceRoot, '05_My_history'),
         path.resolve(workspaceRoot, '06_소시안자료'),
-        path.resolve(workspaceRoot, '07_OUTPUT')
+        path.resolve(workspaceRoot, 'outputs')
       ];
 
       let isAllowed = false;
@@ -859,14 +939,14 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
       const workspaceRoot = projectId
-        ? path.resolve(process.cwd(), '../../04_Projects', projectId)
+        ? path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
 
       const allowedPaths = [
         path.resolve(workspaceRoot, '05_My_history'),
         path.resolve(workspaceRoot, '06_소시안자료'),
-        path.resolve(workspaceRoot, '07_OUTPUT')
+        path.resolve(workspaceRoot, 'outputs')
       ];
 
       let isAllowed = false;
@@ -910,16 +990,45 @@ async function executeTool(toolName, args, projectId = null) {
     if (toolName === 'manageAgentSkills') {
       const { agentId, skillId, action } = args;
       const isActive = action === 'equip';
+
+      // ── [검증] skill-library에 실제 존재하는 스킬인지 확인 ──────────────────
+      if (isActive) {
+        try {
+          const skillLibPath = path.resolve(process.cwd(), '../skill-library');
+          const skillFolders = fs.readdirSync(skillLibPath)
+            .filter(f => fs.existsSync(path.join(skillLibPath, f, 'SKILL.md')));
+
+          // SKILL.md frontmatter에서 name 추출
+          const validSkillNames = new Set();
+          for (const folder of skillFolders) {
+            const raw = fs.readFileSync(path.join(skillLibPath, folder, 'SKILL.md'), 'utf-8');
+            const match = raw.match(/^---[\s\S]*?^name:\s*(.+?)$/m);
+            if (match) validSkillNames.add(match[1].trim());
+          }
+
+          if (!validSkillNames.has(skillId)) {
+            const validList = [...validSkillNames].sort().join(', ');
+            return {
+              success: false,
+              message: `❌ 스킬 장착 실패: '${skillId}'는 skill-library에 존재하지 않습니다.\n\n**유효한 스킬 목록**: ${validList}\n\n스킬 파일이 없다면 \`skill-library/${skillId}/SKILL.md\`를 먼저 생성해주세요.`,
+            };
+          }
+        } catch (validErr) {
+          console.warn('[AriDaemon] manageAgentSkills 스킬 검증 실패 (검증 생략):', validErr.message);
+          // 검증 실패 시 통과 (하위 호환성 유지)
+        }
+      }
+
       await dbManager.toggleAgentSkill(agentId, skillId, isActive);
 
       // REST API로도 변경 사실을 알리기 (프론트 실시간 동기화를 위해)
-      fetch(`http://localhost:${process.env.PORT || 4005}/api/agents/${agentId}/skills`, {
+      fetch(`http://localhost:${process.env.PORT || 4007}/api/agents/${agentId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skillId, active: isActive })
       }).catch(() => { });
 
-      return { success: true, message: `✅ ${agentId}의 ${skillId} 스킬이 ${action === 'equip' ? '장착' : '해제'}되었습니다.` };
+      return { success: true, message: `✅ ${agentId}의 '${skillId}' 스킬이 ${action === 'equip' ? '장착' : '해제'}되었습니다.` };
     }
 
     // ── writeCEOLog ──────────────────────────────────────────────────────────
@@ -948,7 +1057,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
       const ROOT = projectId
-        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Users/01_Company/01_Projects/${projectDirName}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
       if (!absPath.startsWith(ROOT)) {
@@ -969,7 +1078,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
       const ROOT = projectId
-        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Users/01_Company/01_Projects/${projectDirName}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, sourcePath);
       const absDest = path.resolve(ROOT, destPath);
@@ -987,7 +1096,7 @@ async function executeTool(toolName, args, projectId = null) {
     if (toolName === 'renameFile') {
       const { filePath, newName } = args;
       const ROOT = projectId
-        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Users/01_Company/01_Projects/${projectDirName}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absSrc = path.resolve(ROOT, filePath);
       if (!absSrc.startsWith(ROOT)) return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };
@@ -1002,7 +1111,7 @@ async function executeTool(toolName, args, projectId = null) {
     if (toolName === 'deleteFile') {
       const { filePath, reason } = args;
       const ROOT = projectId
-        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Projects/${projectId}`
+        ? `/Users/alex/Documents/08_MyCrew_Anti/04_Users/01_Company/01_Projects/${projectDirName}`
         : '/Users/alex/Documents/08_MyCrew_Anti';
       const absPath = path.resolve(ROOT, filePath);
       if (!absPath.startsWith(ROOT)) return { success: false, message: '접근 불가: MyCrew 샌드박스 보안 (Path Traversal 차단)' };

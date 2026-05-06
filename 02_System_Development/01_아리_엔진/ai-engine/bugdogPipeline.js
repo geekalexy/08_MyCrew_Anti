@@ -33,7 +33,7 @@ const CASE_INDEX_PATH = path.join(CASE_DIR, 'CASE_INDEX.md');
 const ENGINE_LOG_PATH = path.join(ENGINE_ROOT, 'engine.log');
 
 // ─── 트리거 감지 정규식 ────────────────────────────────────────────────────────
-export const BUGDOG_TRIGGER = /^@bugdog\s+기록\s*(.*)/i;
+export const BUGDOG_TRIGGER = /^(?:@bugdog\s+기록|\/bugdog기록)\s*(.*)/i;
 
 /**
  * 트리거 감지 함수 — server.js에서 호출
@@ -176,7 +176,7 @@ async function saveCaseFile(caseId, description, draftContent) {
  * Prime #4: category TEXT 컬럼, ENUM 없음 → 'DOGFOODING' 직접 삽입
  * dbManager는 server.js에서 주입받음 (순환 참조 방지)
  */
-async function createKanbanCard(dbManager, caseId, description, filePath) {
+async function createKanbanCard(dbManager, caseId, description, filePath, projectId) {
   const shortDesc = (description || '이슈').slice(0, 40);
   const taskTitle = `[Dogfooding] CASE_${caseId}: ${shortDesc}`;
   const taskContent = `🐕 Bugdog이 자동으로 기록한 Dogfooding 케이스입니다.\n\n**케이스 파일:** \`${path.basename(filePath)}\`\n\n초안 검토 및 마케팅 앵글 보완 후, 노바에게 소재화 요청 필요.`;
@@ -186,8 +186,9 @@ async function createKanbanCard(dbManager, caseId, description, filePath) {
     taskContent,
     'bugdog',          // requester
     MODEL.FLASH,       // model
-    'sonnet',          // assignedAgent — 소넷이 초안 검토
-    'DOGFOODING'       // category (Prime: TEXT 컬럼, ENUM 없음)
+    'dev_qa',          // assignedAgent — QA 담당(소넷)이 초안 검토
+    'DOGFOODING',      // category (Prime: TEXT 컬럼, ENUM 없음)
+    projectId          // projectId
   );
 
   console.log(`[BugdogPipeline] ✅ 칸반 카드 생성: Task #${taskId} — ${taskTitle}`);
@@ -206,9 +207,21 @@ async function createKanbanCard(dbManager, caseId, description, filePath) {
  * @param {function} ioEmit — io.emit 래퍼 (소켓 브로드캐스트)
  */
 export async function executeBugdogPipeline(triggerData, dbManager, broadcastLog, ioEmit) {
-  const { description = '', taskId = null, channel = 'dashboard' } = triggerData;
+  const { description = '', taskId = null, channel = 'dashboard', projectId = null } = triggerData;
 
-  console.log(`[BugdogPipeline] 🐕 파이프라인 시작 — "${description}" (channel: ${channel})`);
+  // [Phase 32] 1. taskId가 있으면 해당 태스크의 projectId를 조회 (현재 프로젝트 칸반에 카드 생성하기 위함)
+  let resolvedProjectId = projectId;
+  if (!resolvedProjectId && taskId) {
+    try {
+      const task = await dbManager.getTaskById(taskId);
+      if (task && task.project_id) resolvedProjectId = task.project_id;
+    } catch (err) {
+      console.warn('[BugdogPipeline] projectId 조회 실패:', err.message);
+    }
+  }
+  resolvedProjectId = resolvedProjectId || 'proj-1';
+
+  console.log(`[BugdogPipeline] 🐕 파이프라인 시작 — "${description}" (channel: ${channel}, project: ${resolvedProjectId})`);
   broadcastLog?.('info', `🐕 [Bugdog] 기록 시작: "${description || '이슈 자동 수집'}"`, 'bugdog', taskId);
 
   try {
@@ -230,11 +243,11 @@ export async function executeBugdogPipeline(triggerData, dbManager, broadcastLog
 
     // Step 4: 칸반 카드 자동 생성
     broadcastLog?.('info', '🐕 [Bugdog] Step 4/4 — 칸반 카드 생성 중...', 'bugdog', taskId);
-    const newTaskId = await createKanbanCard(dbManager, caseId, description, filePath);
+    const newTaskId = await createKanbanCard(dbManager, caseId, description, filePath, resolvedProjectId);
 
-    // 완료 브로드캐스트
+    // 완료 브로드캐스트 (원래 명령어를 친 taskId로 로그를 쏴줘야 UI 화면에서 멈춤 현상 없이 완료 메시지가 보임)
     const summary = `✅ CASE_${caseId} 기록 완료! 파일: ${filename} | 칸반 #${newTaskId} 생성됨`;
-    broadcastLog?.('info', `🐕 [Bugdog] ${summary}`, 'bugdog', newTaskId);
+    broadcastLog?.('info', `🐕 [Bugdog] ${summary}`, 'bugdog', taskId);
     ioEmit?.('bugdog:case_created', {
       caseId,
       filename,

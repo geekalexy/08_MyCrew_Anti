@@ -8,7 +8,9 @@ import { useSocket } from '../../hooks/useSocket';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import { renderTaggedText } from '../../utils/TagRenderer';
+import { renderTaggedText, renderChainRefText } from '../../utils/TagRenderer';
+import { useContextChain, extractChainRefs } from '../../hooks/useContextChain';
+import ContextChainPanel from './ContextChainPanel';
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -330,6 +332,18 @@ export default function TaskDetailModal() {
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
   const [copiedCommentIdx, setCopiedCommentIdx] = useState(null); // [Phase 36b] 복사 피드백 상태
+
+  // ── [Phase 37] Live Split Preview ────────────────────────────────────────
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [splitRatio, setSplitRatio] = useState(50);      // 좌측 패널 % 비율
+  const [previewError, setPreviewError] = useState(false); // iframe 로드 실패 여부
+  const [hasPreviewData, setHasPreviewData] = useState(false); // OUTPUT/index.html 존재 여부
+  const iframeRef  = useRef(null);
+  const resizerRef = useRef(null);
+  const isDragging = useRef(false);
+
+  // [Phase 37 Context Chain 훅은 task 선언 이후로 이동됨 — 아래 참고]
+
   const textareaRef = useRef(null);
   const editAreaRef = useRef(null);
   const moreMenuRef = useRef(null);
@@ -352,20 +366,38 @@ export default function TaskDetailModal() {
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
 
+  // ── [Phase 37] Context Chaining — task 선언 이후 (ReferenceError 방지) ───
+  const projectId = task?.projectId || task?.project_id || null;
+  const contextChain = useContextChain(projectId);
+  const isChainMode = !!contextChain.activeRef;
+  // ─────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!activeDetailTaskId) return;
-    setActiveCommentTab('discussion'); // [S4-2] 새로운 태스크 클릭 시 항상 디스커션 탭 기본값 유지
+    setComments([]);
+    setActiveCommentTab('discussion');
     setIsLoadingComments(true);
     fetch(`${SERVER_URL}/api/tasks/${activeDetailTaskId}/comments`)
       .then((r) => r.json())
       .then((data) => setComments(Array.isArray(data.comments) ? data.comments : []))
       .catch(() => setComments([]))
       .finally(() => setIsLoadingComments(false));
-      
-    // 초기 폼 상태 동기화 (항상 초기화 상태 유지 - Stateless UX)
+
+    // 초기 폼 상태 동기화
     setCommentColumn('NO_CHANGE');
     setCommentAssignee('NO_CHANGE');
     setCommentPriority('NO_CHANGE');
+
+    // [Phase 37] OUTPUT/index.html 존재 여부 사전 체크
+    setHasPreviewData(false);
+    setIsPreviewMode(false);
+    const projectId = tasks[String(activeDetailTaskId)]?.projectId
+      || tasks[String(activeDetailTaskId)]?.project_id;
+    if (projectId) {
+      fetch(`http://localhost:4007/preview/${projectId}/OUTPUT/index.html`, { method: 'HEAD' })
+        .then((r) => setHasPreviewData(r.ok))
+        .catch(() => setHasPreviewData(false));
+    }
   }, [activeDetailTaskId]);
 
   // 텍스트에어리어 자동 높이 조절
@@ -443,7 +475,50 @@ export default function TaskDetailModal() {
     setShowReworkInput(false);
     setReworkReason('');
     setIsArchived(false);
-  }, [setActiveDetailTaskId, isArchived, activeDetailTaskId, removeTask]);
+    setIsPreviewMode(false);
+    setIsExpanded(false); // [버그수정] 확장 페이지 상태 초기화
+    contextChain.closePanel(); // [버그수정] 체인 패널 상태 초기화
+    setSplitRatio(50);
+  }, [setActiveDetailTaskId, isArchived, activeDetailTaskId, removeTask, contextChain]);
+
+  // ── [Phase 37] Resizer 드래그 핸들러 ─────────────────────────────────────
+  const handleResizerMouseDown = useCallback((e) => {
+    e.preventDefault();
+    isDragging.current = true;
+    // iframe 위에서 mousemove 이벤트 끊김 방지
+    if (iframeRef.current) iframeRef.current.style.pointerEvents = 'none';
+
+    const onMouseMove = (ev) => {
+      if (!isDragging.current) return;
+      const container = resizerRef.current?.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const newRatio = ((ev.clientX - rect.left) / rect.width) * 100;
+      setSplitRatio(Math.min(Math.max(newRatio, 20), 80)); // 20~80% 클램핑
+    };
+    const onMouseUp = () => {
+      isDragging.current = false;
+      if (iframeRef.current) iframeRef.current.style.pointerEvents = 'auto';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, []);
+
+  const previewUrl = (() => {
+    const projectId = task?.projectId || task?.project_id;
+    if (!projectId) return null;
+    return `http://localhost:4007/preview/${projectId}/OUTPUT/index.html`;
+  })();
+
+  const handlePreviewRefresh = () => {
+    setPreviewError(false);
+    if (iframeRef.current) {
+      iframeRef.current.src = iframeRef.current.src;
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const handleEditTask = () => {
     setEditTitle(task.title);
@@ -466,7 +541,11 @@ export default function TaskDetailModal() {
       const pipelineMode = trimmedContent.startsWith('/run-b') ? 'run-b' : 'run';
       const projectId = task.projectId || task.project_id;
       if (projectId) {
-        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: String(task.id) })
+        })
           .then(async (res) => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '파이프라인 시작 실패');
@@ -564,7 +643,11 @@ export default function TaskDetailModal() {
       // DB 저장은 서버의 broadcastLog에 위임하여 중복 방지 (B-4 수정)
 
       if (projectId) {
-        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { 
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: String(task.id) })
+        })
           .then(async (res) => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '파이프라인 명령 실패');
@@ -743,6 +826,11 @@ export default function TaskDetailModal() {
   const statusInfo = STATUS_LABEL[task.status] || STATUS_LABEL['PENDING'];
   const isReview = task.column === 'review';
 
+  // [Phase 37 Bugfix] 태스크 본문이나 댓글에 웹 프론트엔드(HTML/CSS/JS 등) 코드 블록이 있는 경우에만 프리뷰 버튼 노출
+  const uiCodeRegex = /```(html|css|js|jsx|ts|tsx|javascript|typescript)(?:\s|$)/i;
+  const hasCodeBlock = (typeof task.content === 'string' && uiCodeRegex.test(task.content)) || 
+                       (Array.isArray(comments) && comments.some(c => typeof c.content === 'string' && uiCodeRegex.test(c.content)));
+
   return (
     <div
       className={`modal-overlay ${isExpanded ? 'modal-overlay--expanded' : ''}`}
@@ -779,13 +867,6 @@ export default function TaskDetailModal() {
                 fontSize: '0.76rem', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
                 letterSpacing: '0.08em', color: 'var(--text-muted)' 
               }}>Task #{task.project_task_num != null ? task.project_task_num : String(task.id).slice(-6)}</span>
-              <span style={{
-                fontSize: '0.76rem', fontWeight: 700, padding: '2px 9px', borderRadius: '4px',
-                background: 'rgba(180,197,255,0.08)', color: statusInfo.color,
-                fontFamily: 'Space Grotesk, sans-serif'
-              }}>
-                {statusInfo.text}
-              </span>
              </div>
             {isEditing ? (
               <input 
@@ -798,6 +879,57 @@ export default function TaskDetailModal() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
+
+            {/* 👀 Live Preview 버튼 — OUTPUT/index.html 존재 및 코드 블록 포함 여부에 따라 노출 */}
+            {previewUrl && hasPreviewData && hasCodeBlock && (
+              <button
+                id="btn-live-preview"
+                onClick={() => {
+                  setIsPreviewMode(v => {
+                    const nextV = !v;
+                    if (nextV) setIsExpanded(true);
+                    return nextV;
+                  });
+                  setPreviewError(false);
+                  if (isChainMode) contextChain.closePanel();
+                }}
+                title={isPreviewMode ? '프리뷰 닫기' : '결과물 미리보기'}
+                style={{
+                  background: isPreviewMode
+                    ? 'linear-gradient(135deg, rgba(100,135,242,0.3), rgba(74,222,128,0.15))'
+                    : 'rgba(180,197,255,0.07)',
+                  border: `1px solid ${isPreviewMode ? 'rgba(100,135,242,0.55)' : 'rgba(180,197,255,0.18)'}`,
+                  color: isPreviewMode ? '#b4c5ff' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '0.35rem',
+                  padding: '0.35rem 0.75rem', borderRadius: '8px',
+                  fontSize: '0.78rem', fontWeight: 700,
+                  fontFamily: 'Space Grotesk, sans-serif',
+                  letterSpacing: '0.03em',
+                  boxShadow: isPreviewMode ? '0 0 10px rgba(100,135,242,0.25)' : 'none',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => {
+                  if (!isPreviewMode) {
+                    e.currentTarget.style.background = 'rgba(180,197,255,0.13)';
+                    e.currentTarget.style.borderColor = 'rgba(180,197,255,0.35)';
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!isPreviewMode) {
+                    e.currentTarget.style.background = 'rgba(180,197,255,0.07)';
+                    e.currentTarget.style.borderColor = 'rgba(180,197,255,0.18)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>
+                  {isPreviewMode ? 'close' : 'preview'}
+                </span>
+                {isPreviewMode ? '닫기' : '미리보기'}
+              </button>
+            )}
 
             {/* 더보기 메뉴 드롭다운 */}
             <div style={{ position: 'relative' }} ref={moreMenuRef}>
@@ -866,8 +998,21 @@ export default function TaskDetailModal() {
           </div>
         </div>
 
-        {/* 본문 (스크롤 가능) */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
+        {/* ── [Phase 37] Split View 컨테이너 ── */}
+        <div style={{
+          flex: 1, display: 'flex', overflow: 'hidden',
+          // 프리뷰 또는 체인 패널 모드에선 row, 일반 모드에선 column
+          flexDirection: (isPreviewMode || isChainMode) ? 'row' : 'column',
+        }}>
+
+        {/* Left Pane — 기존 본문 (스크롤 가능) */}
+        <div style={{
+          flex: isPreviewMode ? `0 0 ${splitRatio}%` : '1 1 auto',
+          overflowY: 'auto',
+          padding: '1rem 1.5rem',
+          minWidth: 0,
+          transition: isDragging.current ? 'none' : 'flex-basis 0.05s',
+        }}>
 
           {/* 태스크 내용 */}
           {isEditing ? (
@@ -1406,11 +1551,24 @@ export default function TaskDetailModal() {
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeRaw]}
                         components={{
-                          // [Phase 36b] 카드링크 태그 인라인 렌더링 (언더라인+블루, Q4)
+                          // [Phase 36b/37] 카드링크 + 컨텍스트 체인 [#ID] 인라인 렌더링
                           p: ({ children }) => {
                             const processChild = (child) => {
                               if (typeof child !== 'string') return child;
-                              return renderTaggedText(child, null);
+                              // [#ID] 체인 칩 먼저 처리 (대괄호 문법)
+                              const chainParts = renderChainRefText(
+                                child,
+                                contextChain.chainCache,
+                                (refId) => {
+                                  contextChain.openPanel(refId);
+                                  setIsPreviewMode(false);
+                                  if (!isExpanded) setIsExpanded(true);
+                                }
+                              );
+                              // 남은 string 노드에 #NCN 처리
+                              return chainParts.flatMap(part =>
+                                typeof part === 'string' ? renderTaggedText(part, null) : [part]
+                              );
                             };
                             const processed = Array.isArray(children)
                               ? children.flatMap(processChild)
@@ -1580,6 +1738,10 @@ export default function TaskDetailModal() {
                 onChange={(e) => {
                   const val = e.target.value;
                   setCommentText(val);
+                  // ── [Phase 37] [#ID] 디바운스 검증 ──
+                  const refs = extractChainRefs(val);
+                  refs.forEach(refId => contextChain.debouncedValidate(refId));
+                  // ─────────────────────────────────────
                   const slashIdx = val.lastIndexOf('/');
                   if (slashIdx !== -1) {
                     const afterSlash = val.slice(slashIdx + 1);
@@ -1618,7 +1780,11 @@ export default function TaskDetailModal() {
                       setActiveCommentTab('activity');
                       setCommentText('');
                       if (projectId) {
-                        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
+                        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { 
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ taskId: String(task.id) })
+                        })
                           .then(async (res) => {
                             const data = await res.json();
                             if (!res.ok) throw new Error(data.error || '실패');
@@ -1769,8 +1935,166 @@ export default function TaskDetailModal() {
           </div>
         </div>
 
+        {/* ── [Phase 37] Resizer 핸들 ── */}
+        {(isPreviewMode || isChainMode) && (
+          <div
+            ref={resizerRef}
+            onMouseDown={handleResizerMouseDown}
+            title="드래그해서 크기 조절"
+            style={{
+              width: '5px', flexShrink: 0,
+              background: 'rgba(180,197,255,0.12)',
+              cursor: 'col-resize',
+              transition: 'background 0.15s',
+              position: 'relative',
+              zIndex: 10,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,135,242,0.35)'}
+            onMouseLeave={e => { if (!isDragging.current) e.currentTarget.style.background = 'rgba(180,197,255,0.12)'; }}
+          >
+            {/* 핸들 시각 표시 점 */}
+            <div style={{
+              position: 'absolute', top: '50%', left: '50%',
+              transform: 'translate(-50%,-50%)',
+              display: 'flex', flexDirection: 'column', gap: '4px',
+            }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'rgba(180,197,255,0.5)' }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── [Phase 37] Right Pane — 컨텍스트 체인 패널 ── */}
+        {isChainMode && !isPreviewMode && (
+          <div style={{
+            flex: `0 0 ${100 - splitRatio}%`,
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden', minWidth: 0,
+            background: 'var(--bg-base)',
+            borderLeft: '1px solid var(--border)',
+          }}>
+            <ContextChainPanel
+              activeRef={contextChain.activeRef}
+              chainData={contextChain.chainData}
+              isLoading={contextChain.isLoading}
+              canGoBack={contextChain.canGoBack}
+              onNavigate={(refId) => contextChain.navigateTo(refId)}
+              onBack={contextChain.navigateBack}
+              onClose={contextChain.closePanel}
+            />
+          </div>
+        )}
+
+        {/* ── [Phase 37] Right Pane — iframe 프리뷰 ── */}
+        {isPreviewMode && (
+          <div style={{
+            flex: `0 0 ${100 - splitRatio}%`,
+            display: 'flex', flexDirection: 'column',
+            overflow: 'hidden', minWidth: 0,
+            background: 'var(--bg-base)',
+            borderLeft: '1px solid var(--border)',
+          }}>
+            {/* 프리뷰 툴바 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.45rem 0.8rem',
+              background: 'var(--bg-surface-2)',
+              borderBottom: '1px solid var(--border)',
+              flexShrink: 0,
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--brand)', opacity: 0.8 }}>preview</span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'SF Mono, monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {previewUrl}
+              </span>
+
+              {/* 새로고침 */}
+              <button
+                id="btn-preview-refresh"
+                onClick={handlePreviewRefresh}
+                title="새로고침 (에이전트가 파일을 업데이트한 경우)"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                  padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>refresh</span>
+              </button>
+
+              {/* 새 창 열기 */}
+              <button
+                id="btn-preview-new-tab"
+                onClick={() => window.open(previewUrl, '_blank')}
+                title="새 탭에서 열기"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                  padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>open_in_new</span>
+              </button>
+            </div>
+
+            {/* iframe 또는 Empty State */}
+            {previewError ? (
+              /* Empty State: OUTPUT/index.html 없을 때 */
+              <div style={{
+                flex: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center',
+                gap: '0.75rem', padding: '2rem',
+                color: 'var(--text-muted)',
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', opacity: 0.4 }}>web_asset_off</span>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
+                    아직 OUTPUT/index.html이 없어요
+                  </div>
+                  <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
+                    에이전트가 코드를 생성하면 자동으로 표시됩니다.<br />
+                    생성 후 <strong>새로고침</strong> 버튼을 눌러주세요.
+                  </div>
+                </div>
+                <button
+                  onClick={handlePreviewRefresh}
+                  style={{
+                    marginTop: '0.5rem', padding: '0.5rem 1.2rem',
+                    background: 'rgba(100,135,242,0.12)',
+                    border: '1px solid rgba(100,135,242,0.3)',
+                    borderRadius: '8px', color: 'var(--brand)',
+                    cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
+                  다시 시도
+                </button>
+              </div>
+            ) : (
+              <iframe
+                ref={iframeRef}
+                src={previewUrl}
+                title={`프리뷰 — ${task?.title || 'Task'}`}
+                style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                onError={() => setPreviewError(true)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Split View 컨테이너 닫기 */}
+        </div>
+
           {/* Review 상태: 승인/재작업 영역만 유지 */}
           {isReview && (
+
             <div className="modal__footer">
               <div className="modal__review-zone">
                 {showReworkInput ? (

@@ -23,6 +23,7 @@ import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
 import obsidianAdapter from './ai-engine/adapters/obsidianAdapter.js';
 import zeroConfigService from './ai-engine/services/zeroConfigService.js';
+import contextChainService from './ai-engine/services/contextChainService.js';
 import statusReporter from './ai-engine/statusReporter.js';
 import { processOnboardingUrl } from './ai-engine/tools/onboardingPipeline.js';
 import { initAdapterWatcher } from './ai-engine/AdapterWatcher.js';
@@ -75,8 +76,8 @@ app.use('/preview/:projectId', async (req, res, next) => {
     const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
     const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
     
-    // 아웃풋(outputs)만 서빙하면 인풋(inputs) 경로(이미지 등)를 불러올 수 없는 문제 해결
-    // 프로젝트 루트 전체를 서빙하되, 프론트엔드 Iframe은 /preview/ID/outputs/index.html 로 접근하도록 설계
+    // 아웃풋(OUTPUT)만 서빙하면 인풋(INPUT) 경로(이미지 등)를 불러올 수 없는 문제 해결
+    // 프로젝트 루트 전체를 서빙하되, 프론트엔드 Iframe은 /preview/ID/OUTPUT/index.html 로 접근하도록 설계
     express.static(projectRoot)(req, res, next);
   } catch (err) {
     console.error('[Preview Route] 정적 파일 서빙 오류:', err);
@@ -91,6 +92,17 @@ export const io = new Server(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+});
+
+// ─── [Phase 37] Live Preview 자동 새로고침 알림 ──────────────────────────────
+// ariDaemon의 writeFile 툴이 OUTPUT 파일 저장 완료 후 호출
+// → io.emit('preview:file_saved') → 프론트엔드 iframe 자동 새로고침
+app.post('/api/preview/notify', (req, res) => {
+  const { projectId, filePath } = req.body;
+  if (!projectId) return res.status(400).json({ error: 'projectId required' });
+  io.emit('preview:file_saved', { projectId, filePath, ts: Date.now() });
+  console.log(`[Preview] 🔄 파일 저장 알림 → projectId=${projectId} path=${filePath}`);
+  res.json({ ok: true });
 });
 
 // [Phase 25] videoLabRouter에 io 인스턴스 주입 (판정 엔드포인트 브로드캐스트용)
@@ -557,6 +569,8 @@ app.post('/api/tasks', async (req, res) => {
       targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
     }
     
+    const contextChain = await contextChainService.calculateNewChain(content, targetProjectId);
+    
     const taskId = await dbManager.createTask(
       title || content.slice(0, 30), 
       content, 
@@ -564,18 +578,21 @@ app.post('/api/tasks', async (req, res) => {
       targetModel, 
       assignee && assignee !== '미할당' ? assignee : null, 
       category || 'QUICK_CHAT', 
-      targetProjectId
+      targetProjectId,
+      null, 0, null, contextChain
     );
     
+    const newTask = await dbManager.getTaskById(taskId);
     broadcastLog('info', `수동 태스크 생성됨: ${title}`, 'system', taskId);
     io.emit('task:created', {
       taskId: String(taskId),
-      title: title || content.slice(0, 30),
+      title: newTask ? newTask.title : (title || content.slice(0, 30)),
       content,
       column: column || 'todo',
       agentId: assignee !== '미할당' ? assignee : null,
       priority: priority || 'medium',
       projectId: targetProjectId,
+      project_task_num: newTask ? newTask.project_task_num : null
     });
     
     res.json({ status: 'ok', taskId: String(taskId) });
@@ -707,15 +724,17 @@ io.on('connection', (socket) => {
         targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
       }
       const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null, 'QUICK_CHAT', targetProjectId);
+      const newTask = await dbManager.getTaskById(taskId);
       broadcastLog('info', `태스크 생성됨: ${title}`, 'system', taskId);
       io.emit('task:created', {
         taskId: String(taskId),
-        title,
+        title: newTask ? newTask.title : title,
         content,
         column: column || 'todo',
         agentId: assignee !== '미할당' ? assignee : null,
         priority: priority || 'medium',
         projectId: targetProjectId,
+        project_task_num: newTask ? newTask.project_task_num : null
       });
       
       // 새로 할당된 에이전트가 있으면 Dispatcher 트리거
@@ -1409,25 +1428,36 @@ app.get('/health', (req, res) => {
 /**
  * [Phase 36] 파이프라인 내부 실행함수 — REST 엔드포인트와 자동 시작 공유
  */
-async function startPipelineInternal(projectId, mode) {
+async function startPipelineInternal(projectId, mode, targetTaskId = null) {
   const currentMode = await dbManager.getProjectPipelineMode(projectId);
   if (currentMode !== 'none') throw new Error(`이미 파이프라인이 실행 중입니다 (${currentMode}).`);
 
-  // [Phase 36-A V3] PENDING/PLANNED 카드 전체에 다음 sprint_no 일괄 할당
-  const taskCount = await dbManager.initDynamicPipeline(projectId);
-  if (taskCount === 0) throw new Error('실행할 할 일(PENDING/PLANNED) 카드가 없습니다.');
+  let firstTask = null;
+  let sprintNo = 1;
 
-  // [V3] sprint_no 조회 후, 해당 스프린트의 가장 앞 카드(project_task_num 오름차순)를 첫 주자로 선정
-  const sprintNo = await dbManager.getMaxSprintNo(projectId);
-  const allTasks = await dbManager.getAllTasks(projectId);
-  let firstTask = allTasks
-    .filter(t => t.sprint_no === sprintNo && t.assigned_agent !== 'CEO')
-    .sort((a, b) => (a.project_task_num ?? a.id) - (b.project_task_num ?? b.id))[0] || null;
+  if (targetTaskId) {
+    firstTask = await dbManager.getTaskById(targetTaskId);
+    if (!firstTask) throw new Error('지정된 시작 카드를 찾을 수 없습니다.');
+    // [Phase 36-B] 특정 카드에서 시작할 경우, 해당 카드를 새 스프린트의 시작점으로 삼음
+    sprintNo = (await dbManager.getMaxSprintNo(projectId)) + 1;
+    await dbManager.updateTaskSprintNo(targetTaskId, sprintNo);
+  } else {
+    // [Phase 36-A V3] PENDING/PLANNED 카드 전체에 다음 sprint_no 일괄 할당
+    const taskCount = await dbManager.initDynamicPipeline(projectId);
+    if (taskCount === 0) throw new Error('실행할 할 일(PENDING/PLANNED) 카드가 없습니다.');
 
-  if (!firstTask) throw new Error('파이프라인 첫 번째 카드를 찾을 수 없습니다. (대기 카드가 없거나 모두 CEO 할당 상태입니다)');
+    // [V3] sprint_no 조회 후, 해당 스프린트의 가장 앞 카드(project_task_num 오름차순)를 첫 주자로 선정
+    sprintNo = await dbManager.getMaxSprintNo(projectId);
+    const allTasks = await dbManager.getAllTasks(projectId);
+    firstTask = allTasks
+      .filter(t => t.sprint_no === sprintNo && t.assigned_agent !== 'CEO')
+      .sort((a, b) => (a.project_task_num ?? a.id) - (b.project_task_num ?? b.id))[0] || null;
 
-  // [Phase 36-A] 첫 카드가 미할당(null)인 경우, 릴레이 시작을 위해 CTO(dev_senior)에게 자동 배정
-  if (!firstTask.assigned_agent || firstTask.assigned_agent === '미할당') {
+    if (!firstTask) throw new Error('파이프라인 첫 번째 카드를 찾을 수 없습니다. (대기 카드가 없거나 모두 CEO 할당 상태입니다)');
+  }
+
+  // [Phase 36-B] 첫 카드가 미할당이거나 CEO 개입으로 리뷰/완료된 상태에서 재시작할 경우 -> 시니어 엔지니어(dev_senior)가 릴레이 주도
+  if (!firstTask.assigned_agent || firstTask.assigned_agent === '미할당' || firstTask.status === 'REVIEW' || firstTask.status === 'DONE') {
     firstTask.assigned_agent = 'dev_senior';
     await dbManager.updateTaskAssignedAgent(firstTask.id, 'dev_senior');
   }
@@ -1436,7 +1466,7 @@ async function startPipelineInternal(projectId, mode) {
 
   const startMsg = mode === 'run'
     ? `🚀 /run 파이프라인 시작 — Sprint #${sprintNo} 자율 완주 모드`
-    : `⏸ /run-b 중간 점검 모드 시작 — Sprint #${sprintNo} 단계별 확인`;
+    : `⏸ /run-b 반자율 완주 모드 시작 — Sprint #${sprintNo} 체크포인트 기반`;
   broadcastLog('info', startMsg, 'system', null, 'DASHBOARD', projectId);
   io.to(`project_${projectId}`).emit('pipeline:started', { projectId, mode, firstTaskId: String(firstTask.id), sprintNo });
 
@@ -1458,6 +1488,7 @@ async function startPipelineInternal(projectId, mode) {
  */
 app.post('/api/projects/:id/pipeline/:mode', async (req, res) => {
   const { id: projectId, mode } = req.params;
+  const { taskId } = req.body || {};
 
   if (mode === 'stop' || mode === 'pause') {
     try {
@@ -1476,7 +1507,7 @@ app.post('/api/projects/:id/pipeline/:mode', async (req, res) => {
     return res.status(400).json({ error: '허용된 모드: run | run-b | stop' });
   }
   try {
-    const result = await startPipelineInternal(projectId, mode);
+    const result = await startPipelineInternal(projectId, mode, taskId);
     res.json({ ok: true, ...result });
   } catch (err) {
     const status = err.message.includes('이미') ? 409 : err.message.includes('없습') ? 404 : 500;
@@ -1969,14 +2000,17 @@ app.get('/api/tasks/archived', async (req, res) => {
 /** POST /api/tasks/notify-created — 시스템/에이전트가 생성한 태스크 소켓 브로드캐스트 */
 app.post('/api/tasks/notify-created', async (req, res) => {
   try {
-    const { taskId, title, content, column, agentId, priority } = req.body;
+    const { taskId, title, content, column, agentId, priority, projectId } = req.body;
+    const newTask = await dbManager.getTaskById(taskId);
     io.emit('task:created', { 
       taskId: String(taskId), 
-      title, 
-      content, 
+      title: newTask ? newTask.title : title, 
+      content: newTask ? newTask.content : content, 
       column: column || 'todo', 
-      agentId, 
-      priority 
+      agentId: newTask ? newTask.assigned_agent : agentId, 
+      priority: newTask ? newTask.priority : (priority || 'medium'),
+      projectId: newTask ? newTask.project_id : (projectId || 'proj-1'),
+      project_task_num: newTask ? newTask.project_task_num : null
     });
     res.sendStatus(200);
   } catch (err) {
@@ -2223,10 +2257,26 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
     const { author, content, worked, assignedAgent } = req.body;
     if (!author || !content) return res.status(400).json({ status: 'error', message: '작성자와 내용 필수' });
     const sid = req.params.id;
-    await dbManager.createComment(sid, author, content);
+    const task = await dbManager.getTaskById(sid);
+    const projectId = task ? task.project_id : null;
+    
+    // [Context Chaining] 컨텍스트 상속 로직 (PRD v1.3)
+    const contextChain = await contextChainService.calculateNewChain(content, projectId);
+    
+    await dbManager.createComment(sid, author, content, null, contextChain);
     // 실시간 브로드캐스트 — author를 agentId로 전달해 채팅 버블 방향 식별
     io.emit('task:comment_added', { taskId: sid, author, text: content, createdAt: new Date().toISOString() });
     broadcastLog('info', content, author, sid);
+
+    // [Phase 36-B] CEO가 코멘트 작성 시 파이프라인(워치독) 강제 종료
+    if (author === 'CEO' && projectId) {
+      const mode = await dbManager.getProjectPipelineMode(projectId);
+      if (mode !== 'none') {
+        await dbManager.setPipelineMode(projectId, 'none');
+        stopPipelineWatchdog(projectId);
+        broadcastLog('info', `⏸ CEO 개입 감지 — 파이프라인 자동 진행(Watchdog)이 일시 중지되었습니다.`, 'system', sid, 'DASHBOARD', projectId);
+      }
+    }
 
     // ── 🏓 핑퐁 규칙: worked=true 시 담당자를 requester(원래 할당자)로 복귀 ──
     if (worked === true) {
@@ -3806,6 +3856,25 @@ async function runWatchdog() {
 
 // ─── 서버 기동 (app.listen → httpServer.listen으로 변경: socket.io 필수) ────
 if (process.env.NO_SERVER !== 'true') {
+  // ─────────────────────────────────────────────────────────────────────────────
+  // [Phase 38] Context Chaining API (PRD v1.3)
+  // ─────────────────────────────────────────────────────────────────────────────
+  app.get('/api/v1/context/:refId/:projectId', async (req, res) => {
+    try {
+      const { refId, projectId } = req.params;
+      // 프론트엔드가 URL Fragment(#) 충돌을 피하기 위해 '#'을 제거하고 보냄
+      const normalizedRefId = refId.startsWith('#') ? refId : `#${refId}`;
+      const result = await contextChainService.resolveChainDetails(normalizedRefId, projectId);
+      if (result.error) {
+        return res.status(400).json(result);
+      }
+      res.json(result);
+    } catch (err) {
+      console.error('[API] /api/v1/context 오류:', err);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  });
+
   httpServer.listen(PORT, () => {
     console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);

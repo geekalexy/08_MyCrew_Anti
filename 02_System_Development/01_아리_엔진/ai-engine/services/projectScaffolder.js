@@ -52,8 +52,8 @@ class ProjectScaffolder {
         path.join(projectPath, '01_Memory', 'trend_research'),
         path.join(projectPath, '02_Team'),
         path.join(projectPath, '03_Skills'),
-        path.join(projectPath, 'inputs'),
-        path.join(projectPath, 'outputs'),
+        path.join(projectPath, 'INPUT'),
+        path.join(projectPath, 'OUTPUT'),
       ];
 
       for (const dir of directories) {

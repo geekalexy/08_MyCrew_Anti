@@ -116,6 +116,11 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN pipeline_is_review_stop INTEGER DEFAULT 0`);
       console.log('[DB] Phase 36 마이그레이션: Task.pipeline_is_review_stop 컬럼 추가 완료');
     }
+    // [Context Chaining] 컨텍스트 체이닝 (PRD v1.3)
+    if (!names.includes('context_chain')) {
+      db.run(`ALTER TABLE Task ADD COLUMN context_chain TEXT DEFAULT '[]'`);
+      console.log('[DB] Context Chaining 마이그레이션: Task.context_chain 컬럼 추가 완료');
+    }
   });
 
   db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
@@ -136,6 +141,11 @@ db.serialize(() => {
         ) WHERE comment_idx IS NULL
       `);
       console.log('[DB] Phase 36b 마이그레이션: TaskComment.comment_idx 컬럼 추가 및 소급 완료');
+    }
+    // [Context Chaining] 컨텍스트 체이닝 (PRD v1.3)
+    if (!names.includes('context_chain')) {
+      db.run(`ALTER TABLE TaskComment ADD COLUMN context_chain TEXT DEFAULT '[]'`);
+      console.log('[DB] Context Chaining 마이그레이션: TaskComment.context_chain 컬럼 추가 완료');
     }
   });
 
@@ -532,17 +542,18 @@ db.serialize(() => {
 
 class DatabaseManager {
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
-  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0, sprintNo = null) {
+  createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0, sprintNo = null, contextChain = []) {
     const riskLevel = classifyRiskLevel(content || '');
     const initialStatus = pipelineStep != null && pipelineStep > 1 ? 'PLANNED' : 'PENDING';
     return new Promise((resolve, reject) => {
+      const chainString = JSON.stringify(contextChain || []);
       db.run(
-        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num, pipeline_step, pipeline_is_review_stop, sprint_no)
+        `INSERT INTO Task (title, content, status, requester, model, risk_level, assigned_agent, category, project_id, project_task_num, pipeline_step, pipeline_is_review_stop, sprint_no, context_chain)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
            (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL),
-           ?, ?, ?
+           ?, ?, ?, ?
          )`,
-        [title || '', content || '', initialStatus, requester, model, riskLevel, assignedAgent, category, projectId, projectId, pipelineStep, pipelineIsReviewStop ? 1 : 0, sprintNo],
+        [title || '', content || '', initialStatus, requester, model, riskLevel, assignedAgent, category, projectId, projectId, pipelineStep, pipelineIsReviewStop ? 1 : 0, sprintNo, chainString],
         function(err) {
           if (err) reject(err);
           else resolve(this.lastID);
@@ -705,7 +716,7 @@ class DatabaseManager {
         // 3. Project Agents Insert (Phase 35: 동적 인스턴스 패러다임)
         // [ROLE-FIX] 백엔드 역할 사전 — 프론트엔드 roleRegistry와 동일한 한국어 표기명
         const ROLE_DISPLAY_NAMES = {
-          dev_fullstack: '풀스택 엔지니어', dev_ux: 'UI/UX 디자이너', dev_senior: 'CTO',
+          dev_fullstack: '풀스택 엔지니어', dev_ux: 'UI/UX 디자이너', dev_senior: '시니어 엔지니어',
           dev_qa: 'QA 엔지니어', dev_advisor: '테크 어드바이저',
           dev_pm: '기술 PM',
           mkt_lead: '마케팅 리더', mkt_planner: '기획자', mkt_designer: '디자이너',
@@ -723,7 +734,7 @@ class DatabaseManager {
         const ROLE_DEFAULT_MODELS = {
           dev_advisor:  MODEL.ANTI_OPUS_THINK,       // 테크 어드바이저 - Opus
           dev_qa:       MODEL.ANTI_GEMINI_FLASH,     // QA 엔지니어 - 3 Flash
-          dev_senior:   MODEL.ANTI_GEMINI_PRO_HIGH,  // CTO - 3.1 Pro High
+          dev_senior:   MODEL.ANTI_GEMINI_PRO_HIGH,  // 시니어 엔지니어 - 3.1 Pro High
           dev_fullstack: MODEL.ANTI_SONNET_THINK,    // 풀스택 엔지니어 - Sonnet
           dev_ux:       MODEL.ANTI_GEMINI_PRO_HIGH,
           mkt_lead:     MODEL.ANTI_GEMINI_PRO_HIGH,
@@ -1106,6 +1117,20 @@ class DatabaseManager {
     });
   }
 
+  // ─── Task Sprint 번호 업데이트 ───────────────────────────
+  updateTaskSprintNo(id, sprintNo) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task SET sprint_no = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [sprintNo, id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
   // ─── [Phase 14] Task 모델 정보 업데이트 (실제 사용된 LLM 기록) ──────────────
   updateTaskModel(id, modelName, category = null) {
     return new Promise((resolve, reject) => {
@@ -1246,13 +1271,14 @@ class DatabaseManager {
   }
 
   // ─── Task 댓글 추가 ───────────────────────────────────────────────────────
-  createComment(taskId, author, content, metaData = null) {
+  createComment(taskId, author, content, metaData = null, contextChain = []) {
     return new Promise((resolve, reject) => {
       const stmt = db.prepare(
-        `INSERT INTO TaskComment (task_id, author, content, meta_data) VALUES (?, ?, ?, ?)`
+        `INSERT INTO TaskComment (task_id, author, content, meta_data, context_chain) VALUES (?, ?, ?, ?, ?)`
       );
       const metaString = metaData ? JSON.stringify(metaData) : null;
-      stmt.run([taskId, author, content, metaString], function (err) {
+      const chainString = JSON.stringify(contextChain || []);
+      stmt.run([taskId, author, content, metaString, chainString], function (err) {
         if (err) reject(err);
         else resolve(this.lastID);
       });
@@ -1363,7 +1389,7 @@ class DatabaseManager {
   getComments(taskId) {
     return new Promise((resolve, reject) => {
       db.all(
-        `SELECT id, author, content, meta_data, created_at FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
+        `SELECT id, author, content, meta_data, created_at, context_chain FROM TaskComment WHERE task_id = ? ORDER BY created_at ASC`,
         [taskId],
         (err, rows) => {
           if (err) return reject(err);

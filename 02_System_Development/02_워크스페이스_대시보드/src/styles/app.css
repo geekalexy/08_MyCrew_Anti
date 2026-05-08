@@ -799,6 +799,13 @@ html, body, #root {
   border: none !important;
 }
 
+/* [Phase 37] Live Split Preview 모드 — 90vw 풀 확장 */
+.modal--preview {
+  max-width: 90vw !important;
+  width: 90vw !important;
+  max-height: 95dvh !important;
+}
+
 @media (max-width: 768px) {
   .modal-overlay--expanded {
     left: 0;

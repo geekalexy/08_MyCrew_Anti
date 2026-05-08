@@ -342,7 +342,7 @@ function buildAriTools(cols) {
             properties: {
               dirPath: {
                 type: 'string',
-                description: '조회할 폴더 경로 (예: "01_아리_엔진/outputs", "/Users/alex/.../outputs")',
+                description: '조회할 폴더 경로 (예: "01_아리_엔진/OUTPUT", "/Users/alex/.../OUTPUT")',
               },
             },
             required: ['dirPath'],
@@ -358,7 +358,7 @@ function buildAriTools(cols) {
             properties: {
               filePath: {
                 type: 'string',
-                description: '분석할 이미지 파일 경로 (예: "01_아리_엔진/outputs/result.png", "/Users/alex/.../image.png")',
+                description: '분석할 이미지 파일 경로 (예: "01_아리_엔진/OUTPUT/result.png", "/Users/alex/.../image.png")',
               },
               prompt: {
                 type: 'string',
@@ -648,14 +648,14 @@ async function executeTool(toolName, args, projectId = null) {
 
   // ── instagramAnalyze: DB 불필요 — Puppeteer 워커 실행 ────────────────
   if (toolName === 'instagramAnalyze') {
-    const { instagram_id } = args;
+    const instagram_id = args.instagram_id || args.username || args.id || args.account;
     if (!instagram_id) return { success: false, message: 'instagram_id 파라미터가 없습니다.' };
     return await instagramAnalyze(instagram_id);
   }
 
   // ── instagramBatchAnalyze: 여러 계정 순차 스크래핑 ────────────────
   if (toolName === 'instagramBatchAnalyze') {
-    const { instagram_ids } = args;
+    const instagram_ids = args.instagram_ids || args.usernames || args.accounts || args.ids;
     if (!instagram_ids || !Array.isArray(instagram_ids)) return { success: false, message: 'instagram_ids 배열이 필요합니다.' };
     return await instagramBatchAnalyze(instagram_ids);
   }
@@ -913,7 +913,7 @@ async function executeTool(toolName, args, projectId = null) {
       const allowedPaths = [
         path.resolve(workspaceRoot, '05_My_history'),
         path.resolve(workspaceRoot, '06_소시안자료'),
-        path.resolve(workspaceRoot, 'outputs')
+        path.resolve(workspaceRoot, 'OUTPUT')
       ];
 
       let isAllowed = false;
@@ -946,7 +946,7 @@ async function executeTool(toolName, args, projectId = null) {
       const allowedPaths = [
         path.resolve(workspaceRoot, '05_My_history'),
         path.resolve(workspaceRoot, '06_소시안자료'),
-        path.resolve(workspaceRoot, 'outputs')
+        path.resolve(workspaceRoot, 'OUTPUT')
       ];
 
       let isAllowed = false;
@@ -1069,6 +1069,16 @@ async function executeTool(toolName, args, projectId = null) {
       fs.mkdirSync(path.dirname(absPath), { recursive: true });
       fs.writeFileSync(absPath, content, 'utf-8');
       if (!fs.existsSync(absPath)) return { success: false, message: `파일 저장 실패: ${filePath}` };
+
+      // ── [Phase 37] OUTPUT 파일 저장 시 Live Preview 자동 새로고침 알림 ──
+      if (projectId && filePath.toUpperCase().includes('OUTPUT')) {
+        fetch(`http://localhost:${process.env.PORT || 4007}/api/preview/notify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, filePath }),
+        }).catch(() => {}); // 실패 시 조용히 무시 (미리보기 새로고침은 non-critical)
+      }
+
       return { success: true, message: `✅ 파일 저장 완료: ${filePath}` };
     }
 

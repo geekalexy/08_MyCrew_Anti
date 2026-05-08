@@ -12,7 +12,7 @@
 ✅ **백엔드(Luca) 지원 완료 사항**:
 - 아리 엔진(`server.js`)에 정적 라우팅 설정 완료 (또는 즉시 완료 예정).
 - 프론트엔드에서 아래 Iframe URL을 호출하면, 해당 프로젝트의 결과물이 렌더링됩니다.
-  👉 **Iframe URL 형식**: `http://localhost:4007/preview/{task.project_id}/outputs/index.html`
+  👉 **Iframe URL 형식**: `http://localhost:4007/preview/{task.project_id}/OUTPUT/index.html`
 
 ---
 

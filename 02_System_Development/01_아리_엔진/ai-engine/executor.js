@@ -7,13 +7,14 @@ import filePollingAdapter from './adapters/FilePollingAdapter.js';
 import modelSelector from './modelSelector.js';
 import dbManager from '../database.js';
 import systemShieldSkill from './skills/systemShieldSkill.js';
+import contextInjector from './tools/contextInjector.js';
+import contextChainService from './services/contextChainService.js';
 import scrubber from './tools/scrubbing.js';
 import { MODEL } from './modelRegistry.js';
 import { generateImage } from '../skill-library/05_design/nanoBananaGenerator.js';
 import { generateVideo } from '../skill-library/05_design/remotionRenderer.js';
 import ruleHarvester from './tools/ruleHarvester.js';
 import workflowOrchestrator from './tools/workflowOrchestrator.js';
-import contextInjector from './tools/contextInjector.js';
 
 
 
@@ -372,6 +373,26 @@ class Executor {
       }
     }
 
+    // [Context Chaining] 컨텍스트 상속 프리뷰/주입 (PRD v1.3)
+    const chainMatch = actualContent.match(/\[(#\d+(?:C\d+)?)\]/);
+    if (chainMatch && taskId) {
+      try {
+        const refId = chainMatch[1];
+        const currentTask = await dbManager.getTaskById(taskId);
+        const projectId = currentTask?.project_id;
+        if (projectId) {
+          const chainDetails = await contextChainService.resolveChainDetails(refId, projectId);
+          if (!chainDetails.error && chainDetails.chain.length > 0) {
+            const compressedChainContext = contextChainService.compressChainForAgent(chainDetails.chain);
+            actualContent += compressedChainContext;
+            console.log(`[ContextChain/run] ${chainDetails.chain.length}개 체인 압축 주입 완료`);
+          }
+        }
+      } catch (e) {
+        console.warn('[ContextChain/run] 체인 주입 중 오류:', e.message);
+      }
+    }
+
     // [Phase 18-1 Ollie GAP-2] URL 스크래핑 및 Context 주입
     const urlMatches = actualContent.match(/https?:\/\/[^\s]+/g);
     if (urlMatches && urlMatches.length > 0) {
@@ -393,6 +414,25 @@ class Executor {
         }
       } catch (err) {
         console.error('[URL Parser] 파싱 연동 중 오류 발생:', err.message);
+      }
+    }
+
+    // [Instagram 스크래핑 바이패스]
+    const igMatch = actualContent.match(/([a-zA-Z0-9._]{2,30}(?:\s*,\s*[a-zA-Z0-9._]{2,30})*)\s*(?:계정\s*|의\s*)?(?:인스타|인스타그램|instagram|ig)\s*(?:분석|수집|가져와|긁어와|조사)/i);
+    if (igMatch) {
+      this._log('info', `> [Instagram] 인스타그램 스크래퍼를 웜업합니다. 계정 데이터를 수집 중입니다... (약 5~15초 소요)`, agentId, taskId);
+      try {
+        const { instagramBatchAnalyze } = await import('./tools/instagramAdapter.js');
+        const ids = igMatch[1].split(',').map(s => s.trim()).filter(Boolean);
+        const scrapeResult = await instagramBatchAnalyze(ids);
+        if (scrapeResult.success) {
+           actualContent += `\n\n[인스타그램 분석 시스템 도구 결과]\n아래는 당신이 도구를 통해 수집한 실제 데이터입니다. 절대로 지어내지 말고, 이 데이터를 바탕으로 사용자에게 응답하세요:\n\n${scrapeResult.message}`;
+           console.log(`[Executor] Instagram 데이터 ${ids.length}개 계정 수집 성공 및 프롬프트 주입 완료`);
+        } else {
+           actualContent += `\n\n[인스타그램 분석 시스템 도구 결과]\n수집에 실패했습니다: ${scrapeResult.message}`;
+        }
+      } catch (err) {
+        console.error('[Instagram Bypass] 오류:', err.message);
       }
     }
 
@@ -514,7 +554,7 @@ class Executor {
       }
 
       const relayInstruction = `\n\n[자율 릴레이 바통 터치 규칙 — Phase 37 MANDATORY]\n작업 완료 후, 본문 최하단에 다음 목적에 맞는 태그를 작성하세요.\n\n🚨 [dev_advisor 필수 검수 규칙 — 모든 규칙보다 우선 적용]\n아래 상황에서는 반드시 review_request로 dev_advisor에게 넘겨야 합니다:\n  ✅ 코드(백엔드/프론트엔드/API)를 직접 작성하여 완료한 경우\n  ✅ 아키텍처 설계 문서를 완성한 경우\n  ✅ 데이터베이스 스키마를 설계/완성한 경우\n  ✅ 핵심 비즈니스 로직을 구현한 경우\n  ✅ QA 테스트를 완료하고 최종 결과를 보고하는 경우\n→ 위 경우 반드시: "assignee": "dev_advisor"\n\n━━ 방법 A: 핑퐁 (같은 카드, 다른 담당자에게) ━━\n사용 시점: 동일 산출물에 대한 반복 작업\n[핑퐁 키워드 패턴 — 아래 상황에서는 반드시 <review_request> 사용]\n  • 구현 완료 → 코드 리뷰 요청 → assignee: dev_advisor (필수)\n  • 코드 리뷰 완료 → 피드백 반영 → assignee: 원래 구현자\n  • 피드백 반영 완료 → 재검토 요청 → assignee: dev_advisor\n  • 재검토 통과 → QA 요청 → assignee: dev_qa\n  • QA 완료 → QA 결과 보고 → assignee: dev_advisor (최종 승인)\n  • 문서/설계 작성 완료 → 검토 요청 → assignee: dev_advisor\n<review_request>\n{\n  "title": "[리뷰] 작업 제목 (예: 텔레그램 미니앱 백엔드 API 코드 리뷰)",\n  "assignee": "dev_advisor",\n  "message": "검토 요청 내용 및 주요 구현 사항 요약"\n}\n</review_request>\n\n━━ 방법 B: 신규 카드 (완전히 새로운 업무 단위) ━━\n사용 시점: 새로운 기능·컴포넌트·시작\n주의: PRD/아키텍처 완료 후 바로 개발 카드를 만들지 말 것. 반드시 dev_advisor 검수 먼저.\n  • 아키텍처 승인 완료 → 백엔드 개발 시작\n  • 기능 A 완료 + 리뷰 통과 → 독립적인 기능 B 시작\n  • QA 중 신규 버그 발견 → 버그 수정 카드 생성\n<next_sprint>\n{\n  "title": "새 카드 제목",\n  "content": "새 담당자가 수행할 지시사항",\n  "assignee": "다음 담당자 역할 ID"\n}\n</next_sprint>\n\n━━ 방법 C: 릴레이 종료 (프로젝트/스프린트 완전 종료) ━━\n사용 시점: 모든 요구사항이 구현되고 QA까지 통과하여 더 이상 진행할 작업이 없는 경우.\n이 태그를 사용하면 자율 릴레이가 깔끔하게 종료되며 CEO의 최종 승인을 대기합니다.\n<pipeline_end>\n{\n  "message": "최종 완성되었습니다. 승인 부탁드립니다."\n}\n</pipeline_end>\n\n🔴 절대 금지 사항:\n- 본인(현재 담당자)에게 넘기는 것 금지\n- 코드 작성 완료 후 dev_advisor 검수 없이 next_sprint로 다음 개발 카드 생성 금지\n- dev_advisor 미거침 직행 개발 릴레이 금지\n`;
-      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다.\n이 태그를 사용하면 프로젝트의 input/output 폴더 구조에 맞게 시스템이 물리적으로 파일을 자동 저장합니다.\n🚨 주의: <file_operations> 태그는 시스템 백그라운드에서 처리되므로 사용자 화면에는 코드가 보이지 않습니다.\n따라서 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문(채팅창)에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output", // "input" 또는 "output"\n    "path": "code/backend/main.js", // 하위 폴더 및 파일명\n    "content": "여기에 저장할 파일 내용 전체를 작성하세요..."\n  }\n]\n</file_operations>\n`;
+      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다. (기본 출력 폴더명은 'OUTPUT' 입니다.)\n🚨 중요: HTML 기반의 프론트엔드 웹앱을 만들 때, 메인 파일은 반드시 하위 폴더 없이 최상위 경로인 \`index.html\` 로 저장하십시오! (예: path: "index.html") 그래야만 사용자의 Live Preview 버튼이 정상적으로 활성화됩니다.\n이 태그를 사용하면 프로젝트의 input/output 폴더 구조에 맞게 시스템이 물리적으로 파일을 자동 저장합니다.\n🚨 주의: <file_operations> 태그는 시스템 백그라운드에서 처리되므로 사용자 화면에는 코드가 보이지 않습니다.\n따라서 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문(채팅창)에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output", // "input" 또는 "output"\n    "path": "index.html", // 하위 폴더 및 파일명\n    "content": "여기에 저장할 파일 내용 전체를 작성하세요..."\n  }\n]\n</file_operations>\n`;
       const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
@@ -636,8 +676,10 @@ class Executor {
           for (const op of parsed.file_operations) {
             if (op.action === 'write' && op.path) {
               // [Fix] 하드코딩된 폴더명 대신 실제 디스크 구조에 매핑
-              const targetFolder = (op.type === 'input') ? 'inputs' : 'outputs';
-              const safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+              const targetFolder = (op.type === 'input') ? 'INPUT' : 'OUTPUT';
+              let safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+              // [Fix] 에이전트가 path에 'OUTPUT/...' 형식으로 폴더명을 중복 작성하는 경우 제거
+              safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|04_IO\/inputs|outputs|inputs)[\\/]/i, '');
               const absolutePath = path.join(projectRoot, targetFolder, safePath);
 
               // [Fix] Path Traversal 이중 방어 — projectRoot 외부 접근 차단
@@ -826,7 +868,7 @@ class Executor {
       }
 
       const relayInstruction = `\n\n[자율 릴레이 바통 터치 규칙 — Phase 37 MANDATORY]\n작업 완료 후, 본문 최하단에 다음 목적에 맞는 태그를 작성하세요.\n\n🚨 [dev_advisor 필수 검수 규칙 — 모든 규칙보다 우선 적용]\n아래 상황에서는 반드시 review_request로 dev_advisor에게 넘겨야 합니다:\n  ✅ 코드(백엔드/프론트엔드/API)를 직접 작성하여 완료한 경우\n  ✅ 아키텍처 설계 문서를 완성한 경우\n  ✅ 데이터베이스 스키마를 설계/완성한 경우\n  ✅ 핵심 비즈니스 로직을 구현한 경우\n  ✅ QA 테스트를 완료하고 최종 결과를 보고하는 경우\n→ 위 경우 반드시: "assignee": "dev_advisor"\n\n━━ 방법 A: 핑퐁 (같은 카드, 다른 담당자에게) ━━\n사용 시점: 동일 산출물에 대한 반복 작업\n[핑퐁 키워드 패턴 — 아래 상황에서는 반드시 <review_request> 사용]\n  • 구현 완료 → 코드 리뷰 요청 → assignee: dev_advisor (필수)\n  • 코드 리뷰 완료 → 피드백 반영 → assignee: 원래 구현자\n  • 피드백 반영 완료 → 재검토 요청 → assignee: dev_advisor\n  • 재검토 통과 → QA 요청 → assignee: dev_qa\n  • QA 완료 → QA 결과 보고 → assignee: dev_advisor (최종 승인)\n  • 문서/설계 작성 완료 → 검토 요청 → assignee: dev_advisor\n<review_request>\n{\n  "title": "[리뷰] 작업 제목 (예: 텔레그램 미니앱 백엔드 API 코드 리뷰)",\n  "assignee": "dev_advisor",\n  "message": "검토 요청 내용 및 주요 구현 사항 요약"\n}\n</review_request>\n\n━━ 방법 B: 신규 카드 (완전히 새로운 업무 단위) ━━\n사용 시점: 새로운 기능·컴포넌트·시작\n주의: PRD/아키텍처 완료 후 바로 개발 카드를 만들지 말 것. 반드시 dev_advisor 검수 먼저.\n  • 아키텍처 승인 완료 → 백엔드 개발 시작\n  • 기능 A 완료 + 리뷰 통과 → 독립적인 기능 B 시작\n  • QA 중 신규 버그 발견 → 버그 수정 카드 생성\n<next_sprint>\n{\n  "title": "새 카드 제목",\n  "content": "새 담당자가 수행할 지시사항",\n  "assignee": "다음 담당자 역할 ID"\n}\n</next_sprint>\n\n━━ 방법 C: 릴레이 종료 (프로젝트/스프린트 완전 종료) ━━\n사용 시점: 모든 요구사항이 구현되고 QA까지 통과하여 더 이상 진행할 작업이 없는 경우.\n이 태그를 사용하면 자율 릴레이가 깔끔하게 종료되며 CEO의 최종 승인을 대기합니다.\n<pipeline_end>\n{\n  "message": "최종 완성되었습니다. 승인 부탁드립니다."\n}\n</pipeline_end>\n\n🔴 절대 금지 사항:\n- 본인(현재 담당자)에게 넘기는 것 금지\n- 코드 작성 완료 후 dev_advisor 검수 없이 next_sprint로 다음 개발 카드 생성 금지\n- dev_advisor 미거침 직행 개발 릴레이 금지\n`;
-      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다.\n🚨 주의: 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output",\n    "path": "code/backend/main.js",\n    "content": "저장할 파일 내용 전체..."\n  }\n]\n</file_operations>\n`;
+      const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다. (기본 출력 폴더명은 'OUTPUT' 입니다.)\n🚨 중요: HTML 기반의 프론트엔드 웹앱을 만들 때, 메인 파일은 반드시 하위 폴더 없이 최상위 경로인 \`index.html\` 로 저장하십시오! (예: path: "index.html") 그래야만 사용자의 Live Preview 버튼이 정상적으로 활성화됩니다.\n🚨 주의: 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output",\n    "path": "index.html",\n    "content": "저장할 파일 내용 전체..."\n  }\n]\n</file_operations>\n`;
       const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '繞에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흔내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
     }
@@ -869,6 +911,45 @@ class Executor {
       }
     }
 
+    // [Context Chaining] 컨텍스트 상속 프리뷰/주입 (PRD v1.3)
+    const chainMatchDirect = resolvedContent.match(/\[(#\d+(?:C\d+)?)\]/);
+    if (chainMatchDirect && taskId) {
+      try {
+        const refId = chainMatchDirect[1];
+        const currentTask = await dbManager.getTaskById(taskId);
+        const projectId = currentTask?.project_id;
+        if (projectId) {
+          const chainDetails = await contextChainService.resolveChainDetails(refId, projectId);
+          if (!chainDetails.error && chainDetails.chain.length > 0) {
+            const compressedChainContext = contextChainService.compressChainForAgent(chainDetails.chain);
+            resolvedContent += compressedChainContext;
+            console.log(`[ContextChain/runDirect] ${chainDetails.chain.length}개 체인 압축 주입 완료`);
+          }
+        }
+      } catch (e) {
+        console.warn('[ContextChain/runDirect] 체인 주입 중 오류:', e.message);
+      }
+    }
+
+    // [Instagram 스크래핑 바이패스]
+    const igMatchDirect = resolvedContent.match(/([a-zA-Z0-9._]{2,30}(?:\s*,\s*[a-zA-Z0-9._]{2,30})*)\s*(?:계정\s*|의\s*)?(?:인스타|인스타그램|instagram|ig)\s*(?:분석|수집|가져와|긁어와|조사)/i);
+    if (igMatchDirect) {
+      this._log('info', `> [Instagram] 인스타그램 스크래퍼를 웜업합니다. 계정 데이터를 수집 중입니다... (약 5~15초 소요)`, agentId, taskId);
+      try {
+        const { instagramBatchAnalyze } = await import('./tools/instagramAdapter.js');
+        const ids = igMatchDirect[1].split(',').map(s => s.trim()).filter(Boolean);
+        const scrapeResult = await instagramBatchAnalyze(ids);
+        if (scrapeResult.success) {
+           resolvedContent += `\n\n[인스타그램 분석 시스템 도구 결과]\n아래는 당신이 도구를 통해 수집한 실제 데이터입니다. 절대로 지어내지 말고, 이 데이터를 바탕으로 사용자에게 응답하세요:\n\n${scrapeResult.message}`;
+           console.log(`[Executor/runDirect] Instagram 데이터 ${ids.length}개 계정 수집 성공 및 프롬프트 주입 완료`);
+        } else {
+           resolvedContent += `\n\n[인스타그램 분석 시스템 도구 결과]\n수집에 실패했습니다: ${scrapeResult.message}`;
+        }
+      } catch (err) {
+        console.error('[Instagram Bypass] 오류:', err.message);
+      }
+    }
+
     // 3. 모델 직접 호출 (filePollingAdapter 미경유)
     // 라우팅: BRIDGE_AGENTS → antigravityAdapter(파일 브릿지), 나머지 → Gemini API 직접
     let result;
@@ -904,8 +985,10 @@ class Executor {
         const ioLogs = [];
         for (const op of parsed.file_operations) {
           if (op.action === 'write' && op.path) {
-            const targetFolder = (op.type === 'input') ? 'inputs' : 'outputs';
-            const safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+            const targetFolder = (op.type === 'input') ? 'INPUT' : 'OUTPUT';
+            let safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
+            // [Fix] 에이전트가 path에 'OUTPUT/...' 형식으로 폴더명을 중복 작성하는 경우 제거
+            safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|04_IO\/inputs|outputs|inputs)[\\/]/i, '');
             const absolutePath = path.join(projectRoot, targetFolder, safePath);
             if (!absolutePath.startsWith(projectRoot)) {
               ioLogs.push(`- ⛔ \`${op.path}\` 경로 탈출 시도 차단됨 (보안 정책)`);

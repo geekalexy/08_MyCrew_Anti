@@ -170,30 +170,9 @@ async function saveCaseFile(caseId, description, draftContent) {
   return { filePath, filename, caseId };
 }
 
-// ─── 칸반 카드 생성 ────────────────────────────────────────────────────────────
-
-/**
- * Prime #4: category TEXT 컬럼, ENUM 없음 → 'DOGFOODING' 직접 삽입
- * dbManager는 server.js에서 주입받음 (순환 참조 방지)
- */
-async function createKanbanCard(dbManager, caseId, description, filePath, projectId) {
-  const shortDesc = (description || '이슈').slice(0, 40);
-  const taskTitle = `[Dogfooding] CASE_${caseId}: ${shortDesc}`;
-  const taskContent = `🐕 Bugdog이 자동으로 기록한 Dogfooding 케이스입니다.\n\n**케이스 파일:** \`${path.basename(filePath)}\`\n\n초안 검토 및 마케팅 앵글 보완 후, 노바에게 소재화 요청 필요.`;
-
-  const taskId = await dbManager.createTask(
-    taskTitle,
-    taskContent,
-    'bugdog',          // requester
-    MODEL.FLASH,       // model
-    'dev_qa',          // assignedAgent — QA 담당(소넷)이 초안 검토
-    'DOGFOODING',      // category (Prime: TEXT 컬럼, ENUM 없음)
-    projectId          // projectId
-  );
-
-  console.log(`[BugdogPipeline] ✅ 칸반 카드 생성: Task #${taskId} — ${taskTitle}`);
-  return taskId;
-}
+/* ─── 칸반 카드 생성 (사용자 공간 분리로 인해 제거) ───
+// async function createKanbanCard(...) { ... }
+*/
 
 // ─── 메인 파이프라인 ──────────────────────────────────────────────────────────
 
@@ -241,12 +220,12 @@ export async function executeBugdogPipeline(triggerData, dbManager, broadcastLog
     const caseId = await getNextCaseId();
     const { filePath, filename } = await saveCaseFile(caseId, description, draftContent);
 
-    // Step 4: 칸반 카드 자동 생성
-    broadcastLog?.('info', '🐕 [Bugdog] Step 4/4 — 칸반 카드 생성 중...', 'bugdog', taskId);
-    const newTaskId = await createKanbanCard(dbManager, caseId, description, filePath, resolvedProjectId);
+    // Step 4: 칸반 카드 자동 생성 (사용자 공간 보호를 위해 비활성화)
+    // broadcastLog?.('info', '🐕 [Bugdog] Step 4/4 — 칸반 카드 생성 중...', 'bugdog', taskId);
+    // const newTaskId = await createKanbanCard(dbManager, caseId, description, filePath, resolvedProjectId);
 
     // 완료 브로드캐스트 (원래 명령어를 친 taskId로 로그를 쏴줘야 UI 화면에서 멈춤 현상 없이 완료 메시지가 보임)
-    const summary = `✅ CASE_${caseId} 기록 완료! 파일: ${filename} | 칸반 #${newTaskId} 생성됨`;
+    const summary = `✅ CASE_${caseId} 기록 완료! 파일: ${filename}`;
     broadcastLog?.('info', `🐕 [Bugdog] ${summary}`, 'bugdog', taskId);
     ioEmit?.('bugdog:case_created', {
       caseId,
@@ -257,7 +236,7 @@ export async function executeBugdogPipeline(triggerData, dbManager, broadcastLog
     });
 
     console.log(`[BugdogPipeline] 🎉 파이프라인 완료 — CASE_${caseId}`);
-    return { success: true, caseId, filename, taskId: newTaskId };
+    return { success: true, caseId, filename };
 
   } catch (err) {
     const errMsg = `❌ [Bugdog] 파이프라인 실패: ${err.message}`;

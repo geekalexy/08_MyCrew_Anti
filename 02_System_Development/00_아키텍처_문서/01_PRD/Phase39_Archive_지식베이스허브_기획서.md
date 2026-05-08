@@ -1,4 +1,4 @@
-# [Phase 38] MyCrew 지식 그래프 & 아카이브 허브 (Graphify 기반)
+# [Phase 39] MyCrew 지식 그래프 & 아카이브 허브 (Graphify 기반)
 
 ## 1. 개요 (Overview)
 기존 칸반 보드의 '완료' 카드들을 모아두던 수동적인 아카이브를 전면 개편하여, 프로젝트 전체를 **"거대한 지식 신경망(Knowledge Graph)"**으로 변환합니다.

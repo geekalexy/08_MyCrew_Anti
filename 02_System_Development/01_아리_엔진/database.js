@@ -537,10 +537,40 @@ db.serialize(() => {
   } catch (e) {
     console.warn('[DB] Phase 30: agents.json 시드 실패 —', e.message);
   }
+
+  // ─── [Phase 38-1] Chrome Extension 세션 저장소 (Sprint 5) ────────
+  db.run(`CREATE TABLE IF NOT EXISTS extension_sessions (
+    session_id TEXT PRIMARY KEY,
+    history    TEXT NOT NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 });
 
 
 class DatabaseManager {
+  // ─── [Phase 38-1] Chrome Extension 세션 DB 연동 ────────
+  saveExtensionSession(sessionId, historyArr) {
+    return new Promise((resolve, reject) => {
+      const historyStr = JSON.stringify(historyArr || []);
+      db.run(
+        `INSERT INTO extension_sessions (session_id, history, updated_at) 
+         VALUES (?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT(session_id) DO UPDATE SET history=excluded.history, updated_at=CURRENT_TIMESTAMP`,
+        [sessionId, historyStr],
+        (err) => { if (err) reject(err); else resolve(); }
+      );
+    });
+  }
+
+  getExtensionSession(sessionId) {
+    return new Promise((resolve, reject) => {
+      db.get(`SELECT history FROM extension_sessions WHERE session_id = ?`, [sessionId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row ? JSON.parse(row.history) : []);
+      });
+    });
+  }
+
   // ─── Task 생성 (risk_level 자동 태깅) ────────────────────────────────────
   createTask(title, content, requester, model = MODEL.ANTI_GEMINI_PRO_HIGH, assignedAgent = null, category = 'QUICK_CHAT', projectId = 'proj-1', pipelineStep = null, pipelineIsReviewStop = 0, sprintNo = null, contextChain = []) {
     const riskLevel = classifyRiskLevel(content || '');

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "MyCrew Antigravity Assistant",
+  "version": "1.0.0",
+  "description": "MyCrew Agent interface for Chrome Side Panel",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "ws://localhost:3000/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Open MyCrew Assistant"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  }
+}

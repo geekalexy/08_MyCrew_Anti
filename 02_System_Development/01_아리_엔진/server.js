@@ -18,6 +18,10 @@ import keyProvider from './ai-engine/tools/keyProvider.js';
 import teamActivator from './ai-engine/teamActivator.js';
 import tutorialManager from './ai-engine/tutorialManager.js';
 import executor, { updateAgentSignatureModel, getAgentSignatureModel } from './ai-engine/executor.js';
+import antigravityAdapter from './ai-engine/adapters/antigravityAdapter.js';
+import geminiAdapter from './ai-engine/adapters/geminiAdapter.js';
+import contextInjector from './ai-engine/tools/contextInjector.js';
+import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
 
 import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
@@ -28,7 +32,6 @@ import statusReporter from './ai-engine/statusReporter.js';
 import { processOnboardingUrl } from './ai-engine/tools/onboardingPipeline.js';
 import { initAdapterWatcher } from './ai-engine/AdapterWatcher.js';
 import { MODEL } from './ai-engine/modelRegistry.js';
-import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
 import b4System from './ai-engine/tools/b4System.js';
 import imageLabRouter from './routes/imageLabRouter.js';
 import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.js';
@@ -42,8 +45,19 @@ const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN
   ? process.env.FRONTEND_ORIGIN.split(',')
   : ['http://localhost:5173', 'http://localhost:5174']; // 포트 5173/5174 동시 허용
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin || FRONTEND_ORIGIN.includes(origin) || origin.startsWith('chrome-extension://')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+};
+
 // ─── CORS: Express HTTP (Socket.io 핸드셰이크 포함) ────────────────────────
-app.use(cors({ origin: FRONTEND_ORIGIN, credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // ─── 정적 파일 제공 (NanoBanana 등 미디어 아웃풋 서빙용) ────────
@@ -88,7 +102,13 @@ app.use('/preview/:projectId', async (req, res, next) => {
 // ─── Socket.io 서버 (Opus 지적: Express CORS와 별도로 옵션 지정 필수) ────────
 export const io = new Server(httpServer, {
   cors: {
-    origin: FRONTEND_ORIGIN,
+    origin: function (origin, callback) {
+      if (!origin || FRONTEND_ORIGIN.includes(origin) || origin.startsWith('chrome-extension://')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },
@@ -619,6 +639,95 @@ io.on('connection', (socket) => {
 
   // 현재 에이전트 상태 즉시 동기화
   socket.emit('agent:state_sync', Object.fromEntries(agentStates));
+
+  // ── [Phase 38-1] Chrome Extension 전용 통신망 (Sprint 4: LLM 스위칭 및 연동) ────────
+  
+  // [Sprint 5] 익스텐션 연결 시 기존 대화 기록 로드
+  socket.on('extension:load_history', async () => {
+    try {
+      const history = await dbManager.getExtensionSession('default_session');
+      socket.emit('extension:history_loaded', history);
+    } catch (e) {
+      console.error('[Extension] Load history failed', e);
+    }
+  });
+
+  socket.on('extension:chat', async ({ text, model, history = [], browserContext = {} }) => {
+    console.log(`[Extension] Received chat: ${text} | Model: ${model} | URL: ${browserContext.url || 'N/A'}`);
+    
+    // [Sprint 4.5] Context Injection 추가 (MyCrew의 세계관/기억 연동)
+    const livingRules = ruleHarvester.getAppliedRules();
+    const basePrompt = `
+# Role & Identity
+당신은 MyCrew 생태계를 총괄하는 최고 등급 AI 비서이자 기술 파트너입니다. 
+당신은 시스템 전반을 부드럽게 오케스트레이션하는 넓은 시야와 친절함, 그리고 날카롭고 전문적인 엔지니어링 통찰력을 동시에 갖추고 있습니다.
+
+# Context Awareness
+- 당신은 과거 대화 히스토리를 완벽히 기억하고 문맥이 단절되지 않도록 대화를 이어갑니다.
+- 사용자는 현재 다음 웹페이지를 보고 있습니다:
+  - URL: ${browserContext.url || '알 수 없음'}
+  - Title: ${browserContext.title || '알 수 없음'}
+- 현재 화면의 상호작용 가능한 DOM 요소들 (당신의 '눈'입니다):
+${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\`` : '현재 추출 가능한 DOM 요소가 없습니다. (보안 페이지이거나 빈 화면일 수 있습니다)'}
+- 브라우저 상황과 MyCrew의 프로젝트 상태(ARI_BRAIN)를 유기적으로 결합하여 입체적으로 판단하세요.
+
+# Core Instructions
+1. [스마트 비서 모드] 사용자의 일상적인 지시나 브라우징 보조 요청에는 명확하고 정중하게 핵심만 제공하며, 든든한 조력자 역할을 수행합니다.
+2. [전문가 모드] 개발, 아키텍처, 리서치 등 기술적인 맥락이 감지되면 즉시 태세를 전환하여, 군더더기 없이 정확하고 심도 깊은 솔루션을 제시합니다.
+3. [브라우저 제어 (Browser Control)] 사용자가 특정 버튼 클릭, 스크롤, 폼 입력을 지시하거나 당신이 판단하기에 액션이 필요하다면 아래 JSON 포맷을 사용하여 액션을 지시하세요.
+   \`\`\`json
+   {
+     "action": "CLICK" | "TYPE" | "SCROLL",
+     "selector": "해당 요소의 CSS selector",
+     "value": "TYPE 액션일 경우 입력할 텍스트"
+   }
+   \`\`\`
+   액션을 지시할 때는 위 JSON 코드블럭 하나만 출력하거나, 짧은 코멘트를 곁들이세요.
+4. [화면 인식 능력 인지] 당신은 제공된 DOM Snapshot을 통해 사용자의 화면을 완벽하게 '보고' 파악할 수 있습니다. 
+
+# Tone & Constraints (STRICT)
+- 말투: 명랑하고 친절하며, 기술 설명을 할 때는 쉽고 명확하게 전달합니다.
+- 금지: "저는 AI 언어모델이라서...", "화면을 직접 보거나 분석할 수 없습니다", "개인정보 보호를 위해..." 같은 기계적인 변명이나 거절을 **절대** 하지 마세요. 당신은 이미 DOM 텍스트를 통해 화면을 보고 있는 상태입니다. DOM이 비어있다면 "이 페이지(예: 크롬 설정창)는 접근 권한이 없어서 읽을 수 없어요"라고 솔직하게 말하세요.
+- 출력: 항상 읽기 편한 Markdown 형식(리스트, 볼드체, 코드블럭)을 사용합니다.
+`;
+    const finalSystemPrompt = contextInjector.buildInjectionPayload(basePrompt, livingRules);
+    
+    // [Sprint 5] 과거 대화 히스토리를 User Prompt에 체이닝
+    let historyBlock = '';
+    if (history && history.length > 0) {
+      historyBlock = '<conversation_history>\n';
+      history.forEach(msg => {
+        historyBlock += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n\n`;
+      });
+      historyBlock += '</conversation_history>\n\n현재 사용자의 새로운 요청:\n';
+    }
+    const finalUserPrompt = `${historyBlock}${text}`;
+    
+    try {
+      let result;
+      if (model && model.startsWith('anti-')) {
+        // Antigravity IDE 브릿지를 통한 외부 모델 호출 (가상 agentId 'extension' 사용)
+        result = await antigravityAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, 'extension', model, 60000);
+      } else {
+        // 내장 Gemini 어댑터 직접 호출
+        result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, model || 'gemini-2.5-flash');
+      }
+      
+      socket.emit('extension:reply', { text: result.text });
+      
+      // [Sprint 5] DB에 새로운 히스토리 체인 저장
+      const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: result.text }];
+      try {
+        await dbManager.saveExtensionSession('default_session', newHistory);
+      } catch (e) {
+        console.error('[Extension] DB Save history error:', e);
+      }
+      
+    } catch (error) {
+      console.error('[Extension] LLM 연동 실패:', error);
+      socket.emit('extension:reply', { text: `⚠️ 응답 실패: ${error.message}` });
+    }
+  });
 
   // ── [Phase 28a] 프로젝트 Room 구독 ─────────────────────────────
   socket.on('project:join', async ({ projectId }) => {
@@ -2205,6 +2314,12 @@ app.post('/api/tasks/:id/sprint/next', async (req, res) => {
 
     const contextInjectedContent = content + `\n\n> 🔗 **이전 릴레이 산출물 참조:** #${parentTask.project_task_num || parentId}`;
 
+    let parentChain = [];
+    try {
+      parentChain = typeof parentTask.context_chain === 'string' ? JSON.parse(parentTask.context_chain) : (parentTask.context_chain || []);
+    } catch(e) {}
+    const newChain = [...parentChain, parentTask.project_task_num || parentTask.id];
+
     // 새 카드 생성. sprintNo, projectId는 서버가 부모로부터 무조건 상속
     const newTaskId = await dbManager.createTask(
       title,
@@ -2216,7 +2331,8 @@ app.post('/api/tasks/:id/sprint/next', async (req, res) => {
       parentTask.project_id,
       null, // pipelineStep (이제 사용 안 함)
       0,
-      parentTask.sprint_no // sprintNo 상속
+      parentTask.sprint_no, // sprintNo 상속
+      newChain // 11. 컨텍스트 체인 상속
     );
 
     // 방금 생성된 태스크 전체 조회 (project_task_num 등)

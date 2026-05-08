@@ -1595,7 +1595,7 @@ async function runBridgeMonitor() {
   setTimeout(runBridgeMonitor, BRIDGE_POLL_MS);
 }
 
-// 브릿지 모니터 시작
-runBridgeMonitor();
-console.log(`[Bridge] 🌉 Anti-Bridge Monitor 시작 — ${BRIDGE_REQ_DIR} (${BRIDGE_POLL_MS / 1000}초 폴링)`);
+// ─── [Phase 38] MCP V2 마이그레이션 — 레거시 파일 폴링 비활성화 ───
+// runBridgeMonitor(); // Deprecated
+console.log(`[Bridge] 🚫 Anti-Bridge Monitor 비활성화 (Phase 38 V2 MCP로 완전 전환됨)`);
 

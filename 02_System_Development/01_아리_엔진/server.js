@@ -642,6 +642,55 @@ io.on('connection', (socket) => {
 
   // ── [Phase 38-1] Chrome Extension 전용 통신망 (Sprint 4: LLM 스위칭 및 연동) ────────
   
+  // ── [Sprint 7 — Step 2] System Action 컨트롤러 ─────────────────────
+  // LLM이 반환한 system_action을 실제 DB 조작으로 변환하는 실행기
+  async function executeSystemAction(sa, socket) {
+    const projectId = 'proj-1'; // TODO: 프로젝트 컨텍스트에서 동적 추출
+    
+    switch (sa.action) {
+      case 'CHANGE_STATUS': {
+        const validStatuses = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'PLANNED', 'REVIEW'];
+        const target = (sa.target || '').toUpperCase();
+        if (!validStatuses.includes(target)) {
+          return { success: false, message: `⚠️ 유효하지 않은 상태값: ${sa.target}` };
+        }
+        await dbManager.updateTaskStatus(sa.taskId, target);
+        io.to(`project_${projectId}`).emit('kanban:refresh');
+        return { success: true, message: `✅ #${sa.taskId} 카드 상태를 **${target}**로 변경했습니다.` };
+      }
+      
+      case 'CREATE_TASK': {
+        const title = sa.title || '새 작업';
+        const newId = await dbManager.createTask(title, title, 'extension_agent', undefined, null, 'QUICK_CHAT', projectId);
+        io.to(`project_${projectId}`).emit('kanban:refresh');
+        return { success: true, message: `✅ 새 카드 **#${newId}** (${title})를 생성했습니다.` };
+      }
+      
+      case 'ASSIGN_AGENT': {
+        await dbManager.updateTaskAssignedAgent(sa.taskId, sa.assignee);
+        io.to(`project_${projectId}`).emit('kanban:refresh');
+        return { success: true, message: `✅ #${sa.taskId} 카드의 담당자를 **${sa.assignee}**로 변경했습니다.` };
+      }
+      
+      default:
+        return { success: false, message: `⚠️ 알 수 없는 액션: ${sa.action}` };
+    }
+  }
+  
+  // ── [Sprint 7] Approval Gate용 액션 설명 생성기 ──────────────────────
+  function getActionDescription(sa) {
+    switch (sa.action) {
+      case 'CHANGE_STATUS':
+        return `#${sa.taskId} 카드의 상태를 '${sa.target}'(으)로 변경`;
+      case 'CREATE_TASK':
+        return `새 카드 '${sa.title || '새 작업'}' 생성`;
+      case 'ASSIGN_AGENT':
+        return `#${sa.taskId} 카드의 담당자를 '${sa.assignee}'(으)로 변경`;
+      default:
+        return `알 수 없는 액션: ${sa.action}`;
+    }
+  }
+
   // [Sprint 5] 익스텐션 연결 시 기존 대화 기록 로드
   socket.on('extension:load_history', async () => {
     try {
@@ -654,6 +703,39 @@ io.on('connection', (socket) => {
 
   socket.on('extension:chat', async ({ text, model, history = [], browserContext = {} }) => {
     console.log(`[Extension] Received chat: ${text} | Model: ${model} | URL: ${browserContext.url || 'N/A'}`);
+    
+    // ── [Sprint 7 — Step 4] Slash Command 전처리기 ─────────────────────
+    // LLM 호출 없이 즉시 시스템 기능으로 연결하여 비용 절감 및 즉시 응답
+    if (text.startsWith('/task ')) {
+      const taskContent = text.slice(6).trim();
+      if (!taskContent) {
+        socket.emit('extension:reply', { text: '⚠️ 사용법: `/task [작업 내용]` — 내용을 입력해주세요.' });
+        return;
+      }
+      try {
+        const taskId = await dbManager.createTask(
+          taskContent,          // title
+          taskContent,          // content
+          'extension_user',     // requester
+          undefined,            // model (default)
+          null,                 // assignedAgent
+          'QUICK_CHAT',         // category
+          'proj-1'              // projectId (기본 프로젝트)
+        );
+        // 대시보드 칸반 보드 실시간 동기화
+        io.to('project_proj-1').emit('kanban:refresh');
+        socket.emit('extension:reply', { 
+          text: `✅ **새 카드 생성 완료!**\n- 카드 번호: #${taskId}\n- 내용: ${taskContent}\n- 상태: 대기(PENDING)\n\n대시보드 칸반 보드에서 확인하실 수 있습니다.` 
+        });
+        // 히스토리에도 기록
+        const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: `[/task] 카드 #${taskId} 생성 완료` }];
+        try { await dbManager.saveExtensionSession('default_session', newHistory); } catch (e) { /* silent */ }
+      } catch (error) {
+        console.error('[Extension] /task 실패:', error);
+        socket.emit('extension:reply', { text: `⚠️ 카드 생성 실패: ${error.message}` });
+      }
+      return; // LLM 호출 없이 즉시 리턴
+    }
     
     // [Sprint 4.5] Context Injection 추가 (MyCrew의 세계관/기억 연동)
     const livingRules = ruleHarvester.getAppliedRules();
@@ -684,6 +766,18 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
    \`\`\`
    액션을 지시할 때는 위 JSON 코드블럭 하나만 출력하거나, 짧은 코멘트를 곁들이세요.
 4. [화면 인식 능력 인지] 당신은 제공된 DOM Snapshot을 통해 사용자의 화면을 완벽하게 '보고' 파악할 수 있습니다. 
+5. [마이크루 시스템 제어 (System Action)] 사용자가 칸반 보드의 카드 상태 변경, 새 카드 생성, 담당자 할당 등을 요청하면 아래 JSON 포맷을 메시지 끝에 추가하세요.
+   \`\`\`json
+   {
+     "system_action": {
+       "action": "CHANGE_STATUS" | "CREATE_TASK" | "ASSIGN_AGENT",
+       "taskId": 13,
+       "target": "COMPLETED",
+       "title": "새 카드 제목 (CREATE_TASK용)",
+       "assignee": "pico (ASSIGN_AGENT용)"
+     }
+   }
+   \`\`\`
 
 # Tone & Constraints (STRICT)
 - 말투: 명랑하고 친절하며, 기술 설명을 할 때는 쉽고 명확하게 전달합니다.
@@ -713,10 +807,52 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
         result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, model || 'gemini-2.5-flash');
       }
       
-      socket.emit('extension:reply', { text: result.text });
+      // ── [Sprint 7 — Step 1] System Action Backend Interceptor ──────────
+      // LLM 응답에서 system_action JSON 블록을 탐지하여 백엔드에서 선제 처리
+      let responseText = result.text;
+      const systemActionMatch = responseText.match(/\{\s*"system_action"\s*:\s*\{[\s\S]*?\}\s*\}/);
+      
+      if (systemActionMatch) {
+        try {
+          const parsed = JSON.parse(systemActionMatch[0]);
+          const sa = parsed.system_action;
+          
+          // 응답 텍스트에서 JSON 블록 제거 (사용자에게는 깔끔한 텍스트만 전달)
+          responseText = responseText.replace(/```json\s*\{\s*"system_action"[\s\S]*?```/g, '').trim();
+          responseText = responseText.replace(/\{\s*"system_action"\s*:\s*\{[\s\S]*?\}\s*\}/g, '').trim();
+          
+          // ── [Sprint 7 — Step 3] Approval Gate (보안 승인 계층) ────────
+          const RISK_MAP = { 'CHANGE_STATUS': 'MEDIUM', 'CREATE_TASK': 'LOW', 'ASSIGN_AGENT': 'MEDIUM' };
+          const riskLevel = RISK_MAP[sa.action] || 'HIGH';
+          
+          if (riskLevel === 'LOW') {
+            // 🟢 Low Risk: 즉시 실행 (CREATE_TASK는 비파괴적)
+            const execResult = await executeSystemAction(sa, socket);
+            responseText += `\n\n${execResult.message}`;
+          } else {
+            // 🟡 Medium Risk: 사용자 확인 필요
+            socket.emit('extension:confirm_action', {
+              action: sa,
+              description: getActionDescription(sa),
+              responseText: responseText  // 원본 텍스트도 함께 전달
+            });
+            // 확인 대기 중임을 알림
+            responseText += `\n\n⏳ **시스템 액션 확인 대기 중** — 익스텐션에서 [확인] 또는 [취소]를 선택해주세요.`;
+          }
+          
+        } catch (parseError) {
+          // ── [Sprint 7 — Graceful Fallback] JSON 파싱 실패 시 대화 흐름 유지
+          console.warn('[Extension] system_action JSON 파싱 실패 (Graceful Fallback):', parseError.message);
+          responseText = responseText.replace(/```json\s*\{\s*"system_action"[\s\S]*?```/g, '').trim();
+          responseText = responseText.replace(/\{\s*"system_action"\s*:\s*\{[\s\S]*?\}\s*\}/g, '').trim();
+          responseText += '\n\n⚠️ 명령을 처리하지 못했습니다. 다시 한 번 말씀해 주세요.';
+        }
+      }
+      
+      socket.emit('extension:reply', { text: responseText });
       
       // [Sprint 5] DB에 새로운 히스토리 체인 저장
-      const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: result.text }];
+      const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: responseText }];
       try {
         await dbManager.saveExtensionSession('default_session', newHistory);
       } catch (e) {
@@ -726,6 +862,20 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
     } catch (error) {
       console.error('[Extension] LLM 연동 실패:', error);
       socket.emit('extension:reply', { text: `⚠️ 응답 실패: ${error.message}` });
+    }
+  });
+
+  // ── [Sprint 7 — Step 3] Approval Gate: 사용자 확인 응답 수신 ────────
+  socket.on('extension:confirm_action_response', async ({ action, approved }) => {
+    if (approved) {
+      try {
+        const execResult = await executeSystemAction(action, socket);
+        socket.emit('extension:reply', { text: `✅ ${execResult.message}` });
+      } catch (error) {
+        socket.emit('extension:reply', { text: `⚠️ 액션 실행 실패: ${error.message}` });
+      }
+    } else {
+      socket.emit('extension:reply', { text: '🚫 액션이 취소되었습니다.' });
     }
   });
 

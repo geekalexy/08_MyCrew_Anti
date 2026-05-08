@@ -76,5 +76,6 @@
 *   ✅ **Sprint 6**: **Action Execution (브라우저 제어 파이프라인)**.
     *   화면의 상호작용 요소(DOM)를 긁어서 LLM에 제공 (시야 확보).
     *   LLM의 판단에 따라 화면 버튼을 클릭(`CLICK`)하거나 텍스트를 입력(`TYPE`)하는 기능 구현 완료.
-*   ⏳ **Sprint 7**: **Command System 확장 (Next)**.
-    *   `/task [내용]` 퀵 커맨드를 이용한 마이크루 Inbox 태스크 즉시 생성 기능 등 부가 기능 연동.
+*   ✅ **Sprint 7**: **Command System 확장 및 승인 게이트 (Approval Gate)**.
+    *   `/task [내용]` 퀵 커맨드를 이용한 마이크루 Inbox 태스크 즉시 생성 기능 연동 완료.
+    *   보안성 강화를 위한 시스템 액션(Medium Risk) 컨펌 모달(Approval Gate) 파이프라인 연동 완료.

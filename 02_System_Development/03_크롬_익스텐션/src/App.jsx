@@ -9,6 +9,7 @@ function App() {
   const [input, setInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [selectedModel, setSelectedModel] = useState('anti-gemini-3.1-pro-high');
+  const [pendingAction, setPendingAction] = useState(null);
   const socketRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -34,6 +35,14 @@ function App() {
     socketRef.current.on('disconnect', () => {
       setIsConnected(false);
       setMessages(prev => [...prev, { role: 'system', content: 'Connection lost. Reconnecting...' }]);
+    });
+
+    // ── [Sprint 7 — Step 3] Approval Gate 이벤트 수신 ────────
+    socketRef.current.on('extension:confirm_action', (data) => {
+      setPendingAction(data);
+      if (data.responseText) {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.responseText }]);
+      }
     });
 
     socketRef.current.on('extension:reply', async (data) => {
@@ -183,6 +192,23 @@ function App() {
     setInput('');
   };
 
+  // ── [Sprint 7 — Step 3] Approval Gate 핸들러 ────────
+  const handleConfirmAction = (approved) => {
+    if (!pendingAction || !isConnected) return;
+    socketRef.current.emit('extension:confirm_action_response', {
+      action: pendingAction.action,
+      approved: approved
+    });
+    
+    // UI에 사용자의 선택 표시
+    setMessages(prev => [...prev, { 
+      role: 'user', 
+      content: approved ? '[시스템 액션 승인됨]' : '[시스템 액션 거부됨]' 
+    }]);
+    
+    setPendingAction(null);
+  };
+
   return (
     <div className="flex flex-col h-screen w-full bg-[#0a0a0a] text-gray-300 font-sans p-4">
       
@@ -259,6 +285,38 @@ function App() {
           <Send size={18} />
         </button>
       </div>
+
+      {/* ── [Sprint 7 — Step 3] Approval Modal ──────── */}
+      {pendingAction && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-5 shadow-2xl w-full max-w-sm animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-3 text-amber-400">
+              <AlertCircle size={24} />
+              <h3 className="font-semibold text-lg">권한 승인 필요</h3>
+            </div>
+            <p className="text-gray-300 text-sm mb-5 leading-relaxed">
+              에이전트가 다음 마이크루 시스템 조작을 요청했습니다:<br/>
+              <span className="inline-block mt-2 font-medium text-white bg-[#2a2a2a] px-3 py-1.5 rounded-md border border-[#444] w-full text-center">
+                {pendingAction.description}
+              </span>
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => handleConfirmAction(false)}
+                className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-[#333] text-gray-400 hover:bg-[#2a2a2a] hover:text-white transition-colors"
+              >
+                거부 (Cancel)
+              </button>
+              <button 
+                onClick={() => handleConfirmAction(true)}
+                className="flex-1 py-2.5 rounded-lg font-medium text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)] transition-all transform hover:-translate-y-0.5"
+              >
+                승인 (Confirm)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

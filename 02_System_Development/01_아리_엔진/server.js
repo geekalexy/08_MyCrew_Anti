@@ -3228,6 +3228,147 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
   }
 });
 
+/**
+ * [Phase 39-1] POST /api/projects/:id/plan-master/analyze — Plan Master 스코프 심층 분석
+ */
+app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
+  const { id: projectId } = req.params;
+  const { requirements, deadline } = req.body;
+  try {
+    broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${requirements.substring(0, 30)}...)`, 'system', null, 'DASHBOARD', projectId);
+    
+    const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
+사용자의 요구사항: "${requirements}"
+개발 완료 희망일: "${deadline}"
+
+이 정보를 바탕으로 스코프를 분석하고, mcp_server.js에 정의된 analyze_scope 도구의 inputSchema 형식과 완벽히 일치하는 순수 JSON 객체를 반환하십시오.
+(반드시 마크다운 코드 블록이나 기타 텍스트 없이 JSON 형태만 반환할 것)
+
+만약 요구사항이 너무 짧거나 모호하여 스코프 산정이 불가능하다면:
+{
+  "thought": "요구사항이 너무 짧아 의도를 파악하기 어렵다...",
+  "thoughtNumber": 1,
+  "nextThoughtNeeded": false,
+  "needs_clarification": true,
+  "options": ["A. 단순 카탈로그 형태의 랜딩 페이지", "B. 결제 연동이 포함된 풀스택 쇼핑몰"]
+}
+
+충분히 구체적이라면:
+{
+  "thought": "결제와 장바구니가 필수이므로 MVP는 결제 모듈 연동에 집중한다...",
+  "thoughtNumber": 1,
+  "nextThoughtNeeded": false,
+  "needs_clarification": false,
+  "must_have": ["상품 목록 조회", "장바구니", "결제 연동"],
+  "nice_to_have": ["위시리스트", "상품 추천 AI"]
+}`;
+
+    // Priority 2: 1차 분류는 Sonnet 4.6 호출 강제 (Fallback으로 Gemini 3.1 처리 내장)
+    const result = await antigravityAdapter.generateResponse(
+      requirements, 
+      systemPrompt, 
+      'sonnet', // agentKey
+      'anti-claude-sonnet-4.6-thinking', // overrideModel
+      2 * 60 * 1000 // 2분 타임아웃
+    );
+
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
+    } catch(e) {
+      console.warn('[Plan Master] JSON 파싱 실패, Fallback 적용');
+      parsedResult = {
+        thought: "JSON 파싱 오류로 인한 긴급 폴백",
+        needs_clarification: true,
+        options: ["요구사항을 조금 더 상세히 적어주세요.", "기능을 단계별로 나누어 설명해주세요."]
+      };
+    }
+
+    res.json({ status: parsedResult.needs_clarification ? 'needs_clarification' : 'success', ...parsedResult });
+  } catch (err) {
+    console.error('[API /api/projects/:id/plan-master/analyze] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * [Phase 39-1] POST /api/projects/:id/plan-master/generate-roadmaps — 로드맵 생성 및 칸반 카드/백로그 업데이트
+ */
+app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => {
+  const { id: projectId } = req.params;
+  const { must_have, nice_to_have, thought } = req.body;
+  try {
+    broadcastLog('info', `[Plan Master] MVP 로드맵 생성 중...`, 'system', null, 'DASHBOARD', projectId);
+    
+    const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
+이전 분석 단계에서 확정된 스코프는 다음과 같습니다:
+- 필수(Must-have): ${must_have ? must_have.join(', ') : '없음'}
+- 확장(Nice-to-have): ${nice_to_have ? nice_to_have.join(', ') : '없음'}
+
+이 스코프를 바탕으로 다음 단계인 \`make_roadmaps\`와 \`confirm_mvp\`의 결과를 하나의 JSON 객체로 합쳐서 반환하십시오.
+(반드시 마크다운 코드 블록이나 기타 텍스트 없이 JSON 형태만 반환할 것)
+
+형식:
+{
+  "thought": "로드맵을 구성하는 사고 과정...",
+  "thoughtNumber": 2,
+  "nextThoughtNeeded": false,
+  "mvp_tasks": ["상품 목록 조회 개발", "장바구니 API 연동", "PG 결제 모듈 부착"],
+  "future_scope": ["위시리스트", "상품 추천 AI"],
+  "message_to_user": "최소 스펙인 결제 및 장바구니 기능으로 2주 내 런칭 가능한 MVP 로드맵을 설계했습니다. 진행할까요?"
+}`;
+
+    const result = await antigravityAdapter.generateResponse(
+      "로드맵을 생성하고 최종 확인 메시지를 작성해주세요.", 
+      systemPrompt, 
+      'sonnet', 
+      'anti-claude-sonnet-4.6-thinking', 
+      2 * 60 * 1000 
+    );
+
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
+    } catch(e) {
+      console.warn('[Plan Master] 로드맵 JSON 파싱 실패, Fallback 적용');
+      parsedResult = {
+        mvp_tasks: must_have || ["기본 기능 구현"],
+        future_scope: nice_to_have || [],
+        message_to_user: "MVP 로드맵 생성을 완료했습니다. 진행할까요?"
+      };
+    }
+
+    // 1. mvp_tasks를 칸반 보드의 Todo(Backlog)에 자동 생성
+    if (parsedResult.mvp_tasks && parsedResult.mvp_tasks.length > 0) {
+      for (const taskTitle of parsedResult.mvp_tasks) {
+        await dbManager.createTask({
+          project_id: projectId,
+          title: taskTitle,
+          status: 'BACKLOG',
+          assigned_agent: 'dev_senior' // 기본 할당
+        });
+      }
+    }
+    
+    // 2. future_scope도 칸반에 [백로그] 태그 달아서 생성 (또는 Graphify 지식망 Future Scope 노드 생성)
+    if (parsedResult.future_scope && parsedResult.future_scope.length > 0) {
+      for (const taskTitle of parsedResult.future_scope) {
+        await dbManager.createTask({
+          project_id: projectId,
+          title: `[확장 버전] ${taskTitle}`,
+          status: 'BACKLOG',
+          assigned_agent: null
+        });
+      }
+    }
+
+    res.json({ status: 'success', ...parsedResult });
+  } catch (err) {
+    console.error('[API /api/projects/:id/plan-master/generate-roadmaps] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /** POST /api/tasks/:id/run — Zero-Command Trigger & Intent Routing (Phase 39) */
 app.post('/api/tasks/:id/run', async (req, res) => {
   const sid = String(req.params.id);

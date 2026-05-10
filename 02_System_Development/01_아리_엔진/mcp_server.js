@@ -100,16 +100,55 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 });
 
 const ALL_TOOLS = [
+  // ── [Phase 39-1] Plan Master 전용 기획 도구 (Sequential Thinking 적용) ──
   {
     name: "analyze_scope",
-    description: "[기획 모드 전용] Sequential Thinking을 활용해 사용자 요구사항의 모순을 찾고 우선순위를 쪼갭니다.",
-    inputSchema: { type: "object", properties: { requirements: { type: "string" } }, required: ["requirements"] }
+    description: "사용자의 초기 요구사항을 심층 분석하여 구체성이 부족한 경우 객관식 옵션을 제시하거나, 충분한 경우 Must-have와 Nice-to-have 스코프를 JSON으로 반환합니다.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        thought: { type: "string", description: "현재 단계의 분석 내용 및 근거 (Sequential Thinking)" },
+        thoughtNumber: { type: "integer", description: "현재 사고 단계 번호" },
+        nextThoughtNeeded: { type: "boolean", description: "추가적인 사고가 필요한지 여부" },
+        needs_clarification: { type: "boolean", description: "요구사항이 너무 포괄적이어서 사용자에게 구체화 옵션을 물어봐야 하는지 여부" },
+        options: { type: "array", items: { type: "string" }, description: "needs_clarification이 true일 때 사용자에게 제시할 객관식 옵션 2~3개" },
+        must_have: { type: "array", items: { type: "string" }, description: "필수 스코프 기능 목록 (충분히 구체적일 때만)" },
+        nice_to_have: { type: "array", items: { type: "string" }, description: "확장 기능 스코프 목록 (충분히 구체적일 때만)" }
+      },
+      required: ["thought", "thoughtNumber", "nextThoughtNeeded", "needs_clarification"]
+    }
   },
   {
-    name: "split_roadmap",
-    description: "[기획 모드 전용] 분석 결과를 바탕으로 물리적 PRD 문서를 생성합니다.",
-    inputSchema: { type: "object", properties: { prd_content: { type: "string" } }, required: ["prd_content"] }
+    name: "make_roadmaps",
+    description: "분석된 스코프를 바탕으로 MVP 로드맵 태스크 리스트와 향후 확장 버전(Future Scope) 노드를 생성합니다.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        thought: { type: "string", description: "현재 로드맵 구성에 대한 근거 (Sequential Thinking)" },
+        thoughtNumber: { type: "integer", description: "사고 단계 번호" },
+        nextThoughtNeeded: { type: "boolean", description: "추가 사고 필요 여부" },
+        mvp_tasks: { type: "array", items: { type: "string" }, description: "생성할 칸반 보드 태스크 이름 목록" },
+        future_scope: { type: "array", items: { type: "string" }, description: "v2.0 등 백로그로 미뤄둘 확장 기능 목록" },
+        graph_nodes: { type: "array", items: { type: "object" }, description: "Graphify 시각화를 위한 노드 연결 데이터" }
+      },
+      required: ["thought", "thoughtNumber", "nextThoughtNeeded", "mvp_tasks", "future_scope"]
+    }
   },
+  {
+    name: "confirm_mvp",
+    description: "생성된 기획안에 대해 사용자에게 최종 확인을 요청하고 대기 상태로 전환합니다.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        thought: { type: "string", description: "컨펌 대기 전 최종 점검 내용 (Sequential Thinking)" },
+        thoughtNumber: { type: "integer", description: "사고 단계 번호" },
+        nextThoughtNeeded: { type: "boolean", description: "추가 사고 필요 여부" },
+        message_to_user: { type: "string", description: "사용자에게 보여줄 최종 브리핑 메시지" }
+      },
+      required: ["thought", "thoughtNumber", "nextThoughtNeeded", "message_to_user"]
+    }
+  },
+  // ── [기존 도구들] ──
   {
     name: "run_tasks",
     description: "[개발 모드 전용] Shrimp Task Manager 방식의 의존성 기반 자율 코딩을 실행합니다.",
@@ -149,8 +188,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
   let filteredTools = ALL_TOOLS;
   
-  if (mode === 'ARCHITECT') {
-    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'split_roadmap'].includes(t.name));
+  if (mode === 'ARCHITECT' || mode === 'PLAN_MASTER') {
+    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'make_roadmaps', 'confirm_mvp'].includes(t.name));
   } else if (mode === 'DEV') {
     filteredTools = ALL_TOOLS.filter(t => ['run_tasks', 'trace_bug'].includes(t.name));
   } else if (mode === 'REVIEW') {
@@ -177,11 +216,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   
   // Phase 39: 스킬 MOCK 실행 (실제 내부 로직은 파이프라인에서 구현)
+  // ── [Phase 39-1] Plan Master 도구 실행 (LLM이 전달한 JSON 수신) ──
   if (name === "analyze_scope") {
-    return { content: [{ type: "text", text: `[analyze_scope] 요구사항 분석 완료: ${args.requirements.substring(0, 50)}...` }] };
+    // LLM이 보낸 options나 must_have 구조를 받아서 반환
+    if (args.needs_clarification) {
+      return { content: [{ type: "text", text: JSON.stringify({ status: 'needs_clarification', options: args.options, thought: args.thought }) }] };
+    } else {
+      return { content: [{ type: "text", text: JSON.stringify({ status: 'success', must_have: args.must_have, nice_to_have: args.nice_to_have, thought: args.thought }) }] };
+    }
   }
-  if (name === "split_roadmap") {
-    return { content: [{ type: "text", text: `[split_roadmap] PRD 문서 생성 완료.` }] };
+  if (name === "make_roadmaps") {
+    return { content: [{ type: "text", text: JSON.stringify({ status: 'success', mvp_tasks: args.mvp_tasks, future_scope: args.future_scope, thought: args.thought }) }] };
+  }
+  if (name === "confirm_mvp") {
+    return { content: [{ type: "text", text: JSON.stringify({ status: 'pending_user_confirm', message: args.message_to_user, thought: args.thought }) }] };
   }
   if (name === "run_tasks") {
     return { content: [{ type: "text", text: `[run_tasks] 자율 코딩 태스크 시작: ${args.command}` }] };

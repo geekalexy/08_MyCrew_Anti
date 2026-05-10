@@ -320,8 +320,7 @@ export default function TaskDetailModal() {
   const [isEditing, setIsEditing] = useState(false);
   
   // [Phase 39] 통합 UI 모드/모델 상태
-  const [selectedMode, setSelectedMode] = useState('DEV');
-  const [selectedModel, setSelectedModel] = useState('Claude Sonnet 4.6 (Thinking)');
+  const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -348,8 +347,11 @@ export default function TaskDetailModal() {
   const resizerRef = useRef(null);
   const isDragging = useRef(false);
 
+  const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
+  const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
+
   // [Phase B] Right Pane 탭 상태 ('preview' | 'graph')
-  const [rightPaneTab, setRightPaneTab] = useState('preview');
+  const [rightPaneTab, setRightPaneTab] = useState(task?.status === 'BACKLOG' ? 'graph' : 'preview');
   const [graphPaneExists, setGraphPaneExists] = useState(false);
   const [graphPaneChecked, setGraphPaneChecked] = useState(false);
   const graphIframeRef = useRef(null);
@@ -366,17 +368,44 @@ export default function TaskDetailModal() {
   const [slashTarget, setSlashTarget]         = useState(null); // 'comment' | 'edit'
   const slashRef = useRef(null);
   
-  const SLASH_COMMANDS = [
-    { id: '/코드',  label: '코드 블록 삽입', icon: 'data_object' },
-    { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
-    { id: '/run',   label: '자율 릴레이 — PRD→Advisor 자동 완주', icon: 'play_arrow' },
-    { id: '/run-b', label: '반자동 릴레이 — PRD→승인→Advisor',  icon: 'step_into'  },
-    { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
-  ];
+  const getSlashCommands = (status) => {
+    const commands = [
+      { id: '/코드',  label: '코드 블록 삽입', icon: 'data_object' },
+      { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
+      { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
+    ];
+    
+    if (status === 'BACKLOG' || status === 'TODO') {
+      commands.push(
+        { id: '/init', label: '기획서 초안 작성', icon: 'edit_document' },
+        { id: '/plan_master', label: '스코프 분석 및 로드맵 생성', icon: 'psychology_alt' },
+        { id: '/split', label: '태스크 분할', icon: 'call_split' }
+      );
+    } else if (status === 'IN_PROGRESS') {
+      commands.push(
+        { id: '/auto_run', label: '자율 연속 파이프라인 실행', icon: 'rocket_launch' },
+        { id: '/debug', label: '버그 수정', icon: 'bug_report' },
+        { id: '/refactor', label: '리팩토링', icon: 'cleaning_services' },
+        { id: '/trace', label: '로그 역추적', icon: 'manage_search' }
+      );
+    } else if (status === 'REVIEW') {
+      commands.push(
+        { id: '/review', label: '코드 검토', icon: 'rate_review' },
+        { id: '/auto_test', label: '시나리오 자율 테스트', icon: 'fact_check' },
+        { id: '/linter', label: '정적 분석', icon: 'spellcheck' }
+      );
+    } else if (status === 'DONE' || status === 'FINALIZED') {
+      commands.push(
+        { id: '/deploy', label: '배포', icon: 'cloud_upload' },
+        { id: '/archive', label: '문서화', icon: 'archive' }
+      );
+    }
+    return commands;
+  };
+
+  const SLASH_COMMANDS = getSlashCommands(task?.status);
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
-  const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
-  const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
 
   useEffect(() => {
     if (activeCommentTab === 'graph' && !graphReport) {
@@ -421,6 +450,35 @@ export default function TaskDetailModal() {
       fetch(`${SERVER_URL}/preview/${projectId}/OUTPUT/index.html`, { method: 'HEAD' })
         .then((r) => setHasPreviewData(r.ok))
         .catch(() => setHasPreviewData(false));
+    }
+    
+    // Auto-edit mode & Comment Expanded state for tasks
+    const t = tasks[String(activeDetailTaskId)];
+    if (t) {
+      import('../../store/uiStore').then(module => {
+        const uiStore = module.useUiStore.getState();
+        const isManual = uiStore.lastManualTaskTitle === t.title;
+        
+        // 대표님의 말씀대로, "내용이 비어있는지(!t.content)" + "만들기 버튼 클릭(isManual)" 결합
+        if (!t.content && isManual) {
+          setIsEditing(true);
+          setEditContent('');
+          setEditTitle(t.title);
+          setEditAssignee(t.assignee || '');
+          setEditModel(t.model || '');
+          setEditColumn(t.column || 'todo');
+          setEditPriority(t.priority || '');
+          setIsCommentExpanded(false); // 내용 저장 전단계는 접힘 상태
+          
+          // 1회성 사용 후 플래그 초기화
+          uiStore.setLastManualTaskTitle(null);
+          
+          setTimeout(() => editAreaRef.current?.focus(), 150);
+        } else {
+          setIsEditing(false);
+          setIsCommentExpanded(true); // 내용이 있는 카드나 에이전트 생성 카드는 기본 열림 상태
+        }
+      });
     }
   }, [activeDetailTaskId]);
 
@@ -780,19 +838,35 @@ export default function TaskDetailModal() {
     // CEO 댓글은 항상 현재(또는 새로 지정된) assignedAgent에게 지시
     // → assignee를 바꾸면 새 담당자, 그대로면 기존 담당자
     const assigneeChanged = finalAssignee && finalAssignee !== task.assignee && finalAssignee !== '미할당';
-    const targetName = assigneeChanged
-      ? finalAssignee                                    // 담당자 변경 → 새 담당자
-      : (commentAssignee || task.assignee || 'ARI');    // 담당자 유지 → 현재 담당자
-    const newComment = {
-      author: 'CEO',
-      source: { id: 'user-1', name: 'CEO' },
-      target: { id: 'agent', name: targetName },
-      content: commentText.trim(),
-      created_at: new Date().toISOString()
-    };
-    // Optimistic update — 즉시 반영
-    setComments((prev) => [...prev, newComment]);
-    setCommentText('');
+      const targetName = assigneeChanged
+        ? finalAssignee
+        : (commentAssignee || task.assignee || 'ARI');
+      const newComment = {
+        author: 'CEO',
+        source: { id: 'user-1', name: 'CEO' },
+        target: { id: 'agent', name: targetName },
+        content: commentText.trim(),
+        created_at: new Date().toISOString()
+      };
+      
+      setComments((prev) => [...prev, newComment]);
+      setIsCommentExpanded(false); // Reset comment expansion
+      
+      // REST 동기화
+      fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          author: 'CEO',
+          content: newComment.content,
+          source: newComment.source,
+          target: newComment.target,
+          mode: task.mode || 'DEV',
+          model: task.model || 'Claude Sonnet 4.6 (Thinking)',
+        })
+      }).catch(console.error);
+
+      setCommentText('');
     setCommentColumn('NO_CHANGE');
     setCommentAssignee('NO_CHANGE');
     setCommentPriority('NO_CHANGE');
@@ -924,8 +998,8 @@ export default function TaskDetailModal() {
           </div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
 
-            {/* 👀 Live Preview 버튼 — OUTPUT/index.html 존재 및 코드 블록 포함 여부에 따라 노출 */}
-            {previewUrl && hasPreviewData && hasCodeBlock && (
+            {/* 👀 Live Preview 버튼 — OUTPUT/index.html 존재 및 코드 블록 포함 여부에 따라 노출 (또는 플랜모드 카드일 때 Graphify 지원) */}
+            {((previewUrl && hasPreviewData && hasCodeBlock) || task.status === 'BACKLOG') && (
               <button
                 id="btn-live-preview"
                 onClick={() => {
@@ -1054,6 +1128,7 @@ export default function TaskDetailModal() {
           flex: isPreviewMode ? `0 0 ${splitRatio}%` : '1 1 auto',
           overflowY: 'auto',
           padding: '1rem 1.5rem',
+          paddingRight: '0.5rem', // 우측 스크롤바 정렬을 위해 패딩 조정
           minWidth: 0,
           transition: isDragging.current ? 'none' : 'flex-basis 0.05s',
         }}>
@@ -1111,7 +1186,7 @@ export default function TaskDetailModal() {
                   <div
                     ref={slashRef}
                     style={{
-                      position: 'absolute', bottom: '100%', left: 0, right: 0, marginBottom: 6,
+                      position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
                       background: 'var(--bg-surface-2)', border: '1px solid rgba(124,110,248,0.4)',
                       borderRadius: 10, overflow: 'hidden', zIndex: 200,
                       boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
@@ -1157,7 +1232,7 @@ export default function TaskDetailModal() {
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
                 <button className="btn btn--ghost btn--sm" onClick={() => setIsEditing(false)}>취소</button>
-                <button className="btn btn--primary btn--sm" onClick={handleSaveEdit}>저장</button>
+                <button className="btn btn--primary btn--sm" onClick={handleSaveEdit} disabled={!editContent.trim()} style={{ opacity: !editContent.trim() ? 0.5 : 1, cursor: !editContent.trim() ? 'not-allowed' : 'pointer' }}>저장</button>
               </div>
             </div>
           ) : (
@@ -1298,6 +1373,56 @@ export default function TaskDetailModal() {
           {/* 인라인 상태 및 메타 변경 컨트롤 */}
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap', padding: '0.6rem 0.8rem', background: 'var(--bg-surface-2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
             
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>모드 (Mode)</label>
+              <select
+                value={task.mode || 'NONE'}
+                onChange={(e) => {
+                  const newModeRaw = e.target.value;
+                  const newMode = newModeRaw === 'NONE' ? null : newModeRaw;
+                  const prevMode = task.mode || 'NONE';
+                  
+                  // 모드 변경 API 및 Store 업데이트
+                  patchTask(task.id, { mode: newMode });
+                  fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: newMode })
+                  }).catch(console.error);
+
+                  // 모드 변경 시 타임라인(액티비티) 시스템 로그 기록
+                  if (prevMode !== newModeRaw) {
+                    const modeNames = { 'NONE': '선택하지 않음', 'ARCHITECT': '기획 모드', 'DEV': '개발 모드', 'QA': '리뷰 모드', 'DEBUG': '디버깅 모드' };
+                    const logMsg = `🔄 모드 전환: ${modeNames[prevMode]} ➡️ ${modeNames[newModeRaw]} (으)로 변경되었습니다.`;
+                    
+                    const newLog = {
+                      author: 'system', source: { id: 'system', name: 'system' }, target: { id: 'user-1', name: 'CEO' },
+                      content: logMsg, created_at: new Date().toISOString()
+                    };
+                    setComments(prev => [...prev, newLog]);
+                    
+                    fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ author: 'system', content: logMsg, source: newLog.source, target: newLog.target })
+                    }).catch(console.error);
+                  }
+                }}
+                style={{ 
+                  background: 'var(--bg-surface-3)', color: 'var(--text-primary)', 
+                  border: '1px solid var(--border)', borderRadius: '6px', 
+                  padding: '0.4rem 0.5rem', outline: 'none', fontSize: '0.8rem',
+                  cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif'
+                }}
+              >
+                <option value="NONE">선택하지 않음</option>
+                <option value="ARCHITECT">📐 기획 모드</option>
+                <option value="DEV">💻 개발 모드</option>
+                <option value="QA">🕵️‍♂️ 리뷰 모드</option>
+                <option value="DEBUG">🧰 디버깅 모드</option>
+              </select>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
               <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>담당자 (Assignee)</label>
               <select
@@ -1636,7 +1761,47 @@ export default function TaskDetailModal() {
                     }}>
                       {isSystemLog ? (
                         <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'SF Mono, monospace' }}>
-                          {logContent}
+                          {(() => {
+                            try {
+                              // JSON 파싱 시도 (MCP 도구 응답 등)
+                              const parsed = JSON.parse(logContent);
+                              if (parsed.thought) {
+                                return (
+                                  <>
+                                    <details open style={{ marginBottom: '0.6rem' }}>
+                                      <summary style={{
+                                        cursor: 'pointer', fontSize: '0.72rem',
+                                        color: '#60a5fa', userSelect: 'none',
+                                        fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
+                                        textTransform: 'uppercase', letterSpacing: '0.06em',
+                                        display: 'flex', alignItems: 'center', gap: '0.3rem',
+                                        listStyle: 'none',
+                                      }}>
+                                        <span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>psychology</span>
+                                        사고과정 (Thinking)
+                                      </summary>
+                                      <div style={{
+                                        fontFamily: '"JetBrains Mono", "SF Mono", monospace',
+                                        fontSize: '0.75rem', color: '#9ca3af',
+                                        marginTop: '0.45rem', whiteSpace: 'pre-wrap', lineHeight: 1.5,
+                                        background: 'rgba(0,0,0,0.2)',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px', padding: '0.6rem 0.8rem',
+                                      }}>
+                                        {parsed.thought}
+                                      </div>
+                                    </details>
+                                    <div>
+                                      {JSON.stringify({ ...parsed, thought: undefined }, null, 2).replace(/"undefined",?\n?/g, '')}
+                                    </div>
+                                  </>
+                                );
+                              }
+                            } catch (e) {
+                              // JSON이 아니면 그냥 텍스트 렌더링
+                            }
+                            return logContent;
+                          })()}
                         </div>
                       ) : (
                         <ReactMarkdown
@@ -1823,21 +1988,51 @@ export default function TaskDetailModal() {
                 </select>
               </div>
             </div>
+            {/* 모드 선택 시 매크로 라벨 노출 (항상 보이도록 분리) */}
+            {task?.mode === 'ARCHITECT' && (
+              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(124, 110, 248, 0.1)', color: '#7c6ef8', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>psychology_alt</span>
+                [ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]
+              </div>
+            )}
+            {task?.mode === 'DEV' && (
+              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>rocket_launch</span>
+                [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
+              </div>
+            )}
+            {task?.mode === 'QA' && (
+              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>fact_check</span>
+                [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
+              </div>
+            )}
+            {task?.mode === 'DEBUG' && (
+              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>bug_report</span>
+                [ /auto_debug : 로그 추적 및 에러 자율 수정 ]
+              </div>
+            )}
 
-            {/* [Phase 39] 입력창 상단: 선택된 모드/모델 정보 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0 0.2rem', marginBottom: '-0.3rem' }}>
-              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                {selectedMode === 'ARCHITECT' && '📐 기획 모드'}
-                {selectedMode === 'DEV' && '💻 개발 모드'}
-                {selectedMode === 'QA' && '🕵️‍♂️ 리뷰 모드'}
-                {selectedMode === 'DEBUG' && '🧰 디버깅 모드'}
-              </span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>|</span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {selectedModel}
-              </span>
-            </div>
-
+            {/* 코멘트 작성 토글 영역 */}
+            {!isCommentExpanded ? (
+              <button 
+                onClick={() => {
+                  setIsCommentExpanded(true);
+                  setTimeout(() => textareaRef.current?.focus(), 100);
+                }}
+                style={{
+                  width: '100%', background: 'var(--bg-surface-1)', border: '1px dashed var(--border)', 
+                  borderRadius: '8px', padding: '0.8rem', color: 'var(--text-muted)', fontSize: '0.95rem',
+                  textAlign: 'left', cursor: 'pointer', transition: 'all 0.2s', marginTop: '0.4rem'
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(124,110,248,0.5)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                업무 지시나 피드백을 전달하세요... (/커맨드 호출 가능)
+              </button>
+            ) : (
+              <>
             <div style={{ position: 'relative' }}>
               <textarea
                 ref={textareaRef}
@@ -2008,34 +2203,19 @@ export default function TaskDetailModal() {
               </div>
             )}
             
-            {/* [Phase 39] 하단 툴바: 좌측 아이콘, 우측 전송 버튼 */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <button
-                  title="워크플로우 모드 전환"
-                  onClick={() => setShowModeSelector(!showModeSelector)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.3rem', borderRadius: '4px', transition: 'background 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-1)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>add_circle</span>
-                </button>
-                <button
-                  title="LLM 모델 교체"
-                  onClick={() => setShowModelSelector(!showModelSelector)}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.3rem', borderRadius: '4px', transition: 'background 0.2s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-1)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>keyboard_double_arrow_up</span>
-                </button>
-              </div>
-
+            {/* 하단 툴바: 우측 전송 및 취소 버튼 */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '0.2rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
                   +Enter 업데이트 전송
                 </span>
+                <button
+                  onClick={() => { setIsCommentExpanded(false); setCommentText(''); }}
+                  style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none', padding: '0.4rem 0.8rem', cursor: 'pointer', fontSize: '0.85rem' }}
+                >
+                  접기
+                </button>
                 <button
                   onClick={handleSubmitComment}
                   disabled={
@@ -2052,26 +2232,8 @@ export default function TaskDetailModal() {
                   전송
                 </button>
               </div>
-            </div>
-
-            {/* 임시 셀렉터 UI (추후 고도화 가능) */}
-            {showModeSelector && (
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                {['ARCHITECT', 'DEV', 'QA', 'DEBUG'].map(mode => (
-                  <button key={mode} onClick={() => { setSelectedMode(mode); setShowModeSelector(false); }} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: '4px', background: selectedMode === mode ? 'var(--brand)' : 'var(--bg-surface-1)', color: selectedMode === mode ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
-                    {mode}
-                  </button>
-                ))}
               </div>
-            )}
-            {showModelSelector && (
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
-                {['Claude Opus 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)', 'Gemini 3.1 Pro'].map(model => (
-                  <button key={model} onClick={() => { setSelectedModel(model); setShowModelSelector(false); }} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: '4px', background: selectedModel === model ? 'var(--brand)' : 'var(--bg-surface-1)', color: selectedModel === model ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
-                    {model}
-                  </button>
-                ))}
-              </div>
+            </>
             )}
           </div>
         </div>

@@ -69,6 +69,12 @@ export default function Column({ columnId, tasks, disableDnD }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
+    
+    // 수동 생성 플래그 기록
+    import('../../store/uiStore').then(module => {
+      module.useUiStore.getState().setLastManualTaskTitle(form.title.trim());
+    }).catch(console.error);
+
     emitTaskCreate({
       title: form.title.trim(),
       content: '', // content is now empty by default

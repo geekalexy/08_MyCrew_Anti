@@ -38,6 +38,11 @@ export const useUiStore = create(
       // 태스크 포커스/상세 전환 액션
       setFocusedTaskId: (id) => set({ focusedTaskId: id ? String(id) : null }),
       setActiveDetailTaskId: (id) => set({ activeDetailTaskId: id ? String(id) : null }),
+      
+      // 수동 생성 판별용 임시 상태
+      lastManualTaskTitle: null,
+      setLastManualTaskTitle: (title) => set({ lastManualTaskTitle: title }),
+
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       
       // 워크스페이스 업데이트

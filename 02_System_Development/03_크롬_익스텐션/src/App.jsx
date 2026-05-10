@@ -218,24 +218,25 @@ function App() {
         <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
           <img src={logoUrl} alt="MyCrew Logo" className="w-full h-full object-contain rounded-xl" />
         </div>
-        <h1 className="text-white text-xl font-semibold tracking-wide mb-1">MyCrew MCP for Antigravity</h1>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="flex items-center gap-1 text-xs text-gray-500">
+        
+        {/* Model Switcher Dropdown replacing the H1 */}
+        <select 
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value)}
+          className="w-[85%] max-w-[280px] bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm font-medium text-gray-200 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer mb-2 text-center"
+          style={{ textAlignLast: 'center' }}
+        >
+          {MODELS.map(m => (
+            <option key={m.id} value={m.id} className="text-left">{m.name}</option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
             <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
             {isConnected ? 'Connected' : 'Offline'}
           </span>
         </div>
-        
-        {/* Model Switcher Dropdown */}
-        <select 
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          className="w-[85%] bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
-        >
-          {MODELS.map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </select>
       </div>
 
       {/* Intro Card (Like the screenshot) */}

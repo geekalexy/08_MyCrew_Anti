@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { scrubContent } from '../../utils/scrubContent'; // [S1-4]
 import { renderMarkdown } from '../../utils/markdownRenderer'; // [S1-4] 타임라인 마크다운
+import PlanMasterModal from '../Modal/PlanMasterModal';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
@@ -98,6 +99,8 @@ export default function LogDrawer() {
 
   const [mentionQuery, setMentionQuery]       = useState('');   // @뒤 타이핑 중인 키워드
   const [showMention, setShowMention]         = useState(false); // 드롭다운 표시 여부
+
+  const [showPlanMasterModal, setShowPlanMasterModal] = useState(false);
   const [mentionedAgent, setMentionedAgent]   = useState(null);  // 최종 선택된 에이전트
   const mentionRef = useRef(null);
 
@@ -106,12 +109,46 @@ export default function LogDrawer() {
   const [showSlash, setShowSlash]             = useState(false);
   const slashRef = useRef(null);
   
-  const SLASH_COMMANDS = [
-    { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
-    { id: '/run',   label: '자율 릴레이 — PRD→Advisor 자동 완주', icon: 'play_arrow' },
-    { id: '/run-b', label: '중간 확인 자율완주 — Advisor 리뷰 후 CEO 승인 대기',  icon: 'step_into'  },
-    { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
-  ];
+  const getSlashCommands = (status) => {
+    const commands = [
+      { id: '/bugdog기록', label: '버그독 자동화 기록', icon: 'bug_report' },
+      { id: '/stop',  label: '파이프라인 강제 종료 (Stuck 해제)', icon: 'stop' },
+    ];
+    if (status === 'BACKLOG' || status === 'TODO') {
+      commands.push(
+        { id: '/init', label: '기획서 초안 작성', icon: 'edit_document' },
+        { id: '/plan_master', label: '스코프 분석 및 로드맵 생성', icon: 'psychology_alt' },
+        { id: '/split', label: '태스크 분할', icon: 'call_split' }
+      );
+    } else if (status === 'IN_PROGRESS') {
+      commands.push(
+        { id: '/auto_run', label: '자율 연속 파이프라인 실행', icon: 'rocket_launch' },
+        { id: '/debug', label: '버그 수정', icon: 'bug_report' },
+        { id: '/refactor', label: '리팩토링', icon: 'cleaning_services' },
+        { id: '/trace', label: '로그 역추적', icon: 'manage_search' }
+      );
+    } else if (status === 'REVIEW') {
+      commands.push(
+        { id: '/review', label: '코드 검토', icon: 'rate_review' },
+        { id: '/auto_test', label: '시나리오 자율 테스트', icon: 'fact_check' },
+        { id: '/linter', label: '정적 분석', icon: 'spellcheck' }
+      );
+    } else if (status === 'DONE' || status === 'FINALIZED') {
+      commands.push(
+        { id: '/deploy', label: '배포', icon: 'cloud_upload' },
+        { id: '/archive', label: '문서화', icon: 'archive' }
+      );
+    } else if (!status) {
+      // 카드가 포커싱 되지 않은 글로벌 상태
+      commands.push(
+        { id: '/plan_master', label: 'Plan Master 스코프 분석 및 로드맵 생성', icon: 'psychology_alt' },
+        { id: '/goal', label: '풀 릴레이 파이프라인 (기획 완료 후 노출)', icon: 'auto_awesome' }
+      );
+    }
+    return commands;
+  };
+
+  const SLASH_COMMANDS = getSlashCommands(focusedTaskId ? Object.values(tasks).find(t => String(t.id) === String(focusedTaskId))?.status : null);
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
 
   const filteredCrew = crewList.filter(c =>
@@ -414,6 +451,12 @@ export default function LogDrawer() {
 
     const trimmedText = inputText.trim();
     setShowMention(false); // 전송 시 멘션 드롭다운 닫기
+
+    if (trimmedText === '/plan-master') {
+      setShowPlanMasterModal(true);
+      setBtnMode('send'); isSendingRef.current = false; setInputText('');
+      return;
+    }
 
     // ── [Phase 36] /run, /run-b, /stop 파이프라인 슬래시 커맨드 인터셉트 ────────────
     if (trimmedText.startsWith('/run') || trimmedText.startsWith('/run-b') || trimmedText.startsWith('/stop')) {
@@ -1118,6 +1161,31 @@ export default function LogDrawer() {
             background: 'var(--bg-surface)',
           }}
         >
+          {/* 모드 선택 시 매크로 라벨 노출 */}
+          {focusedTask?.mode === 'ARCHITECT' && (
+            <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(124, 110, 248, 0.1)', color: '#7c6ef8', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>psychology_alt</span>
+              [ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]
+            </div>
+          )}
+          {focusedTask?.mode === 'DEV' && (
+            <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>rocket_launch</span>
+              [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
+            </div>
+          )}
+          {focusedTask?.mode === 'QA' && (
+            <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>fact_check</span>
+              [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
+            </div>
+          )}
+          {focusedTask?.mode === 'DEBUG' && (
+            <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>bug_report</span>
+              [ /auto_debug : 로그 추적 및 에러 자율 수정 ]
+            </div>
+          )}
           <div style={{
             display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%',
             background: 'var(--bg-surface-2)', borderRadius: 14, padding: '0.6rem',
@@ -1492,6 +1560,42 @@ export default function LogDrawer() {
           </div>
         </div>
       </aside>
+
+      {showPlanMasterModal && (
+        <PlanMasterModal 
+          projectId={selectedProjectId}
+          taskId={selectedTaskId}
+          onClose={() => setShowPlanMasterModal(false)}
+          onSubmit={async (data) => {
+            useTimelineStore.getState().appendTimeline({
+              level: 'info', message: '✅ 초기 스코프 확정. MVP 로드맵 및 지식그래프 생성을 시작합니다.',
+              agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
+            });
+            try {
+              const res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/plan-master/generate-roadmaps`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data) // must_have, nice_to_have, thought 등 포함
+              });
+              const roadmapData = await res.json();
+              
+              if (res.ok) {
+                useTimelineStore.getState().appendTimeline({
+                  level: 'info', message: `🚀 기획 종료 (컨펌 대기): ${roadmapData.message_to_user}`,
+                  agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
+                });
+              } else {
+                throw new Error(roadmapData.error || '로드맵 생성 실패');
+              }
+            } catch(e) {
+              useTimelineStore.getState().appendTimeline({
+                level: 'error', message: `❌ 로드맵 생성 중 오류: ${e.message}`,
+                agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
+              });
+            }
+          }}
+        />
+      )}
     </>
   );
 }

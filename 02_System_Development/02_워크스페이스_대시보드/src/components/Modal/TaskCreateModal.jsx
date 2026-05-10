@@ -49,16 +49,22 @@ export default function TaskCreateModal({ isOpen, onClose }) {
     try {
       const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4005';
       const projectId = useProjectStore.getState().selectedProjectId;
+      
+      // 수동 생성 플래그 기록
+      import('../../store/uiStore').then(module => {
+        module.useUiStore.getState().setLastManualTaskTitle(content.trim());
+      }).catch(console.error);
+
       const res = await fetch(`${SERVER_URL}/api/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title:    content.trim(),
-          content:  content.trim(),
+          content:  '', // 모달 진입 시 자동 편집 모드(!t.content)가 정상 작동하도록 본문을 비워둠
           assignee: assignee || 'CEO',
           priority: priority || 'medium',
           category: category || 'QUICK_CHAT',
-          projectId: projectId
+          projectId: projectId,
         }),
       });
       if (res.ok) {

@@ -832,7 +832,7 @@ class Executor {
    * dispatchNextTaskForAgent가 크루 작업을 실행할 때 사용.
    * executor.run()과 동일하되 ASYNC_CATEGORIES 우회 없음.
    */
-  async runDirect(taskContent, agentId = null, taskId = null) {
+  async runDirect(taskContent, agentId = null, taskId = null, forceModel = null) {
     console.log(`[Executor.runDirect] Task #${taskId} 시작 (${agentId})`);
     this._log('info', `> [${agentId}] 사고 회로 가동 중...`, agentId || 'system', taskId);
 
@@ -862,7 +862,7 @@ class Executor {
     }
 
     const signatureModel = AGENT_SIGNATURE_MODELS[agentId?.toLowerCase()];
-    let modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
+    let modelToUse = forceModel || signatureModel || evaluation.recommended_model || MODEL.FLASH;
 
     // ── [Phase 39] Quota Defender (Hotswap Engine) ───────────────────────────
     // Zero-Command (runDirect) 경로에서도 Claude 쿼터 초과를 방어합니다.

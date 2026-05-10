@@ -43,97 +43,7 @@ const IcoCheckCircle = () => (
   </svg>
 );
 
-// ── [Phase 37] 파이프라인 시작 선택 프롬프트 ─────────────────────────
-function PipelineStartPrompt({ projectId, onSelect }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1100,
-      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      paddingBottom: '2.5rem',
-      pointerEvents: 'none',
-    }}>
-      <div style={{
-        background: 'var(--bg-surface-2)',
-        border: '1px solid rgba(180,197,255,0.2)',
-        borderRadius: '16px',
-        padding: '1.5rem 2rem',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(180,197,255,0.08)',
-        backdropFilter: 'blur(20px)',
-        display: 'flex', flexDirection: 'column', gap: '1rem',
-        maxWidth: 440, width: '90vw',
-        pointerEvents: 'auto',
-        animation: 'modal-slide-up 0.25s cubic-bezier(0.34,1.2,0.64,1)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: 'var(--brand)' }}>rocket_launch</span>
-          <div>
-            <p style={{ fontSize: '0.88rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
-              팀 준비 완료! 어떻게 시작하시겠어요?
-            </p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>
-              AI 팀이 지금 바로 일을 시작할 수 있습니다.
-            </p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.6rem' }}>
-          <button
-            id="pipeline-run-btn"
-            onClick={() => onSelect('run')}
-            style={{
-              flex: 1, padding: '0.7rem 0.8rem',
-              background: 'linear-gradient(135deg, rgba(100,135,242,0.2), rgba(124,110,248,0.15))',
-              border: '1px solid rgba(100,135,242,0.4)',
-              borderRadius: '10px', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(100,135,242,0.28)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(100,135,242,0.2), rgba(124,110,248,0.15))'; e.currentTarget.style.transform = ''; }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: '#b4c5ff' }}>play_arrow</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#b4c5ff', letterSpacing: '0.04em' }}>/run</span>
-            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>자율 완주</span>
-          </button>
-          <button
-            id="pipeline-runb-btn"
-            onClick={() => onSelect('run-b')}
-            style={{
-              flex: 1, padding: '0.7rem 0.8rem',
-              background: 'rgba(255,185,99,0.08)',
-              border: '1px solid rgba(255,185,99,0.25)',
-              borderRadius: '10px', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,185,99,0.18)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,185,99,0.08)'; e.currentTarget.style.transform = ''; }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: '#ffb963' }}>step_into</span>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb963', letterSpacing: '0.04em' }}>/run-b</span>
-            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>중간 확인 자율완주</span>
-          </button>
-          <button
-            id="pipeline-later-btn"
-            onClick={() => onSelect(null)}
-            style={{
-              padding: '0.7rem 0.8rem',
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              borderRadius: '10px', cursor: 'pointer',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '1.3rem', color: 'var(--text-muted)' }}>schedule</span>
-            <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>나중에</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// ── [Phase 37] 파이프라인 시작 선택 프롬프트 제거됨 (Zero-Command UX로 통합) ──
 
 export default function App() {
   const { isLogPanelOpen, setLogPanelOpen, theme, toggleTheme, currentView, setCurrentView, hasCompletedOnboarding, setActiveLogTab, completeOnboarding, activeArtifact } = useUiStore();
@@ -143,7 +53,6 @@ export default function App() {
   const [serverOnline, setServerOnline] = useState(null);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isSettingsModalOpen,   setIsSettingsModalOpen]   = useState(false);
-  const [pipelinePrompt, setPipelinePrompt] = useState(null); // { projectId } | null
   
   // 헤더 채용(Recruit) 상태 변수들
   const [isRecruiting, setIsRecruiting] = useState(false);
@@ -168,13 +77,9 @@ export default function App() {
     };
     window.addEventListener('openNewProjectModal', handleOpenNewProjectModal);
     window.addEventListener('closeNewProjectModal', handleCloseNewProjectModal);
-    // [Phase 37] 파이프라인 시작 선택 프롬프트
-    const handlePipelinePrompt = (e) => setPipelinePrompt(e.detail);
-    window.addEventListener('pipelineStartPrompt', handlePipelinePrompt);
     return () => {
       window.removeEventListener('openNewProjectModal', handleOpenNewProjectModal);
       window.removeEventListener('closeNewProjectModal', handleCloseNewProjectModal);
-      window.removeEventListener('pipelineStartPrompt', handlePipelinePrompt);
     };
   }, []);
 
@@ -463,21 +368,7 @@ export default function App() {
         project={selectedProject}
       />
 
-      {/* ── [Phase 37] 파이프라인 시작 선택 프롬프트 ─────────────── */}
-      {pipelinePrompt && (
-        <PipelineStartPrompt
-          projectId={pipelinePrompt.projectId}
-          onSelect={(mode) => {
-            setPipelinePrompt(null);
-            if (!mode) return; // '나중에' 선택
-            const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
-            fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(pipelinePrompt.projectId)}/pipeline/${mode}`, { method: 'POST' })
-              .then(r => r.json())
-              .then(data => console.log('[Pipeline] 시작:', data))
-              .catch(err => console.error('[Pipeline] 시작 실패:', err));
-          }}
-        />
-      )}
+
       {/* ── 모바일 하단 네비게이션 ────────────────────────────── */}
       <nav className="mobile-nav" aria-label="모바일 네비게이션">
         <button

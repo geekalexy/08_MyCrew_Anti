@@ -112,3 +112,9 @@
 - **파비콘 일원화**: 익스텐션 툴바 아이콘 및 패널 상단 파비콘을 위해 사이즈별(16, 48, 128) 로고 리사이징 후 `manifest.json` `icons` 및 `action.default_icon`에 매핑 완료.
 - **System Action 프롬프트 안정화**: 익스텐션 환경에서 AI(Antigravity)가 카드를 생성할 때 랜덤 ID를 지어내던 환각(Hallucination) 버그 수정. `server.js`의 프롬프트를 강화하여 `system_action` JSON을 강제 출력하게 하고, `CREATE_TASK` 시퀀스에서 담당자(`assignee`)가 정상적으로 할당되도록 로직 보완 및 핫픽스 적용.
 
+## 7. [추가] Zero-Command UX 통합 및 Cross-Mode Handoff 설계
+
+**진행 완료된 태스크:**
+- **레거시 슬래시 커맨드 제거**: `/run`, `/run-b`, `/stop` 등의 레거시 커맨드 인터셉트 로직을 `TaskDetailModal.jsx`와 `LogDrawer.jsx`에서 전면 제거하여 백엔드의 Zero-Command 라우터로 책임을 단일화함.
+- **CTA 팝업 제거**: 가입 직후 나타나던 파이프라인 시작 프롬프트(`PipelineStartPrompt`) 컴포넌트를 `App.jsx`에서 제거하여 초기 UX를 극도로 단순화함.
+- **Cross-Mode Handoff(교차 모드 문맥 주입) 설계**: 개발 중 기획 모드로 전환 후 다시 복귀 시, "직전까지 작업한 코드"와 "업데이트된 최신 기획(PRD)"을 동시에 주입하고 시스템 프롬프트 레벨에서 선행 Diff 분석을 강제하는 정교한 컨텍스트 병합 로직을 기획서 및 `server.js`에 탑재 완료.

@@ -21,7 +21,7 @@
         return false;
       };
       window.onunhandledrejection = function(event) {
-        document.body.innerHTML = '<div style="color:red; font-size:1.5rem; padding:2rem; background:black; height:100vh; overflow:auto;"><h1>UNHANDLED PROMISE REJECTION</h1><p>' + event.reason + '</p></div>';
+        console.warn('Unhandled Promise Rejection:', event.reason);
       };
     </script>
     <script type="module" src="/src/main.jsx"></script>

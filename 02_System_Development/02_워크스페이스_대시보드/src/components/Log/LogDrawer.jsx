@@ -458,44 +458,6 @@ export default function LogDrawer() {
       return;
     }
 
-    // ── [Phase 36] /run, /run-b, /stop 파이프라인 슬래시 커맨드 인터셉트 ────────────
-    if (trimmedText.startsWith('/run') || trimmedText.startsWith('/run-b') || trimmedText.startsWith('/stop')) {
-      const isStop = trimmedText.startsWith('/stop');
-      const pipelineMode = isStop ? 'stop' : (trimmedText.startsWith('/run-b') ? 'run-b' : 'run');
-      const projectId = selectedProjectId;
-      if (!projectId) {
-        useChatStore.getState().appendChat({
-          level: 'error', message: '프로젝트를 먼저 선택해주세요.',
-          agentId: 'system', timestamp: new Date().toISOString(),
-        });
-        setBtnMode('send'); isSendingRef.current = false; setInputText('');
-        return;
-      }
-      fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { method: 'POST' })
-        .then(async (res) => {
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || '파이프라인 명령 실패');
-          const msg = isStop
-            ? `🛑 /stop 파이프라인이 정상적으로 종료(초기화)되었습니다.`
-            : (pipelineMode === 'run'
-              ? `🚀 /run 파이프라인 시작 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
-              : `⏸ /run-b 단계별 확인 모드 시작`);
-          useTimelineStore.getState().appendTimeline({
-            level: 'info', message: msg, agentId: 'system',
-            timestamp: new Date().toISOString(), projectId,
-          });
-        })
-        .catch((err) => {
-          useTimelineStore.getState().appendTimeline({
-            level: 'error', message: `❌ ${isStop ? '파이프라인 종료 실패' : '파이프라인 시작 실패'}: ${err.message}`,
-            agentId: 'system', timestamp: new Date().toISOString(), projectId,
-          });
-        })
-        .finally(() => { setBtnMode('send'); isSendingRef.current = false; });
-      setInputText('');
-      if (textareaRef.current) textareaRef.current.style.height = 'auto';
-      return;
-    }
 
     // ── [Phase 32] 버그독 커맨드 인터셉트 (타임라인 휘발 방지) ────────────
     if (trimmedText.startsWith('/bugdog기록')) {
@@ -542,6 +504,7 @@ export default function LogDrawer() {
           author: 'CEO',
           content: commentContent,
           assignedAgent: resolvedAgent || 'ari', // [Fix] @멘션 없으면 ari 기본 라우팅
+          mode: focusedTask?.mode,
         }),
       });
     } else {

@@ -80,6 +80,47 @@ class ModelSelector {
             };
         }
     }
+
+    /**
+     * [Phase 39] Zero-Command Router
+     * 모드를 명시적으로 선택하지 않고 텍스트만 입력했을 때, 문맥을 파악해 적절한 모드를 자동 할당합니다.
+     */
+    async routeZeroCommand(taskContent) {
+        // 너무 짧거나 일상 대화인 경우 LLM 호출 없이 바로 통과 (비용 절감)
+        if (LOCAL_QUICK_PATTERNS.some(p => p.test(taskContent.trim()))) {
+            return 'NONE';
+        }
+
+        try {
+            const systemPrompt = `당신은 초경량 인텐트 라우터입니다.
+            사용자의 입력 텍스트를 분석하여, 다음 4가지 모드 중 가장 적합한 하나를 고르거나 해당하는 것이 없으면 NONE을 반환하세요.
+            
+            [모드 정의]
+            1. ARCHITECT (기획 모드): 기능 정의, 스코프 분석, 전체 아키텍처 설계, "기획해줘", "구조 잡아줘"
+            2. DEV (개발 모드): 실제 코드 작성 및 구현, "만들어줘", "추가해줘", "개발해줘", 기능 단위의 코딩
+            3. QA (리뷰 모드): 완성된 코드 검토, 테스트 작성, "리뷰해줘", "최적화해줘", 보안 검토
+            4. DEBUG (디버깅 모드): 에러/버그 해결, "에러 나", "안 돌아가", "고쳐줘", 로그 분석
+            
+            오직 다음 JSON 형식으로만 응답하시오:
+            { "inferred_mode": "ARCHITECT" | "DEV" | "QA" | "DEBUG" | "NONE", "reason": "짧은 판단 이유" }`;
+
+            const userPrompt = `다음 요청의 의도를 분석하고 최적의 모드를 추천하세요: "${taskContent}"`;
+            
+            const result = await geminiAdapter.generateResponse(userPrompt, systemPrompt, MODEL.FLASH);
+            
+            const cleanJson = result.text.replace(/```json|```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+            
+            const VALID_MODES = ['ARCHITECT', 'DEV', 'QA', 'DEBUG', 'NONE'];
+            const inferred_mode = VALID_MODES.includes(parsed.inferred_mode) ? parsed.inferred_mode : 'NONE';
+            
+            console.log(`[Zero-Command Router] 의도 분석: ${inferred_mode} (사유: ${parsed.reason})`);
+            return inferred_mode;
+        } catch (error) {
+            console.error('[Zero-Command Router] 분석 중 오류 발생, NONE으로 회귀:', error);
+            return 'NONE';
+        }
+    }
 }
 
 export default new ModelSelector();

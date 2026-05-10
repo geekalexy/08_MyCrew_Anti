@@ -437,7 +437,7 @@ async function handleReviewRequest(taskRow, fromAgentId, reviewRequest) {
   }
 }
 
-async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM') {
+async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM', forceModel = null) {
   if (!dbManager || !executor) return;
   try {
     const fullTask = await dbManager.getTaskById(taskId);
@@ -486,7 +486,7 @@ async function forceRedispatchTask(taskId, agentId, additionalContext = '', cont
       agentStates.set(agentId, { status: 'active', lastHeartbeat: Date.now() });
       io.emit('agent:status_change', { agentId, status: 'active' });
       try {
-        const result = await executor.runDirect(enrichedContent, agentId, taskId);
+        const result = await executor.runDirect(enrichedContent, agentId, taskId, forceModel);
         
         const hasReviewRequest2 = result._meta?.review_request && fullTask?.sprint_no != null;
         const hasNextSprint2 = result._meta?.next_sprint && fullTask?.sprint_no != null && !hasReviewRequest2;
@@ -2524,7 +2524,7 @@ app.post('/api/tasks/:id/sprint/next', async (req, res) => {
 /** POST /api/tasks/:id/comments — 댓글 추가 */
 app.post('/api/tasks/:id/comments', async (req, res) => {
   try {
-    const { author, content, worked, assignedAgent } = req.body;
+    const { author, content, worked, assignedAgent, mode } = req.body;
     if (!author || !content) return res.status(400).json({ status: 'error', message: '작성자와 내용 필수' });
     const sid = req.params.id;
     const task = await dbManager.getTaskById(sid);
@@ -2686,10 +2686,36 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
           
           // [System UX Directive] 대표님 피드백 반영: 문서를 인지했음을 나타내는 서두 강제
           fullContextText += `[System UX Action Directive]\n`;
-          fullContextText += `유저가 기존 작업물(초안이나 첨부 문서)의 수정을 지시했거나 참조를 요구한 경우, 당신의 응답 가장 처음에 반드시 "문서를 확인했습니다." 라는 문장으로 시작하여 문서를 성공적으로 읽었음을 사용자에게 알리세요. 그 다음 수정된 작업물 결과를 출력하세요.`;
+          fullContextText += `유저가 기존 작업물(초안이나 첨부 문서)의 수정을 지시했거나 참조를 요구한 경우, 당신의 응답 가장 처음에 반드시 "문서를 확인했습니다." 라는 문장으로 시작하여 문서를 성공적으로 읽었음을 사용자에게 알리세요. 그 다음 수정된 작업물 결과를 출력하세요.\n\n`;
+
+          // [Phase 39] Zero-Command Router: 모드 미선택 시 자동 추론
+          let resolvedMode = mode;
+          if (!resolvedMode || resolvedMode === 'NONE') {
+            resolvedMode = await modelSelector.routeZeroCommand(aiRequestText);
+            if (resolvedMode !== 'NONE') {
+               broadcastLog('info', `🎯 Zero-Command 감지: 문맥을 분석하여 [${resolvedMode}] 모드로 자동 라우팅 되었습니다.`, 'system', sid);
+            }
+          }
+
+          // [Phase 39] Phase 2: Mode-Macro 강제 분기 및 LLM 할당
+          let forceModel = null;
+          if (resolvedMode === 'ARCHITECT') {
+            fullContextText += `[System Mode Directive]\n사용자가 '기획 모드'로 실행했습니다. '/plan_master' 스코프 분석 및 로드맵 자동 생성을 수행하세요.\n\n`;
+            forceModel = 'claude-opus-4-6';
+          } else if (resolvedMode === 'DEV') {
+            fullContextText += `[System Mode Directive]\n사용자가 '개발 모드'로 실행했습니다. '/auto_run' 태스크 기반 자율 연속 파이프라인 실행을 수행하세요.\n`;
+            fullContextText += `⚠️ 주의 (Cross-Mode Handoff): 만약 기획 내용(PRD)과 기존에 작성된 코드가 모두 주입되었다면, 무작정 코딩을 시작하지 마세요. 최신 기획 내용과 기존 코드의 차이(Diff)를 비교하여, "이전 작업물에서 무엇을 제거하고 수정해야 하는지"를 먼저 분석 및 계획한 뒤 개발을 진행하세요.\n\n`;
+            forceModel = 'gemini-3.1-pro-high';
+          } else if (resolvedMode === 'QA') {
+            fullContextText += `[System Mode Directive]\n사용자가 '리뷰 모드'로 실행했습니다. '/auto_test' 시나리오 기반 자율 테스트 및 검증을 수행하세요.\n\n`;
+            forceModel = 'claude-opus-4-6';
+          } else if (resolvedMode === 'DEBUG') {
+            fullContextText += `[System Mode Directive]\n사용자가 '디버깅 모드'로 실행했습니다. '/auto_debug' 로그 추적 및 에러 자율 수정을 수행하세요.\n\n`;
+            forceModel = 'claude-sonnet-4-6';
+          }
 
           // [Fix] 댓글 응답은 즉각적이어야 하므로 runDirect() 사용 (filePollingAdapter 우회)
-          const result = await executor.runDirect(fullContextText, agentToTrigger, sid);
+          const result = await executor.runDirect(fullContextText, agentToTrigger, sid, forceModel);
 
           let cleanText = result.text || '';
           let nextState = 'REVIEW'; // 기본값
@@ -3379,9 +3405,26 @@ app.post('/api/tasks/:id/run', async (req, res) => {
 
     broadcastLog('info', `[Zero-Command] Task #${sid} 실행 트리거 수신 (Mode: ${mode || 'Unknown'})`, 'system', sid);
 
-    // 1. Intent Router 처리
+    // 1. Intent Router 처리 및 [Phase 39] Phase 2: Mode-Macro 강제 분기
     const { default: intentRouter } = await import('./ai-engine/services/intentRouter.js');
-    const routeResult = await intentRouter.routeIntent(intent || mode);
+    let routeResult;
+    let forceModel = null;
+    
+    if (mode === 'ARCHITECT') {
+      routeResult = { mode: 'ARCHITECT', intent: 'plan_master', extractedPayload: intent || '/plan_master' };
+      forceModel = 'claude-opus-4-6';
+    } else if (mode === 'DEV') {
+      routeResult = { mode: 'DEV', intent: 'auto_run', extractedPayload: intent || '/auto_run' };
+      forceModel = 'gemini-3.1-pro-high';
+    } else if (mode === 'QA') {
+      routeResult = { mode: 'QA', intent: 'auto_test', extractedPayload: intent || '/auto_test' };
+      forceModel = 'claude-opus-4-6';
+    } else if (mode === 'DEBUG') {
+      routeResult = { mode: 'DEBUG', intent: 'auto_debug', extractedPayload: intent || '/auto_debug' };
+      forceModel = 'claude-sonnet-4-6';
+    } else {
+      routeResult = await intentRouter.routeIntent(intent || mode);
+    }
     
     // [Phase 39] Selective Loading을 위해 MCP 서버가 읽을 수 있도록 현재 모드 파일 저장
     try {
@@ -3403,7 +3446,7 @@ app.post('/api/tasks/:id/run', async (req, res) => {
     io.emit('task:moved', { taskId: sid, toColumn: 'in_progress' });
     
     // 4. Executor 실행 (강제 트리거)
-    forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode);
+    forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode, forceModel);
 
     res.json({ status: 'ok', message: 'Zero-Command 트리거 성공', route: routeResult });
   } catch (err) {

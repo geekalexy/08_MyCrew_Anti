@@ -318,17 +318,41 @@ export default function TaskDetailModal() {
   
   // 편집 기능 상태 
   const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [editColumn, setEditColumn] = useState('todo');
+  const [editPriority, setEditPriority] = useState('');
+
+  // [Phase 39] Toast & Auto-Fallback 상태
+  const [toastMsg, setToastMsg] = useState('');
+  const showToast = useCallback((msg, duration = 4000) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), duration);
+  }, []);
+
+  const checkAutoFallback = () => {
+    if (!task?.content || task.content.trim().length < 5) {
+      if (['DEV', 'QA', 'DEBUG'].includes(task?.mode)) {
+        patchTask(task.id, { mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)' });
+        fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)' })
+        }).catch(console.error);
+        
+        showToast('📋 상세 내용이 없어 기획 모드로 자동 전환되었습니다.');
+        return 'ARCHITECT';
+      }
+    }
+    return task?.mode || 'DEV';
+  };
   
   // [Phase 39] 통합 UI 모드/모델 상태
   const [isCommentExpanded, setIsCommentExpanded] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showModelSelector, setShowModelSelector] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editContent, setEditContent] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
   const [editModel, setEditModel] = useState('');
-  const [editColumn, setEditColumn] = useState('');
-  const [editPriority, setEditPriority] = useState('');
   
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [reworkReason, setReworkReason] = useState('');
@@ -396,8 +420,7 @@ export default function TaskDetailModal() {
       );
     } else if (status === 'DONE' || status === 'FINALIZED') {
       commands.push(
-        { id: '/deploy', label: '배포', icon: 'cloud_upload' },
-        { id: '/archive', label: '문서화', icon: 'archive' }
+        { id: '/deploy', label: '배포', icon: 'cloud_upload' }
       );
     }
     return commands;
@@ -405,6 +428,29 @@ export default function TaskDetailModal() {
 
   const SLASH_COMMANDS = getSlashCommands(task?.status);
   const filteredSlash = SLASH_COMMANDS.filter(c => c.id.includes(slashQuery));
+
+  const getAvailableModes = (status) => {
+    const s = (status || '').toUpperCase();
+    const allModes = [
+      { value: 'NONE', label: '선택하지 않음' },
+      { value: 'ARCHITECT', label: '📐 기획 모드' },
+      { value: 'DEV', label: '💻 개발 모드' },
+      { value: 'QA', label: '🕵️‍♂️ 리뷰 모드' },
+      { value: 'DEBUG', label: '🧰 디버깅 모드' },
+    ];
+    
+    if (s === 'BACKLOG' || s === 'TODO') {
+      return allModes.filter(m => ['NONE', 'ARCHITECT', 'DEV'].includes(m.value));
+    } else if (s === 'IN_PROGRESS') {
+      return allModes.filter(m => ['NONE', 'ARCHITECT', 'DEV', 'DEBUG'].includes(m.value));
+    } else if (s === 'REVIEW') {
+      return allModes.filter(m => ['NONE', 'QA', 'DEBUG'].includes(m.value));
+    } else if (s === 'DONE' || s === 'COMPLETED' || s === 'FINALIZED' || s === 'ARCHIVED') {
+      return allModes.filter(m => ['NONE'].includes(m.value));
+    }
+    return allModes;
+  };
+  const availableModes = getAvailableModes(task?.status);
 
 
   useEffect(() => {
@@ -718,82 +764,7 @@ export default function TaskDetailModal() {
     if (!commentText.trim() || !task) return;
 
     const trimmedText = commentText.trim();
-    
-    // ── [Phase 36] /run, /run-b, /stop 파이프라인 슬래시 커맨드 인터셉트 ────────────
-    if (trimmedText.startsWith('/run') || trimmedText.startsWith('/run-b') || trimmedText.startsWith('/stop')) {
-      const isStop = trimmedText.startsWith('/stop');
-      const pipelineMode = isStop ? 'stop' : (trimmedText.startsWith('/run-b') ? 'run-b' : 'run');
-      const projectId = task.projectId || task.project_id;
-
-      // ① 즉시 activity 탭 시스템 로그 (피드백) 및 DB 저장 (모달 닫혀도 유지되도록)
-      const pendingMsg = isStop
-        ? `🛑 /stop 파이프라인 강제 종료 요청`
-        : (pipelineMode === 'run'
-          ? `🚀 /run 파이프라인 시작 요청 — PRD→Advisor 자율 완주 모드`
-          : `⏸ /run-b 파이프라인 시작 요청 — 단계별 CEO 확인 모드`);
-      
-      const newComment = {
-        author: 'system',
-        source: { id: 'system', name: 'system' },
-        target: { id: 'user-1', name: 'CEO' },
-        content: pendingMsg,
-        created_at: new Date().toISOString(),
-      };
-      setComments(prev => [...prev, newComment]);
-      setActiveCommentTab('activity');
-      
-      // DB 저장은 서버의 broadcastLog에 위임하여 중복 방지 (B-4 수정)
-
-      if (projectId) {
-        fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(projectId)}/pipeline/${pipelineMode}`, { 
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId: String(task.id) })
-        })
-          .then(async (res) => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || '파이프라인 명령 실패');
-            const msg = isStop
-              ? `🛑 /stop 파이프라인이 정상적으로 종료(초기화)되었습니다.`
-              : (pipelineMode === 'run'
-                ? `🚀 /run 파이프라인 시작됨 — ${data.title || 'PRD'}부터 Advisor 리뷰까지 자율 완주`
-                : `⏸ /run-b 단계별 확인 모드 시작됨`);
-            useTimelineStore.getState().appendTimeline({
-              level: 'info', message: msg, agentId: 'system',
-              timestamp: new Date().toISOString(), projectId,
-              taskId: String(task.id), // 타임라인에서도 해당 태스크 필터에 걸리도록 taskId 부여
-            });
-            // ② 서버 응답 확인 로그 DB 저장은 서버에서 이미 처리함 (중복 방지)
-            setComments(prev => [...prev, {
-              ...newComment,
-              content: `✅ ${msg}`,
-              created_at: new Date().toISOString(),
-            }]);
-          })
-          .catch((err) => {
-            useTimelineStore.getState().appendTimeline({
-              level: 'error', message: `❌ ${isStop ? '파이프라인 종료 실패' : '파이프라인 시작 실패'}: ${err.message}`,
-              agentId: 'system', timestamp: new Date().toISOString(), projectId,
-              taskId: String(task.id),
-            });
-            fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ author: 'system', content: `❌ 파이프라인 시작 실패: ${err.message}` }),
-            }).catch(console.error);
-            setComments(prev => [...prev, {
-              ...newComment,
-              content: `❌ 파이프라인 시작 실패: ${err.message}`,
-              created_at: new Date().toISOString(),
-            }]);
-          });
-      }
-      setCommentText('');
-      setCommentColumn('NO_CHANGE');
-      setCommentAssignee('NO_CHANGE');
-      setCommentPriority('NO_CHANGE');
-      return;
-    }
+    const finalMode = checkAutoFallback();
 
     let finalColumn = commentColumn === 'NO_CHANGE' ? task.column : commentColumn;
     const finalPriority = commentPriority === 'NO_CHANGE' ? task.priority : commentPriority;
@@ -861,8 +832,9 @@ export default function TaskDetailModal() {
           content: newComment.content,
           source: newComment.source,
           target: newComment.target,
-          mode: task.mode || 'DEV',
+          mode: finalMode,
           model: task.model || 'Claude Sonnet 4.6 (Thinking)',
+          assignedAgent: finalAssignee,
         })
       }).catch(console.error);
 
@@ -870,13 +842,6 @@ export default function TaskDetailModal() {
     setCommentColumn('NO_CHANGE');
     setCommentAssignee('NO_CHANGE');
     setCommentPriority('NO_CHANGE');
-
-    // REST 동기화 (백그라운드)
-    fetch(`${SERVER_URL}/api/tasks/${task.id}/comments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: 'CEO', content: newComment.content, assignedAgent: finalAssignee }),
-    }).catch(console.error);
   };
 
   // Kill 실행
@@ -893,6 +858,7 @@ export default function TaskDetailModal() {
       alert('담당자를 먼저 지정해주세요.');
       return;
     }
+    const finalMode = checkAutoFallback();
     setIsStarting(true);
     // PATCH → server가 task:updated 소켓 emit → 모달의 onTaskUpdated에서 Activity 자동 추가
     fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
@@ -1382,14 +1348,20 @@ export default function TaskDetailModal() {
                   const newMode = newModeRaw === 'NONE' ? null : newModeRaw;
                   const prevMode = task.mode || 'NONE';
                   
+                  // 모드에 따른 LLM 강제 할당 (Phase 39)
+                  let newModel = task.model; // 기본값 유지
+                  if (newMode === 'ARCHITECT') newModel = 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)';
+                  else if (newMode === 'DEV') newModel = 'Gemini 3.1 Pro (High)';
+                  else if (newMode === 'QA') newModel = 'Claude Opus 4.6 (Thinking)';
+                  else if (newMode === 'DEBUG') newModel = 'Claude Sonnet 4.6 (Thinking) + Gemini 3.1 Pro (High) (Fallback)';
+
                   // 모드 변경 API 및 Store 업데이트
-                  patchTask(task.id, { mode: newMode });
+                  patchTask(task.id, { mode: newMode, model: newModel });
                   fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: newMode })
+                    body: JSON.stringify({ mode: newMode, model: newModel })
                   }).catch(console.error);
-
                   // 모드 변경 시 타임라인(액티비티) 시스템 로그 기록
                   if (prevMode !== newModeRaw) {
                     const modeNames = { 'NONE': '선택하지 않음', 'ARCHITECT': '기획 모드', 'DEV': '개발 모드', 'QA': '리뷰 모드', 'DEBUG': '디버깅 모드' };
@@ -1415,11 +1387,9 @@ export default function TaskDetailModal() {
                   cursor: 'pointer', fontFamily: 'Space Grotesk, sans-serif'
                 }}
               >
-                <option value="NONE">선택하지 않음</option>
-                <option value="ARCHITECT">📐 기획 모드</option>
-                <option value="DEV">💻 개발 모드</option>
-                <option value="QA">🕵️‍♂️ 리뷰 모드</option>
-                <option value="DEBUG">🧰 디버깅 모드</option>
+                {availableModes.map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
               </select>
             </div>
 
@@ -1549,6 +1519,32 @@ export default function TaskDetailModal() {
               </select>
             </div>
           </div>
+
+          {/* 모드 선택 시 매크로 라벨 노출 (메타 속성 아래 위치) */}
+          {task?.mode === 'ARCHITECT' && (
+            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(124, 110, 248, 0.1)', color: '#7c6ef8', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>psychology_alt</span>
+              [ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]
+            </div>
+          )}
+          {task?.mode === 'DEV' && (
+            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>rocket_launch</span>
+              [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
+            </div>
+          )}
+          {task?.mode === 'QA' && (
+            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>fact_check</span>
+              [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
+            </div>
+          )}
+          {task?.mode === 'DEBUG' && (
+            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>bug_report</span>
+              [ /auto_debug : 로그 추적 및 에러 자율 수정 ]
+            </div>
+          )}
 
           {/* 댓글 목록 */}
           <div style={{ marginBottom: '1rem' }}>
@@ -1988,32 +1984,6 @@ export default function TaskDetailModal() {
                 </select>
               </div>
             </div>
-            {/* 모드 선택 시 매크로 라벨 노출 (항상 보이도록 분리) */}
-            {task?.mode === 'ARCHITECT' && (
-              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(124, 110, 248, 0.1)', color: '#7c6ef8', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>psychology_alt</span>
-                [ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]
-              </div>
-            )}
-            {task?.mode === 'DEV' && (
-              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>rocket_launch</span>
-                [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
-              </div>
-            )}
-            {task?.mode === 'QA' && (
-              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>fact_check</span>
-                [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
-              </div>
-            )}
-            {task?.mode === 'DEBUG' && (
-              <div style={{ marginBottom: '8px', padding: '6px 12px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.1rem' }}>bug_report</span>
-                [ /auto_debug : 로그 추적 및 에러 자율 수정 ]
-              </div>
-            )}
-
             {/* 코멘트 작성 토글 영역 */}
             {!isCommentExpanded ? (
               <button 
@@ -2544,6 +2514,20 @@ export default function TaskDetailModal() {
             </div>
           )}
       </div>
+
+      {toastMsg && (
+        <div style={{
+          position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(30,30,30,0.95)', border: '1px solid rgba(255,255,255,0.15)',
+          color: '#fff', padding: '12px 24px', borderRadius: '8px', zIndex: 9999,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', gap: '8px',
+          fontFamily: 'Space Grotesk, sans-serif', fontSize: '0.9rem', fontWeight: 500,
+          animation: 'fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+        }}>
+          <span className="material-symbols-outlined" style={{ color: 'var(--brand)', fontSize: '1.2rem' }}>info</span>
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 }

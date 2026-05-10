@@ -1,7 +1,7 @@
 // src/store/settingsStore.js — Heartbeat 설정 (백엔드 /api/settings 연동)
 import { create } from 'zustand';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 export const useSettingsStore = create((set) => ({
   heartbeat_auto_resume_level: 'SAFE_ONLY',

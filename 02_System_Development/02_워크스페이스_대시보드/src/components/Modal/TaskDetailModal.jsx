@@ -7,7 +7,6 @@ import { useTimelineStore } from '../../store/timelineStore';
 import { useSocket } from '../../hooks/useSocket';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
 import { renderTaggedText, renderChainRefText } from '../../utils/TagRenderer';
 import { useContextChain, extractChainRefs } from '../../hooks/useContextChain';
 import ContextChainPanel from './ContextChainPanel';
@@ -25,7 +24,7 @@ const TEAM_AGENTS = {
   team_B: { img: 'LUMI', vid: 'PICO', brain: 'LUNA',  protocol: 'CKS 협력'   },
 };
 
-const SERVER_URL_TL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL_TL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 function WorkflowTimeline({ taskId }) {
   const logs = useTimelineStore((s) => s.timelines);
@@ -258,7 +257,7 @@ const STATUS_LABEL = {
   PAUSED:     { text: '중단됨',    color: 'var(--status-active)' },
 };
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 const formatModelName = (modelStr, agentMeta = {}) => {
   if (!modelStr) return '';
@@ -308,16 +307,23 @@ export default function TaskDetailModal() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
   const [isLoadingComments, setIsLoadingComments] = useState(false);
-  const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity'
-  const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
+  const [activeCommentTab, setActiveCommentTab] = useState('discussion'); // [S4-2] 탭: 'discussion' | 'activity' | 'graph'
+  const [graphReport, setGraphReport] = useState(null);
   
-  // 패스 21: 댓글 전송 시 함께 업데이트할 필드 상태
+
+  const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
   const [commentColumn, setCommentColumn] = useState('');
   const [commentAssignee, setCommentAssignee] = useState('');
   const [commentPriority, setCommentPriority] = useState('medium');
   
   // 편집 기능 상태 
   const [isEditing, setIsEditing] = useState(false);
+  
+  // [Phase 39] 통합 UI 모드/모델 상태
+  const [selectedMode, setSelectedMode] = useState('DEV');
+  const [selectedModel, setSelectedModel] = useState('Claude Sonnet 4.6 (Thinking)');
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showModelSelector, setShowModelSelector] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
   const [editAssignee, setEditAssignee] = useState('');
@@ -342,6 +348,12 @@ export default function TaskDetailModal() {
   const resizerRef = useRef(null);
   const isDragging = useRef(false);
 
+  // [Phase B] Right Pane 탭 상태 ('preview' | 'graph')
+  const [rightPaneTab, setRightPaneTab] = useState('preview');
+  const [graphPaneExists, setGraphPaneExists] = useState(false);
+  const [graphPaneChecked, setGraphPaneChecked] = useState(false);
+  const graphIframeRef = useRef(null);
+
   // [Phase 37 Context Chain 훅은 task 선언 이후로 이동됨 — 아래 참고]
 
   const textareaRef = useRef(null);
@@ -365,6 +377,18 @@ export default function TaskDetailModal() {
 
   const task = activeDetailTaskId ? (tasks[String(activeDetailTaskId)] || null) : null;
   const isFocused = String(focusedTaskId) === String(activeDetailTaskId);
+
+  useEffect(() => {
+    if (activeCommentTab === 'graph' && !graphReport) {
+      const projectId = task?.projectId || task?.project_id;
+      if (projectId) {
+        fetch(`${SERVER_URL}/preview/${projectId}/OUTPUT/GRAPH_REPORT.md`)
+          .then(r => r.ok ? r.text() : '지식망 리포트가 아직 생성되지 않았거나 워치독 스캔 전입니다.')
+          .then(text => setGraphReport(text))
+          .catch(() => setGraphReport('리포트를 불러오지 못했습니다.'));
+      }
+    }
+  }, [activeCommentTab, task, SERVER_URL, graphReport]);
 
   // ── [Phase 37] Context Chaining — task 선언 이후 (ReferenceError 방지) ───
   const projectId = task?.projectId || task?.project_id || null;
@@ -394,7 +418,7 @@ export default function TaskDetailModal() {
     const projectId = tasks[String(activeDetailTaskId)]?.projectId
       || tasks[String(activeDetailTaskId)]?.project_id;
     if (projectId) {
-      fetch(`http://localhost:4007/preview/${projectId}/OUTPUT/index.html`, { method: 'HEAD' })
+      fetch(`${SERVER_URL}/preview/${projectId}/OUTPUT/index.html`, { method: 'HEAD' })
         .then((r) => setHasPreviewData(r.ok))
         .catch(() => setHasPreviewData(false));
     }
@@ -479,6 +503,7 @@ export default function TaskDetailModal() {
     setIsExpanded(false); // [버그수정] 확장 페이지 상태 초기화
     contextChain.closePanel(); // [버그수정] 체인 패널 상태 초기화
     setSplitRatio(50);
+    setRightPaneTab('preview'); // [Phase B] 탭 초기화
   }, [setActiveDetailTaskId, isArchived, activeDetailTaskId, removeTask, contextChain]);
 
   // ── [Phase 37] Resizer 드래그 핸들러 ─────────────────────────────────────
@@ -509,8 +534,27 @@ export default function TaskDetailModal() {
   const previewUrl = (() => {
     const projectId = task?.projectId || task?.project_id;
     if (!projectId) return null;
-    return `http://localhost:4007/preview/${projectId}/OUTPUT/index.html`;
+    return `${SERVER_URL}/preview/${projectId}/OUTPUT/index.html`;
   })();
+
+  // [Phase B] 지식 그래프 URL
+  const graphUrl = (() => {
+    const projectId = task?.projectId || task?.project_id;
+    if (!projectId) return null;
+    return `${SERVER_URL}/preview/${projectId}/OUTPUT/graph.html`;
+  })();
+
+  // [Phase B] Graph 탭 클릭 시 graph.html 존재 확인
+  const handleGraphTabClick = () => {
+    setRightPaneTab('graph');
+    if (!graphPaneChecked && graphUrl) {
+      setGraphPaneChecked(false);
+      fetch(graphUrl, { method: 'HEAD' })
+        .then((r) => setGraphPaneExists(r.ok))
+        .catch(() => setGraphPaneExists(false))
+        .finally(() => setGraphPaneChecked(true));
+    }
+  };
 
   const handlePreviewRefresh = () => {
     setPreviewError(false);
@@ -1128,7 +1172,7 @@ export default function TaskDetailModal() {
                 <ReactMarkdown
                   className="notion-md"
                   remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeRaw]}
+
                 >
                   {task.content || ''}
                 </ReactMarkdown>
@@ -1401,6 +1445,7 @@ export default function TaskDetailModal() {
                     {[
                       { key: 'discussion', icon: 'forum',    label: 'Discussion', count: discussionComments.length },
                       { key: 'activity',   icon: 'history',  label: 'Activity',   count: activityComments.length },
+                      { key: 'graph',      icon: 'account_tree', label: 'Graphify Report', count: 0 },
                     ].map(tab => (
                       <button key={tab.key} onClick={() => setActiveCommentTab(tab.key)} style={{
                         display: 'flex', alignItems: 'center', gap: '0.3rem',
@@ -1428,7 +1473,19 @@ export default function TaskDetailModal() {
                   </div>
 
                   {/* 탭 콘텐츠 */}
-                  {isLoadingComments ? (
+                  {activeCommentTab === 'graph' ? (
+                    <div style={{ padding: '0.5rem', fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                      {graphReport ? (
+                        <div className="markdown-body" style={{ background: 'transparent' }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {graphReport}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>리포트 데이터를 불러오는 중...</p>
+                      )}
+                    </div>
+                  ) : isLoadingComments ? (
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>댓글 불러오는 중...</p>
                   ) : visibleComments.length === 0 ? (
                     <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
@@ -1452,7 +1509,26 @@ export default function TaskDetailModal() {
                   // - 에이전트(lumi/nova 등): 크루 자체 작성
                   const isCeo = srcName === 'CEO';
                   const isAriDelegate = srcName === 'ARI(위임)';
-                  const isAgentComment = !isCeo && !isAriDelegate && c.author !== 'CEO' && c.author !== '대표님';
+                  const isAgentComment = !isCeo && !isAriDelegate && c.author !== 'CEO' && c.author !== '대표님' && c.author !== 'system';
+
+                  // [Phase 39] System Log MCP Terminal Parsing
+                  const isSystemLog = c.author === 'system';
+                  let mcpToolName = null;
+                  let logContent = c.content || '';
+                  if (isSystemLog) {
+                    const match = logContent.match(/^\[([a-zA-Z0-9_]+)\]\s*(.*)/s);
+                    if (match) {
+                      mcpToolName = match[1];
+                      logContent = match[2];
+                    }
+                  }
+                  const getToolIcon = (name) => {
+                    if (name === 'trace_bug') return 'bug_report';
+                    if (name === 'run_tasks') return 'terminal';
+                    if (name === 'search_web') return 'travel_explore';
+                    if (name.includes('graph')) return 'account_tree';
+                    return 'build';
+                  };
                   // CEO: 초록 / ARI(위임): 주황 / 에이전트: 브랜드색
                   const srcColor = isCeo ? '#4ade80' : isAriDelegate ? '#fb923c' : 'var(--brand)';
                   const tgtColor = isAgentComment ? 'var(--status-active)' : (isCeo || isAriDelegate) ? 'var(--brand)' : 'var(--text-muted)';
@@ -1475,21 +1551,28 @@ export default function TaskDetailModal() {
                     </div>
                   )}
                   <div style={{
-                    background: isChainComment ? 'rgba(180,197,255,0.04)' : 'var(--bg-surface-2)',
+                    background: isSystemLog ? '#0d0f14' : (isChainComment ? 'rgba(180,197,255,0.04)' : 'var(--bg-surface-2)'),
                     borderRadius: '10px',
                     padding: '0.7rem 0.9rem',
-                    border: isChainComment ? '1px solid rgba(180,197,255,0.15)' : '1px solid var(--border)',
+                    border: isSystemLog ? '1px solid #333' : (isChainComment ? '1px solid rgba(180,197,255,0.15)' : '1px solid var(--border)'),
+                    color: isSystemLog ? '#e5e7eb' : 'inherit',
                   }}>
 
                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem', alignItems: 'center' }}>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                         {c.author === 'system' ? (
+                         {isSystemLog ? (
                            <span style={{
-                             fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)',
-                             fontFamily: 'Space Grotesk, sans-serif', textTransform: 'uppercase',
-                             letterSpacing: '0.07em', background: 'rgba(255,255,255,0.06)',
-                             border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '1px 6px',
-                           }}>System Log</span>
+                             display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                             fontSize: '0.68rem', fontWeight: 700, color: '#9ca3af',
+                             fontFamily: 'SF Mono, Space Grotesk, sans-serif', textTransform: 'uppercase',
+                             letterSpacing: '0.05em', background: 'rgba(255,255,255,0.08)',
+                             border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '2px 8px',
+                           }}>
+                             <span className="material-symbols-outlined" style={{ fontSize: '0.85rem', color: mcpToolName ? '#60a5fa' : '#9ca3af' }}>
+                               {mcpToolName ? getToolIcon(mcpToolName) : 'memory'}
+                             </span>
+                             {mcpToolName ? `MCP Tool: ${mcpToolName}` : 'System Log'}
+                           </span>
                          ) : (
                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: srcColor }}>{srcName}</span>
                          )}
@@ -1545,40 +1628,50 @@ export default function TaskDetailModal() {
                          )}
                        </span>
                      </div>
-                    <div style={{ fontSize: '1.05rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, wordBreak: 'break-word' }}>
-                      <ReactMarkdown
-                        className="notion-md"
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        components={{
-                          // [Phase 36b/37] 카드링크 + 컨텍스트 체인 [#ID] 인라인 렌더링
-                          p: ({ children }) => {
-                            const processChild = (child) => {
-                              if (typeof child !== 'string') return child;
-                              // [#ID] 체인 칩 먼저 처리 (대괄호 문법)
-                              const chainParts = renderChainRefText(
-                                child,
-                                contextChain.chainCache,
-                                (refId) => {
-                                  contextChain.openPanel(refId);
-                                  setIsPreviewMode(false);
-                                  if (!isExpanded) setIsExpanded(true);
-                                }
-                              );
-                              // 남은 string 노드에 #NCN 처리
-                              return chainParts.flatMap(part =>
-                                typeof part === 'string' ? renderTaggedText(part, null) : [part]
-                              );
-                            };
-                            const processed = Array.isArray(children)
-                              ? children.flatMap(processChild)
-                              : processChild(children);
-                            return <p>{processed}</p>;
-                          },
-                        }}
-                      >
-                        {c.content || ''}
-                      </ReactMarkdown>
+                    <div style={{ 
+                      fontSize: isSystemLog ? '0.78rem' : '1.05rem', 
+                      color: isSystemLog ? '#e5e7eb' : 'var(--text-secondary)', 
+                      lineHeight: 1.5, margin: 0, wordBreak: 'break-word',
+                      marginTop: isSystemLog ? '0.6rem' : '0'
+                    }}>
+                      {isSystemLog ? (
+                        <div style={{ whiteSpace: 'pre-wrap', fontFamily: 'SF Mono, monospace' }}>
+                          {logContent}
+                        </div>
+                      ) : (
+                        <ReactMarkdown
+                          className="notion-md"
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            // [Phase 36b/37] 카드링크 + 컨텍스트 체인 [#ID] 인라인 렌더링
+                            p: ({ children }) => {
+                              const processChild = (child) => {
+                                if (typeof child !== 'string') return child;
+                                // [#ID] 체인 칩 먼저 처리 (대괄호 문법)
+                                const chainParts = renderChainRefText(
+                                  child,
+                                  contextChain.chainCache,
+                                  (refId) => {
+                                    contextChain.openPanel(refId);
+                                    setIsPreviewMode(false);
+                                    if (!isExpanded) setIsExpanded(true);
+                                  }
+                                );
+                                // 남은 string 노드에 #NCN 처리
+                                return chainParts.flatMap(part =>
+                                  typeof part === 'string' ? renderTaggedText(part, null) : [part]
+                                );
+                              };
+                              const processed = Array.isArray(children)
+                                ? children.flatMap(processChild)
+                                : processChild(children);
+                              return <p>{processed}</p>;
+                            },
+                          }}
+                        >
+                          {logContent}
+                        </ReactMarkdown>
+                      )}
                     </div>
 
                     {/* ── [사고과정] 에이전트 댓글에만 표시 ── */}
@@ -1729,6 +1822,20 @@ export default function TaskDetailModal() {
                   <option value="high">높음</option>
                 </select>
               </div>
+            </div>
+
+            {/* [Phase 39] 입력창 상단: 선택된 모드/모델 정보 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0 0.2rem', marginBottom: '-0.3rem' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {selectedMode === 'ARCHITECT' && '📐 기획 모드'}
+                {selectedMode === 'DEV' && '💻 개발 모드'}
+                {selectedMode === 'QA' && '🕵️‍♂️ 리뷰 모드'}
+                {selectedMode === 'DEBUG' && '🧰 디버깅 모드'}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>|</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {selectedModel}
+              </span>
             </div>
 
             <div style={{ position: 'relative' }}>
@@ -1900,38 +2007,72 @@ export default function TaskDetailModal() {
                 📦 아카이빙 완료 — Obsidian에 저장됩니다. X 버튼으로 닫으면 칸반에서 제거됩니다.
               </div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
-                +Enter 업데이트 전송
-              </span>
-              <button
-                onClick={handleSubmitComment}
-                disabled={
-                  isArchived ||           // 아카이빙 완료 시 전송 비활성
-                  commentColumn === 'archive' ||
-                  (!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority)
-                }
-                style={{
-                  background: 'var(--brand-dim, #2668ff)',
-                  color: '#ffffff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '0.4rem 1rem',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  fontFamily: 'Space Grotesk, sans-serif',
-                  transition: 'all 0.18s ease',
-                  letterSpacing: '0.02em',
-                  boxShadow: '0 2px 8px rgba(38,104,255,0.35)',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#1a52e8'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand-dim, #2668ff)'; }}
-              >
-                전송 및 반영
-              </button>
+            
+            {/* [Phase 39] 하단 툴바: 좌측 아이콘, 우측 전송 버튼 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  title="워크플로우 모드 전환"
+                  onClick={() => setShowModeSelector(!showModeSelector)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.3rem', borderRadius: '4px', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>add_circle</span>
+                </button>
+                <button
+                  title="LLM 모델 교체"
+                  onClick={() => setShowModelSelector(!showModelSelector)}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0.3rem', borderRadius: '4px', transition: 'background 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>keyboard_double_arrow_up</span>
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>keyboard_command_key</span>
+                  +Enter 업데이트 전송
+                </span>
+                <button
+                  onClick={handleSubmitComment}
+                  disabled={
+                    isArchived ||
+                    commentColumn === 'archive' ||
+                    (!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority)
+                  }
+                  style={{
+                    background: 'var(--brand-dim, #2668ff)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', transition: 'all 0.18s ease', letterSpacing: '0.02em', boxShadow: '0 2px 8px rgba(38,104,255,0.35)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#1a52e8'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--brand-dim, #2668ff)'; }}
+                >
+                  전송
+                </button>
+              </div>
             </div>
+
+            {/* 임시 셀렉터 UI (추후 고도화 가능) */}
+            {showModeSelector && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                {['ARCHITECT', 'DEV', 'QA', 'DEBUG'].map(mode => (
+                  <button key={mode} onClick={() => { setSelectedMode(mode); setShowModeSelector(false); }} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: '4px', background: selectedMode === mode ? 'var(--brand)' : 'var(--bg-surface-1)', color: selectedMode === mode ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    {mode}
+                  </button>
+                ))}
+              </div>
+            )}
+            {showModelSelector && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                {['Claude Opus 4.6 (Thinking)', 'Claude Sonnet 4.6 (Thinking)', 'Gemini 3.1 Pro'].map(model => (
+                  <button key={model} onClick={() => { setSelectedModel(model); setShowModelSelector(false); }} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem', borderRadius: '4px', background: selectedModel === model ? 'var(--brand)' : 'var(--bg-surface-1)', color: selectedModel === model ? '#fff' : 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    {model}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1986,7 +2127,7 @@ export default function TaskDetailModal() {
           </div>
         )}
 
-        {/* ── [Phase 37] Right Pane — iframe 프리뷰 ── */}
+        {/* ── [Phase B] Right Pane — iframe 프리뷰 (Preview / Graph 탭) ── */}
         {isPreviewMode && (
           <div style={{
             flex: `0 0 ${100 - splitRatio}%`,
@@ -1995,96 +2136,206 @@ export default function TaskDetailModal() {
             background: 'var(--bg-base)',
             borderLeft: '1px solid var(--border)',
           }}>
-            {/* 프리뷰 툴바 */}
+            {/* [Phase B] 탭 헤더: [Preview] / [Graph] */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem',
-              padding: '0.45rem 0.8rem',
+              display: 'flex', alignItems: 'center',
+              borderBottom: '1px solid var(--border)',
+              background: 'var(--bg-surface-2)',
+              flexShrink: 0,
+              padding: '0 0.5rem',
+            }}>
+              {[
+                { key: 'preview', icon: 'preview',      label: 'Preview' },
+                { key: 'graph',   icon: 'account_tree', label: 'Graph'   },
+              ].map(tab => (
+                <button
+                  key={tab.key}
+                  id={`btn-right-pane-tab-${tab.key}`}
+                  onClick={() => tab.key === 'graph' ? handleGraphTabClick() : setRightPaneTab('preview')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.3rem',
+                    padding: '0.45rem 0.75rem',
+                    fontSize: '0.72rem', fontWeight: 700,
+                    fontFamily: 'Space Grotesk, sans-serif',
+                    letterSpacing: '0.04em',
+                    border: 'none',
+                    borderBottom: rightPaneTab === tab.key ? '2px solid var(--brand)' : '2px solid transparent',
+                    borderRadius: 0,
+                    background: 'none',
+                    color: rightPaneTab === tab.key ? 'var(--brand)' : 'var(--text-muted)',
+                    cursor: 'pointer',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.85rem' }}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+
+              {/* 공통 툴 버튼 (새로고침, 새 탭) */}
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: '2px' }}>
+                <button
+                  id="btn-preview-refresh"
+                  onClick={() => {
+                    if (rightPaneTab === 'preview') {
+                      setPreviewError(false);
+                      if (iframeRef.current) iframeRef.current.src = iframeRef.current.src;
+                    } else {
+                      // Graph 탭 재확인
+                      setGraphPaneChecked(false);
+                      if (graphUrl) {
+                        fetch(graphUrl, { method: 'HEAD' })
+                          .then((r) => setGraphPaneExists(r.ok))
+                          .catch(() => setGraphPaneExists(false))
+                          .finally(() => setGraphPaneChecked(true));
+                      }
+                      if (graphIframeRef.current) graphIframeRef.current.src = graphIframeRef.current.src;
+                    }
+                  }}
+                  title="새로고침"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                    padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>refresh</span>
+                </button>
+                <button
+                  id="btn-preview-new-tab"
+                  onClick={() => {
+                    const url = rightPaneTab === 'preview' ? previewUrl : graphUrl;
+                    if (url) window.open(url, '_blank');
+                  }}
+                  title="새 탭에서 열기"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
+                    padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>open_in_new</span>
+                </button>
+              </div>
+            </div>
+
+            {/* URL 표시 바 */}
+            <div style={{
+              padding: '0.2rem 0.8rem',
               background: 'var(--bg-surface-2)',
               borderBottom: '1px solid var(--border)',
               flexShrink: 0,
             }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: 'var(--brand)', opacity: 0.8 }}>preview</span>
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'SF Mono, monospace', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {previewUrl}
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontFamily: 'SF Mono, monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                {rightPaneTab === 'preview' ? previewUrl : graphUrl}
               </span>
-
-              {/* 새로고침 */}
-              <button
-                id="btn-preview-refresh"
-                onClick={handlePreviewRefresh}
-                title="새로고침 (에이전트가 파일을 업데이트한 경우)"
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
-                  padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>refresh</span>
-              </button>
-
-              {/* 새 창 열기 */}
-              <button
-                id="btn-preview-new-tab"
-                onClick={() => window.open(previewUrl, '_blank')}
-                title="새 탭에서 열기"
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--text-muted)', display: 'flex', alignItems: 'center',
-                  padding: '4px', borderRadius: '6px', transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'none'}
-              >
-                <span className="material-symbols-outlined" style={{ fontSize: '1.05rem' }}>open_in_new</span>
-              </button>
             </div>
 
-            {/* iframe 또는 Empty State */}
-            {previewError ? (
-              /* Empty State: OUTPUT/index.html 없을 때 */
-              <div style={{
-                flex: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                gap: '0.75rem', padding: '2rem',
-                color: 'var(--text-muted)',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', opacity: 0.4 }}>web_asset_off</span>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
-                    아직 OUTPUT/index.html이 없어요
+            {/* ── Preview 탭 콘텐츠 ── */}
+            {rightPaneTab === 'preview' && (
+              previewError ? (
+                <div style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: '0.75rem', padding: '2rem',
+                  color: 'var(--text-muted)',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '2.5rem', opacity: 0.4 }}>web_asset_off</span>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
+                      아직 OUTPUT/index.html이 없어요
+                    </div>
+                    <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
+                      에이전트가 코드를 생성하면 자동으로 표시됩니다.<br />
+                      생성 후 <strong>새로고침</strong> 버튼을 눌러주세요.
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
-                    에이전트가 코드를 생성하면 자동으로 표시됩니다.<br />
-                    생성 후 <strong>새로고침</strong> 버튼을 눌러주세요.
-                  </div>
+                  <button
+                    onClick={() => { setPreviewError(false); if (iframeRef.current) iframeRef.current.src = iframeRef.current.src; }}
+                    style={{
+                      marginTop: '0.5rem', padding: '0.5rem 1.2rem',
+                      background: 'rgba(100,135,242,0.12)',
+                      border: '1px solid rgba(100,135,242,0.3)',
+                      borderRadius: '8px', color: 'var(--brand)',
+                      cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
+                    다시 시도
+                  </button>
                 </div>
-                <button
-                  onClick={handlePreviewRefresh}
-                  style={{
-                    marginTop: '0.5rem', padding: '0.5rem 1.2rem',
-                    background: 'rgba(100,135,242,0.12)',
-                    border: '1px solid rgba(100,135,242,0.3)',
-                    borderRadius: '8px', color: 'var(--brand)',
-                    cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-                    display: 'flex', alignItems: 'center', gap: '0.4rem',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
-                  다시 시도
-                </button>
-              </div>
-            ) : (
-              <iframe
-                ref={iframeRef}
-                src={previewUrl}
-                title={`프리뷰 — ${task?.title || 'Task'}`}
-                style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                onError={() => setPreviewError(true)}
-              />
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  src={previewUrl}
+                  title={`프리뷰 — ${task?.title || 'Task'}`}
+                  style={{ flex: 1, width: '100%', border: 'none', background: '#fff' }}
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  onError={() => setPreviewError(true)}
+                />
+              )
+            )}
+
+            {/* ── Graph 탭 콘텐츠 ── */}
+            {rightPaneTab === 'graph' && (
+              !graphPaneChecked ? (
+                /* 로딩 */
+                <div style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: '0.75rem', color: 'var(--text-muted)',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '2rem', opacity: 0.5, animation: 'spin 1.2s linear infinite' }}>sync</span>
+                  <span style={{ fontSize: '0.82rem' }}>그래프 확인 중...</span>
+                </div>
+              ) : graphPaneExists ? (
+                /* 그래프 존재: Iframe 렌더링 */
+                <iframe
+                  ref={graphIframeRef}
+                  src={graphUrl}
+                  title={`지식 그래프 — ${task?.title || 'Task'}`}
+                  style={{ flex: 1, width: '100%', border: 'none', background: '#0d0f14' }}
+                  sandbox="allow-scripts allow-same-origin"
+                />
+              ) : (
+                /* 그래프 없음: Empty State */
+                <div style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: '1rem', padding: '2rem', color: 'var(--text-muted)',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.3 }}>account_tree</span>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
+                      지식 그래프가 아직 없어요
+                    </div>
+                    <div style={{ fontSize: '0.78rem', lineHeight: 1.6 }}>
+                      태스크가 <strong>Done</strong> 처리되면<br />
+                      Graphify 워치독이 자동으로 생성합니다.
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleGraphTabClick}
+                    style={{
+                      padding: '0.5rem 1.2rem',
+                      background: 'rgba(100,135,242,0.1)',
+                      border: '1px solid rgba(100,135,242,0.3)',
+                      borderRadius: '8px', color: 'var(--brand)',
+                      cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
+                    다시 확인
+                  </button>
+                </div>
+              )
             )}
           </div>
         )}

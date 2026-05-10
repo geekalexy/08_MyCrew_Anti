@@ -6,10 +6,12 @@ import { useSocket } from '../../hooks/useSocket';
 import { useAgentStore } from '../../store/agentStore';
 
 const COLUMN_LABELS = {
+  backlog:     'Backlog',
   todo:        'To Do',
   in_progress: 'In Progress',
   review:      'Review',
   done:        'Done',
+  finalized:   'Finalized',
 };
 
 const PRIORITY_OPTIONS = ['urgent', 'high', 'medium', 'low'];

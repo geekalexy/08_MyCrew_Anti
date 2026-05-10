@@ -7,7 +7,7 @@ import { useUiStore } from '../../store/uiStore';
 // html-to-image: npm install html-to-image 설치 후 사용
 import { toPng } from 'html-to-image';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 // ── Brand Studio 데이터 (프론트 표시용) ─────────────────────────────────────
 // 브랜드 커스텀 컬러 레이블 (3슬롯)

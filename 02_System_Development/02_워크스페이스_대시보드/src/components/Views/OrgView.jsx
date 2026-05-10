@@ -7,7 +7,7 @@ import { useProjectStore } from '../../store/projectStore';
 import TeamGuidelinesEditor from '../Guidelines/TeamGuidelinesEditor';
 import { getRoleData, inferProjectType } from '../../data/roleRegistry';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 /* ── 아이콘 ─ */
 const IcoPlay  = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>;

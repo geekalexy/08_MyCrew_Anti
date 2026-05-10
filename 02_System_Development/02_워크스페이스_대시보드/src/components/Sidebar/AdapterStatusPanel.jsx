@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 const ADAPTER_DEFS = [
   {

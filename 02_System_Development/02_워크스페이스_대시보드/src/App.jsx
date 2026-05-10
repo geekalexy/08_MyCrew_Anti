@@ -196,13 +196,13 @@ export default function App() {
     fetchSettings();
     fetchProjects(); // [Phase 28a] 프로젝트 목록 및 초기 선택 동기화
     useAuthStore.getState().syncWithBackend();
-    const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+    const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
     fetch(`${SERVER_URL}/health`)
       .then((r) => setServerOnline(r.ok))
       .catch(() => setServerOnline(false));
   }, []);
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const selectedProject = projects && Array.isArray(projects) ? projects.find((p) => p.id === selectedProjectId) : null;
 
   const [isEditingProjectName, setIsEditingProjectName] = useState(false);
   const [editProjectNameInput, setEditProjectNameInput] = useState('');
@@ -470,7 +470,7 @@ export default function App() {
           onSelect={(mode) => {
             setPipelinePrompt(null);
             if (!mode) return; // '나중에' 선택
-            const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+            const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
             fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(pipelinePrompt.projectId)}/pipeline/${mode}`, { method: 'POST' })
               .then(r => r.json())
               .then(data => console.log('[Pipeline] 시작:', data))

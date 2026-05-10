@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:legacy": "vite --mode legacy --port 5173",
+    "dev:mcp": "vite --mode mcp --port 5174",
     "build": "vite build",
     "preview": "vite preview"
   },

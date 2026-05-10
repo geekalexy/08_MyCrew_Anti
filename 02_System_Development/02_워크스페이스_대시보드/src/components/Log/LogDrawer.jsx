@@ -12,7 +12,7 @@ import { io } from 'socket.io-client';
 import { scrubContent } from '../../utils/scrubContent'; // [S1-4]
 import { renderMarkdown } from '../../utils/markdownRenderer'; // [S1-4] 타임라인 마크다운
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 // ── Ari 전용 Socket 싱글턴 (/ari 네임스페이스) ───────────────────────────────
 // HTTP REST /api/chat 완전 대체 (Phase 22 Sprint 1)
@@ -864,19 +864,19 @@ export default function LogDrawer() {
                       .replace(/^[\w가-힣]+:\s*/, (m) => isUser ? '' : m)
                   );
 
-                  // 시스템 이벤트: 중앙 뱃지 (긴 메시지 대응)
                   if (isSystem) {
                     const isLongMessage = log.message.length > 40;
                     return (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'center', margin: '0.8rem 0' }}>
+                      <div key={i} style={{ display: 'flex', justifyContent: 'flex-start', margin: '0.8rem 0' }}>
                         <div style={{
                           display: 'flex', alignItems: isLongMessage ? 'flex-start' : 'center', gap: '0.4rem',
                           background: 'rgba(255,255,255,0.04)', borderRadius: isLongMessage ? 12 : 20,
-                          padding: isLongMessage ? '0.6rem 1rem' : '0.3rem 0.85rem', border: '1px solid rgba(255,255,255,0.06)',
-                          maxWidth: '90%', lineHeight: 1.5
+                          padding: isLongMessage ? '0.5rem 0.8rem' : '0.3rem 0.8rem', border: '1px solid rgba(255,255,255,0.06)',
+                          maxWidth: '100%', lineHeight: 1.5
                         }}>
-                          <span className="material-symbols-outlined" style={{ fontSize: isLongMessage ? '1rem' : '0.85rem', color: 'var(--text-muted)', marginTop: isLongMessage ? '0.1rem' : 0 }}>info</span>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'keep-all', wordWrap: 'break-word', flex: 1 }}>{transformedMsg}</span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', wordBreak: 'keep-all', wordWrap: 'break-word', flex: 1 }}>
+                            {typeof transformedMsg === 'string' ? transformedMsg.replace(/^>\s*/, '') : transformedMsg}
+                          </span>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.5, flexShrink: 0, marginTop: isLongMessage ? '0.15rem' : 0 }}>{time}</span>
                         </div>
                       </div>
@@ -899,7 +899,7 @@ export default function LogDrawer() {
                           <div style={{
                             background: 'rgba(124,110,248,0.18)', color: 'var(--text-primary)',
                             borderRadius: '14px 4px 14px 14px', padding: '0.55rem 0.85rem',
-                            fontSize: '1rem', lineHeight: 1.55, wordBreak: 'break-word',
+                            fontSize: '0.85rem', lineHeight: 1.55, wordBreak: 'break-word',
                             border: '1px solid rgba(124,110,248,0.25)',
                           }}>
                           {/* 이미지 렌더링 (base64 또는 URL) */}
@@ -924,35 +924,20 @@ export default function LogDrawer() {
                     );
                   }
 
-                  // AI 에이전트 발화: 말풍선 없이 텍스트만 좌측 정렬
-                  const agentInitial = (log.agentId || 'A').charAt(0).toUpperCase();
+                  // AI 에이전트 발화: 말풍선 없이 텍스트만 좌측 정렬 (프로필 원형 제거)
                   const agentColors  = { ari: '#7C6EF8', sonnet: '#4ECDC4', opus: '#F7D94C', luca: '#78C896' };
                   const agentColor   = agentColors[log.agentId] || '#9B8BFB';
 
                   return (
                     <div key={i} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+                      display: 'flex', alignItems: 'flex-start', gap: '0',
                       marginTop: sameAuthor ? '0.1rem' : '0.9rem',
                     }}>
-                      {/* 에이전트 아바타 */}
-                      {!sameAuthor ? (
-                        <div style={{
-                          width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                          background: `${agentColor}1A`, border: `1.5px solid ${agentColor}55`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '0.6rem', fontWeight: 700, color: agentColor, marginTop: '0.1rem',
-                        }}>
-                          {agentInitial}
-                        </div>
-                      ) : (
-                        <div style={{ width: 24, flexShrink: 0 }} />
-                      )}
-
-                      {/* 텍스트만 — 말풍선 없음 */}
-                      <div style={{ flex: 1 }}>
+                      {/* 텍스트만 — 말풍선 및 아바타 없음 */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         {!sameAuthor && (
                           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
-                            {log.agentId}
+                            <span style={{ color: agentColor, fontWeight: 700 }}>{log.agentId}</span>
                             {!focusedTaskId && log.taskId && (() => {
                                const logTask = Object.values(tasks).find(t => String(t.id) === String(log.taskId));
                                const displayNum = logTask?.project_task_num != null
@@ -990,10 +975,12 @@ export default function LogDrawer() {
                           </details>
                         )}
 
-                        <p style={{
-                          fontSize: '1rem', lineHeight: 1.6,
+                        <div style={{
+                          fontSize: '0.82rem', lineHeight: 1.6,
                           color: 'var(--text-secondary)', wordBreak: 'break-word',
                           margin: 0,
+                          width: '100%',
+                          overflowX: 'auto',
                         }}>
                         {(!sameAuthor && !isUser && !isSystem && log.taskId && cleanMsg.length > 50) ? (
                             <>
@@ -1014,9 +1001,9 @@ export default function LogDrawer() {
                             </>
                           ) : (
                             // [S1-4] 타임라인 에이전트 메시지 마크다운 렌더링 활성화
-                            <span dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanMsg) }} />
+                            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(cleanMsg) }} />
                           )}
-                        </p>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1076,29 +1063,29 @@ export default function LogDrawer() {
                 {/* ── Ari 스트리밍 버블: 생각 중 애니메이션 + 실시간 타이핑 ── */}
                 {isStreaming && activeLogTab === 'interaction' && (
                   <div style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '0.5rem',
+                    display: 'flex', alignItems: 'flex-start', gap: '0',
                     marginTop: '0.9rem', animation: 'fadeIn 0.15s',
                   }}>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                      background: 'rgba(124,110,248,0.1)', border: '1.5px solid rgba(124,110,248,0.4)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '0.6rem', fontWeight: 700, color: '#7C6EF8', marginTop: '0.1rem',
-                    }}>A</div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>
-                        ari <span style={{ opacity: 0.5 }}>· 방금</span>
+                        <span style={{ color: '#7C6EF8', fontWeight: 700 }}>ari</span> <span style={{ opacity: 0.5 }}>· 방금</span>
                       </p>
                       {streamingText ? (
                         /* 텍스트 수신 중: 스트리밍 텍스트 + 커서 */
-                        <p style={{ fontSize: '1rem', lineHeight: 1.6, color: 'var(--text-secondary)', wordBreak: 'break-word', margin: 0 }}>
+                        <div style={{
+                          fontSize: '0.82rem', lineHeight: 1.6,
+                          color: 'var(--text-secondary)', wordBreak: 'break-word',
+                          margin: 0,
+                          width: '100%',
+                          overflowX: 'auto',
+                        }}>
                           {streamingText}
                           <span style={{
                             display: 'inline-block', width: '2px', height: '1em',
                             background: '#7C6EF8', marginLeft: '2px', verticalAlign: 'text-bottom',
                             animation: 'blink 0.8s step-end infinite',
                           }} />
-                        </p>
+                        </div>
                       ) : (
                         /* 대기 중: '생각 중...' 바운싱 닷 */
                         <p style={{ display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '1.6rem' }}>

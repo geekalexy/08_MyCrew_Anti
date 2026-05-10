@@ -37,6 +37,7 @@ import imageLabRouter from './routes/imageLabRouter.js';
 import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.js';
 import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
 import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
+import { triggerGraphifyUpdate } from './ai-engine/workers/graphifyWatchdog.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -661,9 +662,10 @@ io.on('connection', (socket) => {
       
       case 'CREATE_TASK': {
         const title = sa.title || '새 작업';
-        const newId = await dbManager.createTask(title, title, 'extension_agent', undefined, null, 'QUICK_CHAT', projectId);
+        const assignee = sa.assignee || null;
+        const newId = await dbManager.createTask(title, title, 'extension_agent', undefined, assignee, 'QUICK_CHAT', projectId);
         io.to(`project_${projectId}`).emit('kanban:refresh');
-        return { success: true, message: `✅ 새 카드 **#${newId}** (${title})를 생성했습니다.` };
+        return { success: true, message: `✅ 새 카드 **#${newId}** (${title})를 생성했습니다.` + (assignee ? ` (담당자: ${assignee})` : '') };
       }
       
       case 'ASSIGN_AGENT': {
@@ -766,17 +768,19 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
    \`\`\`
    액션을 지시할 때는 위 JSON 코드블럭 하나만 출력하거나, 짧은 코멘트를 곁들이세요.
 4. [화면 인식 능력 인지] 당신은 제공된 DOM Snapshot을 통해 사용자의 화면을 완벽하게 '보고' 파악할 수 있습니다. 
-5. [마이크루 시스템 제어 (System Action)] 사용자가 칸반 보드의 카드 상태 변경, 새 카드 생성, 담당자 할당 등을 요청하면 아래 JSON 포맷을 메시지 끝에 추가하세요.
+5. [마이크루 시스템 제어 (System Action)] 사용자가 칸반 보드의 카드 상태 변경, 새 카드 생성, 담당자 할당 등을 요청하면 **반드시** 아래 JSON 포맷을 메시지 끝에 추가하세요. 
+   ⚠️ 중요: 절대로 스스로 가짜 태스크 ID(예: #177...)를 지어내서 완료/생성했다고 응답하지 마세요. 태스크 관리는 오직 아래 JSON을 출력함으로써 백엔드에 위임해야 합니다.
+   [상태 변경 예시]
    \`\`\`json
-   {
-     "system_action": {
-       "action": "CHANGE_STATUS" | "CREATE_TASK" | "ASSIGN_AGENT",
-       "taskId": 13,
-       "target": "COMPLETED",
-       "title": "새 카드 제목 (CREATE_TASK용)",
-       "assignee": "pico (ASSIGN_AGENT용)"
-     }
-   }
+   { "system_action": { "action": "CHANGE_STATUS", "taskId": 13, "target": "COMPLETED" } }
+   \`\`\`
+   [새 카드 생성 예시]
+   \`\`\`json
+   { "system_action": { "action": "CREATE_TASK", "title": "새 카드 제목", "assignee": "dev_fullstack" } }
+   \`\`\`
+   [담당자 할당 예시]
+   \`\`\`json
+   { "system_action": { "action": "ASSIGN_AGENT", "taskId": 13, "assignee": "dev_senior" } }
    \`\`\`
 
 # Tone & Constraints (STRICT)
@@ -2986,6 +2990,24 @@ app.patch('/api/tasks/:id', async (req, res) => {
       // 수정: column 변경이 있으면 무조건 task:moved emit → confirmTaskMove 트리거 보장
       io.emit('task:moved', { taskId: String(taskId), toColumn: finalColumn });
 
+      // ── [Phase 40] Graphify Watchdog: 카드가 완료 상태로 이동 시 지식 그래프 갱신 ──
+      if (finalColumn === 'done' || finalColumn === 'finalized') {
+        try {
+          const freshTask = await dbManager.getTaskById(taskId);
+          if (freshTask && freshTask.project_id) {
+            const pData = await dbManager.getProjectById(freshTask.project_id);
+            if (pData && pData.name) {
+              const projectDirName = `${pData.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pData.id.slice(-5)}`;
+              // 주의: process.cwd()는 01_아리_엔진 이므로 상대 경로로 04_Users 계산
+              const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+              triggerGraphifyUpdate(projectRoot);
+            }
+          }
+        } catch (e) {
+          console.error('[GraphifyWatchdog] 트리거 실패:', e.message);
+        }
+      }
+
       // ── [BugFix] in_progress로 변경 시 에이전트 실행 트리거 ──────────────
       if (finalColumn === 'in_progress') {
         const freshTask = await dbManager.getTaskById(taskId);
@@ -3202,6 +3224,49 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
     
     res.json({ status: 'ok', message: '재작업 지시 완료. In Progress로 이동했습니다.' });
   } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+/** POST /api/tasks/:id/run — Zero-Command Trigger & Intent Routing (Phase 39) */
+app.post('/api/tasks/:id/run', async (req, res) => {
+  const sid = String(req.params.id);
+  const { mode, intent } = req.body; // { mode: 'DEV', intent: 'run_tasks' } 혹은 일반 코멘트
+  try {
+    const task = await dbManager.getTaskById(sid);
+    if (!task) return res.status(404).json({ status: 'error', message: '태스크를 찾을 수 없습니다.' });
+
+    broadcastLog('info', `[Zero-Command] Task #${sid} 실행 트리거 수신 (Mode: ${mode || 'Unknown'})`, 'system', sid);
+
+    // 1. Intent Router 처리
+    const { default: intentRouter } = await import('./ai-engine/services/intentRouter.js');
+    const routeResult = await intentRouter.routeIntent(intent || mode);
+    
+    // [Phase 39] Selective Loading을 위해 MCP 서버가 읽을 수 있도록 현재 모드 파일 저장
+    try {
+      // server.js 상단에 fs, path가 이미 import 되어 있음
+      const modeFilePath = path.resolve(process.cwd(), '.agents/current_mcp_mode.txt');
+      const dir = path.dirname(modeFilePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(modeFilePath, routeResult.mode || 'DEV', 'utf8');
+    } catch(e) {
+      console.warn('[Zero-Command] MCP 모드 파일 기록 실패:', e.message);
+    }
+    
+    // 2. 에이전트 할당 확인 (없으면 기본 개발자 또는 Assistant 할당)
+    const agentToTrigger = task.assigned_agent || 'dev_senior';
+    
+    // 3. 상태 변경 및 소켓 브로드캐스트
+    await dbManager.updateTaskStatus(sid, 'IN_PROGRESS');
+    io.emit('task:updated', { taskId: sid, status: 'IN_PROGRESS', column: 'in_progress' });
+    io.emit('task:moved', { taskId: sid, toColumn: 'in_progress' });
+    
+    // 4. Executor 실행 (강제 트리거)
+    forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode);
+
+    res.json({ status: 'ok', message: 'Zero-Command 트리거 성공', route: routeResult });
+  } catch (err) {
+    console.error('[API /api/tasks/:id/run] Error:', err.message);
     res.status(500).json({ status: 'error', message: err.message });
   }
 });

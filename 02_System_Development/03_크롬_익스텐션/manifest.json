@@ -3,6 +3,11 @@
   "name": "MyCrew Antigravity Assistant",
   "version": "1.0.0",
   "description": "MyCrew Agent interface for Chrome Side Panel",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "sidePanel",
     "storage",
@@ -19,7 +24,12 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Open MyCrew Assistant"
+    "default_title": "Open MyCrew Assistant",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "side_panel": {
     "default_path": "index.html"

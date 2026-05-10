@@ -1,7 +1,7 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import util from 'util';
 
-const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
 /**
  * Graphify 워치독 (백그라운드 그래프 갱신 데몬)
@@ -12,12 +12,12 @@ export async function triggerGraphifyUpdate(projectDir) {
   console.log(`[GraphifyWatchdog] 🔄 지식 그래프 갱신 시작: ${projectDir}`);
   
   try {
-    // 실제 운영 시 'graphify --update' 명령어로 교체
-    // 현재는 목업 실행
-    console.log(`[GraphifyWatchdog] 실행: graphify --update ${projectDir}`);
-    
-    // const { stdout, stderr } = await execPromise(`graphify --update "${projectDir}"`);
-    // if (stderr) console.warn('[GraphifyWatchdog] 경고:', stderr);
+    // Phase C 실제 구동: Python 데몬을 통해 AST 스캔 및 graph.html 생성
+    const mcpPath = new URL('../graphify_mcp.py', import.meta.url).pathname;
+    console.log(`[GraphifyWatchdog] 실행: python3 ${mcpPath} --update "${projectDir}"`);
+    const { stdout, stderr } = await execFilePromise('python3', [mcpPath, '--update', projectDir]);
+    if (stdout) console.log('[GraphifyWatchdog] 출력:', stdout.trim());
+    if (stderr) console.warn('[GraphifyWatchdog] 경고:', stderr.trim());
     
     // 성공 시 graph.json이 갱신되었다고 가정
     console.log(`[GraphifyWatchdog] ✅ 지식 그래프(AST) 갱신 완료!`);

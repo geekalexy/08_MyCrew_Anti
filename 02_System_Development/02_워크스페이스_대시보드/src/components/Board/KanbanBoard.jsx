@@ -16,8 +16,8 @@ import { useUiStore } from '../../store/uiStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSocket } from '../../hooks/useSocket';
 
-const COLUMNS = ['todo', 'in_progress', 'review', 'done'];
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const COLUMNS = ['backlog', 'todo', 'in_progress', 'review', 'done', 'finalized'];
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 export default function KanbanBoard() {
   const tasks = useKanbanStore((s) => s.tasks);
@@ -28,6 +28,11 @@ export default function KanbanBoard() {
   const [activeTask, setActiveTask] = useState(null);
   const [archivedTasks, setArchivedTasks] = useState([]); // [아카이브] 아카이브된 태스크 상태 추가
   const [selectedSprint, setSelectedSprint] = useState('ALL'); // [Sprint 필터] 선택된 스프린트
+
+  // [Phase B] 메인 탭 상태 ('kanban' | 'graph')
+  const [mainTab, setMainTab] = useState('kanban');
+  const [graphExists, setGraphExists] = useState(false);
+  const [graphCheckDone, setGraphCheckDone] = useState(false);
 
   // [Sprint 단위 보기] 현재 프로젝트의 유효한 스프린트 번호 목록 추출 (내림차순)
   const availableSprints = useMemo(() => {
@@ -87,6 +92,17 @@ export default function KanbanBoard() {
     return () => controller.abort();
   }, [selectedProjectId, isLoaded]);
 
+  // [Phase B] 지식 그래프 탭 전환 시 graph.html 존재 여부 확인
+  useEffect(() => {
+    if (mainTab !== 'graph' || !selectedProjectId) return;
+    setGraphCheckDone(false);
+    setGraphExists(false);
+    fetch(`${SERVER_URL}/preview/${selectedProjectId}/OUTPUT/graph.html`, { method: 'HEAD' })
+      .then((r) => setGraphExists(r.ok))
+      .catch(() => setGraphExists(false))
+      .finally(() => setGraphCheckDone(true));
+  }, [mainTab, selectedProjectId]);
+
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -133,6 +149,16 @@ export default function KanbanBoard() {
 
     if (fromColumn && fromColumn !== toColumn && COLUMNS.includes(toColumn)) {
       emitTaskMove(taskId, fromColumn, toColumn);
+      
+      // [Phase 39] Zero-Command Trigger: 'To Do' -> 'In Progress' 이동 시 자율 코딩 시작
+      if (fromColumn === 'todo' && toColumn === 'in_progress') {
+        console.log(`[Zero-Command] Task #${taskId} 자동 실행(run_tasks) 트리거됨`);
+        fetch(`${SERVER_URL}/api/tasks/${taskId}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode: 'DEV', intent: 'run_tasks' })
+        }).catch(err => console.error('[Zero-Command] 실행 호출 실패:', err));
+      }
     }
   };
 
@@ -169,6 +195,111 @@ export default function KanbanBoard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* [Phase B] 메인 탭 네비게이션 — [칸반 보드 | 지식 그래프] */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.25rem',
+        padding: '0.4rem 1rem',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--bg-surface-1)',
+        flexShrink: 0,
+      }}>
+        {[
+          { key: 'kanban', icon: 'view_kanban', label: '칸반 보드' },
+          { key: 'graph',  icon: 'account_tree', label: '지식 그래프' },
+        ].map(tab => (
+          <button
+            key={tab.key}
+            id={`btn-main-tab-${tab.key}`}
+            onClick={() => setMainTab(tab.key)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.4rem',
+              padding: '0.4rem 0.9rem',
+              fontSize: '0.8rem', fontWeight: 700,
+              fontFamily: 'Space Grotesk, sans-serif',
+              letterSpacing: '0.04em',
+              border: 'none',
+              borderBottom: mainTab === tab.key ? '2px solid var(--brand)' : '2px solid transparent',
+              borderRadius: 0,
+              background: 'none',
+              color: mainTab === tab.key ? 'var(--brand)' : 'var(--text-muted)',
+              cursor: 'pointer',
+              transition: 'color 0.15s',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {/* [Phase B] 지식 그래프 뷰 — graph.html 전체 Iframe */}
+      {mainTab === 'graph' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {!graphCheckDone ? (
+            /* 로딩 상태 */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: '0.75rem', color: 'var(--text-muted)',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '2rem', opacity: 0.5, animation: 'spin 1.2s linear infinite' }}>sync</span>
+              <span style={{ fontSize: '0.85rem' }}>지식 그래프 확인 중...</span>
+            </div>
+          ) : graphExists ? (
+            /* 그래프 존재: Iframe 렌더링 */
+            <iframe
+              id="iframe-knowledge-graph"
+              src={`${SERVER_URL}/preview/${selectedProjectId}/OUTPUT/graph.html`}
+              title="프로젝트 지식 그래프"
+              style={{ flex: 1, width: '100%', border: 'none', background: '#0d0f14' }}
+              sandbox="allow-scripts allow-same-origin"
+            />
+          ) : (
+            /* 그래프 없음: Empty State */
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              gap: '1rem', padding: '2rem', color: 'var(--text-muted)',
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.3 }}>account_tree</span>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+                  지식 그래프가 아직 생성되지 않았습니다
+                </div>
+                <div style={{ fontSize: '0.8rem', lineHeight: 1.65, color: 'var(--text-muted)' }}>
+                  칸반 태스크가 <strong>Done</strong> 상태로 완료되면<br />
+                  Graphify 워치독이 자동으로 그래프를 생성합니다.
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setGraphCheckDone(false);
+                  fetch(`${SERVER_URL}/preview/${selectedProjectId}/OUTPUT/graph.html`, { method: 'HEAD' })
+                    .then((r) => setGraphExists(r.ok))
+                    .catch(() => setGraphExists(false))
+                    .finally(() => setGraphCheckDone(true));
+                }}
+                style={{
+                  padding: '0.5rem 1.2rem',
+                  background: 'rgba(100,135,242,0.1)',
+                  border: '1px solid rgba(100,135,242,0.3)',
+                  borderRadius: '8px', color: 'var(--brand)',
+                  cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: '0.4rem',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>refresh</span>
+                다시 확인
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* [Phase B] 칸반 뷰 — mainTab이 'graph'일 때 숨김 (상태 보존) */}
+      <div style={{ display: mainTab === 'kanban' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+
       {/* Sprint 필터 툴바 */}
       {availableSprints.length > 0 && (
         <div style={{ padding: '0.5rem 1rem', display: 'flex', gap: '1rem', alignItems: 'center', background: 'var(--surface-50)', borderBottom: '1px solid var(--border)', marginBottom: '1rem', borderRadius: '8px' }}>
@@ -190,6 +321,15 @@ export default function KanbanBoard() {
               종료된 Sprint 일괄 아카이브
             </button>
           )}
+          <div style={{ marginLeft: 'auto' }}>
+            <button
+              onClick={() => useUiStore.getState().setCurrentView('archive')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: 'var(--surface-100)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>inventory_2</span>
+              아카이브 ({archivedTasks.length})
+            </button>
+          </div>
         </div>
       )}
 
@@ -218,46 +358,13 @@ export default function KanbanBoard() {
             />
           </SortableContext>
         ))}
-        
-        {/* 아카이브 컬럼 (최대 5개 표시 및 더보기 버튼) */}
-        <div className="column column--archived" style={{ opacity: 0.9 }}>
-          <div className="column__header">
-            <div className="column__header-left">
-              <h3 className="column__title">Archive</h3>
-              <span className="column__count">{archivedTasks.length}</span>
-            </div>
-          </div>
-          <div className="column__cards">
-            {archivedTasks.slice(0, 5).map((task) => (
-              <div key={task.id} className="task-card" style={{ opacity: 0.7, pointerEvents: 'none' }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  #{String(task.id).slice(-6)} {task.sprint_no ? `(S${task.sprint_no})` : ''}
-                </div>
-                <p className="task-card__title line-clamp-2" style={{ margin: '0.35rem 0 0', padding: 0 }}>
-                  {task.title}
-                </p>
-              </div>
-            ))}
-            {archivedTasks.length > 5 && (
-              <div 
-                style={{ textAlign: 'center', padding: '0.8rem 0', color: 'var(--brand)', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
-                onClick={() => useUiStore.getState().setCurrentView('archive')}
-              >
-                더보기 ({archivedTasks.length - 5}개)
-              </div>
-            )}
-            {archivedTasks.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                보관된 카드가 없습니다.
-              </div>
-            )}
-          </div>
-        </div>
       </div>
       <DragOverlay>
         {activeTask ? <TaskCard task={activeTask} isDragging /> : null}
       </DragOverlay>
     </DndContext>
+
+      </div>{/* 칸반 뷰 wrapper 닫기 */}
     </div>
   );
 }

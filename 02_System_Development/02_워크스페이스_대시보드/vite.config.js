@@ -27,8 +27,7 @@ function oauthCallbackPlugin() {
 export default defineConfig({
   plugins: [react(), oauthCallbackPlugin()],
   server: {
-    port: 5174,
-    strictPort: true,   // 5174 점유 시 에러로 명확히 알림 (silent fallback 방지)
+    strictPort: true,   // 지정된 포트 점유 시 에러로 명확히 알림 (silent fallback 방지)
     proxy: {
       '/webhook': 'http://localhost:4000',
       '/health':  'http://localhost:4000',

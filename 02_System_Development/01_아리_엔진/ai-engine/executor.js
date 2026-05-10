@@ -322,6 +322,24 @@ class Executor {
     let modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
     let actualContent = taskContent;
 
+    // ── [Phase 39] Quota Defender (Hotswap Engine) ───────────────────────────
+    // Claude 4.6 계열 모델 사용 시, 일일 쿼터 초과 위험이 감지되면
+    // 자동으로 Gemini 3.1 Pro로 Hotswap(우회)하여 파이프라인 중단을 방어합니다.
+    if (modelToUse && modelToUse.toLowerCase().includes('claude')) {
+      try {
+        // [TODO] 향후 OpenRouter API 또는 DB에서 실시간 잔여 쿼터 패치 연동
+        const isQuotaCritical = false; // 현재는 Hook 포인트로 활성화
+        if (isQuotaCritical) {
+          console.warn(`[Quota Defender] Claude 쿼터 임계점 도달 (<15분). Gemini 3.1 Pro로 Hotswap 진행.`);
+          this._log('warn', `> ⚠️ Claude 4.6 일일 쿼터가 15분 미만으로 떨어졌습니다. 서비스 안정성을 위해 [Gemini 3.1 Pro] 엔진으로 핫스왑(Hotswap)하여 실행합니다.`, 'system', taskId);
+          modelToUse = MODEL.PRO;
+        }
+      } catch (err) {
+        console.warn('[Quota Defender] 쿼터 체크 에러 (무시):', err.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     if (taskContent.includes('--pro') || taskContent.includes('--deep')) {
       modelToUse = MODEL.PRO;
       actualContent = taskContent.replace(/--pro|--deep/g, '').trim();
@@ -844,7 +862,23 @@ class Executor {
     }
 
     const signatureModel = AGENT_SIGNATURE_MODELS[agentId?.toLowerCase()];
-    const modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
+    let modelToUse = signatureModel || evaluation.recommended_model || MODEL.FLASH;
+
+    // ── [Phase 39] Quota Defender (Hotswap Engine) ───────────────────────────
+    // Zero-Command (runDirect) 경로에서도 Claude 쿼터 초과를 방어합니다.
+    if (modelToUse && modelToUse.toLowerCase().includes('claude')) {
+      try {
+        const isQuotaCritical = false; // 현재는 Hook 포인트로 활성화
+        if (isQuotaCritical) {
+          console.warn(`[Quota Defender] Claude 쿼터 임계점 도달 (<15분). Gemini 3.1 Pro로 Hotswap 진행 (runDirect).`);
+          this._log('warn', `> ⚠️ Claude 4.6 일일 쿼터가 15분 미만으로 떨어졌습니다. 서비스 안정성을 위해 [Gemini 3.1 Pro] 엔진으로 핫스왑(Hotswap)하여 실행합니다.`, 'system', taskId);
+          modelToUse = MODEL.PRO;
+        }
+      } catch (err) {
+        console.warn('[Quota Defender] 쿼터 체크 에러 (무시):', err.message);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // 2. 스킬 문서 로드
     const skill = router.route(taskContent, evaluation.category);

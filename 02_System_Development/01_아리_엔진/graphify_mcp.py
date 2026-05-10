@@ -1,15 +1,162 @@
 import sys
 import json
 import os
-import subprocess
+import re
 
 # 초소형 Python 기반 MCP 서버 (Graphify 연동용)
 # 표준 입출력(stdio)을 통해 Node.js 서버나 Antigravity와 통신합니다.
 
+def parse_js_imports(file_path):
+    imports = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            # match: import X from 'Y'
+            # match: import { X } from 'Y'
+            # match: require('Y')
+            import_patterns = [
+                r"import\s+.*?\s+from\s+['\"]([^'\"]+)['\"]",
+                r"import\s+['\"]([^'\"]+)['\"]",
+                r"require\s*\(\s*['\"]([^'\"]+)['\"]\s*\)"
+            ]
+            for pattern in import_patterns:
+                imports.extend(re.findall(pattern, content))
+    except Exception:
+        pass
+    return imports
+
+def build_graph(project_dir):
+    elements = []
+    nodes = set()
+    edges = []
+    
+    # scan for .js, .jsx
+    for root, dirs, files in os.walk(project_dir):
+        if 'node_modules' in root or '.git' in root:
+            continue
+        for file in files:
+            if file.endswith(('.js', '.jsx', '.ts', '.tsx')):
+                file_path = os.path.join(root, file)
+                rel_path = os.path.relpath(file_path, project_dir)
+                rel_path = rel_path.replace("\\", "/")
+                
+                nodes.add(rel_path)
+                
+                imports = parse_js_imports(file_path)
+                for imp in imports:
+                    if imp.startswith('.'):
+                        # resolve relative to current dir
+                        curr_dir = os.path.dirname(rel_path)
+                        target_path = os.path.normpath(os.path.join(curr_dir, imp)).replace("\\", "/")
+                        # Simple heuristic: if it doesn't have an extension, we just keep the resolved path
+                        # In cytoscape it's fine to have nodes without extensions.
+                        edges.append((rel_path, target_path))
+                        nodes.add(target_path)
+                    else:
+                        # external module
+                        nodes.add(imp)
+                        edges.append((rel_path, imp))
+                        
+    for n in nodes:
+        elements.append({"data": {"id": n, "label": os.path.basename(n)}})
+    
+    for i, (source, target) in enumerate(edges):
+        elements.append({"data": {"id": f"e{i}", "source": source, "target": target}})
+        
+    return {"elements": elements}
+
+def generate_graph_html(project_dir, graph_data):
+    html_content = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Knowledge Graph</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f111a; color: #fff; margin: 0; padding: 0; overflow: hidden; }
+        #cy { width: 100vw; height: 100vh; display: block; }
+        .panel { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px; font-size: 14px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body>
+    <div class="panel">Graphify Knowledge Hub</div>
+    <div id="cy"></div>
+    <script>
+        var graphData = GRAPH_DATA_PLACEHOLDER;
+        var cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: graphData.elements,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': '#00d2ff',
+                        'label': 'data(label)',
+                        'color': '#fff',
+                        'text-valign': 'center',
+                        'text-halign': 'right',
+                        'text-margin-x': 10,
+                        'font-size': '12px',
+                        'width': 20,
+                        'height': 20,
+                        'border-width': 2,
+                        'border-color': '#005f73'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': '#3a404d',
+                        'target-arrow-color': '#3a404d',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier',
+                        'opacity': 0.8
+                    }
+                }
+            ],
+            layout: {
+                name: 'cose',
+                idealEdgeLength: 100,
+                nodeOverlap: 20,
+                refresh: 20,
+                fit: true,
+                padding: 50,
+                randomize: true,
+                componentSpacing: 100,
+                nodeRepulsion: 400000,
+                edgeElasticity: 100,
+                nestingFactor: 5,
+                gravity: 80,
+                numIter: 1000,
+                initialTemp: 200,
+                coolingFactor: 0.95,
+                minTemp: 1.0
+            }
+        });
+        
+        // Node click interaction
+        cy.on('tap', 'node', function(evt){
+            var node = evt.target;
+            console.log('Tapped ' + node.id());
+        });
+    </script>
+</body>
+</html>"""
+    html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", json.dumps(graph_data))
+    
+    os.makedirs(project_dir, exist_ok=True)
+    with open(os.path.join(project_dir, 'graph.html'), 'w', encoding='utf-8') as f:
+        f.write(html_content)
+        
+    with open(os.path.join(project_dir, 'graph.json'), 'w', encoding='utf-8') as f:
+        json.dump(graph_data, f, ensure_ascii=False, indent=2)
+
+
 def handle_request(req):
     method = req.get("method")
     
-    # 리소스 목록 제공 (graph.json, GRAPH_REPORT.md 등)
+    # 리소스 목록 제공
     if method == "resources/list":
         return {
             "resources": [
@@ -32,22 +179,23 @@ def handle_request(req):
             "tools": [
                 {
                     "name": "query_graph",
-                    "description": "지식 그래프(Graphify)에 Cypher/하이퍼쿼리를 날려 의존성 및 연결 관계를 추적합니다.",
+                    "description": "지식 그래프(Graphify)에 쿼리를 날려 의존성 및 연결 관계를 추적합니다.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "query": {"type": "string", "description": "예: shortest_path(TaskDetailModal, database.js)"}
+                            "query": {"type": "string", "description": "예: shortest_path(TaskDetailModal, database) 또는 dependencies(App.jsx)"},
+                            "project_dir": {"type": "string", "description": "스캔할 프로젝트 폴더 경로 (예: 07_OUTPUT/test_project)"}
                         },
-                        "required": ["query"]
+                        "required": ["query", "project_dir"]
                     }
                 },
                 {
                     "name": "update_graph",
-                    "description": "프로젝트의 최신 상태를 스캔하여 graph.json을 갱신합니다.",
+                    "description": "프로젝트의 최신 상태를 스캔하여 graph.json 및 graph.html을 갱신합니다.",
                     "inputSchema": {
                         "type": "object",
                         "properties": {
-                            "project_dir": {"type": "string", "description": "스캔할 프로젝트 폴더 경로"}
+                            "project_dir": {"type": "string", "description": "스캔할 프로젝트 폴더 경로 (예: 07_OUTPUT/test_project)"}
                         },
                         "required": ["project_dir"]
                     }
@@ -63,10 +211,17 @@ def handle_request(req):
         if tool_name == "update_graph":
             project_dir = args.get("project_dir", "./")
             try:
-                # graphify --update 명령어 실행 (목업)
-                # result = subprocess.run(["graphify", "--update", project_dir], capture_output=True, text=True)
+                # 1. 의존성 추출 및 그래프 생성
+                graph_data = build_graph(project_dir)
+                
+                # 2. Cytoscape HTML 및 JSON 렌더링 후 저장
+                generate_graph_html(project_dir, graph_data)
+                
+                node_count = len([n for n in graph_data.get('elements', []) if 'source' not in n.get('data', {})])
+                edge_count = len([e for e in graph_data.get('elements', []) if 'source' in e.get('data', {})])
+                
                 return {
-                    "content": [{"type": "text", "text": f"✅ {project_dir} 폴더의 지식 그래프가 성공적으로 갱신되었습니다. (Mock)"}]
+                    "content": [{"type": "text", "text": f"✅ {project_dir} 폴더의 지식 그래프가 성공적으로 갱신되었습니다.\n노드: {node_count}개, 엣지: {edge_count}개"}]
                 }
             except Exception as e:
                 return {
@@ -75,23 +230,96 @@ def handle_request(req):
                 }
                 
         elif tool_name == "query_graph":
-            query = args.get("query")
-            # 목업 응답 반환
-            return {
-                "content": [{"type": "text", "text": f"쿼리 '{query}' 실행 결과:\n[Node A] -> [Node B] 의존성이 발견되었습니다. (Mock)"}]
-            }
+            query = args.get("query", "")
+            project_dir = args.get("project_dir", "./")
+            graph_file = os.path.join(project_dir, 'graph.json')
+            
+            if not os.path.exists(graph_file):
+                return {"content": [{"type": "text", "text": f"❌ {graph_file} 파일이 존재하지 않습니다. 먼저 update_graph 도구를 실행하세요."}]}
+                
+            try:
+                with open(graph_file, 'r', encoding='utf-8') as f:
+                    graph_data = json.load(f)
+                    
+                elements = graph_data.get('elements', [])
+                adj = {}
+                nodes = []
+                for el in elements:
+                    data = el.get('data', {})
+                    if 'source' in data and 'target' in data:
+                        adj.setdefault(data['source'], []).append(data['target'])
+                    elif 'id' in data:
+                        nodes.append(data['id'])
+                        
+                def find_node(term):
+                    for n in nodes:
+                        if term.lower() in n.lower():
+                            return n
+                    return None
+                    
+                # shortest_path(A, B)
+                match_sp = re.search(r"shortest_path\(([^,]+),\s*([^)]+)\)", query)
+                # dependencies(A)
+                match_dep = re.search(r"dependencies\(([^)]+)\)", query)
+                
+                if match_sp:
+                    src_term = match_sp.group(1).strip()
+                    dst_term = match_sp.group(2).strip()
+                    src = find_node(src_term)
+                    dst = find_node(dst_term)
+                    
+                    if not src or not dst:
+                        return {"content": [{"type": "text", "text": f"❌ 노드를 찾을 수 없습니다. (검색어: {src_term}, {dst_term})"}]}
+                        
+                    queue = [(src, [src])]
+                    visited = set([src])
+                    path = None
+                    
+                    while queue:
+                        curr, p = queue.pop(0)
+                        if curr == dst:
+                            path = p
+                            break
+                        for nxt in adj.get(curr, []):
+                            if nxt not in visited:
+                                visited.add(nxt)
+                                queue.append((nxt, p + [nxt]))
+                                
+                    if path:
+                        path_str = " -> ".join(path)
+                        return {"content": [{"type": "text", "text": f"✅ 경로 발견:\n{path_str}"}]}
+                    else:
+                        return {"content": [{"type": "text", "text": f"❌ {src} 에서 {dst} 로 가는 경로가 없습니다."}]}
+                        
+                elif match_dep:
+                    src_term = match_dep.group(1).strip()
+                    src = find_node(src_term)
+                    if not src:
+                        return {"content": [{"type": "text", "text": f"❌ 노드를 찾을 수 없습니다. (검색어: {src_term})"}]}
+                        
+                    deps = adj.get(src, [])
+                    if deps:
+                        deps_str = "\n".join([f"- {d}" for d in deps])
+                        return {"content": [{"type": "text", "text": f"✅ {src}의 의존성 (Imports):\n{deps_str}"}]}
+                    else:
+                        return {"content": [{"type": "text", "text": f"✅ {src}은(는) 다른 파일을 import하지 않습니다."}]}
+                else:
+                    return {"content": [{"type": "text", "text": f"❌ 지원하지 않는 쿼리 포맷입니다. shortest_path(A, B) 또는 dependencies(A)를 사용하세요."}]}
+            except Exception as e:
+                return {
+                    "content": [{"type": "text", "text": f"쿼리 실행 중 오류 발생: {str(e)}"}],
+                    "isError": True
+                }
             
     return {"error": {"code": -32601, "message": "Method not found"}}
 
 def main():
-    # 간단한 JSON-RPC over stdio 루프
     while True:
         line = sys.stdin.readline()
         if not line:
             break
         try:
             req = json.loads(line)
-            # JSON-RPC 요청인 경우
             if "method" in req:
                 resp = handle_request(req)
                 resp["jsonrpc"] = "2.0"
@@ -104,5 +332,77 @@ def main():
             sys.stdout.write(json.dumps(err_resp) + "\n")
             sys.stdout.flush()
 
+def execute_query_cli(query, project_dir="./"):
+    graph_file = os.path.join(project_dir, 'graph.json')
+    if not os.path.exists(graph_file):
+        return f"❌ {graph_file} 파일이 존재하지 않습니다."
+        
+    try:
+        with open(graph_file, 'r', encoding='utf-8') as f:
+            graph_data = json.load(f)
+            
+        elements = graph_data.get('elements', [])
+        adj = {}
+        nodes = []
+        for el in elements:
+            data = el.get('data', {})
+            if 'source' in data and 'target' in data:
+                adj.setdefault(data['source'], []).append(data['target'])
+            elif 'id' in data:
+                nodes.append(data['id'])
+                
+        def find_node(term):
+            for n in nodes:
+                if term.lower() in n.lower():
+                    return n
+            return None
+            
+        match_sp = re.search(r"shortest_path\(([^,]+),\s*([^)]+)\)", query)
+        match_dep = re.search(r"dependencies\(([^)]+)\)", query)
+        
+        if match_sp:
+            src = find_node(match_sp.group(1).strip())
+            dst = find_node(match_sp.group(2).strip())
+            if not src or not dst:
+                return "❌ 노드를 찾을 수 없습니다."
+                
+            queue = [(src, [src])]
+            visited = set([src])
+            while queue:
+                curr, p = queue.pop(0)
+                if curr == dst:
+                    return " -> ".join(p)
+                for nxt in adj.get(curr, []):
+                    if nxt not in visited:
+                        visited.add(nxt)
+                        queue.append((nxt, p + [nxt]))
+            return f"❌ {src} 에서 {dst} 로 가는 경로가 없습니다."
+            
+        elif match_dep:
+            src = find_node(match_dep.group(1).strip())
+            if not src:
+                return "❌ 노드를 찾을 수 없습니다."
+            deps = adj.get(src, [])
+            return "\n".join([f"- {d}" for d in deps]) if deps else "의존성이 없습니다."
+            
+        return "❌ 지원하지 않는 쿼리 포맷입니다."
+    except Exception as e:
+        return str(e)
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        import argparse
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--update", type=str, help="Update graph for project_dir")
+        parser.add_argument("--query", type=str, help="Query graph (e.g., shortest_path(A, B))")
+        parser.add_argument("--dir", type=str, default="./", help="Project dir for query")
+        args = parser.parse_args()
+        
+        if args.update:
+            graph_data = build_graph(args.update)
+            generate_graph_html(args.update, graph_data)
+            print(f"Graph updated for {args.update}")
+        elif args.query:
+            print(execute_query_cli(args.query, args.dir))
+    else:
+        main()

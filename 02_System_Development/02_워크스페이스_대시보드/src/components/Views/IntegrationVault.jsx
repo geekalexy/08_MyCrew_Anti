@@ -2,7 +2,7 @@
 // Phase 22 Sprint 1 — AI 어댑터 섹션 추가 (Imagen 3, Antigravity CLI, Claude Code)
 import { useState } from 'react';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 /* ── 통합 목록 ───────────────────────────────────────────── */
 const INTEGRATIONS = [

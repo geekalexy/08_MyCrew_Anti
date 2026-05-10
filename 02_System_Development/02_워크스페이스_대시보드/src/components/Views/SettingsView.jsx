@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import IntegrationVault from './IntegrationVault';
 import AdapterStatusPanel from '../Sidebar/AdapterStatusPanel';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 /* ── SVG 아이콘 ─────────────────────────────────────────── */
 const IcoPalette = () => (

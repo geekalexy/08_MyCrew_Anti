@@ -8,7 +8,7 @@ import { useTimelineStore } from '../store/timelineStore';
 import { useProjectStore } from '../store/projectStore';
 import { useUiStore } from '../store/uiStore';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 // 모듈 레벨 싱글턴 소켓
 let socketInstance = null;

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Terminal, Sparkles, AlertCircle } from 'lucide-react';
+import { Send, Sparkles, AlertCircle } from 'lucide-react';
 import { io } from 'socket.io-client';
+import logoUrl from './logo.png';
 
 function App() {
   const [messages, setMessages] = useState([
@@ -23,7 +24,7 @@ function App() {
   ];
 
   useEffect(() => {
-    socketRef.current = io('http://localhost:4007', {
+    socketRef.current = io('http://localhost:4010', {
       transports: ['websocket', 'polling']
     });
 
@@ -214,13 +215,12 @@ function App() {
       
       {/* Header & Model Switcher */}
       <div className="flex flex-col items-center mb-4">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-pink-500 flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-          <Terminal size={24} color="white" />
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+          <img src={logoUrl} alt="MyCrew Logo" className="w-full h-full object-contain rounded-xl" />
         </div>
-        <h1 className="text-white text-lg font-semibold tracking-wide mb-1">Antigravity Browser Control</h1>
+        <h1 className="text-white text-xl font-semibold tracking-wide mb-1">MyCrew MCP for Antigravity</h1>
         <div className="flex items-center gap-2 mb-3">
-          <span className="px-2 py-0.5 bg-[#1a1a1a] border border-[#333] rounded text-[10px] text-gray-400">Preview</span>
-          <span className="flex items-center gap-1 text-[10px] text-gray-500">
+          <span className="flex items-center gap-1 text-xs text-gray-500">
             <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
             {isConnected ? 'Connected' : 'Offline'}
           </span>
@@ -230,7 +230,7 @@ function App() {
         <select 
           value={selectedModel}
           onChange={(e) => setSelectedModel(e.target.value)}
-          className="w-[85%] bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+          className="w-[85%] bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
         >
           {MODELS.map(m => (
             <option key={m.id} value={m.id}>{m.name}</option>
@@ -241,7 +241,7 @@ function App() {
       {/* Intro Card (Like the screenshot) */}
       {messages.length === 1 && (
         <div className="mb-6 mx-2 p-4 bg-[#1a1a1a] rounded-xl border border-[#2a2a2a] shadow-lg">
-          <p className="text-sm text-gray-400 leading-relaxed text-center">
+          <p className="text-base text-gray-400 leading-relaxed text-center">
             The agent can click, scroll, type, and navigate web pages automatically. While working, it displays an overlay showing its progress and provides controls to stop execution if you need to intervene.
           </p>
         </div>
@@ -252,10 +252,10 @@ function App() {
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div className={`
-              max-w-[85%] rounded-lg text-sm leading-relaxed
+              max-w-[85%] rounded-lg text-base leading-relaxed
               ${msg.role === 'user' ? 'bg-[#1a1a1a] border border-[#333] text-gray-200 p-3' : ''}
               ${msg.role === 'assistant' ? 'text-gray-300 px-1 py-2' : ''}
-              ${msg.role === 'system' ? 'w-full text-center text-xs text-blue-400 opacity-70 mb-2' : ''}
+              ${msg.role === 'system' ? 'w-full text-center text-sm text-blue-400 opacity-70 mb-2' : ''}
             `}>
               {msg.content}
             </div>
@@ -276,7 +276,7 @@ function App() {
             }
           }}
           placeholder="Ask Antigravity to do something..."
-          className="w-full bg-[#1a1a1a] border border-[#333] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:border-blue-500 transition-colors shadow-inner text-sm placeholder-gray-500"
+          className="w-full bg-[#1a1a1a] border border-[#333] text-white rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:border-blue-500 transition-colors shadow-inner text-base placeholder-gray-500"
         />
         <button 
           onClick={handleSend}
@@ -292,9 +292,9 @@ function App() {
           <div className="bg-[#1a1a1a] border border-[#333] rounded-xl p-5 shadow-2xl w-full max-w-sm animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-3 text-amber-400">
               <AlertCircle size={24} />
-              <h3 className="font-semibold text-lg">권한 승인 필요</h3>
+              <h3 className="font-semibold text-xl">권한 승인 필요</h3>
             </div>
-            <p className="text-gray-300 text-sm mb-5 leading-relaxed">
+            <p className="text-gray-300 text-base mb-5 leading-relaxed">
               에이전트가 다음 마이크루 시스템 조작을 요청했습니다:<br/>
               <span className="inline-block mt-2 font-medium text-white bg-[#2a2a2a] px-3 py-1.5 rounded-md border border-[#444] w-full text-center">
                 {pendingAction.description}
@@ -303,13 +303,13 @@ function App() {
             <div className="flex gap-3">
               <button 
                 onClick={() => handleConfirmAction(false)}
-                className="flex-1 py-2.5 rounded-lg font-medium text-sm border border-[#333] text-gray-400 hover:bg-[#2a2a2a] hover:text-white transition-colors"
+                className="flex-1 py-2.5 rounded-lg font-medium text-base border border-[#333] text-gray-400 hover:bg-[#2a2a2a] hover:text-white transition-colors"
               >
                 거부 (Cancel)
               </button>
               <button 
                 onClick={() => handleConfirmAction(true)}
-                className="flex-1 py-2.5 rounded-lg font-medium text-sm bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)] transition-all transform hover:-translate-y-0.5"
+                className="flex-1 py-2.5 rounded-lg font-medium text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] hover:shadow-[0_0_20px_rgba(37,99,235,0.6)] transition-all transform hover:-translate-y-0.5"
               >
                 승인 (Confirm)
               </button>

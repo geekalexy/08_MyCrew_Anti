@@ -7,7 +7,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useUiStore } from '../../store/uiStore';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
 // ── A. 비디오 템플릿 프리셋 ─────────────────────────────────────────────────
 const VIDEO_PRESETS = [

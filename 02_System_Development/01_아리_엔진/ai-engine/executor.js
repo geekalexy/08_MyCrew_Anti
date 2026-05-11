@@ -584,7 +584,7 @@ class Executor {
             if (pRow) {
               const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
               const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
-              const wikiPath = path.resolve(pRoot, '.mycrew/wiki/PROJECT_WIKI.md');
+              const wikiPath = path.resolve(pRoot, 'Project_WIKI/00_Index/PROJECT_WIKI.md');
               if (fs.existsSync(wikiPath)) {
                 const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
                 finalSystemPrompt += `\n\n## 📚 프로젝트 위키 (자동 로드)\n${wikiContent}`;

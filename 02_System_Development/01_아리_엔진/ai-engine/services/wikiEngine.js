@@ -1,16 +1,19 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import dbManager from '../../database.js';
 import geminiAdapter from '../adapters/geminiAdapter.js';
 import { MODEL } from '../modelRegistry.js';
 import { fileURLToPath } from 'url';
 
+const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 class WikiEngine {
   constructor() {
-    this.wikiDirName = '.mycrew/wiki';
+    this.wikiDirName = 'Project_WIKI';
   }
 
   async getProjectRoot(projectId) {
@@ -20,109 +23,110 @@ class WikiEngine {
     return path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
   }
 
-  async ensureDirectories(projectRoot) {
-    const wikiDir = path.join(projectRoot, this.wikiDirName);
-    const rawDir = path.join(wikiDir, 'raw');
-    const rulesDir = path.join(wikiDir, 'rules');
+  async ensureOntologyDirectories(wikiRoot) {
+    const dirs = [
+      '00_Index',
+      '10_Product',
+      '20_Domain',
+      '30_Requirements',
+      '40_Flows',
+      '50_Business_Rules',
+      '60_Roles_Permissions',
+      '70_External_Integrations',
+      '90_Decisions',
+      '99_Graph_Data',
+      'raw/meetings'
+    ];
     
-    await fs.mkdir(wikiDir, { recursive: true });
-    await fs.mkdir(rawDir, { recursive: true });
-    await fs.mkdir(rulesDir, { recursive: true });
-    
-    return { wikiDir, rawDir, rulesDir };
-  }
-
-  async readSources(projectRoot, rawDir) {
-    const sources = {};
-    
-    // 1. 칸반 카드 수집 (최근 카드 20개 정도)
-    // 실제로는 DB에서 가져오는 로직이 필요. 현재는 간단하게 생략 또는 Mocking.
-    
-    // 2. raw/ 디렉토리 수집
-    try {
-      const files = await fs.readdir(rawDir);
-      const rawContents = [];
-      for (const file of files) {
-        if (file.endsWith('.txt') || file.endsWith('.md')) {
-          const content = await fs.readFile(path.join(rawDir, file), 'utf-8');
-          rawContents.push(`[${file}]\n${content}`);
-        }
-      }
-      sources.raw = rawContents.join('\n\n');
-    } catch (e) {
-      sources.raw = '';
+    for (const d of dirs) {
+      await fs.mkdir(path.join(wikiRoot, d), { recursive: true });
     }
-
-    return sources;
   }
 
-  async generateWiki(projectId) {
+  async updateGraphify(projectRoot) {
+    try {
+      // Execute Python engine to Detect & Extract (generates graph.json)
+      const scriptPath = path.resolve(__dirname, '../../graphify_mcp.py');
+      await execAsync(`python3 "${scriptPath}" --update "${projectRoot}"`);
+      return true;
+    } catch (e) {
+      console.error('[WikiEngine] Graphify update failed:', e.message);
+      return false;
+    }
+  }
+
+  async generateOntology(projectId) {
     try {
       const projectRow = await dbManager.getProjectById(projectId);
       if (!projectRow) throw new Error('프로젝트를 찾을 수 없습니다.');
       
-      const projectType = (projectRow.project_type || 'development').toUpperCase();
       const projectRoot = await this.getProjectRoot(projectId);
       if (!projectRoot) throw new Error('프로젝트 루트 경로를 확인할 수 없습니다.');
 
-      const { wikiDir, rawDir, rulesDir } = await this.ensureDirectories(projectRoot);
+      const wikiRoot = path.join(projectRoot, this.wikiDirName);
+      await this.ensureOntologyDirectories(wikiRoot);
 
-      // Rule 파일 읽기
-      const ruleFileName = `WIKI_RULES_${projectType}.md`;
-      const ruleFilePath = path.join(rulesDir, ruleFileName);
-      let rulesContent = '';
+      console.log(`[WikiEngine] Graphify 엔진 트리거: ${projectId}`);
+      const graphUpdated = await this.updateGraphify(projectRoot);
+      if (!graphUpdated) throw new Error('그래프 추출에 실패했습니다.');
+
+      // Read extracted graph.json
+      const graphPath = path.join(projectRoot, 'graph.json');
+      let graphData;
       try {
-        rulesContent = await fs.readFile(ruleFilePath, 'utf-8');
+        const raw = await fs.readFile(graphPath, 'utf-8');
+        graphData = JSON.parse(raw);
+        // Move graph.json to 99_Graph_Data to respect zero-copy/ontology rule
+        await fs.rename(graphPath, path.join(wikiRoot, '99_Graph_Data', 'graph.json'));
       } catch (e) {
-        console.warn(`[WikiEngine] 규칙 파일 없음. 템플릿 복사 시도: ${ruleFilePath}`);
-        try {
-          const templatePath = path.resolve(__dirname, 'templates', ruleFileName);
-          rulesContent = await fs.readFile(templatePath, 'utf-8');
-          await fs.writeFile(ruleFilePath, rulesContent, 'utf-8');
-        } catch (tmplErr) {
-          console.warn(`[WikiEngine] 템플릿 파일도 없음. 기본 규칙 텍스트 사용.`);
-          rulesContent = `
-# 기본 위키 생성 규칙
-이 프로젝트는 ${projectType} 유형입니다.
-요약, 진행 상태, 핵심 결정 사항을 마크다운으로 정리해주세요.
-          `;
+        throw new Error('graph.json 파일을 읽을 수 없습니다.');
+      }
+
+      const elements = graphData.elements || [];
+      const decisions = [];
+      const concepts = [];
+      const sections = [];
+
+      // Cluster nodes by type
+      for (const el of elements) {
+        const data = el.data || {};
+        if (data.type === 'decision') decisions.push(data.label || data.id);
+        if (data.type === 'concept') concepts.push(data.id);
+        if (data.type === 'section') sections.push(data.label || data.id);
+      }
+
+      console.log(`[WikiEngine] 노드 분류 완료. Decisions: ${decisions.length}, Concepts: ${concepts.length}`);
+
+      // Export 90_Decisions (ADR)
+      if (decisions.length > 0) {
+        const adrPrompt = `다음은 회의록에서 추출된 프로젝트 의사결정(Decision) 노드들입니다.\n${decisions.join('\n')}\n이를 바탕으로 마크다운 형식의 DECISION_LOG.md(의사결정 기록)를 작성해주세요. (배경, 결정사항, 영향도로 구조화)`;
+        const adrRes = await geminiAdapter.generateResponse(adrPrompt, "당신은 아키텍처 의사결정 기록자입니다.", MODEL.PRO);
+        if (adrRes?.text) {
+          await fs.writeFile(path.join(wikiRoot, '90_Decisions', 'DECISION_LOG.md'), adrRes.text, 'utf-8');
         }
       }
 
-      // 소스 데이터 수집
-      const sources = await this.readSources(projectRoot, rawDir);
-      
-      // LLM 프롬프트 구성
-      const systemPrompt = `당신은 MyCrew의 자율 Project Wiki Generator입니다.
-당신은 주어진 데이터 소스와 규칙(WIKI_RULES)을 바탕으로 프로젝트 전체를 조망하는 PROJECT_WIKI.md 파일을 생성해야 합니다.
-
-[WIKI_RULES]
-${rulesContent}
-
-반드시 완성된 마크다운 텍스트만 출력하세요. 추가적인 설명이나 인사말은 생략하세요.`;
-
-      const userPrompt = `[프로젝트 정보]
-이름: ${projectRow.name}
-목표: ${projectRow.objective}
-상태: ${projectRow.status}
-
-[수집된 원본 소스 (raw/)]
-${sources.raw || '(자료 없음)'}
-
-위 내용을 바탕으로 최신 프로젝트 위키를 작성해주세요.`;
-
-      // 생성 (비서 모델 대신 좀 더 큰 모델 혹은 빠르고 정확한 모델 사용)
-      console.log(`[WikiEngine] 프로젝트 위키 갱신 시작: ${projectId}`);
-      const response = await geminiAdapter.generateResponse(userPrompt, systemPrompt, MODEL.PRO); // [BugFix] 하드코딩 환각 제거 (P-006 준수)
-      
-      if (response && response.text) {
-        const wikiPath = path.join(wikiDir, 'PROJECT_WIKI.md');
-        await fs.writeFile(wikiPath, response.text, 'utf-8');
-        console.log(`[WikiEngine] PROJECT_WIKI.md 갱신 완료: ${wikiPath}`);
-        return true;
+      // Export 20_Domain (Glossary)
+      if (concepts.length > 0) {
+        const domainPrompt = `다음은 프로젝트 문서에서 추출된 도메인 개념(Concept) 링크들입니다.\n${concepts.join('\n')}\n이를 바탕으로 마크다운 형식의 용어 사전(Glossary.md)을 작성해주세요. 각 용어에 대한 간단한 추론 정의를 포함하세요.`;
+        const domainRes = await geminiAdapter.generateResponse(domainPrompt, "당신은 도메인 설계자입니다.", MODEL.PRO);
+        if (domainRes?.text) {
+          await fs.writeFile(path.join(wikiRoot, '20_Domain', 'Glossary.md'), domainRes.text, 'utf-8');
+        }
       }
+
+      // Export 00_Index (PROJECT_WIKI.md Master Index)
+      const indexPrompt = `프로젝트 명: ${projectRow.name}\n목표: ${projectRow.objective}\n현재까지 수집된 노드 수: ${elements.length}\n이 프로젝트의 전체 지식을 아우르는 00_Index/PROJECT_WIKI.md 문서를 생성해주세요. 다른 온톨로지 폴더(10_Product ~ 90_Decisions)로 안내하는 인덱스 역할을 해야 합니다.`;
+      const indexRes = await geminiAdapter.generateResponse(indexPrompt, "당신은 프로젝트 관리자입니다.", MODEL.PRO);
+      if (indexRes?.text) {
+        await fs.writeFile(path.join(wikiRoot, '00_Index', 'PROJECT_WIKI.md'), indexRes.text, 'utf-8');
+      }
+
+      console.log(`[WikiEngine] 온톨로지 Export 완료: ${projectId}`);
+      return true;
+
     } catch (err) {
-      console.error('[WikiEngine] 위키 생성 실패:', err.message);
+      console.error('[WikiEngine] 온톨로지 위키 생성 실패:', err.message);
       return false;
     }
   }

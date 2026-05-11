@@ -62,7 +62,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // ─── 정적 파일 제공 (NanoBanana 등 미디어 아웃풋 서빙용) ────────
-const outputsDir = path.resolve(process.cwd(), '05_Outputs');
+const outputsDir = path.resolve(process.cwd(), '05_Output_v1');
 if (!fs.existsSync(outputsDir)) {
   fs.mkdirSync(outputsDir, { recursive: true });
 }
@@ -1318,7 +1318,7 @@ reviewNs.on('connection', (socket) => {
     console.log(`[Socket/review] ${socket.id} → 세션 [${sessionId}] 참여`);
 
     // 기존 판정 이력 즉시 전송 (fs/path 는 상단 import 사용)
-    const verdictFilePath = path.resolve(process.cwd(), `05_Outputs/review_verdicts/${sessionId}.json`);
+    const verdictFilePath = path.resolve(process.cwd(), `05_Output_v1/review_verdicts/${sessionId}.json`);
     if (fs.existsSync(verdictFilePath)) {
       try {
         const history = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8'));

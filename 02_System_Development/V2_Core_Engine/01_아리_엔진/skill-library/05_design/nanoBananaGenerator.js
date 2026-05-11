@@ -59,7 +59,7 @@ export async function generateImage(prompt, style = '', width = 1080, height = 1
     console.log(`[LUMI Skill] NanoBanana 이미지 저장 완료: ${filePath}`);
     
     // 상대 경로로 반환 — 프론트엔드에서 `${SERVER_URL}${imageUrl}` 형태로 조립
-    const fileUrl = `/05_Outputs/${fileName}`;
+    const fileUrl = `/05_Output_v1/${fileName}`;
     
     return fileUrl;
 

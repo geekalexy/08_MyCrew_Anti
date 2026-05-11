@@ -42,7 +42,7 @@ export async function generateVideo(text = "MyCrew Remotion POC") {
     console.log(`[Video Skill] 렌더링 완료! stdout: ${stdout}`);
     
     const serverPort = process.env.PORT || 4000;
-    const fileUrl = `http://localhost:${serverPort}/05_Outputs/${fileName}`;
+    const fileUrl = `http://localhost:${serverPort}/05_Output_v1/${fileName}`;
     
     // 타임라인 출력을 위한 비디오 마크다운/HTML 태그 반환
     return `<video controls width="100%"><source src="${fileUrl}" type="video/mp4">브라우저가 비디오 태그를 지원하지 않습니다.</video>\n\n> 🎬 **비디오 렌더링 완료**: [다운로드 링크](${fileUrl})`;

@@ -14,9 +14,9 @@ import { clearSkillCache } from '../ai-engine/executor.js';
 const router = express.Router();
 
 // ── 용도별 저장 디렉토리 설정 ──────────────────────────────────
-const REFS_DIR      = path.resolve(process.cwd(), '05_Outputs/lab_refs');
-const GEN_DIR       = path.resolve(process.cwd(), '05_Outputs/lab');
-const SNAPSHOTS_DIR = path.resolve(process.cwd(), '05_Outputs/lab_snapshots'); // html-snapshot 임시
+const REFS_DIR      = path.resolve(process.cwd(), '05_Output_v1/lab_refs');
+const GEN_DIR       = path.resolve(process.cwd(), '05_Output_v1/lab');
+const SNAPSHOTS_DIR = path.resolve(process.cwd(), '05_Output_v1/lab_snapshots'); // html-snapshot 임시
 
 [REFS_DIR, GEN_DIR, SNAPSHOTS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -305,7 +305,7 @@ router.post('/analyze', upload.single('image'), async (req, res) => {
 
     const sessionId = crypto.randomUUID();
     const imagePath = req.file.path;
-    const imageUrl = `/05_Outputs/lab_refs/${req.file.filename}`;
+    const imageUrl = `/05_Output_v1/lab_refs/${req.file.filename}`;
 
     // ── 스타일별(동적) 시스템 프롬프트로 Gemini Vision 호출 ─────────────────
     const result = await analyzeImageForPrompt(imagePath, systemPrompt);
@@ -397,7 +397,7 @@ router.post('/html-snapshot', async (req, res) => {
     });
     await browser.close();
 
-    const snapshotUrl = `/05_Outputs/lab_snapshots/${snapName}`;
+    const snapshotUrl = `/05_Output_v1/lab_snapshots/${snapName}`;
     console.log(`[ImageLab] html-snapshot 완료: ${snapName} (${width}×${height}, transparent=${transparent})`);
     res.json({ status: 'ok', snapshotUrl, snapPath });
 
@@ -523,10 +523,10 @@ router.post('/learn', async (req, res) => {
     // ── 3. Winner 이미지 보존 (파인튜닝 데이터셋 수집) ─────────────
     let winnerSaved = false;
     if (isWinnerAuto && generatedUrl) {
-      const WINNERS_DIR = path.resolve(process.cwd(), '05_Outputs/winners');
+      const WINNERS_DIR = path.resolve(process.cwd(), '05_Output_v1/winners');
       if (!fs.existsSync(WINNERS_DIR)) fs.mkdirSync(WINNERS_DIR, { recursive: true });
 
-      // URL → 실제 파일 경로 변환 (예: /05_Outputs/lab/gen_xxx.png → outputs/lab/gen_xxx.png)
+      // URL → 실제 파일 경로 변환 (예: /05_Output_v1/lab/gen_xxx.png → outputs/lab/gen_xxx.png)
       const relPath    = generatedUrl.replace(/^\//, '');
       const srcPath    = path.resolve(process.cwd(), relPath);
       const winnerName = `winner_${styleTag}_${Date.now()}.png`;
@@ -557,7 +557,7 @@ router.post('/learn', async (req, res) => {
     clearSkillCache(category);
 
     // Winner 폴더 현황 카운트
-    const WINNERS_DIR = path.resolve(process.cwd(), '05_Outputs/winners');
+    const WINNERS_DIR = path.resolve(process.cwd(), '05_Output_v1/winners');
     const winnerCount = fs.existsSync(WINNERS_DIR)
       ? fs.readdirSync(WINNERS_DIR).filter(f => f.endsWith('.png')).length
       : 0;
@@ -636,7 +636,7 @@ router.get('/assets', async (req, res) => {
 /** [GET] /api/imagelab/winners/count - Winner 누적 수 조회 (페이지 마운트 시 상태 복구용) */
 router.get('/winners/count', (req, res) => {
   try {
-    const WINNERS_DIR = path.resolve(process.cwd(), '05_Outputs/winners');
+    const WINNERS_DIR = path.resolve(process.cwd(), '05_Output_v1/winners');
     const count = fs.existsSync(WINNERS_DIR)
       ? fs.readdirSync(WINNERS_DIR).filter(f => f.endsWith('.png')).length
       : 0;
@@ -652,7 +652,7 @@ router.get('/winners/count', (req, res) => {
 // 프롬프트 최적화 학습 불필요 — 자연어 지시 → 브랜드 일관성 자동 적용
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BRAND_ARCHIVE_DIR = path.resolve(process.cwd(), '05_Outputs/brand-archive');
+const BRAND_ARCHIVE_DIR = path.resolve(process.cwd(), '05_Output_v1/brand-archive');
 if (!fs.existsSync(BRAND_ARCHIVE_DIR)) fs.mkdirSync(BRAND_ARCHIVE_DIR, { recursive: true });
 
 // 소시안 브랜드 프리셋 정의 (SSOT)

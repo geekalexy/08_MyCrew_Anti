@@ -8,8 +8,8 @@ import dbManager from '../database.js';
 const router = express.Router();
 
 // ── 디렉토리 셋업 ───────────────────────────────────────────
-const TEMP_DIR = path.resolve(process.cwd(), '05_Outputs/video_lab');
-const WINNERS_DIR = path.resolve(process.cwd(), '05_Outputs/video_winners');
+const TEMP_DIR = path.resolve(process.cwd(), '05_Output_v1/video_lab');
+const WINNERS_DIR = path.resolve(process.cwd(), '05_Output_v1/video_winners');
 
 [TEMP_DIR, WINNERS_DIR].forEach(dir => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -33,7 +33,7 @@ async function renderRemotionVideo(jsonProps) {
     // 임시 props 파일 정리
     if (fs.existsSync(propsPath)) fs.unlinkSync(propsPath);
     
-    return `/05_Outputs/video_lab/${fileName}`;
+    return `/05_Output_v1/video_lab/${fileName}`;
 }
 
 // ── 라우트 핸들러 ───────────────────────────────────────────
@@ -428,7 +428,7 @@ router.post('/learn', async (req, res) => {
 //   }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VERDICTS_DIR = path.resolve(process.cwd(), '05_Outputs/review_verdicts');
+const VERDICTS_DIR = path.resolve(process.cwd(), '05_Output_v1/review_verdicts');
 if (!fs.existsSync(VERDICTS_DIR)) fs.mkdirSync(VERDICTS_DIR, { recursive: true });
 
 // io 인스턴스를 router에서 접근하기 위한 미들웨어 주입용 setter
@@ -857,7 +857,7 @@ router.post('/review/finalize-render', async (req, res) => {
         const outputPath = await VideoAdapter.renderVideo(remotionProps, outputFileName);
         console.log(`[VideoLab/Finalize] ✅ 마스터 비디오 렌더링 완료: ${outputPath}`);
 
-        res.json({ status: 'ok', videoUrl: `http://localhost:${process.env.PORT || 4000}/05_Outputs/${outputFileName}` });
+        res.json({ status: 'ok', videoUrl: `http://localhost:${process.env.PORT || 4000}/05_Output_v1/${outputFileName}` });
     } catch (err) {
         console.error('[VideoLab/Finalize] 최종 렌더링 에러:', err);
         res.status(500).json({ status: 'error', message: err.message });

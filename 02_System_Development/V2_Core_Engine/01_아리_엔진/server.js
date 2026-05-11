@@ -3441,31 +3441,42 @@ app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => 
       };
     }
 
+    // [H-001 Fix] createTask positional 시그니처로 통일 + 생성된 ID 수집
+    const createdIds = [];
+
     // 1. mvp_tasks를 칸반 보드의 Todo(Backlog)에 자동 생성
     if (parsedResult.mvp_tasks && parsedResult.mvp_tasks.length > 0) {
       for (const taskTitle of parsedResult.mvp_tasks) {
-        await dbManager.createTask({
-          project_id: projectId,
-          title: taskTitle,
-          status: 'BACKLOG',
-          assigned_agent: 'dev_senior' // 기본 할당
-        });
+        const taskId = await dbManager.createTask(
+          taskTitle,       // title
+          taskTitle,       // content
+          'plan_master',   // requester
+          null,            // model (default)
+          'dev_senior',    // assignedAgent
+          'BACKLOG',       // category
+          projectId        // projectId
+        );
+        if (taskId) createdIds.push(String(taskId));
       }
     }
     
-    // 2. future_scope도 칸반에 [백로그] 태그 달아서 생성 (또는 Graphify 지식망 Future Scope 노드 생성)
+    // 2. future_scope도 칸반에 [확장 버전] 태그 달아서 생성
     if (parsedResult.future_scope && parsedResult.future_scope.length > 0) {
       for (const taskTitle of parsedResult.future_scope) {
-        await dbManager.createTask({
-          project_id: projectId,
-          title: `[확장 버전] ${taskTitle}`,
-          status: 'BACKLOG',
-          assigned_agent: null
-        });
+        const taskId = await dbManager.createTask(
+          `[확장 버전] ${taskTitle}`, // title
+          taskTitle,                  // content
+          'plan_master',              // requester
+          null,                       // model (default)
+          null,                       // assignedAgent
+          'BACKLOG',                  // category
+          projectId                   // projectId
+        );
+        if (taskId) createdIds.push(String(taskId));
       }
     }
-    // 3. 칸반 카드 생성 소켓 브로드캐스트 (UI 실시간 갱신)
-    io.emit('task:bulk_created', { projectId, count: (parsedResult.mvp_tasks?.length || 0) + (parsedResult.future_scope?.length || 0) });
+    // [H-001 Fix] 전역 emit → 프로젝트 Room 한정 emit (다른 프로젝트 클라이언트 불필요 재렌더링 방지)
+    io.to(`project_${projectId}`).emit('task:bulk_created', { projectId, taskIds: createdIds, count: createdIds.length });
 
     res.json({ status: 'success', ...parsedResult });
   } catch (err) {
@@ -3482,16 +3493,27 @@ app.post('/api/projects/:id/plan-master/confirm', async (req, res) => {
   const { id: projectId } = req.params;
   const { action, feedback } = req.body; // action: 'confirm' | 'revise'
   try {
+    const project = await dbManager.getProjectById(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    // [N-001 Fix] LOCKED 상태 가드 - 다중 클라이언트 동시 접근 및 revise 루프 방어
+    if (project.plan_master_status === 'LOCKED') {
+      return res.status(409).json({ error: 'MVP 기획이 이미 확정(LOCKED)되어 더 이상 수정이나 확정(confirm)을 진행할 수 없습니다.' });
+    }
+
     if (action === 'confirm') {
       // [DB Update] 상태를 확정(LOCKED)으로 변경
       await dbManager.updateProjectPlanMasterStatus(projectId, 'LOCKED', false);
 
       broadcastLog('success', `[Plan Master] ✅ MVP v1.0 기획이 최종 확정(Locked-on)되었습니다.`, 'system', null, 'DASHBOARD', projectId);
+      // [M-002 Fix] 동기 I/O → 비동기 + atomic write (Phase 41 패턴 동일 적용)
       try {
         const lockPath = path.resolve(process.cwd(), '.mycrew/docs/roadmaps/v1.0_MVP_PRD.locked');
         const lockDir = path.dirname(lockPath);
-        if (!fs.existsSync(lockDir)) fs.mkdirSync(lockDir, { recursive: true });
-        fs.writeFileSync(lockPath, `Locked at ${new Date().toISOString()} by CEO`, 'utf-8');
+        await fs.promises.mkdir(lockDir, { recursive: true });
+        const tmpPath = lockPath + '.tmp';
+        await fs.promises.writeFile(tmpPath, `Locked at ${new Date().toISOString()} by CEO`, 'utf-8');
+        await fs.promises.rename(tmpPath, lockPath); // POSIX atomic rename
       } catch(e) {
         console.warn('[Plan Master] Lock 파일 생성 실패:', e.message);
       }

@@ -1,0 +1,10 @@
+# MyCrew Ignore File
+04_Users
+05_Legacy_Outputs
+채널분석
+outputs
+dist
+build
+.obsidian
+.git
+node_modules

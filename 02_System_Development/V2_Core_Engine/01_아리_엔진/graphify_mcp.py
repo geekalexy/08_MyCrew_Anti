@@ -100,19 +100,35 @@ def build_graph(project_dir, out_dir=None, is_system=False):
             
     new_cache = {}
     
+    # [Q4 Fix] .mycrewignore 로드 및 필터 적용
+    import fnmatch
+    ignore_patterns = ['node_modules', '.git']
+    mycrewignore_path = os.path.join(project_dir, '.mycrewignore')
+    if os.path.exists(mycrewignore_path):
+        try:
+            with open(mycrewignore_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        ignore_patterns.append(line)
+        except Exception:
+            pass
+
+    def is_ignored(path_str):
+        for pat in ignore_patterns:
+            if pat in path_str.split(os.sep) or fnmatch.fnmatch(path_str, pat) or fnmatch.fnmatch(path_str, f"*/{pat}/*"):
+                return True
+        return False
+
     # 1. Detect (스캔 및 파서 라우팅)
     for root, dirs, files in os.walk(project_dir):
-        if 'node_modules' in root or '.git' in root:
-            continue
-            
-        if is_system:
-            if '04_Users' in root or '06_소시안자료' in root or '채널분석' in root or '/outputs' in root:
-                continue
-            
-        # .mycrewignore 유사 처리 (빌드 폴더 등 제외)
-        if 'dist' in root or 'build' in root or 'Project_WIKI' in root:
-            # 단, raw/meetings는 포함
-            if 'Project_WIKI' in root and 'raw' not in root:
+        rel_root = os.path.relpath(root, project_dir).replace("\\", "/")
+        
+        if is_ignored(rel_root):
+            # Project_WIKI/raw 예외 처리 (단, .mycrewignore에 명시적 배제 시 무시)
+            if 'Project_WIKI' in rel_root and 'raw' in rel_root:
+                pass # raw/meetings는 포함시키기 위해 통과
+            else:
                 continue
             
         for file in files:
@@ -299,11 +315,26 @@ def generate_graph_html(project_dir, graph_data, out_dir=None):
     html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", json.dumps(graph_data))
     
     os.makedirs(project_dir, exist_ok=True)
-    with open(os.path.join(project_dir, 'graph.html'), 'w', encoding='utf-8') as f:
-        f.write(html_content)
+    
+    # [N-002 Fix] Atomic write for graph.html
+    html_path = os.path.join(project_dir, 'graph.html')
+    html_tmp = html_path + '.tmp'
+    try:
+        with open(html_tmp, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        os.replace(html_tmp, html_path)
+    except Exception:
+        if os.path.exists(html_tmp): os.remove(html_tmp)
         
-    with open(os.path.join(project_dir, 'graph.json'), 'w', encoding='utf-8') as f:
-        json.dump(graph_data, f, ensure_ascii=False, indent=2)
+    # [N-002 Fix] Atomic write for graph.json
+    json_path = os.path.join(project_dir, 'graph.json')
+    json_tmp = json_path + '.tmp'
+    try:
+        with open(json_tmp, 'w', encoding='utf-8') as f:
+            json.dump(graph_data, f, ensure_ascii=False, indent=2)
+        os.replace(json_tmp, json_path)
+    except Exception:
+        if os.path.exists(json_tmp): os.remove(json_tmp)
 
 
 def handle_request(req):
@@ -424,12 +455,16 @@ def handle_request(req):
                     if not src or not dst:
                         return {"content": [{"type": "text", "text": f"❌ 노드를 찾을 수 없습니다. (검색어: {src_term}, {dst_term})"}]}
                         
+                    # [M-001 Fix] BFS Depth 제한 (MAX_DEPTH=50) — execute_query_cli와 동기화
+                    MAX_DEPTH = 50
                     queue = [(src, [src])]
                     visited = set([src])
                     path = None
                     
                     while queue:
                         curr, p = queue.pop(0)
+                        if len(p) > MAX_DEPTH:
+                            return {"content": [{"type": "text", "text": f"⚠️ 최대 탐색 깊이({MAX_DEPTH})를 초과했습니다. 경로가 너무 깊거나 순환 참조가 있습니다."}]}
                         if curr == dst:
                             path = p
                             break

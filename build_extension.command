@@ -5,7 +5,7 @@
 # ==============================================================================
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-EXTENSION_DIR="$PROJECT_ROOT/02_System_Development/03_크롬_익스텐션"
+EXTENSION_DIR="$PROJECT_ROOT/02_System_Development/V2_Core_Engine/04_크롬_익스텐션"
 
 echo "🚀 크롬 익스텐션 빌드를 시작합니다..."
 cd "$EXTENSION_DIR" || exit

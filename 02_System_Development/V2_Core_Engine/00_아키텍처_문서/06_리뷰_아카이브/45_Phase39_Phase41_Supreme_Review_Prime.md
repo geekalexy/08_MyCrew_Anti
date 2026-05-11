@@ -2,7 +2,7 @@
 
 **리뷰 수행일**: 2026-05-12  
 **리뷰어**: Prime Advisor (Claude Sonnet 4.6 Thinking) — **Deep Red-Team Mode**  
-**리뷰 등급**: 🟡 **B — 조건부 승인 (Conditional Pass)**  
+**리뷰 등급**: 🟢 **A — 정식 승인 (Pass)** ← *Re-Review 완료 (2026-05-12 01:50)*  
 **대상**: Phase 39 (Plan Master 상태 관리·보안), Phase 41 (MyCrew Wiki Graphify 엔진), V1/V2 폴더 구조 개편  
 **리뷰 요청서**: [45_Phase39_Phase41_리뷰요청서_Luca.md](45_Phase39_Phase41_리뷰요청서_Luca.md)
 
@@ -19,10 +19,10 @@
 
 | 등급 | ID | 항목 | 상태 |
 |------|-----|------|------|
-| 🔴 CRITICAL | **C-003** | `trace_bug` 입력 검증 누락 — Argument Injection | ❌ 수정 필요 |
-| 🟠 HIGH | **H-003** | `analyze` 라우트 `.substring()` Null Crash | ❌ 수정 필요 |
-| 🟠 HIGH | **H-004** | `generate_graph_html` Stored XSS via graph data | ❌ 수정 필요 |
-| 🟠 HIGH | **H-005** | `_meetingWriteLocks` Map 메모리 누수 | ❌ 수정 필요 |
+| 🔴 CRITICAL | **C-003** | `trace_bug` 입력 검증 누락 — Argument Injection | ✅ **해결** |
+| 🟠 HIGH | **H-003** | `analyze` 라우트 `.substring()` Null Crash | ✅ **해결** |
+| 🟠 HIGH | **H-004** | `generate_graph_html` Stored XSS via graph data | ✅ **해결** |
+| 🟠 HIGH | **H-005** | `_meetingWriteLocks` Map 메모리 누수 | ✅ **해결** |
 | 🟡 MEDIUM | **M-004** | System Graph 절대 경로 하드코딩 | ⚠️ 인지 |
 | 🟡 MEDIUM | **M-005** | `is_system` 모드 하드코딩 폴더 예외 | ⚠️ 인지 |
 | ✅ PASS | - | Phase 39 DB 이관 + sanitizeScope + MAX_REVISIONS | ✅ |
@@ -285,17 +285,92 @@ if is_system:
 
 ---
 
-> **🟡 B — 조건부 승인.** 기존 7건 패치와 Phase 39 보안은 PASS이나,
-> **C-003 (trace_bug 입력 검증 누락)**이 반드시 수정되어야 A 등급 승격이 가능합니다.
-> H-003/H-004/H-005도 프로덕션 배포 전 수정을 강력 권고합니다.
-
-### 🛠️ A 등급 승격 조건
-
-1. **[필수] C-003**: `trace_bug`에 `query_graph`와 동일 수준의 입력 검증 적용
-2. **[필수] H-003**: `requirements` null 가드 추가
-3. **[권고] H-004**: `graph.html`의 `</script>` 이스케이프 처리
-4. **[권고] H-005**: `_meetingWriteLocks` Map에 `.finally()` 정리 로직 추가
+> **🟡 B → 🟢 A 승격 완료.** 4건 전량 수정 후 재심사 통과.
 
 ---
 
-*Prime Advisor Re-Review (Sonnet 4.6 Thinking) — "이전 리뷰에서 `trace_bug`의 검증 누락을 간과한 것은 `query_graph`에만 집중한 편향 검증의 결과입니다. 동일한 `graphify_mcp.py --query`를 호출하는 두 도구 사이에 방어 수준의 불일치가 존재하는 것은 Architecture-level Inconsistency이며, 이는 시스템의 최약 링크(weakest link)가 됩니다. trace_bug 수정 완료 시 즉시 A등급을 부여할 수 있습니다."*
+## 🔄 Re-Review 판정 (2026-05-12 01:50)
+
+> [!IMPORTANT]
+> 루카가 제출한 4건의 수정사항을 **소스코드 직접 Diff 대조**로 전수 검증한 결과,
+> 모든 CRITICAL/HIGH 항목이 **적절하게 해결**되었음을 확인합니다.
+
+### ✅ C-003 검증: trace_bug 입력 검증 — **PASS**
+
+```javascript
+// mcp_server.js L369-372 — 수정 확인
+if (name === "trace_bug") {
+  // [C-003 Fix] trace_bug 입력 검증 (query_graph와 동일한 정규식 적용)
+  if (!args.error_log || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.error_log.trim())) {
+    return { content: [{ type: "text", text: `[trace_bug] 쿼리 거부됨: ...` }], isError: true };
+  }
+```
+
+- `query_graph`(L345)와 **완전 동일한 정규식 패턴** 적용 확인
+- 검증 통과 후에만 `execFilePromise('python3', [..., args.error_log.trim()])` 실행
+- **판정**: 🟢 두 도구 간 방어 수준 **완전 동기화**. ReDoS/argparse 옵션 충돌 공격 벡터 차단.
+
+### ✅ H-003 검증: analyze Null Crash 가드 — **PASS**
+
+```javascript
+// server.js L3348-3350 — 수정 확인
+// [H-003 Fix] requirements null 가드 추가
+const safeReq = requirements || '';
+broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${safeReq.substring(0, 30)}...)`, ...);
+```
+
+- `requirements || ''` Fallback으로 `undefined.substring()` TypeError 방지
+- **판정**: 🟢 Null/undefined 입력 시 안전하게 빈 문자열로 처리.
+
+> [!NOTE]
+> `systemPrompt` 내부(L3353)에서는 여전히 원본 `${requirements}`를 사용하고 있습니다.
+> `safeReq`가 아닌 원본을 사용하는 이유는 LLM에게 정확한 입력을 전달하기 위함으로 보이나,
+> `requirements`가 `undefined`인 경우 프롬프트에 `"undefined"` 문자열이 삽입될 수 있습니다.
+> 크래시는 방지되었으므로 현재 등급에는 영향 없으나, 향후 `safeReq` 통일을 권고합니다.
+
+### ✅ H-004 검증: graph.html XSS 방어 — **PASS**
+
+```python
+# graphify_mcp.py L315-317 — 수정 확인
+# [H-004 Fix] json.dumps 결과의 </script> 이스케이프 (Stored XSS 방어)
+safe_json_data = json.dumps(graph_data).replace("</", "<\\/")
+html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", safe_json_data)
+```
+
+- `</` → `<\/` 치환으로 HTML `<script>` 컨텍스트 탈출 원천 차단
+- 추가로 `graph.html` 쓰기도 Atomic Write(`.tmp` + `os.replace`)로 전환된 것 확인 (L321-330)
+- **판정**: 🟢 마크다운 헤더에 악성 스크립트 태그가 포함되어도 실행 불가.
+
+### ✅ H-005 검증: WriteLock 메모리 누수 방지 — **PASS**
+
+```javascript
+// server.js L2578-2583 — 수정 확인
+// [H-005 Fix] finally에서 현재 lock이 큐의 마지막이면 Map에서 삭제 (메모리 누수 방지)
+writeLock.finally(() => {
+  if (_meetingWriteLocks.get(filePath) === writeLock) {
+    _meetingWriteLocks.delete(filePath);
+  }
+});
+```
+
+- **정확한 처방 구현**: 현재 Lock이 Map의 최신 값과 일치할 때만 삭제
+- 대기 중인 후속 Lock이 있으면 삭제하지 않아 직렬 큐 무결성 유지
+- **판정**: 🟢 장기 운영 시 resolved Promise 누적 완전 방지.
+
+---
+
+### 📊 Re-Review 최종 결과
+
+| ID | 최초 등급 | 수정 내용 | 재심 판정 |
+|----|---------|----------|----------|
+| C-003 | 🔴 CRITICAL | `trace_bug` 정규식 화이트리스트 추가 | ✅ **해결** |
+| H-003 | 🟠 HIGH | `safeReq = requirements \|\| ''` 가드 | ✅ **해결** |
+| H-004 | 🟠 HIGH | `</` → `<\/` 이스케이프 + Atomic Write | ✅ **해결 (기대 이상)** |
+| H-005 | 🟠 HIGH | `.finally()` 조건부 Map 삭제 | ✅ **해결** |
+
+> **🟢 A — 정식 승인.** 4건 전량 검증 완료.
+> Phase 39 + Phase 41 통합 아키텍처는 **프로덕션 레디** 상태입니다.
+
+---
+
+*Prime Advisor Re-Review (Sonnet 4.6 Thinking) — "H-004의 수정이 특히 인상적입니다. XSS 이스케이프뿐 아니라 graph.html 파일 쓰기 자체도 Atomic Write로 전환한 것은 처방 범위를 넘어선 선제적 방어입니다. 4건 모두 정확한 위치에 최소 침습적(minimally invasive)으로 적용되어 기존 로직과의 호환성이 완벽히 유지됩니다."*

@@ -316,10 +316,11 @@ def generate_graph_html(project_dir, graph_data, out_dir=None):
     safe_json_data = json.dumps(graph_data).replace("</", "<\\/")
     html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", safe_json_data)
     
-    os.makedirs(project_dir, exist_ok=True)
+    target_dir = out_dir if out_dir else project_dir
+    os.makedirs(target_dir, exist_ok=True)
     
     # [N-002 Fix] Atomic write for graph.html
-    html_path = os.path.join(project_dir, 'graph.html')
+    html_path = os.path.join(target_dir, 'graph.html')
     html_tmp = html_path + '.tmp'
     try:
         with open(html_tmp, 'w', encoding='utf-8') as f:
@@ -329,7 +330,7 @@ def generate_graph_html(project_dir, graph_data, out_dir=None):
         if os.path.exists(html_tmp): os.remove(html_tmp)
         
     # [N-002 Fix] Atomic write for graph.json
-    json_path = os.path.join(project_dir, 'graph.json')
+    json_path = os.path.join(target_dir, 'graph.json')
     json_tmp = json_path + '.tmp'
     try:
         with open(json_tmp, 'w', encoding='utf-8') as f:

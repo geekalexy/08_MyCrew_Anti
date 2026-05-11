@@ -3344,12 +3344,13 @@ app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => 
   "message_to_user": "최소 스펙인 결제 및 장바구니 기능으로 2주 내 런칭 가능한 MVP 로드맵을 설계했습니다. 진행할까요?"
 }`;
 
+    // [Task 2.2] 심층 기획 마스터: Opus 4.6 Thinking 투입 (비즈니스 리스크 분석 + 최종 PRD 분할)
     const result = await antigravityAdapter.generateResponse(
       "로드맵을 생성하고 최종 확인 메시지를 작성해주세요.", 
       systemPrompt, 
-      'sonnet', 
-      'anti-claude-sonnet-4.6-thinking', 
-      2 * 60 * 1000 
+      'opus',                              // agentKey: opus 승격
+      'anti-claude-opus-4.6-thinking',     // overrideModel: Opus 4.6
+      3 * 60 * 1000                        // 3분 타임아웃 (심층 분석)
     );
 
     let parsedResult;
@@ -3387,10 +3388,43 @@ app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => 
         });
       }
     }
+    // 3. 칸반 카드 생성 소켓 브로드캐스트 (UI 실시간 갱신)
+    io.emit('task:bulk_created', { projectId, count: (parsedResult.mvp_tasks?.length || 0) + (parsedResult.future_scope?.length || 0) });
 
     res.json({ status: 'success', ...parsedResult });
   } catch (err) {
     console.error('[API /api/projects/:id/plan-master/generate-roadmaps] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * [Phase 39-1] POST /api/projects/:id/plan-master/confirm — MVP 확정 및 기획 세션 종료
+ * [Task 2.1] 사용자 Confirm 시 PRD 락온, 수정 요청 시 Iterative Review 루프
+ */
+app.post('/api/projects/:id/plan-master/confirm', async (req, res) => {
+  const { id: projectId } = req.params;
+  const { action, feedback } = req.body; // action: 'confirm' | 'revise'
+  try {
+    if (action === 'confirm') {
+      broadcastLog('success', `[Plan Master] ✅ MVP v1.0 기획이 최종 확정(Locked-on)되었습니다.`, 'system', null, 'DASHBOARD', projectId);
+      try {
+        const lockPath = path.resolve(process.cwd(), '.mycrew/docs/roadmaps/v1.0_MVP_PRD.locked');
+        const lockDir = path.dirname(lockPath);
+        if (!fs.existsSync(lockDir)) fs.mkdirSync(lockDir, { recursive: true });
+        fs.writeFileSync(lockPath, `Locked at ${new Date().toISOString()} by CEO`, 'utf-8');
+      } catch(e) {
+        console.warn('[Plan Master] Lock 파일 생성 실패:', e.message);
+      }
+      res.json({ status: 'confirmed', message: 'MVP 기획이 확정되었습니다. 개발 모드로 전환할 수 있습니다.' });
+    } else if (action === 'revise') {
+      broadcastLog('info', `[Plan Master] 🔄 사용자 수정 요청 수신. 스코프 재분석을 시작합니다.`, 'system', null, 'DASHBOARD', projectId);
+      res.json({ status: 'revision_requested', message: '피드백을 반영하여 스코프를 재분석합니다.', feedback });
+    } else {
+      res.status(400).json({ error: 'action must be "confirm" or "revise"' });
+    }
+  } catch (err) {
+    console.error('[API /plan-master/confirm] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

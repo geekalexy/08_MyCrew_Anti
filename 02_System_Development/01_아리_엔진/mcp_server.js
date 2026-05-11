@@ -150,6 +150,17 @@ const ALL_TOOLS = [
   },
   // ── [기존 도구들] ──
   {
+    name: "query_architecture",
+    description: "[기획 모드 전용] 프로젝트의 전체 아키텍처 문서 및 의존성 지식 그래프를 쿼리하여 구조를 파악합니다.",
+    inputSchema: { 
+      type: "object", 
+      properties: { 
+        query: { type: "string", description: "예: dependencies(App.jsx) 또는 shortest_path(A, B)" } 
+      }, 
+      required: ["query"] 
+    }
+  },
+  {
     name: "run_tasks",
     description: "[개발 모드 전용] Shrimp Task Manager 방식의 의존성 기반 자율 코딩을 실행합니다.",
     inputSchema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] }
@@ -189,7 +200,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   let filteredTools = ALL_TOOLS;
   
   if (mode === 'ARCHITECT' || mode === 'PLAN_MASTER') {
-    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'make_roadmaps', 'confirm_mvp'].includes(t.name));
+    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'make_roadmaps', 'confirm_mvp', 'query_architecture'].includes(t.name));
   } else if (mode === 'DEV') {
     filteredTools = ALL_TOOLS.filter(t => ['run_tasks', 'trace_bug'].includes(t.name));
   } else if (mode === 'REVIEW') {
@@ -218,18 +229,96 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Phase 39: 스킬 MOCK 실행 (실제 내부 로직은 파이프라인에서 구현)
   // ── [Phase 39-1] Plan Master 도구 실행 (LLM이 전달한 JSON 수신) ──
   if (name === "analyze_scope") {
-    // LLM이 보낸 options나 must_have 구조를 받아서 반환
+    // [Task 2.1] Sequential Thinking 강제 파싱 + must_have/nice_to_have 구조 반환
+    const result = {
+      thought: args.thought || '',
+      thoughtNumber: args.thoughtNumber || 1,
+      nextThoughtNeeded: args.nextThoughtNeeded || false,
+    };
+
     if (args.needs_clarification) {
-      return { content: [{ type: "text", text: JSON.stringify({ status: 'needs_clarification', options: args.options, thought: args.thought }) }] };
+      result.status = 'needs_clarification';
+      result.options = args.options || [];
     } else {
-      return { content: [{ type: "text", text: JSON.stringify({ status: 'success', must_have: args.must_have, nice_to_have: args.nice_to_have, thought: args.thought }) }] };
+      result.status = 'scope_analyzed';
+      result.must_have = args.must_have || [];
+      result.nice_to_have = args.nice_to_have || [];
     }
+
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
+
   if (name === "make_roadmaps") {
-    return { content: [{ type: "text", text: JSON.stringify({ status: 'success', mvp_tasks: args.mvp_tasks, future_scope: args.future_scope, thought: args.thought }) }] };
+    // [Task 2.1] PRD 파일 물리적 생성 + 칸반 카드 & Graphify Future Scope 노드 등록
+    const result = {
+      status: 'roadmaps_generated',
+      thought: args.thought || '',
+      thoughtNumber: args.thoughtNumber || 2,
+      nextThoughtNeeded: args.nextThoughtNeeded || false,
+      mvp_tasks: args.mvp_tasks || [],
+      future_scope: args.future_scope || [],
+    };
+
+    // (A) PRD 파일 I/O — .mycrew/docs/roadmaps/ 에 버전별 분리 저장
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const roadmapDir = path.resolve(process.cwd(), '.mycrew/docs/roadmaps');
+      fs.mkdirSync(roadmapDir, { recursive: true });
+
+      const mvpContent = `# v1.0 MVP PRD\n## 필수 기능 (Must-have)\n${(args.mvp_tasks || []).map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n생성일: ${new Date().toISOString()}`;
+      fs.writeFileSync(path.join(roadmapDir, 'v1.0_MVP_PRD.txt'), mvpContent, 'utf-8');
+
+      if (args.future_scope && args.future_scope.length > 0) {
+        const futureContent = `# v2.0 Scale-Up PRD\n## 확장 기능 (Future Scope)\n${args.future_scope.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\n생성일: ${new Date().toISOString()}`;
+        fs.writeFileSync(path.join(roadmapDir, 'v2.0_ScaleUp_PRD.txt'), futureContent, 'utf-8');
+      }
+
+      result.prd_files = ['v1.0_MVP_PRD.txt'];
+      if (args.future_scope?.length > 0) result.prd_files.push('v2.0_ScaleUp_PRD.txt');
+    } catch (ioErr) {
+      result.prd_io_error = ioErr.message;
+    }
+
+    // (B) Graphify 지식망 Future Scope 노드 등록
+    if (args.graph_nodes && Array.isArray(args.graph_nodes)) {
+      result.graph_registered = args.graph_nodes.length;
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
+
   if (name === "confirm_mvp") {
-    return { content: [{ type: "text", text: JSON.stringify({ status: 'pending_user_confirm', message: args.message_to_user, thought: args.thought }) }] };
+    // [Task 2.1] 사용자 브리핑 + 대기 상태 전환 + Iterative Review 루프 지원
+    const result = {
+      status: 'pending_user_confirm',
+      thought: args.thought || '',
+      thoughtNumber: args.thoughtNumber || 3,
+      nextThoughtNeeded: args.nextThoughtNeeded || false,
+      message_to_user: args.message_to_user || '',
+      action_required: 'confirm_or_revise',
+      instructions: '사용자가 Confirm(확정) 시 기획 세션이 종료되고 PRD가 락온됩니다. 수정 요청 시 analyze_scope부터 재실행됩니다.',
+    };
+
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  }
+  if (name === "query_architecture") {
+    try {
+      // [H-002] 입력 파라미터 정규식 검증
+      if (!args.query || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.query.trim())) {
+        return { content: [{ type: "text", text: `[query_architecture] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
+      }
+
+      const util = await import('util');
+      const { execFile } = await import('child_process');
+      const execFilePromise = util.promisify(execFile);
+      
+      // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
+      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.query.trim()]);
+      return { content: [{ type: "text", text: `[query_architecture] Graphify 지식망 쿼리 결과:\n${stdout}` }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: `[query_architecture] 쿼리 실패: ${e.message}` }], isError: true };
+    }
   }
   if (name === "run_tasks") {
     return { content: [{ type: "text", text: `[run_tasks] 자율 코딩 태스크 시작: ${args.command}` }] };
@@ -239,8 +328,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const util = await import('util');
       const { execFile } = await import('child_process');
       const execFilePromise = util.promisify(execFile);
-      // 실제 Python Graphify 데몬(또는 CLI)을 통해 쿼리 실행
-      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.error_log || '']).catch(()=>({stdout: '[trace_bug] Graphify 추적 완료 (CLI Fallback)'}));
+      
+      // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
+      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.error_log || '']);
       return { content: [{ type: "text", text: `[trace_bug] Graphify 노드 추적 결과:\n${stdout}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `[trace_bug] 추적 실패: ${e.message}` }], isError: true };

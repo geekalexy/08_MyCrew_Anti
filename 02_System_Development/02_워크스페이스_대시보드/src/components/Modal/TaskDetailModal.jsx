@@ -333,11 +333,11 @@ export default function TaskDetailModal() {
   const checkAutoFallback = () => {
     if (!task?.content || task.content.trim().length < 5) {
       if (['DEV', 'QA', 'DEBUG'].includes(task?.mode)) {
-        patchTask(task.id, { mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)' });
+        patchTask(task.id, { mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking)' });
         fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)' })
+          body: JSON.stringify({ mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking)' })
         }).catch(console.error);
         
         showToast('📋 상세 내용이 없어 기획 모드로 자동 전환되었습니다.');
@@ -407,6 +407,7 @@ export default function TaskDetailModal() {
       );
     } else if (status === 'IN_PROGRESS') {
       commands.push(
+        { id: '/plan_master', label: '추가 기획 및 스코프 분석', icon: 'psychology_alt' },
         { id: '/auto_run', label: '자율 연속 파이프라인 실행', icon: 'rocket_launch' },
         { id: '/debug', label: '버그 수정', icon: 'bug_report' },
         { id: '/refactor', label: '리팩토링', icon: 'cleaning_services' },
@@ -1350,10 +1351,10 @@ export default function TaskDetailModal() {
                   
                   // 모드에 따른 LLM 강제 할당 (Phase 39)
                   let newModel = task.model; // 기본값 유지
-                  if (newMode === 'ARCHITECT') newModel = 'Claude Opus 4.6 (Thinking) + Gemini 3.1 Pro (High)';
+                  if (newMode === 'ARCHITECT') newModel = 'Claude Opus 4.6 (Thinking)';
                   else if (newMode === 'DEV') newModel = 'Gemini 3.1 Pro (High)';
                   else if (newMode === 'QA') newModel = 'Claude Opus 4.6 (Thinking)';
-                  else if (newMode === 'DEBUG') newModel = 'Claude Sonnet 4.6 (Thinking) + Gemini 3.1 Pro (High) (Fallback)';
+                  else if (newMode === 'DEBUG') newModel = 'Claude Sonnet 4.6 (Thinking)';
 
                   // 모드 변경 API 및 Store 업데이트
                   patchTask(task.id, { mode: newMode, model: newModel });
@@ -1566,7 +1567,7 @@ export default function TaskDetailModal() {
                     {[
                       { key: 'discussion', icon: 'forum',    label: 'Discussion', count: discussionComments.length },
                       { key: 'activity',   icon: 'history',  label: 'Activity',   count: activityComments.length },
-                      { key: 'graph',      icon: 'account_tree', label: 'Graphify Report', count: 0 },
+                      { key: 'graph',      icon: 'account_tree', label: 'Graph Report', count: 0 },
                     ].map(tab => (
                       <button key={tab.key} onClick={() => setActiveCommentTab(tab.key)} style={{
                         display: 'flex', alignItems: 'center', gap: '0.3rem',
@@ -1787,8 +1788,80 @@ export default function TaskDetailModal() {
                                         {parsed.thought}
                                       </div>
                                     </details>
+                                    {/* [Task 2.3] Sequential Thinking 타임라인 시각화 */}
+                                    {parsed.thoughtNumber && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                        <div style={{
+                                          width: '22px', height: '22px', borderRadius: '50%',
+                                          background: 'linear-gradient(135deg, #7c6ef8, #60a5fa)',
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          fontSize: '0.65rem', fontWeight: 800, color: '#fff',
+                                          fontFamily: 'Space Grotesk, sans-serif',
+                                          flexShrink: 0,
+                                        }}>{parsed.thoughtNumber}</div>
+                                        <span style={{ fontSize: '0.7rem', color: '#9ca3af', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600 }}>
+                                          {parsed.nextThoughtNeeded ? '사고 진행 중...' : '사고 완료'}
+                                        </span>
+                                        {parsed.status && (
+                                          <span style={{
+                                            fontSize: '0.62rem', padding: '1px 6px', borderRadius: '4px',
+                                            background: parsed.status === 'pending_user_confirm' ? 'rgba(251,146,60,0.15)' : 'rgba(74,222,128,0.15)',
+                                            color: parsed.status === 'pending_user_confirm' ? '#fb923c' : '#4ade80',
+                                            fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif',
+                                          }}>{parsed.status}</span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* [Task 2.4] Confirm/Revise 액션블록 (Plan Master 협상 UX) */}
+                                    {parsed.status === 'pending_user_confirm' && parsed.message_to_user && (
+                                      <div style={{
+                                        marginTop: '0.6rem', padding: '0.7rem 0.9rem',
+                                        background: 'rgba(124,110,248,0.08)',
+                                        border: '1px solid rgba(124,110,248,0.25)',
+                                        borderRadius: '10px',
+                                      }}>
+                                        <div style={{ fontSize: '0.82rem', color: '#e5e7eb', marginBottom: '0.6rem', lineHeight: 1.5 }}>
+                                          {parsed.message_to_user}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                          <button
+                                            onClick={() => {
+                                              fetch(`${SERVER_URL}/api/projects/${task?.project_id}/plan-master/confirm`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ action: 'confirm' })
+                                              }).then(() => showToast('✅ MVP 기획이 확정되었습니다!')).catch(console.error);
+                                            }}
+                                            style={{
+                                              padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 700,
+                                              background: 'linear-gradient(135deg, #4ade80, #22c55e)',
+                                              color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                                              fontFamily: 'Space Grotesk, sans-serif',
+                                            }}
+                                          >✅ 확정하고 개발 시작</button>
+                                          <button
+                                            onClick={() => {
+                                              const fb = prompt('수정 요청 내용을 입력해주세요:');
+                                              if (fb) {
+                                                fetch(`${SERVER_URL}/api/projects/${task?.project_id}/plan-master/confirm`, {
+                                                  method: 'POST',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({ action: 'revise', feedback: fb })
+                                                }).then(() => showToast('🔄 피드백을 반영하여 재분석합니다.')).catch(console.error);
+                                              }
+                                            }}
+                                            style={{
+                                              padding: '0.4rem 1rem', fontSize: '0.78rem', fontWeight: 700,
+                                              background: 'transparent',
+                                              color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '8px', cursor: 'pointer',
+                                              fontFamily: 'Space Grotesk, sans-serif',
+                                            }}
+                                          >📝 기획 수정 요청</button>
+                                        </div>
+                                      </div>
+                                    )}
                                     <div>
-                                      {JSON.stringify({ ...parsed, thought: undefined }, null, 2).replace(/"undefined",?\n?/g, '')}
+                                      {JSON.stringify({ ...parsed, thought: undefined, thoughtNumber: undefined, nextThoughtNeeded: undefined, message_to_user: undefined, status: undefined, action_required: undefined, instructions: undefined }, null, 2).replace(/"undefined",?\n?/g, '')}
                                     </div>
                                   </>
                                 );

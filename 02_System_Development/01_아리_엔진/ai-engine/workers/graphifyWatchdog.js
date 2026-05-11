@@ -12,6 +12,14 @@ export async function triggerGraphifyUpdate(projectDir) {
   console.log(`[GraphifyWatchdog] 🔄 지식 그래프 갱신 시작: ${projectDir}`);
   
   try {
+    const path = await import('path');
+    const resolvedPath = path.resolve(projectDir);
+    const safeBase = path.resolve(process.cwd());
+    if (!resolvedPath.startsWith(safeBase)) {
+      console.error(`[GraphifyWatchdog] ❌ Path Traversal 시도 차단됨: ${projectDir}`);
+      return false;
+    }
+    
     // Phase C 실제 구동: Python 데몬을 통해 AST 스캔 및 graph.html 생성
     const mcpPath = new URL('../graphify_mcp.py', import.meta.url).pathname;
     console.log(`[GraphifyWatchdog] 실행: python3 ${mcpPath} --update "${projectDir}"`);

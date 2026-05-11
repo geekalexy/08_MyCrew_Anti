@@ -316,7 +316,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       const isSystemScope = args.scope === 'system';
       const targetDir = isSystemScope 
-        ? '/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_아키텍처_문서/System_WIKI/99_System_Graph'
+        ? '/Users/alex/Documents/08_MyCrew_Anti/09_MyCrew_Wiki/99_System_Graph'
         : './';
         
       // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파

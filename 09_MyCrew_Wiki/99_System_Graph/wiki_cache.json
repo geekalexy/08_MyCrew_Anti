@@ -3572,7 +3572,7 @@
     ]
   },
   ".agents/rules/nexus-context-load.md": {
-    "hash": "f6b6ba493a52df7bfccb272fb44783d446bbf8db28da6beb3878620a4268d315",
+    "hash": "80a777877e4c2471828956417b982cd63e23718e718218a8ec3247830e456774",
     "nodes": [
       {
         "id": "Section::Nexus — Context Recovery Rules",
@@ -3649,7 +3649,7 @@
     ]
   },
   ".agents/rules/luca-context-load.md": {
-    "hash": "7210e06176ec968ae4ff46b61279c90e4dcfafa45771ea51eaf2812d499d4eca",
+    "hash": "e924dbbf26c482b0a7bb9ada07cb0cb93703f6bca7c65f734f424663fdea715c",
     "nodes": [
       {
         "id": "Section::Luca (Gemini) — Context Recovery Rules",
@@ -3673,6 +3673,10 @@
       },
       {
         "id": "Section::Step 3 — 현재 Phase 확인",
+        "type": "section"
+      },
+      {
+        "id": "Section::Step 4 — 코어 아키텍처 스캔 (Phase 42)",
         "type": "section"
       },
       {
@@ -3718,6 +3722,12 @@
       {
         "source": "luca-context-load.md",
         "target": "Section::Step 3 — 현재 Phase 확인",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "luca-context-load.md",
+        "target": "Section::Step 4 — 코어 아키텍처 스캔 (Phase 42)",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       },
@@ -10965,11 +10975,11 @@
       }
     ]
   },
-  "02_System_Development/05_크롬_익스텐션/tailwind.config.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/tailwind.config.js": {
     "hash": "2248bf828c19499e4a34a9d6696bc862cd53989239b7b4a61a76eef20bfacb79",
     "imports": []
   },
-  "02_System_Development/05_크롬_익스텐션/vite.config.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/vite.config.js": {
     "hash": "21448858b9ed5cbacc12e35ac9343f7c3ad2b921000091727353647fd99cef0d",
     "imports": [
       "vite",
@@ -10978,29 +10988,29 @@
       "./manifest.json"
     ]
   },
-  "02_System_Development/05_크롬_익스텐션/postcss.config.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/postcss.config.js": {
     "hash": "190c877db466995bf1482f4a16abd06e04a89ede3119341e2a86ff96e1737b27",
     "imports": []
   },
-  "02_System_Development/05_크롬_익스텐션/dist/service-worker-loader.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/dist/service-worker-loader.js": {
     "hash": "27e7b200c7b350194ba1e157a9fb9da01fae259a40e0da7038e017bff40b85d8",
     "imports": [
       "./assets/background.js-lPGzw4_1.js"
     ]
   },
-  "02_System_Development/05_크롬_익스텐션/dist/assets/index.html-BX_4P1w4.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/dist/assets/index.html-BX_4P1w4.js": {
     "hash": "351e4a1d1a0ab0314cc0591ee65654649440be187ca45d30c90311b0495d2b9d",
     "imports": []
   },
-  "02_System_Development/05_크롬_익스텐션/dist/assets/background.js-lPGzw4_1.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/dist/assets/background.js-lPGzw4_1.js": {
     "hash": "9d69f49b6624e64991ed8b655fda58332e93e2f7817a9fc481977ddf65ffa09e",
     "imports": []
   },
-  "02_System_Development/05_크롬_익스텐션/src/background.js": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/src/background.js": {
     "hash": "90c8c9be7acdd566653c0f1fc73910d7c0f5c6d56294ac8e459b95e9c5a23469",
     "imports": []
   },
-  "02_System_Development/05_크롬_익스텐션/src/main.jsx": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/src/main.jsx": {
     "hash": "acb24feb3540b5ee687f5a65bdbb81fe3644aa19da89256bc24b18d8ee010410",
     "imports": [
       "react",
@@ -11009,7 +11019,7 @@
       "./index.css"
     ]
   },
-  "02_System_Development/05_크롬_익스텐션/src/App.jsx": {
+  "02_System_Development/V2_Core_Engine/04_크롬_익스텐션/src/App.jsx": {
     "hash": "07ba5ae07d2f836e01cfec237a81e2c11888c10bd964bacf7877257729387059",
     "imports": [
       "react",
@@ -11018,7 +11028,7 @@
       "./logo.png"
     ]
   },
-  "02_System_Development/01_아리_엔진/database.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/database.js": {
     "hash": "2d985214cc35320632a076f4b367148081aa5d8084cbbbedbc866e02e0d54fda",
     "imports": [
       "sqlite3",
@@ -11029,26 +11039,26 @@
       "./ai-engine/modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/scratch2.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/scratch2.js": {
     "hash": "4aade06041c20ab342f9ac34827a60cb9ebf1ac778745d6d2dd4c8175dd5a4cd",
     "imports": [
       "./database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/delete_tasks.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/delete_tasks.js": {
     "hash": "e5bd2b0c3c92c07ea65b931525189535b405119127142d64dd66b15afe0e289b",
     "imports": [
       "./database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/scratch.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/scratch.js": {
     "hash": "9036a230e4c419e27025bc69879521eed35e2339689d2a3073c9681c811b0007",
     "imports": [
       "./database.js",
       "./ai-engine/services/contextChainService.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/bugdogRunner.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/bugdogRunner.js": {
     "hash": "10c8b8552ec72faf9c057b4365e1404e468f8fb29f50eced56132699bf64f492",
     "imports": [
       "fs",
@@ -11057,19 +11067,19 @@
       "sqlite3"
     ]
   },
-  "02_System_Development/01_아리_엔진/delete_tasks_direct.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/delete_tasks_direct.js": {
     "hash": "1fea4ba9b96cfc1ecc099f5b0b2e569fc20598f4e65f05dd28a2c22458fc4909",
     "imports": [
       "sqlite3"
     ]
   },
-  "02_System_Development/01_아리_엔진/scratch3.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/scratch3.js": {
     "hash": "c60e8ca98695e0b621a898ab066e2305f4a992fc8c28c3d2fec1444f046b4574",
     "imports": [
       "./database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/server.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/server.js": {
     "hash": "0206d07e99557b9b8affe5dd5430f72d8c459c297c69e1626589e631c6739d68",
     "imports": [
       "express",
@@ -11110,27 +11120,27 @@
       "dotenv/config"
     ]
   },
-  "02_System_Development/01_아리_엔진/mcp_server.js": {
-    "hash": "51a919e3c4c6da33ed0cf15cd1d5ab8a4823fb6e6abc8032aa320f8a7ffebf0d",
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/mcp_server.js": {
+    "hash": "01b8e580093bebe686bb86c1dfebd12663e008b24bc42ffab980f54bf0deb510",
     "imports": [
       "@modelcontextprotocol/sdk/server/index.js",
       "@modelcontextprotocol/sdk/server/stdio.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/puppeteer_test.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/puppeteer_test.js": {
     "hash": "adaf1a75da3819ea5a2c66cf03a0a0a5faab1843bef9a19330551ce9f2a9e477",
     "imports": [
       "puppeteer-core"
     ]
   },
-  "02_System_Development/01_아리_엔진/scratch4.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/scratch4.js": {
     "hash": "241cf0f064566cb7b0b2c730de90789e0cbd9349f56437af4a84945133b5cd9b",
     "imports": [
       "./database.js",
       "./ai-engine/services/contextChainService.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/README.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/README.md": {
     "hash": "aef53f844fdec35dfd2ae5d7828922704faa4b2192483a06c8dcc524f566a869",
     "nodes": [
       {
@@ -11197,14 +11207,14 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/remotion.config.ts": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/remotion.config.ts": {
     "hash": "e0c35bef34d60e1b6a23a305842c8e7ef574f760f55fc66e5d4834632bc204e8",
     "imports": [
       "@remotion/cli/config",
       "@remotion/tailwind-v4"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/SKILL.md": {
     "hash": "2e8d90b1490e0b188cd7b3b442f1cdc87a42c887e08cbabdb3941064ef80d91a",
     "nodes": [
       {
@@ -11311,7 +11321,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/images.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/images.md": {
     "hash": "833e0a038d7c158f58b39f9bca7efafbbc4b944a54b3ae1c95e0d5973345e22c",
     "nodes": [
       {
@@ -11398,7 +11408,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/text-animations.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/text-animations.md": {
     "hash": "40ac6b1bccf1c57d9edd46c74e847ec6e86fe775d3ef4fd14e1338f4a2606171",
     "nodes": [
       {
@@ -11435,7 +11445,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets.md": {
     "hash": "68b70928aaea682165f33dc8e98278d9dca8512b50e44abc2c884ee5f3ac78de",
     "nodes": [
       {
@@ -11502,7 +11512,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-video-duration.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-video-duration.md": {
     "hash": "ed594a0d73a5274483f21c30e612aba57089d5bbc5437041aa32d07a8e789fd9",
     "nodes": [
       {
@@ -11559,7 +11569,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transcribe-captions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transcribe-captions.md": {
     "hash": "ad1a62af35fe176b37ac4d98f796451ca66bcc9983207a9710ec3eca6e847738",
     "nodes": [
       {
@@ -11596,7 +11606,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/light-leaks.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/light-leaks.md": {
     "hash": "17d2f136f7bf2f438274a0ade43df017c360ae31175d8367ce476415c222dfca",
     "nodes": [
       {
@@ -11663,7 +11673,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/measuring-text.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/measuring-text.md": {
     "hash": "5cab1807b9ae9f5be3fc0e1cb0e0513a69451e31e32657d6a665573331db6807",
     "nodes": [
       {
@@ -11730,7 +11740,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/parameters.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/parameters.md": {
     "hash": "9de38837a07dc406052dfbb759c58ca5298ca331d86d9aa0f4e177b339e288b5",
     "nodes": [
       {
@@ -11747,12 +11757,12 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/tailwind.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/tailwind.md": {
     "hash": "6212ce72abe5eaee0eb41822b2cdf944b77ad9b082426909beb2da07151e1788",
     "nodes": [],
     "edges": []
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/can-decode.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/can-decode.md": {
     "hash": "d2323cc4f2a884a09d167f31a4fcb36bd94adf1002de88b99bd9af1a2bc5ed71",
     "nodes": [
       {
@@ -11799,7 +11809,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transitions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transitions.md": {
     "hash": "f6b0ca21322d68ab516345e8d57a2039c48654c98604b673913382c854e79d86",
     "nodes": [
       {
@@ -11936,7 +11946,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/timing.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/timing.md": {
     "hash": "d7df8f74a08a86ff019cbd3bf528dd9d9528ae1860be70d54b3334544d6b36a7",
     "nodes": [
       {
@@ -11993,7 +12003,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/import-srt-captions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/import-srt-captions.md": {
     "hash": "ad89cc1834dcd63ff225593f699611a1a20b57eff4ed8e587f429b36516ec82c",
     "nodes": [
       {
@@ -12040,7 +12050,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/trimming.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/trimming.md": {
     "hash": "ae00948f6a903e384c7c312896adba9b50ed592f24a5a090699b7345849b36b9",
     "nodes": [
       {
@@ -12077,7 +12087,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/silence-detection.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/silence-detection.md": {
     "hash": "ed95d46d078f3749b87ec3c6e25c1c5b0c8485fdcb41156d649266369748fdc2",
     "nodes": [
       {
@@ -12144,7 +12154,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/measuring-dom-nodes.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/measuring-dom-nodes.md": {
     "hash": "4017103b03f14a041ac433be78c521ec2e9961629fae419c8b196d349637585b",
     "nodes": [
       {
@@ -12171,7 +12181,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/compositions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/compositions.md": {
     "hash": "3223ce9326048ef734fe880e5ddbd33e75e12dc4deb7f6043c58d11329d47f31",
     "nodes": [
       {
@@ -12228,7 +12238,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/sequencing.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/sequencing.md": {
     "hash": "7c18f2ac36974fd7b85c01efa1135ea06a14e8492dd9fe82ced3bec0b4bb605d",
     "nodes": [
       {
@@ -12295,7 +12305,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/videos.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/videos.md": {
     "hash": "d9d3032a57f92c759daf0bd60b3282f6810ecc9958e9093a6b828de623b05328",
     "nodes": [
       {
@@ -12392,7 +12402,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-audio-duration.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-audio-duration.md": {
     "hash": "720a5346ae79555e933498995d5cb04d1bfbeeee7232436d8835c3ec17d46281",
     "nodes": [
       {
@@ -12449,7 +12459,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/audio-visualization.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/audio-visualization.md": {
     "hash": "0f4043de86639b6390e5ab888eaa66a24a10a8bd540f1443327cb88107eae1e9",
     "nodes": [
       {
@@ -12536,7 +12546,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/audio.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/audio.md": {
     "hash": "e931664ac23bc4acfa137d8b415702bb4860b4fbabd6caed0042c0902d3bec90",
     "nodes": [
       {
@@ -12643,7 +12653,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/3d.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/3d.md": {
     "hash": "42cef6d68fb4a266ab495d35df0c60e03672b0d85c043f9b567f6aa7ff00dd0d",
     "nodes": [
       {
@@ -12710,7 +12720,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/fonts.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/fonts.md": {
     "hash": "1749e4cf82e8b157d4b0a26f46721152d3ef9e5e9a1686753b8bb6a1be83ddbc",
     "nodes": [
       {
@@ -12817,7 +12827,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/voiceover.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/voiceover.md": {
     "hash": "60340034cf422052007183d031171b3c88422dd3fe85f0d915283dd8ec5df3e8",
     "nodes": [
       {
@@ -12884,7 +12894,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/subtitles.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/subtitles.md": {
     "hash": "9f18ec4a9c88adf35d51b44aaf344442443fd687a4dc948366ebb683fc3ecd30",
     "nodes": [
       {
@@ -12921,7 +12931,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/calculate-metadata.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/calculate-metadata.md": {
     "hash": "7d6217deed7425c6662e8d112b933be162a99a9f26a5c10b7c0b2ba62329a269",
     "nodes": [
       {
@@ -12998,7 +13008,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/charts.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/charts.md": {
     "hash": "c6863bd1122f53f80c2211fbe19bc5e3db8a38a5d43473748da8067af10fcf29",
     "nodes": [
       {
@@ -13075,12 +13085,12 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/animations.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/animations.md": {
     "hash": "d9ee77603e83316355788b1418cde5cdb0370efe0be21bb0a66eaa26c3bd26d7",
     "nodes": [],
     "edges": []
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/maps.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/maps.md": {
     "hash": "5a531e1c925c58c4aa019c33bf2b6c0412560af3359295ab080f33e063e01d61",
     "nodes": [
       {
@@ -13197,7 +13207,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/ffmpeg.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/ffmpeg.md": {
     "hash": "b67ff4e3ce01c48241ef92fa165398d427e9f676ae8e17d1ed19d5584bff5002",
     "nodes": [
       {
@@ -13234,7 +13244,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/extract-frames.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/extract-frames.md": {
     "hash": "771eb211c58130b2e4533dfec87abe584a2070c1d3dd0a0d6f16d2bb85dd237f",
     "nodes": [
       {
@@ -13301,7 +13311,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/lottie.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/lottie.md": {
     "hash": "6dd0a845f5cea9c0f3d2465b5678a16076f5778ad1a628abbf387dba0b929cbb",
     "nodes": [
       {
@@ -13348,7 +13358,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/gifs.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/gifs.md": {
     "hash": "db5d84bb8da4c52c133cdc9820a5b6995db94a548df5f9838efb8d1224065787",
     "nodes": [
       {
@@ -13435,12 +13445,12 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/sfx.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/sfx.md": {
     "hash": "96fcc4f0973b5ed5cd9cd0d4d0479c642984cfacd8010fc7d6186c468296626b",
     "nodes": [],
     "edges": []
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-video-dimensions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/get-video-dimensions.md": {
     "hash": "ed1bb6e0ae742e4bfcb18e7c50af23fc782a9d699b90d367250437c7f6da7304",
     "nodes": [
       {
@@ -13497,7 +13507,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transparent-videos.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/transparent-videos.md": {
     "hash": "394ccda476e084522d544471fee92d7c65672e2cbaf2201a785c3dd5c74f31a4",
     "nodes": [
       {
@@ -13534,7 +13544,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/display-captions.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/display-captions.md": {
     "hash": "20b8898a90536fa427a5a39571fc7deac7bde96c4c7bfdf413eee1ef4ef85530",
     "nodes": [
       {
@@ -13631,11 +13641,11 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/text-animations-typewriter.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/text-animations-typewriter.tsx": {
     "hash": "92b5f47d6d18387a0aa008ce9dceefd30f673ae5879e16892bd4b4ea97f5dddb",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/text-animations-word-highlight.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/text-animations-word-highlight.tsx": {
     "hash": "30e707bbc90e3734fcdb0f9e869bdb9fbbaf8ded1d923951d616f5ba402ce03d",
     "imports": [
       "@remotion/google-fonts/Inter",
@@ -13643,21 +13653,21 @@
       "remotion"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/charts-bar-chart.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/.agents/skills/remotion-best-practices/rules/assets/charts-bar-chart.tsx": {
     "hash": "6e5e219c596c8515336570a5bc89c233e32e695d5816dec88eb929e798eeea61",
     "imports": [
       "@remotion/google-fonts/Inter",
       "remotion"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/src/Composition.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/src/Composition.tsx": {
     "hash": "0baa8072f0522a3a8ff3046b91e0f2faf0e82ff7867b79d6212479936599a2b8",
     "imports": [
       "remotion",
       "./PicoCharacter"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/src/Root.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/src/Root.tsx": {
     "hash": "c374a79c9bba7f06f7f1282b6e4e306c84e1f13c193766c5c40e590b9d74fdfe",
     "imports": [
       "remotion",
@@ -13665,33 +13675,33 @@
       "./index.css"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/src/PicoCharacter.tsx": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/src/PicoCharacter.tsx": {
     "hash": "4611bb67fa3236e255c85b21a7018a67ab31c79fd49940b0d352ada3f876b9fb",
     "imports": [
       "remotion"
     ]
   },
-  "02_System_Development/01_아리_엔진/remotion-poc/src/index.ts": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/remotion-poc/src/index.ts": {
     "hash": "957e481dd33a29b4a55ae0e95dbf763b7e48c37c427ca4bd1275faf34bc07a74",
     "imports": [
       "remotion",
       "./Root"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/check_models.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/check_models.js": {
     "hash": "54884b79296eca0f49f178542344f681535a29739e08cd335ca7e48ea461a17f",
     "imports": [
       "fs",
       "dotenv"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_ig_puppeteer.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_ig_puppeteer.js": {
     "hash": "e2a9c18af991d1315197f76f3351c35da2526a239210511fddaeb17cfe693e17",
     "imports": [
       "puppeteer-core"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai4.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai4.js": {
     "hash": "9d4188ab9c349c8c669446f9636d64766cc8755361f626fe05db2e8d462dc858",
     "imports": [
       "@google/genai",
@@ -13699,14 +13709,14 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_oauth.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_oauth.js": {
     "hash": "3fa231588f8c6f0646b93afde983551601eea6e13a7e215e40f63945346c2ca3",
     "imports": [
       "./server.js",
       "node-fetch"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai5.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai5.js": {
     "hash": "75f2e29dbb357b8efaf1b6862ad61a917171a5440852f8ac7a93a1ec955e2af1",
     "imports": [
       "@google/genai",
@@ -13714,7 +13724,7 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_ig_login_scrape.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_ig_login_scrape.js": {
     "hash": "f4a37216b1c70b8acf2da270f08cee513666ba3a54d49f44f4884822045f25b0",
     "imports": [
       "puppeteer-core",
@@ -13724,7 +13734,7 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_naver_api.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_naver_api.js": {
     "hash": "8d93a24ab8397a7ddc7ff3747da6edd391522deffd1fe3dcbdb4108c9371eaa8",
     "imports": [
       "./ai-engine/agents/youtube-autopilot/NaverNewsHarvester.js",
@@ -13734,7 +13744,7 @@
       "dotenv/config"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_tts.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_tts.js": {
     "hash": "10a922f39bd13d94af5f2d137d66f63870889ec02fccda4361a5073729f61a4a",
     "imports": [
       "./ai-engine/agents/youtube-autopilot/TTSAgent.js",
@@ -13742,20 +13752,20 @@
       "dotenv/config"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai.js": {
     "hash": "b7076a8b228d94bc23dfd2bd852b94441b30b1b1aa222c248b77f70ed7dc06d6",
     "imports": [
       "@google/genai"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_list_models.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_list_models.js": {
     "hash": "e899f3503109b9fd057f297eeb45f4296f510132aeb9c0a9387a8950f5df6887",
     "imports": [
       "dotenv",
       "node-fetch"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_oauth2.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_oauth2.js": {
     "hash": "19577e332d8ca70d07b88ee488d08fbaeb9c57a5ba3971a336f09c88df0d9eda",
     "imports": [
       "fs",
@@ -13763,31 +13773,31 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai6.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai6.js": {
     "hash": "0f86c68d93caf5353927ffde1a9c85edd6305a691dce70b9873c3649076e2ecb",
     "imports": [
       "@google/genai"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_agent_trigger.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_agent_trigger.js": {
     "hash": "4bbe14ea8c1b5940f8b677acce91ea744191c3ce4352a7f5a2b38645c5e55448",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai2.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai2.js": {
     "hash": "9cdf1a052bf950ce34e06d56d14e622e067b274f6b26206b9bd07f2311987879",
     "imports": [
       "@google/genai",
       "./server.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_interest_analyzer.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_interest_analyzer.js": {
     "hash": "954660a96ed07384a91b9dec5e56e0962a4eca6e885fa4800f63f37e8c2b703b",
     "imports": [
       "dotenv",
       "./ai-engine/agents/youtube-autopilot/InterestAnalyzer.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/tests/test_genai3.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/tests/test_genai3.js": {
     "hash": "37b57016d7eac50984f4421c50bca8a286b5bf4875b69f6179fd5c28df67ae32",
     "imports": [
       "@google/genai",
@@ -13795,7 +13805,7 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/03_naver_datalab_trend_api.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/03_naver_datalab_trend_api.md": {
     "hash": "ba1b47e3282c503d27050703e7abed8101486e7ee33d020252d2154a71bebf82",
     "nodes": [
       {
@@ -13942,7 +13952,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/20260420_API리밋_분석및픽스_Luca.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/20260420_API리밋_분석및픽스_Luca.md": {
     "hash": "86195ab8c1c3fef80407349696ab2e7ad1c03a5ee3d35d1fbb1719557640a5eb",
     "nodes": [
       {
@@ -14059,7 +14069,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/ARI_INTELLIGENCE_DESIGN.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/ARI_INTELLIGENCE_DESIGN.md": {
     "hash": "39182ea0876ded03d7bd67cc62998dd88885efd1c79e44cae4fb1cf9b9011077",
     "nodes": [
       {
@@ -14286,7 +14296,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/PRIME_BRIEFING_20260423.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/PRIME_BRIEFING_20260423.md": {
     "hash": "35ee378994573f3a4eca12a5603110ae9bcd8967a56d396dde417ff517d619b0",
     "nodes": [
       {
@@ -14483,7 +14493,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/ARI_BRAIN.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/ARI_BRAIN.md": {
     "hash": "5af7f71577a31bbb8e51a9b1ba6f7f04715d727f3eae0b0f9ceef94526f248fa",
     "nodes": [
       {
@@ -14570,7 +14580,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/02_naver_news_search_api.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/02_naver_news_search_api.md": {
     "hash": "d5c8041c0044f9c140e183689cfcde98bf28ca9667ad7f89bf154270f02a7e36",
     "nodes": [
       {
@@ -14727,7 +14737,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/01_naver_openapi_overview.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/01_naver_openapi_overview.md": {
     "hash": "08f472a54401c2f247e05dfeae4fd94b1dd0234f3448b33f457f8bb746cbc670",
     "nodes": [
       {
@@ -14864,7 +14874,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/04_naver_api_integration_guide.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/04_naver_api_integration_guide.md": {
     "hash": "7b7c34b0b4f4cd1f78102c7f351a6930cc5db86226128728626872b45c49e1f7",
     "nodes": [
       {
@@ -15021,7 +15031,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/docs/ARI_CONTEXT.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/docs/ARI_CONTEXT.md": {
     "hash": "a543f7022fb34bbbb46373e03eea109f4f2ab31750c6384c9851d345d11f33c7",
     "nodes": [
       {
@@ -15138,28 +15148,28 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/scripts/p0-shielder.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/scripts/p0-shielder.js": {
     "hash": "016d56efcc620589b3411f7f9094ff5a3d5e155093e3ac18b043ae22eb7f3a19",
     "imports": [
       "fs",
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/teamActivator.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/teamActivator.js": {
     "hash": "af3f815773237a6a4d97bf0d6d4741456b74cbd016156b154028d304c5bc49d1",
     "imports": [
       "../database.js",
       "./policyGuard.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/statusReporter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/statusReporter.js": {
     "hash": "ae8851e191af09ec9bcae6cbb2b4c4d4505368a5eee0cb02a4403bdaa026f7fa",
     "imports": [
       "./adapters/geminiAdapter.js",
       "./modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/ariDaemon.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/ariDaemon.js": {
     "hash": "965b7194f1c6fd97d9c3c657210170092a308b1faba1e6c2ec5ed5e9849b0ade",
     "imports": [
       "express",
@@ -15175,7 +15185,7 @@
       "./tools/instagramAdapter.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md": {
     "hash": "70ef7266af7909d1a0f78f75753d87d28d685c9389b549da643640e7c5569f06",
     "nodes": [
       {
@@ -15302,23 +15312,23 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tutorialManager.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tutorialManager.js": {
     "hash": "d9ca4356405a81ecb5984cd88d43c7b384319fe7fc52e9bd65ca665dce8f4e1a",
     "imports": [
       "../database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/omoLauncher.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/omoLauncher.js": {
     "hash": "95f64c360ab4c543d42a687b1f091d33104ba9990c4df4968dd38c7f0f226c3a",
     "imports": [
       "child_process"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/policyGuard.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/policyGuard.js": {
     "hash": "c600b153f8c3e35bda77fc02dfef916137204e15c719037120a8af2437c0eb91",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/bugdogPipeline.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/bugdogPipeline.js": {
     "hash": "8a0c1806f1307685cf6333807f4832e675b6a55df02b3629d5ef909cbda8257d",
     "imports": [
       "fs/promises",
@@ -15329,18 +15339,18 @@
       "./modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/modelSelector.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/modelSelector.js": {
     "hash": "b1c460989267c817d19261e4ef950b8d8395440de0e3d3b13835da555c15af2c",
     "imports": [
       "./adapters/geminiAdapter.js",
       "./modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/modelRegistry.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/modelRegistry.js": {
     "hash": "1652d6504e96e37923287a91b0ee4a2ade035bd62a526ca7090276a94bbaf561",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/router.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/router.js": {
     "hash": "2e800e8ffbcdb1a9b9cccfe19ac06400744ce73059bb4c849683e4cc2d5472b6",
     "imports": [
       "./skills/generalSkill.js",
@@ -15353,14 +15363,14 @@
       "./skills/routingSkill.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/AdapterWatcher.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AdapterWatcher.js": {
     "hash": "6fdd7dfbfd45186db186a3148f84746b0cb47ab0f08fcadaf3bc73f680713152",
     "imports": [
       "fs",
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/executor.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/executor.js": {
     "hash": "12aa0c689ebff098bc21130b6f4a15be030664cc0147fff52cd155d6d639a27f",
     "imports": [
       "fs",
@@ -15382,7 +15392,7 @@
       "./tools/workflowOrchestrator.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/naverSearchAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/naverSearchAdapter.js": {
     "hash": "769a6a10e174e5d2c443c6949e5472085226f46ea3be865510c6907f7fe5ccfe",
     "imports": [
       "dotenv",
@@ -15390,7 +15400,7 @@
       "url"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/instagramAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/instagramAdapter.js": {
     "hash": "b597be7a0951b6395d2aaf2fdecf639985c55bf7e56666ccf9e44f7f8d78312e",
     "imports": [
       "url",
@@ -15398,7 +15408,7 @@
       "fs"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/onboardingPipeline.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/onboardingPipeline.js": {
     "hash": "f97704a4811ae686f9275ee916e26c7e610f4aa7f296816496e1874821e9bf51",
     "imports": [
       "fs",
@@ -15407,7 +15417,7 @@
       "../adapters/geminiAdapter.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/workflowOrchestrator.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/workflowOrchestrator.js": {
     "hash": "7c42c805348a8d50a5ccc947fb0d5dd1c265623f8b389d8f3f22001acd804b1c",
     "imports": [
       "../../database.js",
@@ -15417,17 +15427,17 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/keyProvider.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/keyProvider.js": {
     "hash": "fa8c31cd3cc30970bbc438df735062c5ba0989704e7b1fac7f8bfdfc48f76b94",
     "imports": [
       "../../database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/requestQueue.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/requestQueue.js": {
     "hash": "0efa357f7ded3bf2f00be0ff193a8a30d9e4f701b68de65369c8b22d99d73579",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/ruleHarvester.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/ruleHarvester.js": {
     "hash": "2c26e0589a2785ca5ad4dba604bcfd867fbf4181796d0e3e588d4b0a8cd10ff9",
     "imports": [
       "fs",
@@ -15437,11 +15447,11 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/scrubbing.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/scrubbing.js": {
     "hash": "1366184620beceeebaf2e53a4105102cbe9f64618f59aed03f652fe32813989a",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/contextInjector.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/contextInjector.js": {
     "hash": "c4c29c1dd77d7790ec9575a5f2ac8aba45cb297d415558afecc34f1ef07a13ff",
     "imports": [
       "fs",
@@ -15449,14 +15459,14 @@
       "url"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/urlParser.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/urlParser.js": {
     "hash": "d59a91213daaf5539d4c5fb69ddbb73bd572dcd8c5ebfcac66d807ee4099c0f1",
     "imports": [
       "axios",
       "cheerio"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/tools/b4System.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/tools/b4System.js": {
     "hash": "29acddaa403702db5a2779cf8a85e35fead4bf6c589863ea24e62d064b6ce8f0",
     "imports": [
       "fs",
@@ -15467,13 +15477,13 @@
       "./ruleHarvester.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/CurationAgent.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/CurationAgent.js": {
     "hash": "a9832cabb3f8f6547d40c85accdb5586065ee4db8f56a93e03f6aa98cb12fab7",
     "imports": [
       "@google/genai"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/DataHarvester.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/DataHarvester.js": {
     "hash": "492667011c38e5d5b6945ccea674dd8dc2778a4bd9682b95cbc3c00431d8376f",
     "imports": [
       "node-fetch",
@@ -15481,13 +15491,13 @@
       "./NaverDataLabHarvester.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/NaverNewsHarvester.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/NaverNewsHarvester.js": {
     "hash": "681410f9df2e3e5c8af352055abdfe7f4ca7f2ab1d908fe9558e18ae23353f24",
     "imports": [
       "node-fetch"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/InterestAnalyzer.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/InterestAnalyzer.js": {
     "hash": "5611160552d69626021e03aa83f8cf45a60f10919363903936bba7b606baa785",
     "imports": [
       "node-fetch",
@@ -15495,7 +15505,7 @@
       "../../adapters/geminiAdapter.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/index.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/index.js": {
     "hash": "f9e02ec06123ca4cd777182431c4815dac11f3eeed946805ee61b79ce7619e77",
     "imports": [
       "path",
@@ -15508,17 +15518,17 @@
       "../../services/youtubeUploader.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/ImageLabAgent.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/ImageLabAgent.js": {
     "hash": "7ac0b539980903be6a731b0a47345f1ce2bb398641aea5e2202997ea7cf11e75",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/NaverDataLabHarvester.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/NaverDataLabHarvester.js": {
     "hash": "406e69eb42546f79a3f33bf3b91e34204f1d247d0814c6edff73e4b0e2260455",
     "imports": [
       "node-fetch"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/agents/youtube-autopilot/TTSAgent.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/agents/youtube-autopilot/TTSAgent.js": {
     "hash": "f99c33a507d18bc04830bc222542e649dd72cc4fbf6d82c2a41d8361b1e4373e",
     "imports": [
       "fs/promises",
@@ -15527,7 +15537,7 @@
       "../../tools/keyProvider.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/antigravityAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/antigravityAdapter.js": {
     "hash": "5c59f647cb097c1cfc237341fe8cafd4c25734ee13b7dffbe435a8219d22afaf",
     "imports": [
       "fs",
@@ -15537,13 +15547,13 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/NotebookLMAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/NotebookLMAdapter.js": {
     "hash": "6ffcf70651d365c83ac973d7133b6058729bf2c2630e0f1b11a4c6bf60bfa9bd",
     "imports": [
       "../../server.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/FilePollingAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/FilePollingAdapter.js": {
     "hash": "3c55c636fe096166da198f62677c6fcdbf6c285a3c4e13be2b8547380b3b9a0d",
     "imports": [
       "fs",
@@ -15551,7 +15561,7 @@
       "./BaseAdapter.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/geminiAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/geminiAdapter.js": {
     "hash": "9d00830f3fcacf5f7ee30ed67cacb4faa2516205f0b8ae10e3c5362cba3f76e2",
     "imports": [
       "@google/genai",
@@ -15561,7 +15571,7 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/anthropicAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/anthropicAdapter.js": {
     "hash": "fb7ce8ea5a013b39d91ab365fa41b7e2b79f81cf84103c65a7c533f5626c293c",
     "imports": [
       "@anthropic-ai/sdk",
@@ -15569,7 +15579,7 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/VideoAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/VideoAdapter.js": {
     "hash": "0771c74b981be96e3568279644d439ac9e7fd9156f4132b3afc62187f56858ce",
     "imports": [
       "child_process",
@@ -15577,11 +15587,11 @@
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/BaseAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/BaseAdapter.js": {
     "hash": "15a1f77b08e2286bec0969b2938e805ad1ed9390082f2f9862b86443007dc2d1",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/adapters/obsidianAdapter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/adapters/obsidianAdapter.js": {
     "hash": "f1d2706bd8e55ec75d9be6b2e2312efadda5a79722687a709ab5c6b7daabd05d",
     "imports": [
       "child_process",
@@ -15590,14 +15600,14 @@
       "dotenv/config"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/workers/graphifyWatchdog.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/workers/graphifyWatchdog.js": {
     "hash": "949c4ca25724ac73cdd6eeabde77ee263d10cdb8a79c83c01b345e0f47e15356",
     "imports": [
       "child_process",
       "util"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/workers/memoryWatchdog.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/workers/memoryWatchdog.js": {
     "hash": "4fe6c08fb247eb92f43ea99e23711850a340dc5af5617b158afe7b503935d764",
     "imports": [
       "fs",
@@ -15605,45 +15615,45 @@
       "../adapters/geminiAdapter.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/mediaSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/mediaSkill.js": {
     "hash": "64c667a4db509fcd508553d74dcfaf882a5129c8b31829af591bd476f9c5f117",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/systemShieldSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/systemShieldSkill.js": {
     "hash": "f08be835ccf746610cee054f1173b264a26b797c6b9cd0ec8d00a609cd0bfd90",
     "imports": [
       "crypto"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/generalSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/generalSkill.js": {
     "hash": "1a29ae5f8f814cfe81fc9db54028e11d597a54f38e30379c3f3de5a5b264f9ab",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/routingSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/routingSkill.js": {
     "hash": "c6d2668830f8d9956908cf3ffaf9c6d23aa1a09ea91b1acc70967b1dceca3ae4",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/researchSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/researchSkill.js": {
     "hash": "3dc4e70414d5d3b86c767e127b078700172ebc38b599f20910ebe5373d70edae",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/analysisSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/analysisSkill.js": {
     "hash": "cc742ee330255eae405c8aa386c8995e8a8f3f4462d4cec69783e979023094bc",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/marketingSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/marketingSkill.js": {
     "hash": "3b9b30dca0d2a4ad10f47411db86dcaf40e51b1adcba400076a413182c7d8c4a",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/designSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/designSkill.js": {
     "hash": "676402da1771aa5571d9a23c886a3690ef2951b2e4d4f7f9a50e49f4fa4ebaab",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skills/contentSkill.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skills/contentSkill.js": {
     "hash": "ad41c0a9a29fb3764c9a7ecbe69e94d5d9cb9d5a8c9a1c391d35edfc8f056e18",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/intentRouter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/intentRouter.js": {
     "hash": "cf37c8a6c6ec3f2a4fbec962df52466267c409bfd2d7e5f0dcc1ea4224970f0c",
     "imports": [
       "fs",
@@ -15653,8 +15663,8 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/systemWatchdog.js": {
-    "hash": "056787f7def01d84b574ce9e1a2a72d2aab49883b8f89843c3053853ad414fa3",
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/systemWatchdog.js": {
+    "hash": "fb000c8b3c58c7e4736f2f875878b29101741df005d4b7b0f9ab0c965dc84701",
     "imports": [
       "fs/promises",
       "path",
@@ -15663,7 +15673,7 @@
       "url"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/imageAnalysisService.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/imageAnalysisService.js": {
     "hash": "efccd4242e7236684d6ddb2aa4df9d372cab448c3325be791c535020849b3562",
     "imports": [
       "fs",
@@ -15673,7 +15683,7 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/zeroConfigService.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/zeroConfigService.js": {
     "hash": "7db1c5acfd5d7dacaa7e77144cc933fa4e324dd84003830731e54194dde4e64b",
     "imports": [
       "../adapters/antigravityAdapter.js",
@@ -15684,7 +15694,7 @@
       "../modelRegistry.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/wikiEngine.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/wikiEngine.js": {
     "hash": "767fa59aa7ffd70e1ff759d146ad6bf16e3db45589b3b36e453601e083d8598c",
     "imports": [
       "fs/promises",
@@ -15695,7 +15705,7 @@
       "url"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/youtubeUploader.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/youtubeUploader.js": {
     "hash": "68cd035d1bca587b25c96e8bc31f4a543b4619d7c6c086e073809642b7aceaa0",
     "imports": [
       "googleapis",
@@ -15704,24 +15714,24 @@
       "dotenv"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/youtubeScraper.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/youtubeScraper.js": {
     "hash": "495ee05335d5e7d0cd266d9c85e353fec4b37cf83b4d03c6ec0ddba56cbf6d08",
     "imports": []
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/projectScaffolder.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/projectScaffolder.js": {
     "hash": "97c634cb796037fe060b2115eebbcd9900cdeb0b5685775925d6a541b0d36220",
     "imports": [
       "fs/promises",
       "path"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/contextChainService.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/contextChainService.js": {
     "hash": "696cf3d317f69120b759f51ed7c63f88f53fd39159ae1c3d7164759d92adb7cc",
     "imports": [
       "../../database.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/services/templates/WIKI_RULES_DEV.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/templates/WIKI_RULES_DEV.md": {
     "hash": "fd975a28f4ff91f6a7eb008b08cf4486db924265aaebdb331f5d5e7fa783def6",
     "nodes": [
       {
@@ -15828,7 +15838,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/ai-engine/skill-library/00_team/TEAM_GROUND_RULES.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/skill-library/00_team/TEAM_GROUND_RULES.md": {
     "hash": "15733a542a046f00a8b08d9f170b17bdc448b0fc9a8e823ed6c2dda9ecafd4be",
     "nodes": [
       {
@@ -15845,7 +15855,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/routes/imageLabRouter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/routes/imageLabRouter.js": {
     "hash": "20658d35c4a52a3e7254e0d7b55130813f1f9b07317412b090103f8b352e0d5e",
     "imports": [
       "express",
@@ -15860,7 +15870,7 @@
       "../ai-engine/executor.js"
     ]
   },
-  "02_System_Development/01_아리_엔진/routes/videoLabRouter.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/routes/videoLabRouter.js": {
     "hash": "aebad1cb8981b7d5173df20869dbac91312c8462881cd811dcb37aa09718e08b",
     "imports": [
       "express",
@@ -15881,7 +15891,7 @@
       "util"
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/socian/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/socian/SKILL.md": {
     "hash": "ac808be764e2a85b52d5539b0070285fa4df6bb15382879580b6e678a9692412",
     "nodes": [
       {
@@ -16018,7 +16028,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/socian/workflows/03_cks_sprint_retrospective.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/socian/workflows/03_cks_sprint_retrospective.md": {
     "hash": "63a4903ee10fb535813e524a7205d0e5c1ff4c0fd4e7ce68eb268f872658ea62",
     "nodes": [
       {
@@ -16095,7 +16105,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/socian/workflows/02_instagram_reels.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/socian/workflows/02_instagram_reels.md": {
     "hash": "28bd92424d546b43ea72274782080bcda956f8c441a5e69dadb8de2239ad98c6",
     "nodes": [
       {
@@ -16192,7 +16202,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/socian/workflows/01_blog_post.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/socian/workflows/01_blog_post.md": {
     "hash": "79810a36a9a22c7e71a0d378e4579fee6f45ff15b897c59b40648554b74a40bf",
     "nodes": [
       {
@@ -16289,7 +16299,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/02_marketing/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/02_marketing/SKILL.md": {
     "hash": "bbea2e4d0f4db6167303075675e27763850c486d936c9dd2176bfb90640578a0",
     "nodes": [
       {
@@ -16326,7 +16336,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/04_analysis/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/04_analysis/SKILL.md": {
     "hash": "ee658ce21207b451906516b58ffe606bfc7e85e364c8490432e78bdf8bcf3cb8",
     "nodes": [
       {
@@ -16363,7 +16373,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/00_skill-creator/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/00_skill-creator/SKILL.md": {
     "hash": "41bbe7c56de4fbe4370ddb3257189d61cb5d7b31cc553f6ebf848b0f89e999c9",
     "nodes": [
       {
@@ -16630,7 +16640,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/mycrew-core-protocol/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/mycrew-core-protocol/SKILL.md": {
     "hash": "54fe4a8f8d777bfa7fe0a259568d00ebbb8576fd7eaa8adf001f0f6879687fe4",
     "nodes": [
       {
@@ -16937,7 +16947,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/03_content/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/03_content/SKILL.md": {
     "hash": "f4a7a7e24c3f7ab20889d223fec7a50eca092a247642398b501c9adb5a8b597c",
     "nodes": [
       {
@@ -16974,7 +16984,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/dev_autonomous_relay/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/dev_autonomous_relay/SKILL.md": {
     "hash": "c4404be5d7da1e65d27870cc1a3a4aa686355765eafe726b1189a6c014636ca9",
     "nodes": [
       {
@@ -17031,7 +17041,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/_docs/Self_Learning_Architecture.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/_docs/Self_Learning_Architecture.md": {
     "hash": "953f3a945d31adab9c428a9a13ddb63751682a8a1c329edd65b44c24f7271e47",
     "nodes": [
       {
@@ -17258,7 +17268,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/00_team/TEAM_GROUND_RULES.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/00_team/TEAM_GROUND_RULES.md": {
     "hash": "d10651eac1ce55347b435bd53a81734f878e22a83153be591560fe956d6ffb69",
     "nodes": [
       {
@@ -17275,7 +17285,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/01_routing/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/01_routing/SKILL.md": {
     "hash": "f28edd34cc45fcf92b5a91639c168d8f86295e7c07aca672ec4bc797d1ebf938",
     "nodes": [
       {
@@ -17412,7 +17422,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/05_design/image_quality_benchmark.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/05_design/image_quality_benchmark.js": {
     "hash": "574038189a7147c7de102f088a028b754ff3ec7678cf512ad941d05ad00b43f1",
     "imports": [
       "fs",
@@ -17421,7 +17431,7 @@
       "url"
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/05_design/nanoBananaGenerator.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/05_design/nanoBananaGenerator.js": {
     "hash": "2dd784137934e8d31ec810ac4c96c0e7fcacb17276175ce9ec15793de60058fe",
     "imports": [
       "@google/genai",
@@ -17430,7 +17440,7 @@
       "crypto"
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/05_design/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/05_design/SKILL.md": {
     "hash": "9bba87363c5aac82348b4ef8fdb982ac9e029bb8946a4641bc1242756919f05f",
     "nodes": [
       {
@@ -17697,7 +17707,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/05_design/remotionRenderer.js": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/05_design/remotionRenderer.js": {
     "hash": "f89a6fc94b0ce5e2285438bcc2cc4de8dd07cc83686e52e2432c335f110da6c6",
     "imports": [
       "child_process",
@@ -17706,7 +17716,7 @@
       "util"
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/10_secretary/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/10_secretary/SKILL.md": {
     "hash": "066b091884a8c9d07f17afff36c3be8f82600f1ecd7d130f8dfce805a1f3732f",
     "nodes": [
       {
@@ -17823,7 +17833,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/06_research/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/06_research/SKILL.md": {
     "hash": "726dddfd748204766afbf3f3fcc2f735e335d889754589c4c4e6b677fccd0fa8",
     "nodes": [
       {
@@ -17900,7 +17910,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/09_video/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/09_video/SKILL.md": {
     "hash": "5ace087f12f1cf193c6318b65390d65f8dd64370702049b3fcdee6c6bb2b9de0",
     "nodes": [
       {
@@ -17997,7 +18007,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/08_workflow/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/08_workflow/SKILL.md": {
     "hash": "5c72c9aaa0b058a208cdbe7fc5f26cb45dcc430f0f35f03456adff2c84b7ea22",
     "nodes": [
       {
@@ -18044,7 +18054,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/07_system_shield/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/07_system_shield/SKILL.md": {
     "hash": "bbee63b41d8b70e062be454975fcb6e0596905b3b9342b5eefedba365f909576",
     "nodes": [
       {
@@ -18141,7 +18151,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/instagram-analysis/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/instagram-analysis/SKILL.md": {
     "hash": "8d3792e52f3f825e2e3e8215025c95796fc58c4c520ca33ed4ec0159c26659d8",
     "nodes": [
       {
@@ -18218,7 +18228,7 @@
       }
     ]
   },
-  "02_System_Development/01_아리_엔진/skill-library/11_orchestrator/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/11_orchestrator/SKILL.md": {
     "hash": "971e50f3e0a485a937a5b424843ca15b6d302893d9e37a0ec7ba228d77ba7717",
     "nodes": [
       {
@@ -18355,141 +18365,7 @@
       }
     ]
   },
-  "02_System_Development/06_인프라_및_도구/100_Tools/claude_tab_guide.md": {
-    "hash": "7b9f760b9019d076a8b7face34cbe6be5d7d608dd8a2b2964cbb484b035e32b2",
-    "nodes": [
-      {
-        "id": "Section::Claude Code 전용 탭 설정 가이드 (Antigravity IDE)",
-        "type": "section"
-      },
-      {
-        "id": "Section::1. 터미널에서 Claude Code 실행",
-        "type": "section"
-      },
-      {
-        "id": "Section::2. 전용 탭으로 고정하기",
-        "type": "section"
-      },
-      {
-        "id": "Section::3. 사이드바(Activity Bar)로 이동",
-        "type": "section"
-      },
-      {
-        "id": "Section::4. (선택) 모델 선택창에 Claude 추가",
-        "type": "section"
-      }
-    ],
-    "edges": [
-      {
-        "source": "claude_tab_guide.md",
-        "target": "Section::Claude Code 전용 탭 설정 가이드 (Antigravity IDE)",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "claude_tab_guide.md",
-        "target": "Section::1. 터미널에서 Claude Code 실행",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "claude_tab_guide.md",
-        "target": "Section::2. 전용 탭으로 고정하기",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "claude_tab_guide.md",
-        "target": "Section::3. 사이드바(Activity Bar)로 이동",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "claude_tab_guide.md",
-        "target": "Section::4. (선택) 모델 선택창에 Claude 추가",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      }
-    ]
-  },
-  "02_System_Development/06_인프라_및_도구/60-Paperclip/60_Paperclip_Guide.md": {
-    "hash": "616813ed59c6de9efef156a43c636048f224da2f19b77fddbab681505c8df61b",
-    "nodes": [
-      {
-        "id": "Section::60-Paperclip 이용 및 링크 가이드",
-        "type": "section"
-      },
-      {
-        "id": "Section::🔗 참고자료를 필요한 목표 지점으로 [[Wikilink]] 연결하기",
-        "type": "section"
-      },
-      {
-        "id": "Wikilink",
-        "type": "concept"
-      },
-      {
-        "id": "프로젝트 노트",
-        "type": "concept"
-      },
-      {
-        "id": "결정 노트",
-        "type": "concept"
-      },
-      {
-        "id": "10-Projects/Q4 북미 시장 진출 전략안",
-        "type": "concept"
-      },
-      {
-        "id": "30-Meetings/2023-11-05 전략회의",
-        "type": "concept"
-      }
-    ],
-    "edges": [
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "Section::60-Paperclip 이용 및 링크 가이드",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "Section::🔗 참고자료를 필요한 목표 지점으로 [[Wikilink]] 연결하기",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "Wikilink",
-        "relation": "REFERENCES",
-        "confidence": 0.8
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "프로젝트 노트",
-        "relation": "REFERENCES",
-        "confidence": 0.8
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "결정 노트",
-        "relation": "REFERENCES",
-        "confidence": 0.8
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "10-Projects/Q4 북미 시장 진출 전략안",
-        "relation": "REFERENCES",
-        "confidence": 0.8
-      },
-      {
-        "source": "60_Paperclip_Guide.md",
-        "target": "30-Meetings/2023-11-05 전략회의",
-        "relation": "REFERENCES",
-        "confidence": 0.8
-      }
-    ]
-  },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/04_Hermes_커뮤니케이션_통합전략.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/04_Hermes_커뮤니케이션_통합전략.md": {
     "hash": "d5b354e3b768276ab736ff8aad3240d8e9a37d7690960c2d5131c4721fe58a1e",
     "nodes": [
       {
@@ -18556,7 +18432,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/03_Phase17-4_스킬UI_설계기획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/03_Phase17-4_스킬UI_설계기획.md": {
     "hash": "c28ba876f389dfb9bca5b3e2a5d01bdea7cc2532bd9729c8508c26a8809cbee2",
     "nodes": [
       {
@@ -18623,7 +18499,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/README.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/README.md": {
     "hash": "398a0dec306e5ec0a16e47eeafbee6bf35a8272bf7b7c1561303a4748ef7e5c7",
     "nodes": [
       {
@@ -18700,7 +18576,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/05_Seniority_클로닝_보안기획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/05_Seniority_클로닝_보안기획.md": {
     "hash": "8fdf2967add43091732769a017aad25bb8b8ea3ed43097fc5eaaa28b0dc54b99",
     "nodes": [
       {
@@ -18767,7 +18643,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/Onboarding_UI_Design_Spec.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/Onboarding_UI_Design_Spec.md": {
     "hash": "22866c9dcfde6ac63fc495821346c44b906b8cde0862ff6e7b4ea2d62726e9cb",
     "nodes": [
       {
@@ -18864,7 +18740,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/Luca_Plans_Archive_Combined.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/Luca_Plans_Archive_Combined.md": {
     "hash": "467f17cc53477be18d27fc8d07fb3c4b6499eaf473759e065cbcd2dc0a58dbbd",
     "nodes": [
       {
@@ -18961,7 +18837,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/09_Phase21_마케팅에이전트_및_초기UX기획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/09_Phase21_마케팅에이전트_및_초기UX기획.md": {
     "hash": "75eed5d83b8f181f3aa34bb0c7286ef9c992fe83fc4f6212498af879e9dcf8be",
     "nodes": [
       {
@@ -19098,7 +18974,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/06_온보딩_보안아키텍처_설계.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/06_온보딩_보안아키텍처_설계.md": {
     "hash": "4850a36967bc2fcbacf9def1c09cf28ec6713193c1d1f004e23f8991a1dd907e",
     "nodes": [
       {
@@ -19165,7 +19041,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/01_Phase17_스킬생태계_구현계획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/01_Phase17_스킬생태계_구현계획.md": {
     "hash": "57bdf51cccaf4cb584172cc221ceea70f25443af7677b3484bb20637ba0f6567",
     "nodes": [
       {
@@ -19232,7 +19108,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/Phase13_옵시디언_멘션_의사결정시스템.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/Phase13_옵시디언_멘션_의사결정시스템.md": {
     "hash": "3a1f8b8d6ecbebb600ae9561e5f438f19c717eb826d6d6ce6c736c4080a26a1a",
     "nodes": [
       {
@@ -19319,7 +19195,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/02_Phase17_방어로직_통합계획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/02_Phase17_방어로직_통합계획.md": {
     "hash": "b26df2b2d782081d20af9db47869f1e4d352f17120cada70e832fcd3c9fe3041",
     "nodes": [
       {
@@ -19386,7 +19262,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/Phase12_컨텍스트인지_피드백시스템.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/Phase12_컨텍스트인지_피드백시스템.md": {
     "hash": "95aef4fb98671c1f74f46444cc94fd98077c9c9870dd1dee6ef640f2c258faac",
     "nodes": [
       {
@@ -19573,7 +19449,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/07_Phase20_온보딩_고도화계획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/07_Phase20_온보딩_고도화계획.md": {
     "hash": "48aa4a9dfa9e718cc5398a6acb9c9dd4fac7f80deffa56bab423ea0fc6355ca6",
     "nodes": [
       {
@@ -19640,7 +19516,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/Phase01-11_초기설계_역사아카이브.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/Phase01-11_초기설계_역사아카이브.md": {
     "hash": "8eb76e837cd0b12e8f8d69f10cb679c2fbe20d765538df55898f6bcb0923f2a1",
     "nodes": [
       {
@@ -19767,7 +19643,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/기획서_아카이브/08_Phase20_제품화_최종구현계획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/기획서_아카이브/08_Phase20_제품화_최종구현계획.md": {
     "hash": "f62e620e5f4ed18faf196096d3d3ebb9a2d00e12f677d7d0aa9d2ad0484ce0a3",
     "nodes": [
       {
@@ -19834,7 +19710,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase27_Sprint4_코드리뷰_보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase27_Sprint4_코드리뷰_보고서.md": {
     "hash": "56f4e5288468fc30c1be8feefb5bb3ab70c2a2c60d9b63c2922f5ab4fb32ce33",
     "nodes": [
       {
@@ -19891,7 +19767,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/칸반_카드시스템_설계문제_분석_20260429.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/칸반_카드시스템_설계문제_분석_20260429.md": {
     "hash": "117baa800b849b811928b2ba2b3366d03feb53e7a472412e74069a1afbc6215f",
     "nodes": [
       {
@@ -20328,7 +20204,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase27_Luca_결함분석보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase27_Luca_결함분석보고서.md": {
     "hash": "a22aa4cbd9a030a8cc536a11c0b9d59bf63f68c5ad8f24b56e01cb9e588048f0",
     "nodes": [
       {
@@ -20415,7 +20291,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase22.6_사고과정시각화_코드리뷰_Sonnet.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase22.6_사고과정시각화_코드리뷰_Sonnet.md": {
     "hash": "475e0cb7fe8fa0ec7e887ccae82a60fcd505c24cceb796da6b20d4806111f0eb",
     "nodes": [
       {
@@ -20582,7 +20458,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase31_ZeroConfig_버그수정_작업계획서_20260502.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase31_ZeroConfig_버그수정_작업계획서_20260502.md": {
     "hash": "3cfb1bd801e5e6972b70b4ce923e4721adf0b8c100f7af1256750e8f7b3768e5",
     "nodes": [
       {
@@ -20729,7 +20605,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase31_ZeroConfig_QA_버그리포트_20260502.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase31_ZeroConfig_QA_버그리포트_20260502.md": {
     "hash": "35a85369968018a4dd481661bf2f81afb25cc416c1dcb7636f2bac8bf887c855",
     "nodes": [
       {
@@ -20916,7 +20792,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase38-1_ChromeExtension_에이전트_구현보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase38-1_ChromeExtension_에이전트_구현보고서.md": {
     "hash": "f57885dece64bc10b0d04ac1e5c93c080074326ba3121c92b9cff58241c06f69",
     "nodes": [
       {
@@ -21003,7 +20879,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_구현보고서/Phase38-1_Sprint1_개발_보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_구현보고서/Phase38-1_Sprint1_개발_보고서.md": {
     "hash": "ba654eaceefeb9897f11254b0517183c21d58f0a5a99f6fbc5ba85dda4122f0b",
     "nodes": [
       {
@@ -21060,7 +20936,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md": {
     "hash": "03470f7cd7df688d39749be46d82cb4cd24d50fef270005bf52c74ff3286624e",
     "nodes": [
       {
@@ -21187,7 +21063,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/03_운영가이드/Phase38_MCP_투트랙_실행가이드.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/03_운영가이드/Phase38_MCP_투트랙_실행가이드.md": {
     "hash": "1404151650ff426a8d2e748f2a77abd7aad3a0bcd58b9f30e8ade7d0975909d9",
     "nodes": [
       {
@@ -21264,7 +21140,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_Migration_종합리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_Migration_종합리뷰_Prime.md": {
     "hash": "bf984733ef83af03cf7488294c539db0954b29606a9c4ea3bcd7f3bfdc0948e1",
     "nodes": [
       {
@@ -21471,7 +21347,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/14_Phase26_스킬통합_기획안_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/14_Phase26_스킬통합_기획안_리뷰_Prime.md": {
     "hash": "a18018ab0e44200f4a040172250eb4e1bd6dd60e55fdfa0fc66f32e4af46e48a",
     "nodes": [
       {
@@ -21638,7 +21514,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/23_Phase28a_프론트엔드_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/23_Phase28a_프론트엔드_코드리뷰_Prime.md": {
     "hash": "006825d5dc9b7e13f168760fd31b001e8782d5924f7bc0bbba84cce1938b3861",
     "nodes": [
       {
@@ -21705,7 +21581,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Prime_8th_Review.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Prime_8th_Review.md": {
     "hash": "4eb6554a3353eb18456669944e04d089b71e62eaeb243711becd2c3b5f473439",
     "nodes": [
       {
@@ -21912,7 +21788,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Sonnet_Review_Response.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Sonnet_Review_Response.md": {
     "hash": "1d96b567a874b2fff83bb8644537fde7a5634a2aa87e8247df556e5ec574c4f3",
     "nodes": [
       {
@@ -22059,7 +21935,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/03_Phase17-4_스킬섹션UI_리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/03_Phase17-4_스킬섹션UI_리뷰.md": {
     "hash": "d09954da3d4049f064547af68259a7ac7bab42c805fd4be3ecc6c9c86e3f2f6e",
     "nodes": [
       {
@@ -22266,7 +22142,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/18_Phase22.5_텔레그램_그룹채팅_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/18_Phase22.5_텔레그램_그룹채팅_리뷰_Prime.md": {
     "hash": "010aa9eede1bb13aecded6f72be8cea0c29d13bbb682276fcffc3f9666701665",
     "nodes": [
       {
@@ -22573,7 +22449,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/26_Phase29_DynamicContext_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/26_Phase29_DynamicContext_리뷰_Prime.md": {
     "hash": "8c51788c68ac2a440da9d12e00a1729f1d4ac5b912281c2f43b0c2827465aeb0",
     "nodes": [
       {
@@ -22640,7 +22516,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/02_Phase17_방어로직_2차리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/02_Phase17_방어로직_2차리뷰.md": {
     "hash": "80e9ee350ba4040651998ed082052c3cffa7b4509c093d8fabdb62b280bc8607",
     "nodes": [
       {
@@ -22847,7 +22723,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/21_프로젝트_격리_아키텍처_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/21_프로젝트_격리_아키텍처_리뷰_Prime.md": {
     "hash": "2093a8aa0e4d89a95ae453c0f3a83cb05d2c82623afd92045cc7caf219c57fa7",
     "nodes": [
       {
@@ -22924,7 +22800,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/19_Phase30_에이전트객체_DB설계_검수_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/19_Phase30_에이전트객체_DB설계_검수_Prime.md": {
     "hash": "5defb603362eb1981aa54ac8a7ef39bfdf15ff8ada3ec692864bb100e352e3d3",
     "nodes": [
       {
@@ -23211,7 +23087,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_코드리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_코드리뷰요청서_Prime.md": {
     "hash": "ecbce4e8c22392abd8c85e85ca501288e9d1a96347e8b43e8fa47149f07e4035",
     "nodes": [
       {
@@ -23288,7 +23164,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/15_Phase27_Bugdog_자율형CS_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/15_Phase27_Bugdog_자율형CS_리뷰_Prime.md": {
     "hash": "99f38e64edf9e3ab0e520d0c6f0ca8a158b3befc7dfe5a2c1f36c25eb8b1e4d0",
     "nodes": [
       {
@@ -23455,7 +23331,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Phase39-1_Plan_Master_구현보고_리뷰요청서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Phase39-1_Plan_Master_구현보고_리뷰요청서.md": {
     "hash": "d3ac8b091ee788693959ac9675f9d37e857d8949a7a1c759acafaa8d6e1204b1",
     "nodes": [
       {
@@ -23592,7 +23468,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/28_Phase31_ProjectFolder_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/28_Phase31_ProjectFolder_리뷰_Prime.md": {
     "hash": "6992827315d393cac590385fe31b282d776f9a1c76f49c90a0492d0ea85c447e",
     "nodes": [
       {
@@ -23659,7 +23535,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/17_Phase27_아리_컨텍스트_구조분석_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/17_Phase27_아리_컨텍스트_구조분석_리뷰_Prime.md": {
     "hash": "3c9d48344d5b64819a847918bfb006e2ae5635ac8656394fbd0590171707c46a",
     "nodes": [
       {
@@ -23856,7 +23732,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/22_Phase28a_DB_소켓_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/22_Phase28a_DB_소켓_코드리뷰_Prime.md": {
     "hash": "2f430285af69344d134b70ae2ce1b17612a07fcc634b310ba4a4c7f50f6105fc",
     "nodes": [
       {
@@ -23923,7 +23799,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_ContextChaining_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_ContextChaining_Prime.md": {
     "hash": "50ff3d81c8528f5d651305a5dd4c4058c63268f8cb4c8f3ec957c3c1f8e1fe81",
     "nodes": [
       {
@@ -23980,7 +23856,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/07_Phase20_온보딩_2차리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/07_Phase20_온보딩_2차리뷰.md": {
     "hash": "3de2cb2ba2bf1d7a95cee1ed0ea380abeced67d6b405785bb09c410b5bf061bf",
     "nodes": [
       {
@@ -24197,7 +24073,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Prime_7th_Review.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Prime_7th_Review.md": {
     "hash": "8e2a2b3268f966b3c1cbc6ca8dbf498dc4661ce9668937c01b82d1eec6f738c6",
     "nodes": [
       {
@@ -24284,7 +24160,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/29_Phase32_AutoMemory_Watchdog_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/29_Phase32_AutoMemory_Watchdog_리뷰_Prime.md": {
     "hash": "8f281c3e0b425b63797654e7b8b65a377dea3d54bb4de2c43a4f4757517c97f7",
     "nodes": [
       {
@@ -24371,7 +24247,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/32_ProjectSettingsModal_사전리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/32_ProjectSettingsModal_사전리뷰_Prime.md": {
     "hash": "2d586a05ab7abe66775b03f7f5fc9af0ea8b84e9256f85e77a9a7f59466ebe42",
     "nodes": [
       {
@@ -24458,7 +24334,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/25_Phase28b_Prime_리뷰에_대한_답변.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/25_Phase28b_Prime_리뷰에_대한_답변.md": {
     "hash": "dc64f8d241c83378963fa631abb86ca6dc7ea9905548be51ab382cd942cce6be",
     "nodes": [
       {
@@ -24515,7 +24391,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/34_POLICY_INDEX_정책확정_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/34_POLICY_INDEX_정책확정_리뷰_Prime.md": {
     "hash": "24b9867eaa8d3f30476396a5a46767e46f8cb35534033b0b0438baf888e9eb6f",
     "nodes": [
       {
@@ -24592,7 +24468,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_재리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_재리뷰요청서_Prime.md": {
     "hash": "beb78e5baa92d55f5ac5f30b872d0ecfd89e7ab3a27d6f22c5fb3a1a815dbf97",
     "nodes": [
       {
@@ -24669,7 +24545,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/43_Phase39_PlanMaster_리뷰요청서_Luca.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/43_Phase39_PlanMaster_리뷰요청서_Luca.md": {
     "hash": "d0a5fa5dc7b5741822c2be5073f7dcd082e24895ef1cd22de84a2ab26dbafc42",
     "nodes": [
       {
@@ -24746,7 +24622,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/41_Phase39-1_PlanMaster_구현완료_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/41_Phase39-1_PlanMaster_구현완료_코드리뷰_Prime.md": {
     "hash": "152ca2313ddeed4536427e3b6b3aba7a5d2abe761fda3349fdf991664b54f6f8",
     "nodes": [
       {
@@ -24993,12 +24869,12 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/12_유튜브_오토파일럿_리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/12_유튜브_오토파일럿_리뷰.md": {
     "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "nodes": [],
     "edges": []
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Pipeline_Verification_Review.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Pipeline_Verification_Review.md": {
     "hash": "b096e3704a29695ce66307453c11d677a91c65c77c33335d04f40294ada5eb19",
     "nodes": [
       {
@@ -25085,7 +24961,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Phase_20_구현_완료_보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Phase_20_구현_완료_보고서.md": {
     "hash": "4d50607b7a16a315924a37f9a334dec6dd6a1e546bd1af311bf48b58585619f5",
     "nodes": [
       {
@@ -25172,7 +25048,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/04_Hermes_통합전략_리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/04_Hermes_통합전략_리뷰.md": {
     "hash": "6f4680e3490867f1dd9bbbf4d20d271a8a5a08a5a5ccc20ea2752220f19bb406",
     "nodes": [
       {
@@ -25319,7 +25195,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Pipeline_Bug_Analysis.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Pipeline_Bug_Analysis.md": {
     "hash": "e1ccd4fe1f0130e19653d714530b7a4acb9b0d181731e01ced86cd5849b319bf",
     "nodes": [
       {
@@ -25396,7 +25272,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/16_Phase27_Bugdog_v0_코드리뷰_요청_Sonnet.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/16_Phase27_Bugdog_v0_코드리뷰_요청_Sonnet.md": {
     "hash": "de33bad9cf1275d95e18ebbcc82fa9a91ff5ed5a9095ed858e4f729ea01bd7b1",
     "nodes": [
       {
@@ -25553,7 +25429,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_V2_코드리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_V2_코드리뷰요청서_Prime.md": {
     "hash": "153e6e7a4b0c1fda61607a9756630515354716df69b466e7179d48458d09eb9a",
     "nodes": [
       {
@@ -25640,7 +25516,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/27_Phase32_Bugdog_파이프라인_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/27_Phase32_Bugdog_파이프라인_리뷰_Prime.md": {
     "hash": "92d5814800d87cf19479f800e991a612961f18aeab3acd64de067015095804a1",
     "nodes": [
       {
@@ -25827,7 +25703,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/24_Phase28ab_통합_PRD_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/24_Phase28ab_통합_PRD_리뷰_Prime.md": {
     "hash": "56508e06799313fe67642550985f8eecdb7f49a1c2e79ce63ef1ebb9d383e215",
     "nodes": [
       {
@@ -25894,7 +25770,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/20_전략적_Dogfooding_프레임워크_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/20_전략적_Dogfooding_프레임워크_리뷰_Prime.md": {
     "hash": "e433c0423ff144fcd14c56f92c30df99e0a1d2bcc01aa190387413b1fb4f20b7",
     "nodes": [
       {
@@ -26111,7 +25987,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Phase37_Nickname_Residues_Report.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Phase37_Nickname_Residues_Report.md": {
     "hash": "0d5ad6ee155a867da2b2c82b000288a94ed26ca15b6654fca397bedb50730860",
     "nodes": [
       {
@@ -26208,7 +26084,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/README.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/README.md": {
     "hash": "1f53336d0d2254530141d70d471046cf11369de8bb96a44c6f84d3f49721b7e2",
     "nodes": [
       {
@@ -26225,7 +26101,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_V2_코드리뷰_Sonnet.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/38_Phase38_MCP_V2_코드리뷰_Sonnet.md": {
     "hash": "40aca03999a7449dabaff8d3a9524752cb9213126234192d0c91d0fd23b53a14",
     "nodes": [
       {
@@ -26392,7 +26268,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/09_에이전트_실행장애_긴급리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/09_에이전트_실행장애_긴급리뷰.md": {
     "hash": "431550c616b73d732cc456c42b7852851efe6376037bd9860f4aa1b9d4a85dfc",
     "nodes": [
       {
@@ -26429,7 +26305,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/16_Phase27_Bugdog_v0_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/16_Phase27_Bugdog_v0_코드리뷰_Prime.md": {
     "hash": "63046a6f97c6f63232f59270179e25509bd965fcf9048d79b312a9415cc159f2",
     "nodes": [
       {
@@ -26706,7 +26582,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/01_Phase17_스킬생태계_1차리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/01_Phase17_스킬생태계_1차리뷰.md": {
     "hash": "afda7b05ecf9847c953b449784f8ca1ed7e8f9098e0452518e9a41fea67de93e",
     "nodes": [
       {
@@ -26903,7 +26779,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/31_Phase33_IdentityIsolation_PostMortem_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/31_Phase33_IdentityIsolation_PostMortem_리뷰_Prime.md": {
     "hash": "19dd278109805efb0f4d36daa7fbb4b6be502e2c8855e847cc1773e2116df319",
     "nodes": [
       {
@@ -26970,7 +26846,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/12_Phase24_유튜브_오토파일럿_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/12_Phase24_유튜브_오토파일럿_코드리뷰_Prime.md": {
     "hash": "4be77bdbe96c414207fc102fd5943e4b8c5f1f670eb7e22c7edef58ed8d1d816",
     "nodes": [
       {
@@ -27197,7 +27073,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/39_Phase39_Graphify_KnowledgeHub_SupremeReview_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/39_Phase39_Graphify_KnowledgeHub_SupremeReview_Prime.md": {
     "hash": "af88fd09e72484e01eefc71825c4bf9104dbb615b69ac1b4658d4b11f3785872",
     "nodes": [
       {
@@ -27414,7 +27290,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/26_Phase32_Bugdog_파이프라인_리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/26_Phase32_Bugdog_파이프라인_리뷰요청서_Prime.md": {
     "hash": "42730ba480c9de3a1cc3a7ebf07d80147383159a09e202b7a6f07fed8ea8d872",
     "nodes": [
       {
@@ -27571,7 +27447,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/prime_review_phase17_round2.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/prime_review_phase17_round2.md": {
     "hash": "80e9ee350ba4040651998ed082052c3cffa7b4509c093d8fabdb62b280bc8607",
     "nodes": [
       {
@@ -27778,7 +27654,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/22_Phase28a_DB_소켓_코드리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/22_Phase28a_DB_소켓_코드리뷰요청서_Prime.md": {
     "hash": "d2219d84793fe5b295fa7e7ad0cc9f488eb2b69d5124a776db5eee1c8c979737",
     "nodes": [
       {
@@ -27845,7 +27721,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/08_Phase20_구현완료_최종검증.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/08_Phase20_구현완료_최종검증.md": {
     "hash": "1c7abc67527e658f829875ba7b2096e2ccaefbb070dd718b4cecdb7b1a9f215a",
     "nodes": [
       {
@@ -28052,7 +27928,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/35_Phase36A_ChainReaction_릴레이_v3_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/35_Phase36A_ChainReaction_릴레이_v3_리뷰_Prime.md": {
     "hash": "bc3e66c619b6fcf4dfa0d0d3717d8cd7c595d2f798359f80d9ac7ee3d42d0a42",
     "nodes": [
       {
@@ -28179,7 +28055,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/33_ChatInitialization_DataLoss_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/33_ChatInitialization_DataLoss_리뷰_Prime.md": {
     "hash": "6be91f5e634553fa353ae76619fd9463db738223a36d31546f4b0df6b92a4f7f",
     "nodes": [
       {
@@ -28256,7 +28132,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/06_온보딩_보안아키텍처_1차리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/06_온보딩_보안아키텍처_1차리뷰.md": {
     "hash": "c2a3c756424a6fe0b67f370924eb0f173ed0e2bc57f667d6d94b392b07a1fa20",
     "nodes": [
       {
@@ -28483,7 +28359,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/40_Phase39-1_PlanMaster_MyGraph_종합리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/40_Phase39-1_PlanMaster_MyGraph_종합리뷰_Prime.md": {
     "hash": "085758b456efcea3a8666571a9fb317df098fa2a90342a70458064fb7d96547e",
     "nodes": [
       {
@@ -28820,7 +28696,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_종합리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/39_Phase39_ZeroCommand_MCP_종합리뷰_Prime.md": {
     "hash": "637f2f043ca735655ca79307501a27f718ccd02107e828d6b8652160dd2f3602",
     "nodes": [
       {
@@ -29037,7 +28913,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_LiveSplitPreview_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_LiveSplitPreview_Prime.md": {
     "hash": "e16a20925e124e91537a065db04064e77bd89b0121e21613311526f7dea67738",
     "nodes": [
       {
@@ -29094,7 +28970,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Pipeline_Run_Error_Analysis.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Pipeline_Run_Error_Analysis.md": {
     "hash": "4cc9b5a85a54c3d079f1da6adcab81ae7ac7e5ec172baf67b68ac906bbdd5b6f",
     "nodes": [
       {
@@ -29251,7 +29127,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md": {
     "hash": "65270ff4bab414c6a0c5a5fb5a97ec9230ccfb726d678fccc3e4bf225e22b0d9",
     "nodes": [
       {
@@ -29368,7 +29244,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/23_Phase28a_프론트엔드_코드리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/23_Phase28a_프론트엔드_코드리뷰요청서_Prime.md": {
     "hash": "7d9e76f7d3c04137b094bc6f491fd1ad2f09ca6e7690eb7c79f727cee4cba994",
     "nodes": [
       {
@@ -29455,7 +29331,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/16_Phase29_DynamicContext_리뷰요청_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/16_Phase29_DynamicContext_리뷰요청_Prime.md": {
     "hash": "c06ea5fcf325d98f9377722e3af42ca1c5368750952aa835bd3c832dc5a20f1e",
     "nodes": [
       {
@@ -29512,7 +29388,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Data_Deletion_사건.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Data_Deletion_사건.md": {
     "hash": "f829e91f9d4634115ef5ace02e37ae0ae74853a48835bb4ebe9e9da84c6ba477",
     "nodes": [
       {
@@ -29559,7 +29435,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Phase39-1_Plan_Master_리뷰요청서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Phase39-1_Plan_Master_리뷰요청서.md": {
     "hash": "c8e1218ed71b490a61a28b114e46f2b344d31f725bf14bbc0546fd05a7ab0535",
     "nodes": [
       {
@@ -29606,7 +29482,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/05_비밀유지형_경력직_클로닝_리뷰.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/05_비밀유지형_경력직_클로닝_리뷰.md": {
     "hash": "02011a2b7d390aab6129ffca722e1095271dec3a84ac58096237b98fd800674b",
     "nodes": [
       {
@@ -29833,7 +29709,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/42_Phase41_ProjectWiki_Supreme_Review_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_Phase41_ProjectWiki_Supreme_Review_Prime.md": {
     "hash": "dd9be44f8fc129da0539789df74b291a3727f6809af0ca8b82aa49ea909534b3",
     "nodes": [
       {
@@ -30230,7 +30106,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/21_프로젝트_격리_아키텍처_리뷰요청서_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/21_프로젝트_격리_아키텍처_리뷰요청서_Prime.md": {
     "hash": "4e30331d9f333aaa5fb8b74347c41ba437cfe1a07c63146f77e0e76092110813",
     "nodes": [
       {
@@ -30347,7 +30223,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/30_Phase31_ZeroConfig_버그수정_코드리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/30_Phase31_ZeroConfig_버그수정_코드리뷰_Prime.md": {
     "hash": "5fa120cce98cc33b8b924f46ee60c8c37561f169a3542aa3cb815b5d0aef072b",
     "nodes": [
       {
@@ -30564,7 +30440,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/13_Phase27_MCN_가상운영자_파이프라인_리뷰_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/13_Phase27_MCN_가상운영자_파이프라인_리뷰_Prime.md": {
     "hash": "e79c89b7a5c9d7d8bac51ca48905ceaf480beb0972e065c474aef7c121a77446",
     "nodes": [
       {
@@ -30751,7 +30627,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Supreme_Review_Prime.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/37_Phase37_Supreme_Review_Prime.md": {
     "hash": "74d26ae25b025c355396dc7a42c3db58537b6ec32f20a71a0d42bd31f9a4b2c1",
     "nodes": [
       {
@@ -30928,7 +30804,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Anti-Bridge_아키텍처_해설_및_구현현황.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Anti-Bridge_아키텍처_해설_및_구현현황.md": {
     "hash": "52c7ad9cdb78afa269871b90c7fe56d1d399dc1e854f1b9a4032218f2dbf844a",
     "nodes": [
       {
@@ -31075,7 +30951,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase35_Agent_Schema_Migration.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase35_Agent_Schema_Migration.md": {
     "hash": "e3361a7d3c1029a44bc24a6a8ef04d16b045da7a180c10fa850eb8653b203153",
     "nodes": [
       {
@@ -31212,7 +31088,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase33_소프트웨어_개발_프레임워크.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase33_소프트웨어_개발_프레임워크.md": {
     "hash": "8c087b703378e7d4a053849fb5cd4c3ea0c863bb6c2b798838d0ca8d1388354f",
     "nodes": [
       {
@@ -31309,7 +31185,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/VideoLab_버그_개선과제_20260423.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/VideoLab_버그_개선과제_20260423.md": {
     "hash": "8316947573e92ca2571d7c1e973dc049a5291e156e6383f37b630ca818043a62",
     "nodes": [
       {
@@ -31596,7 +31472,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase26_MediaLab_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase26_MediaLab_PRD.md": {
     "hash": "b0e0c69c004801049958abee46016ff7e3a661448e721116d3704b7095386268",
     "nodes": [
       {
@@ -31833,7 +31709,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_Claude_Task_Master_벤치마킹_분석서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_Claude_Task_Master_벤치마킹_분석서.md": {
     "hash": "2a3812081be1bd440baa26cb686ee486758535bb1cd607e0f8226908648e6c84",
     "nodes": [
       {
@@ -31930,7 +31806,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase32_텔레그램_미니앱_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase32_텔레그램_미니앱_기획서.md": {
     "hash": "6981d8090098ab74f3c54712eae35eb71f54cc5ac2647bc0826f9e8a3f09d773",
     "nodes": [
       {
@@ -32017,7 +31893,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_MODE_AUTO_ROUTING_기획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MODE_AUTO_ROUTING_기획.md": {
     "hash": "0c2ae8e2a7c4d484660d6a1f48b8300bee801caeb6d3e5ee21ac8c69dc65c9ac",
     "nodes": [
       {
@@ -32184,7 +32060,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38-1_Sprint7_Command_System_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38-1_Sprint7_Command_System_기획서.md": {
     "hash": "7a4572b9cb5748b3951654474f16e67a9dc09234879d1ee971516a2a1ba9c079",
     "nodes": [
       {
@@ -32351,7 +32227,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/VideoLab_UI_PRD_v4.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/VideoLab_UI_PRD_v4.md": {
     "hash": "a3667bf0545623137095cc640a8e3e566122af77a9c999507196217f0e783881",
     "nodes": [
       {
@@ -32628,7 +32504,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase25_인스타그램_카드뉴스_멀티에이전트_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase25_인스타그램_카드뉴스_멀티에이전트_PRD.md": {
     "hash": "585f4df45a906bbbd0b30856678f420b009bcffe8cbf4778719ed2c6de05b6e2",
     "nodes": [
       {
@@ -32815,7 +32691,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Server_아키텍처_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Server_아키텍처_기획서.md": {
     "hash": "bc23665569bfff7be22991d0e36f9bd38c8fa84743ea3d799b0cb9bb13f68cf6",
     "nodes": [
       {
@@ -32952,7 +32828,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase29_프로젝트_격리_재설계_v2.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase29_프로젝트_격리_재설계_v2.md": {
     "hash": "f7bddc06e77094f66feafcc58bfd276a51da1245ddb47bfda2892dfdbfcdc289",
     "nodes": [
       {
@@ -33209,7 +33085,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase37_Sonnet_Frontend_Handoff.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase37_Sonnet_Frontend_Handoff.md": {
     "hash": "99e305541db6c57bdaf9997caf5217b1eb067337f2556f8456b6b138d5ac21d3",
     "nodes": [
       {
@@ -33296,7 +33172,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase25_에이전트판정연동_AgentVerdictBridge.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase25_에이전트판정연동_AgentVerdictBridge.md": {
     "hash": "ad3729b5ebce3fd445c82e1b33688c09a292a1716b514a1f4517ae69324bf852",
     "nodes": [
       {
@@ -33493,7 +33369,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28_프로젝트_패널_연동_아키텍처.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28_프로젝트_패널_연동_아키텍처.md": {
     "hash": "a2e86f0a0a2f2adb8e5eaf842c01e3d19e5bdc72ae007464125fa03c73218b80",
     "nodes": [
       {
@@ -33610,7 +33486,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_기능영향도_분석서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_기능영향도_분석서.md": {
     "hash": "fd549bc353a208d1944b93cf21d2ec7daabc495684a612268ed0a774cec8439b",
     "nodes": [
       {
@@ -33747,7 +33623,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38-1_Sprint2_MVP_개발계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38-1_Sprint2_MVP_개발계획서.md": {
     "hash": "907c897b3e44b666fe6d4774b712920d4e0c5a7db0e421ebdecc4c231f3d90d9",
     "nodes": [
       {
@@ -33834,7 +33710,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase31_Project_Folder_Architecture.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase31_Project_Folder_Architecture.md": {
     "hash": "0180fa3a09cc322407a9ef7c597a53ca4fd77f1cba368ffc862113c71e8d53cd",
     "nodes": [
       {
@@ -33951,7 +33827,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_Context_Chaining_PRD_v1.4.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_Context_Chaining_PRD_v1.4.md": {
     "hash": "04d14c967b4a905a06c313ed44deb1eb1be961d79918a760225f418c2d768eaa",
     "nodes": [
       {
@@ -34058,7 +33934,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38-1_ChromeExtension_에이전트_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38-1_ChromeExtension_에이전트_기획서.md": {
     "hash": "b1003bfa739c39f6f48937e105c5dfdd8f3d6c64520f2d43b2c39fda64134a7b",
     "nodes": [
       {
@@ -34185,7 +34061,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_태스크_도구_분류_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_태스크_도구_분류_기획서.md": {
     "hash": "08aa5d2eb494cbe002a70c7d3cfbe41d69eac0fc875eb8cbfb78f3eeb6a43461",
     "nodes": [
       {
@@ -34282,7 +34158,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase33_Identity_Isolation_PostMortem.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase33_Identity_Isolation_PostMortem.md": {
     "hash": "52583bbb2dcb1f103ae6d557843484263f81913ef2b755a284a960417eabe0e5",
     "nodes": [
       {
@@ -34389,7 +34265,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase35_Dynamic_Team_Instantiation_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase35_Dynamic_Team_Instantiation_PRD.md": {
     "hash": "a1de26e4c3a7d9788c894999e7e5c12b5ed182bc9cb36b66d31d4a3f850492b7",
     "nodes": [
       {
@@ -34476,7 +34352,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_AutoGit_VersionControl_Draft.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_AutoGit_VersionControl_Draft.md": {
     "hash": "3989838e2d5018f5a6095907620278861f881ac8eb0bef68c5fa8843ea8d46b3",
     "nodes": [
       {
@@ -34563,7 +34439,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Ari_마비_버그_분석보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Ari_마비_버그_분석보고서.md": {
     "hash": "b1f754d8173589c0f96b3ab1b351938d037c2f20a903cbfe16789d29bbd575ae",
     "nodes": [
       {
@@ -34720,7 +34596,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38-1_Sprint4_LLM연동_완료보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38-1_Sprint4_LLM연동_완료보고서.md": {
     "hash": "5b85af915a7df271b0c13fee155dbd18fd9c0a7a84bab7ddbd6f145f0152c346",
     "nodes": [
       {
@@ -34797,7 +34673,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/API_모델식별자_레퍼런스.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/API_모델식별자_레퍼런스.md": {
     "hash": "057406332e73ed53b7a992bc72f6691136147a3114490ab221ca4d8a2d2115a5",
     "nodes": [
       {
@@ -34944,7 +34820,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase25_Sonnet_프론트엔드_UI_의뢰서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase25_Sonnet_프론트엔드_UI_의뢰서.md": {
     "hash": "20fd8b39720eabed9cec91d4faa08772286554896e1de7eeb9291b6a964efeb2",
     "nodes": [
       {
@@ -34971,7 +34847,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/MODEL_CONTROL_ARCHITECTURE.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/MODEL_CONTROL_ARCHITECTURE.md": {
     "hash": "c3b7b06cdbfafdd2ea2ba5076667c308e78304cdb41d3e9923defff180a0a6d6",
     "nodes": [
       {
@@ -35078,7 +34954,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase36_RunPipeline_자율릴레이_기획서_v3.0.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase36_RunPipeline_자율릴레이_기획서_v3.0.md": {
     "hash": "cfca3a33d12ee0ddb846f0c1d806d31e0808da8d85d6a48509f5826a2ba6a2a3",
     "nodes": [
       {
@@ -35205,7 +35081,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase23_상용화_배포및서버전략.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase23_상용화_배포및서버전략.md": {
     "hash": "199191c42e67f94abd49a6a1758851bc7b80981f9caabb4750b200624a1cf438",
     "nodes": [
       {
@@ -35302,7 +35178,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_Archive_지식베이스허브_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_Archive_지식베이스허브_기획서.md": {
     "hash": "9df59465e0d0405b31e83132dd4414acfc07dc35d0034f627ca68f27e9ab1918",
     "nodes": [
       {
@@ -35459,7 +35335,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase31_Prime_Review_Request.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase31_Prime_Review_Request.md": {
     "hash": "496b7156de396c6fe993976fe9fbe7ccf6af867943ee5956748f118df1232032",
     "nodes": [
       {
@@ -35506,7 +35382,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_Shrimp_Task_Manager_벤치마킹_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_Shrimp_Task_Manager_벤치마킹_기획서.md": {
     "hash": "a73b31b6a71b0a39b1901b8611959487f9bb9b51d1d360bf275670746a1f24ed",
     "nodes": [
       {
@@ -35603,7 +35479,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase29_Dynamic_Context_Injection_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase29_Dynamic_Context_Injection_PRD.md": {
     "hash": "4fe2f0fe076a196950b757d54d96d5eff88942a6590a39dac885828c419f7f80",
     "nodes": [
       {
@@ -35800,7 +35676,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_MCP_데이터흐름_아키텍처_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MCP_데이터흐름_아키텍처_PRD.md": {
     "hash": "86fe9cab9e2b66169fc2262dbedf467bcab966b7f5ac79bb5c8620db4a5bbe7c",
     "nodes": [
       {
@@ -35927,7 +35803,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_MODE_AUTO_ROUTING_개발구현계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MODE_AUTO_ROUTING_개발구현계획서.md": {
     "hash": "fe4070fe0bb7fdd480c9c953d767f9eeb5ae5b9f250b66a9d4e26ce9648bb25b",
     "nodes": [
       {
@@ -36034,8 +35910,8 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase42_MyCrew_Self_Graphify_기획서.md": {
-    "hash": "fab9962e6ea44df0461cc408824dafc9cd3df9e50fe763ea62aa7bc7ed3fba8c",
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_MyCrew_Self_Graphify_기획서.md": {
+    "hash": "e08f90df1fc1cf613d593ed21a01b83da6cfc98890dfb15f2c02b2deedc24461",
     "nodes": [
       {
         "id": "Section::Phase 42: MyCrew Self-Graphify (에이전트 전용 시스템 지식망) 기획서",
@@ -36161,7 +36037,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase37_Live_Split_Preview_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase37_Live_Split_Preview_PRD.md": {
     "hash": "50fa0bdba6ef82264f0d62ea4396dd4b588f0538a503e77a5be58e96ec4eaf39",
     "nodes": [
       {
@@ -36218,7 +36094,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase36_RunB_반자율완주모드_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase36_RunB_반자율완주모드_기획서.md": {
     "hash": "d9ca179b73bdd0e051c3a58d2ccb54f4b05d26a8708bbcfc569124d409cbea17",
     "nodes": [
       {
@@ -36335,7 +36211,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase41_Project_Wiki_개발구현계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase41_Project_Wiki_개발구현계획서.md": {
     "hash": "e9e145902f03ae8f2e8c775dbbd30dc667baba9edb782a18e04029ad399fc1ec",
     "nodes": [
       {
@@ -36402,7 +36278,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38-1_Sprint2_통신연결_개발계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38-1_Sprint2_통신연결_개발계획서.md": {
     "hash": "d36fc4bee4c207f5ede1dfa750dec6d1624475a3ee894df8fea19b328c45c8f0",
     "nodes": [
       {
@@ -36469,7 +36345,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase26_Sprint1_InterestAnalyzer_구현보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase26_Sprint1_InterestAnalyzer_구현보고서.md": {
     "hash": "4381db6c255375a9940945b0a452136ea6e72eb6bb6a740094c020f8e7f00413",
     "nodes": [
       {
@@ -36826,7 +36702,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_개발구현계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_개발구현계획서.md": {
     "hash": "be3830a9921324dbb4baecace1b273c66a6f78ea3118e494eabae68a0cf84b20",
     "nodes": [
       {
@@ -36913,7 +36789,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Legacy_Deprecation_분석서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Legacy_Deprecation_분석서.md": {
     "hash": "5145745e82d6fe1f193cc8a7c70e4c396d63ab86d8b299e19ce0711f53769108",
     "nodes": [
       {
@@ -37010,7 +36886,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_실행계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_실행계획서.md": {
     "hash": "0bb229aa14c22c77dfbede3086edc9208027803fcbd510e1aedd605afc9a98d0",
     "nodes": [
       {
@@ -37097,7 +36973,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase27_Bugdog_QA_시나리오_Draft.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase27_Bugdog_QA_시나리오_Draft.md": {
     "hash": "b8b8a5eecd93a77f26e5e4d02731cbe7e72dde344b6076ca7eaefbc1c424f923",
     "nodes": [
       {
@@ -37214,7 +37090,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_관련_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_관련_기획서.md": {
     "hash": "54ae76eed444131391b227e3b0a9abbcfe15dfefe7b13a46d2020d6f77810eaf",
     "nodes": [
       {
@@ -37361,7 +37237,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase32_Auto_Memory_Watchdog_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase32_Auto_Memory_Watchdog_PRD.md": {
     "hash": "58bb9316058009ddf13bedfb534c982aa8c544cd972a23abb3b2d432657c7722",
     "nodes": [
       {
@@ -37428,7 +37304,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28_하드코딩_위험_분석서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28_하드코딩_위험_분석서.md": {
     "hash": "e324baa706cf62309c18bb680284fb27df2d02e759ecb6396a7107e4c18c1c47",
     "nodes": [
       {
@@ -37485,7 +37361,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28a_Extension_프로젝트_공유범위_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28a_Extension_프로젝트_공유범위_PRD.md": {
     "hash": "27e0b723cfab30e0fd015dc07b281814d7b35e2a7c200f8d7c008337fcc09858",
     "nodes": [
       {
@@ -37592,7 +37468,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/폴더구조_정리계획_2026-04-25.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/폴더구조_정리계획_2026-04-25.md": {
     "hash": "9879d03d3683b4a4c5f59936f77a7705ff2707c5ec62e65afc8a6c05ea188327",
     "nodes": [
       {
@@ -37719,7 +37595,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_MCP_온보딩_UX_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MCP_온보딩_UX_기획서.md": {
     "hash": "f89417c6ef52d42fe7f06e193b63c32d2a989268d4532620872f349f099cdd3f",
     "nodes": [
       {
@@ -37846,7 +37722,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase36_RunPipeline_자율릴레이_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase36_RunPipeline_자율릴레이_기획서.md": {
     "hash": "fc10f9c3602169ef6faf6182438fbf3fac1fc0f5fcbaabcf2ad7e25aa695632f",
     "nodes": [
       {
@@ -38233,7 +38109,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase40_My_Graph_아키텍처_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase40_My_Graph_아키텍처_기획서.md": {
     "hash": "aaa0dae8de91ec4fadd1d059d7b1ca86bbca5f0c3d9ea1be1abf63703235e4f2",
     "nodes": [
       {
@@ -38370,7 +38246,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase26_스킬통합_기획안.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase26_스킬통합_기획안.md": {
     "hash": "fcc26259c5f365a31b694976b94bc1cb145314b73a6402e4b51d30a738c654d2",
     "nodes": [
       {
@@ -38607,7 +38483,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase37_ZeroBase_Project_Init_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase37_ZeroBase_Project_Init_PRD.md": {
     "hash": "f9ab56b3eb6e56c042e7bb01c3985fcbd4e63457982e801770f1c832efcb9948",
     "nodes": [
       {
@@ -38714,7 +38590,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase27_Ari_Task_Content_Fix_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase27_Ari_Task_Content_Fix_PRD.md": {
     "hash": "5250cfcfe319a2e3ec0cbd8574bf0cdf2b20235d711a914f1feed63c6753eff3",
     "nodes": [
       {
@@ -38821,7 +38697,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase37_Luca_Backend_Handoff.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase37_Luca_Backend_Handoff.md": {
     "hash": "95149f42992b7cfcae55ac54a60fe5b44ff7a514538fc1a2aa13d52af43094b6",
     "nodes": [
       {
@@ -38888,7 +38764,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase13_옵시디언_멘션_의사결정시스템.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase13_옵시디언_멘션_의사결정시스템.md": {
     "hash": "3a1f8b8d6ecbebb600ae9561e5f438f19c717eb826d6d6ce6c736c4080a26a1a",
     "nodes": [
       {
@@ -38975,7 +38851,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28b_ZeroConfig_빌딩_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28b_ZeroConfig_빌딩_PRD.md": {
     "hash": "ecd6b3271ab1a27f8d75f325e4fe354f243f11b9ad57ef5a48a49b6be59e3e41",
     "nodes": [
       {
@@ -39102,7 +38978,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase25_에이전트_업무_이벤트_워크플로우.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase25_에이전트_업무_이벤트_워크플로우.md": {
     "hash": "4ded4f652b23f6e6bf3e39c352d8e09d8aef5f0f7986653d6fa770057b93a797",
     "nodes": [
       {
@@ -39169,7 +39045,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase32_Watchdog_Review_Request.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase32_Watchdog_Review_Request.md": {
     "hash": "f26424a624756262c823b05c06f5fc9165b35ec5c8b3308bd3a5e06c239a7aeb",
     "nodes": [
       {
@@ -39196,7 +39072,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase27_Bugdog_Autonomous_QA_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase27_Bugdog_Autonomous_QA_PRD.md": {
     "hash": "d001ad6a87d5fcaf7afd2b72058d5db8160e4f55dd9b8d2d5437a76a6a320327",
     "nodes": [
       {
@@ -39363,7 +39239,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase12_컨텍스트인지_피드백시스템.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase12_컨텍스트인지_피드백시스템.md": {
     "hash": "95aef4fb98671c1f74f46444cc94fd98077c9c9870dd1dee6ef640f2c258faac",
     "nodes": [
       {
@@ -39550,7 +39426,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_리뷰요청서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Migration_리뷰요청서.md": {
     "hash": "259d4ecbbe290efdeee62622cef1e9031b2668ca76c649ce6bcea9afbad57587",
     "nodes": [
       {
@@ -39617,7 +39493,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase26_Sprint2_버그수정_데이터흐름_보고서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase26_Sprint2_버그수정_데이터흐름_보고서.md": {
     "hash": "ce497ae7250e54c5d4b644f5e2af5e657a363393a341af528bc5c56311ad9076",
     "nodes": [
       {
@@ -39774,7 +39650,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase31_프로젝트_기반_컨텍스트_격리_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase31_프로젝트_기반_컨텍스트_격리_기획서.md": {
     "hash": "4e402e1e3dd44fd0e58da90c9f69690ec069911b5f868cb43808a72d65f757c8",
     "nodes": [
       {
@@ -39881,7 +39757,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase32_Bugdog_Dogfooding_파이프라인_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase32_Bugdog_Dogfooding_파이프라인_기획서.md": {
     "hash": "d2099169d0b411bba20ea089e939c5952f398f353a5c759ce8fa0e4a3f07e5c1",
     "nodes": [
       {
@@ -40078,7 +39954,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/MyCrew_크루동작방식_쉬운설명.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/MyCrew_크루동작방식_쉬운설명.md": {
     "hash": "391ef31bb4030bf0717389b2c08ac144bfdd45dbc625d6956101635a349c5073",
     "nodes": [
       {
@@ -40155,7 +40031,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28_프로젝트_영향도_분석.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28_프로젝트_영향도_분석.md": {
     "hash": "d46781d184ff6bcd4fa25e89acf5301866f149f0d6100dce66e9cf50745cf8d9",
     "nodes": [
       {
@@ -40292,7 +40168,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_Sequential_Thinking_벤치마킹_분석서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_Sequential_Thinking_벤치마킹_분석서.md": {
     "hash": "c1d4f0e61f9395088c8c23b16e14ed8e5a77edad728f9ddd732da468b017c9e0",
     "nodes": [
       {
@@ -40399,7 +40275,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase24_유튜브_완전자동화_다중에이전트_기획.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase24_유튜브_완전자동화_다중에이전트_기획.md": {
     "hash": "a3fd4db6f6d393b468923c74ddecf578e365dde6c6cc843c4c79e71f83a05f57",
     "nodes": [
       {
@@ -40526,7 +40402,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase31_Luca_Self_Reflection.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase31_Luca_Self_Reflection.md": {
     "hash": "f08f97dbfdbf6b5d967adfd848b3da5ef6777a5a4c7f7384922a4d4c05c78666",
     "nodes": [
       {
@@ -40593,7 +40469,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase38_MCP_Server_개발계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Server_개발계획서.md": {
     "hash": "9afce8db62fea4a9a9a51fee75c4df80a95538a948e8c5c9b19168b3b0044a7c",
     "nodes": [
       {
@@ -40700,7 +40576,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase34_Codex_Bridge_아키텍처_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase34_Codex_Bridge_아키텍처_기획서.md": {
     "hash": "6c8d34166c719369b1c9b9808a53f2c0f74d7f5915dfa5088ecc0bcaf96562ac",
     "nodes": [
       {
@@ -40807,7 +40683,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase36b_CardLink_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase36b_CardLink_기획서.md": {
     "hash": "faa08398310717a4b687ad668a77c58fc271959b8b4516189a9d8b04918f4c9d",
     "nodes": [
       {
@@ -41194,7 +41070,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase24.5_이미지랩_에이전트_파이프라인_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase24.5_이미지랩_에이전트_파이프라인_PRD.md": {
     "hash": "72ea7c66105ee422290cd21c824617c2faa1c818f75095aaa564ba06ff2aaa7a",
     "nodes": [
       {
@@ -41311,7 +41187,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase33_Architecture_Isolation_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase33_Architecture_Isolation_PRD.md": {
     "hash": "618e292761e627d1755efc0d4f37d7f69530c1d97cbb8c1258a70cd23d207f99",
     "nodes": [
       {
@@ -41398,7 +41274,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase28_개발스프린트_계획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase28_개발스프린트_계획서.md": {
     "hash": "e9c54764ffbc60f508cf86eaa3141b54f22dfd899ad3aebc298558edbbfc34ee",
     "nodes": [
       {
@@ -41465,7 +41341,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase39_MCP_스킬_및_모델배정_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MCP_스킬_및_모델배정_기획서.md": {
     "hash": "8e7c847ae7b9baa7627c4bc86737536d8f68feeb687dc9108cfa4fd813778b3a",
     "nodes": [
       {
@@ -41542,7 +41418,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase26_AI_콘텐츠팩토리_파이프라인_PRD.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase26_AI_콘텐츠팩토리_파이프라인_PRD.md": {
     "hash": "ec69147928f6668b90d1c00bb5788c32835ba1458df7f36259c1910dde847318",
     "nodes": [
       {
@@ -41819,7 +41695,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase41_Project_Wiki_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase41_Project_Wiki_기획서.md": {
     "hash": "285588dda87d41dc6caca4634c17825375c4b48baa31f5ec824b2123f4be5a0c",
     "nodes": [
       {
@@ -42126,7 +42002,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/01_PRD/Phase40_Graphify_연동_기획서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase40_Graphify_연동_기획서.md": {
     "hash": "c04f2099a47a92e9cfcc10524593b4d40afd138e7e06df9e14af692fe328e1ab",
     "nodes": [
       {
@@ -42213,7 +42089,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/스킬_기획서/Instagram_스크래핑_스킬_기획서_v1.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/스킬_기획서/Instagram_스크래핑_스킬_기획서_v1.md": {
     "hash": "dc65ad8a542e446dbbefbeea2827598106be6211f8d2db67da77ed91de24e269",
     "nodes": [
       {
@@ -42420,7 +42296,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_진단_기록/Phase30_에이전트_객체_DB_설계_진단.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_진단_기록/Phase30_에이전트_객체_DB_설계_진단.md": {
     "hash": "265cbe4edc902af99b3d5579934ff77cf678d2b5327cd67b3fdf65f138e56425",
     "nodes": [
       {
@@ -42567,7 +42443,7 @@
       }
     ]
   },
-  "02_System_Development/00_아키텍처_문서/02_진단_기록/Phase30_Prime_설계검수_요청서.md": {
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/02_진단_기록/Phase30_Prime_설계검수_요청서.md": {
     "hash": "af1705b5b650223c5bc875b425615ea1cfbe6fd6c2603a0f492a78aaf3f3bbf9",
     "nodes": [
       {
@@ -42734,7 +42610,7 @@
       }
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/vite.config.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/vite.config.js": {
     "hash": "6859ccaf968a857e1403c9043641d293cf2ce4a8d7a8d07804f3e65500d7d78c",
     "imports": [
       "vite",
@@ -42743,13 +42619,13 @@
       "path"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/fix.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/fix.js": {
     "hash": "c7042a6369d3ae84b319a8021d966f99c00f2195612791d9286b1628e08b79b0",
     "imports": [
       "fs"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/.cursor/sonnet_dev_rules.md": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/.cursor/sonnet_dev_rules.md": {
     "hash": "a341263486afcbab17882706cb62b76ab6b5b6757b97195a2df0634a20bff369",
     "nodes": [
       {
@@ -42826,7 +42702,7 @@
       }
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/out/TaskDetailModal.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/out/TaskDetailModal.js": {
     "hash": "c424613eea0ffd3eb42a15200d500246b206a7fe239d20f79b183b2e8b8a3a05",
     "imports": [
       "react",
@@ -42843,7 +42719,7 @@
       "./ContextChainPanel"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/out/ArchiveView.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/out/ArchiveView.js": {
     "hash": "9377344dddb24e1c8e410ed8b0d7864c45a209cdcd45f429463d503efbdec535",
     "imports": [
       "react",
@@ -42851,7 +42727,7 @@
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/out/Sidebar.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/out/Sidebar.js": {
     "hash": "a922ba3aa98a87bd4bfc0ada87faf65f555c87766e0f89520ff18b0be2e3fb46",
     "imports": [
       "react",
@@ -42862,7 +42738,7 @@
       "../../data/roleRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/main.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/main.jsx": {
     "hash": "311b3be917b82225b86c2317c3142e8bb51eb3b0374750aefd66b4e7a715ec6c",
     "imports": [
       "react",
@@ -42870,7 +42746,7 @@
       "./App.jsx"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/App.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/App.jsx": {
     "hash": "1d557f04be1d918e1da042664951d9aa377949f0f42ebdbbc0a825a7e0bf74c6",
     "imports": [
       "react",
@@ -42900,35 +42776,35 @@
       "./styles/markdown.css"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/utils/TagRenderer.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/utils/TagRenderer.jsx": {
     "hash": "1cad38a75c415c06dd1f2464627eb919fa3b842256ca4c1e8b43a9a7e00f6bf6",
     "imports": [
       "../utils/TagRenderer",
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/utils/markdownRenderer.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/utils/markdownRenderer.js": {
     "hash": "df70887fb8c071e8e564b732a16fb3a50f78d06c96d43374422a7c3657c4c9f0",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/utils/scrubContent.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/utils/scrubContent.js": {
     "hash": "c305e74229ad858c7588869d174826f0f9e5e18485fb67a0a4049f89b308985e",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/TerminalLog.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/TerminalLog.jsx": {
     "hash": "409c60bfb898bac468bb9c8ab81cb66c3433c81ed653af6b1adef5785106c773",
     "imports": [
       "../store/kanbanStore",
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Sidebar/AdapterStatusPanel.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Sidebar/AdapterStatusPanel.jsx": {
     "hash": "69b1b8a9f58126f49f776268d314e67ee32efa0374c66df380be268e8bac648d",
     "imports": [
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Sidebar/Sidebar.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Sidebar/Sidebar.jsx": {
     "hash": "397e0766f8175d236eb3ad6416e8a57d7b873f73c32c22651133162c7335599e",
     "imports": [
       "react",
@@ -42939,14 +42815,14 @@
       "../../data/roleRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Recruit/RecruitTalentModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Recruit/RecruitTalentModal.jsx": {
     "hash": "387efd1449adad071abf9260da7c47e4224c60db4959da24a2c87db73f5f13b3",
     "imports": [
       "react",
       "../../store/agentStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Board/Column.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Board/Column.jsx": {
     "hash": "2b3126444400e70552edc5bce84e4ea9294238e1b29e3ff7205fe7b86162284f",
     "imports": [
       "react",
@@ -42956,7 +42832,7 @@
       "../../store/agentStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Board/TaskCard.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Board/TaskCard.jsx": {
     "hash": "ce41af3d0d7cf7a71b25a99388ae2912c5d238328472e5c5976d062b25d9d5d0",
     "imports": [
       "@dnd-kit/sortable",
@@ -42965,7 +42841,7 @@
       "../../store/agentStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Board/KanbanBoard.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Board/KanbanBoard.jsx": {
     "hash": "9b24bef743bae8ee9074bbbf42b2118562ed2679f9d5fcd95e67dd0a0f1b3a42",
     "imports": [
       "react",
@@ -42978,21 +42854,21 @@
       "../../hooks/useSocket"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Status/AgentAvatar.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Status/AgentAvatar.jsx": {
     "hash": "83dda6ba407f3420eb0e5aef4d3cdc4d20d398dee38880e070f33dce9702a0d5",
     "imports": [
       "../../store/kanbanStore",
       "../../store/agentStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Status/AgentStatusBar.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Status/AgentStatusBar.jsx": {
     "hash": "c70acf574525c8c3a17d03fc00b4d1e6408d0f2b9a9e56bcf7fef671454bfc18",
     "imports": [
       "./AgentAvatar",
       "../../store/kanbanStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Log/LogDrawer.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Log/LogDrawer.jsx": {
     "hash": "4057478672400cc2cf026c5705faecf75aa4b8876c66e1d0fa0ac8b6ada6d685",
     "imports": [
       "../../store/chatStore",
@@ -43009,7 +42885,7 @@
       "../Modal/PlanMasterModal"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Skills/SkillSection.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Skills/SkillSection.jsx": {
     "hash": "f6165b553beb1cecfbaeb684ca537fc5bc7d7cf62d5810897aefe76933774785",
     "imports": [
       "react",
@@ -43020,15 +42896,15 @@
       "./SkillAddDrawer"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Skills/SkillDetailModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Skills/SkillDetailModal.jsx": {
     "hash": "6d84b926b662c8554c404c6f0851fe4ed096602d5901c6ab98530956dcf9f59c",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Skills/SkillCard.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Skills/SkillCard.jsx": {
     "hash": "c5c29d53bdbd527da261a690ec7d1adb77ab3e2d993a64660e81ba92975a35e5",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Skills/SkillAddDrawer.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Skills/SkillAddDrawer.jsx": {
     "hash": "770dd78dcd080f6681116ff7b2fae7055b5f419708c0713fc66a795c4f0b35d2",
     "imports": [
       "react",
@@ -43036,14 +42912,14 @@
       "../../data/skillRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Guidelines/TeamGuidelinesEditor.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Guidelines/TeamGuidelinesEditor.jsx": {
     "hash": "81283388bcf0a12099bc7c356ee10d7191166eb6a346209cac0b9c0ec8db56c9",
     "imports": [
       "react",
       "../../store/projectStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/ContextChainPanel.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/ContextChainPanel.jsx": {
     "hash": "e2caffc64b2b22fd0a62d0d82454e7a564d62b02ab16d7039cc3ddfaecced0ee",
     "imports": [
       "react",
@@ -43051,14 +42927,14 @@
       "remark-gfm"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/NewProjectModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/NewProjectModal.jsx": {
     "hash": "14de921aa605cb4f0981569d28fa130ca4cd1f83ed329ad14eb7a86e7ff737cb",
     "imports": [
       "react",
       "../../store/projectStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/TaskDetailModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/TaskDetailModal.jsx": {
     "hash": "2fd18901a6bf084a64b44b872e2dff71f813e0168caf614f0f3912496a1b18e4",
     "imports": [
       "react",
@@ -43074,20 +42950,20 @@
       "./ContextChainPanel"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/TaskCreateModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/TaskCreateModal.jsx": {
     "hash": "aec224532ffbd5b4fb790656eba5756812dda1976384b8f64d3fe58b63ce65a1",
     "imports": [
       "react",
       "../../store/projectStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/PlanMasterModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/PlanMasterModal.jsx": {
     "hash": "9fc490e590d56d2ba0de20b5124cf938f34d0a8cd59cf1b1d325f38caba2063d",
     "imports": [
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Modal/ProjectSettingsModal.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/ProjectSettingsModal.jsx": {
     "hash": "519d9b406089c0b887677bb074d0f3f5113c5d117f221e7bacd383e7267cb2ea",
     "imports": [
       "react",
@@ -43095,21 +42971,21 @@
       "./NewProjectModal"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/VideoLabView_NotebookLM.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/VideoLabView_NotebookLM.jsx": {
     "hash": "bcf037b4e8d75a92342ee0606489cdffc5fdb979427e77b8532dc2404297759c",
     "imports": [
       "react",
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/OnboardingWizard.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/OnboardingWizard.jsx": {
     "hash": "1c2945bb7dfac571b8b1a60a3711ca804be480963ba65baa1aedf9b132644cb2",
     "imports": [
       "react",
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/ImageLabView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/ImageLabView.jsx": {
     "hash": "7696fea5b491a7b383ca65283bab827c85fde618be20e592e5cbb42b0195fec0",
     "imports": [
       "react",
@@ -43117,21 +42993,21 @@
       "html-to-image"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/VideoLabView_Legacy.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/VideoLabView_Legacy.jsx": {
     "hash": "db4484a162ae8480b15106c2c5c4363e6d7ca0580be86f343a6dd29e031dcde7",
     "imports": [
       "react",
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/ArtifactViewer.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/ArtifactViewer.jsx": {
     "hash": "467bad47effcf70cc0c867e583302bc7c587d101a50fe25a1d607d0f10e51102",
     "imports": [
       "react",
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/OrgView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/OrgView.jsx": {
     "hash": "c748647a7dbb1433830538fa4836c5b40b0979b7e0234ba2121b9df969eca442",
     "imports": [
       "react",
@@ -43143,14 +43019,14 @@
       "../../data/roleRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/VideoLabView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/VideoLabView.jsx": {
     "hash": "464aa750cfef5a63346f4d498413a409365617d20b3a21704e8f156cbfcdd93d",
     "imports": [
       "react",
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/ArchiveView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/ArchiveView.jsx": {
     "hash": "7d8d3ded720d69e5f89507614d8a7ad491f7dfd34dd747c765e51d46db5e2492",
     "imports": [
       "react",
@@ -43158,7 +43034,7 @@
       "../../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/AgentDetailView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/AgentDetailView.jsx": {
     "hash": "7f455d361604ceb502b28ada119de1e1ea75d1788d5415aa0aa298dfe9be2316",
     "imports": [
       "react",
@@ -43171,13 +43047,13 @@
       "../../data/roleRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/IntegrationVault.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/IntegrationVault.jsx": {
     "hash": "2d17b58594da7ef54cf8f51f16eaf51306f4a5cd14da7a4aee9665ca400ad09e",
     "imports": [
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/components/Views/SettingsView.jsx": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Views/SettingsView.jsx": {
     "hash": "ae3d80808b1b5ac821485b5ec6b5474b8c5f448eb3a0f6d3dd98d3eda9bed5d7",
     "imports": [
       "react",
@@ -43187,7 +43063,7 @@
       "../Sidebar/AdapterStatusPanel"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/hooks/useSocket.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/hooks/useSocket.js": {
     "hash": "bcd842469b624095cd69c12ce6e03f449e06546831c468c30fb8df9d5dddf3c8",
     "imports": [
       "react",
@@ -43200,56 +43076,56 @@
       "../store/uiStore"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/hooks/useContextChain.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/hooks/useContextChain.js": {
     "hash": "67c783f00aca100a35bb4c7e88d18dcc9f670b1be7c9520c11b4664560893f44",
     "imports": [
       "react"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/data/skillRegistry.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/data/skillRegistry.js": {
     "hash": "4197445a745a623470df74aef38ec628b6c35ae71104efb527f555c3ba71831b",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/data/roleRegistry.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/data/roleRegistry.js": {
     "hash": "dfd7aaca16aed410f6a316d02dbbf3b54ae96a420e17f9ccc8159760273d49de",
     "imports": []
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/projectStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/projectStore.js": {
     "hash": "40a4d7ccb8cc48a8252a4deb4c254911de0c11e55550490412a663e0c56545a5",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/uiStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/uiStore.js": {
     "hash": "59de38b091294c53ab7f8e354e9e58b1393a4fb243da33a5a2e8c224ad77ee0c",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/kanbanStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/kanbanStore.js": {
     "hash": "c535f29bab152c7a12654a60b7f6b0d6078d8c9295624032dd10e28ef4462ae1",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/timelineStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/timelineStore.js": {
     "hash": "c2530f7fdd3f39ec4b3c60cacca45335c839a26700cbc44a2a4af69c3d075ea8",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/chatStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/chatStore.js": {
     "hash": "39c8813af3a78a14fbbda7024d2969ce83ca2a1e1b68afaf72a3fcb639f25427",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/agentStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/agentStore.js": {
     "hash": "353c56f319b863c4f69f4186a3657276ea59c0b28701127bd6cb05190c11d20a",
     "imports": [
       "zustand",
@@ -43258,20 +43134,20 @@
       "../data/roleRegistry"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/settingsStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/settingsStore.js": {
     "hash": "4e6639e58a9f83a51168722a09a6f7e40f9d54c1b644a48a9d2bc57ec01b2577",
     "imports": [
       "zustand"
     ]
   },
-  "02_System_Development/03_워크스페이스_대시보드/src/store/authStore.js": {
+  "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/store/authStore.js": {
     "hash": "edfbfd86728d27713357410bf9fae70c57721998aab3d9c9733d31e25c2cb071",
     "imports": [
       "zustand",
       "zustand/middleware"
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/SKILL_GAP_ANALYSIS.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/SKILL_GAP_ANALYSIS.md": {
     "hash": "60e486c5e2c775714091b4b1cc6d54355ff7072a0410729ade9ed75a658e6ba3",
     "nodes": [
       {
@@ -43418,7 +43294,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/AI_CREW_TECH_TEAM_SKILL_MAP.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/AI_CREW_TECH_TEAM_SKILL_MAP.md": {
     "hash": "da7d3c3694ea893acfc7a372969f180bbc5ff19bb1feb707e3dcbf0cc236c6bf",
     "nodes": [
       {
@@ -43635,7 +43511,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/context-harness/SKILL.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/context-harness/SKILL.md": {
     "hash": "297c8dc8e9fd17572a340eb6e76d5695bde241ae9904564ab0096a9ac25f6ad2",
     "nodes": [
       {
@@ -43792,7 +43668,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/seamless_ux_flow_mapper.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/seamless_ux_flow_mapper.md": {
     "hash": "6fb46bba3c9988d4999317f3fef018bcd71f0b3afc7f576a9267580c6bb28f4a",
     "nodes": [
       {
@@ -43809,7 +43685,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/e2e_test_plan_for_remote_control.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/e2e_test_plan_for_remote_control.md": {
     "hash": "61ebc1e90a705f84097719133c2bfe83b4d81c9d0b1ca41a90f4e2a00abfe580",
     "nodes": [
       {
@@ -43866,7 +43742,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_native_ux_design.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_native_ux_design.md": {
     "hash": "5164780fe8f18e3d2e119fa1e5f7863ba3839edaaf61747bbe00acf7786d5815",
     "nodes": [
       {
@@ -43903,7 +43779,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/remote_control_test_case_generator.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/remote_control_test_case_generator.md": {
     "hash": "3143c03f27822cbdf6eeb5a636aeee03392fb70cbda4cd5c59a0b44cb0bddc17",
     "nodes": [
       {
@@ -43920,7 +43796,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/mycrew_api_integration.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/mycrew_api_integration.md": {
     "hash": "d93580dc6761fa95c5e3297fe77948bff789747d7a756bc2d39e2f3c4a7ba86b",
     "nodes": [
       {
@@ -43967,7 +43843,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/secure_api_designer.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/secure_api_designer.md": {
     "hash": "1edc7178e2c2165b9bda0d45bd210130bfd5917a2f16c0968818039edd6b97c4",
     "nodes": [
       {
@@ -43984,7 +43860,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/prd_writer_agent_tools.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/prd_writer_agent_tools.md": {
     "hash": "fb2a8e2b08b5851a13190e17cd683188488a1c00cbde26d8957982d6cc925269",
     "nodes": [
       {
@@ -44001,7 +43877,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_ui_implementer.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_ui_implementer.md": {
     "hash": "e43387c8c580157ca08f601a55ec3ddbf6dd52a3badb1e25981b0b466546dc71",
     "nodes": [
       {
@@ -44018,7 +43894,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_mini_app_architect.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_mini_app_architect.md": {
     "hash": "ce05156e61408920a468ab34a62cc8958e0ba1b117d706f30486297a57394cdf",
     "nodes": [
       {
@@ -44035,7 +43911,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/agent_control_api_spec.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/agent_control_api_spec.md": {
     "hash": "bfdcca59dfc1d9f53d5efba95bdfe4c5c77f9cc92328a95da2ca446b5a337067",
     "nodes": [
       {
@@ -44082,7 +43958,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_ux_wireframing.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_ux_wireframing.md": {
     "hash": "798706d252adbae874ce49931030fdba6b662b65b2ee771dd68e409091a76fff",
     "nodes": [
       {
@@ -44139,7 +44015,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_miniapp_architecture_3.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_miniapp_architecture_3.md": {
     "hash": "a32b5644c33efe54456112613cd631f620daa48611937858de7d99955c56f03f",
     "nodes": [
       {
@@ -44176,7 +44052,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_architecture_design.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_architecture_design.md": {
     "hash": "4eaf825d9e207d1e240ef8d3941f2a330253b6be22125c073bb6205b029eba11",
     "nodes": [
       {
@@ -44213,7 +44089,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/secure_agent_bridge_api.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/secure_agent_bridge_api.md": {
     "hash": "8c29066dc21682fa4d85f1afa761c0f4dfb99656c52defe34939635a48117a9d",
     "nodes": [
       {
@@ -44230,7 +44106,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/agent_e2e_tester.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/agent_e2e_tester.md": {
     "hash": "144c811ac77d1e6e8a57a51bdccfee3e9dc01768c1b78130bfc68c3dbcfe23f5",
     "nodes": [
       {
@@ -44247,7 +44123,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/realtime_push_architecture.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/realtime_push_architecture.md": {
     "hash": "0833c4a4816e01672b3f17495e255451204fa673bcedb437179f4d5a2ce2a0ce",
     "nodes": [
       {
@@ -44294,7 +44170,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_architect.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/tma_architect.md": {
     "hash": "c6a0c1c1c3eae3f86da45f2915e4094d34c652748ac01c1d0ade95f86e6ced8f",
     "nodes": [
       {
@@ -44311,7 +44187,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/prd_for_agent_control_ui.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/prd_for_agent_control_ui.md": {
     "hash": "8191753a58638327a180fb456cdeecb31b020dd9312f1cab5bb54a487a3f3e5d",
     "nodes": [
       {
@@ -44358,7 +44234,7 @@
       }
     ]
   },
-  "02_System_Development/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_miniapp_sdk.md": {
+  "02_System_Development/V2_Core_Engine/02_스킬_라이브러리/아카이브_미니앱7_스킬/telegram_miniapp_sdk.md": {
     "hash": "621cceab5ed1ca3e67ac127b231c569fbf5177e517aed7e8590dd1f97e1714d4",
     "nodes": [
       {
@@ -44402,6 +44278,140 @@
         "target": "Section::3. API Communication",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
+      }
+    ]
+  },
+  "02_System_Development/V2_Core_Engine/06_인프라_도구/100_Tools/claude_tab_guide.md": {
+    "hash": "7b9f760b9019d076a8b7face34cbe6be5d7d608dd8a2b2964cbb484b035e32b2",
+    "nodes": [
+      {
+        "id": "Section::Claude Code 전용 탭 설정 가이드 (Antigravity IDE)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 터미널에서 Claude Code 실행",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 전용 탭으로 고정하기",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 사이드바(Activity Bar)로 이동",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. (선택) 모델 선택창에 Claude 추가",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "claude_tab_guide.md",
+        "target": "Section::Claude Code 전용 탭 설정 가이드 (Antigravity IDE)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "claude_tab_guide.md",
+        "target": "Section::1. 터미널에서 Claude Code 실행",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "claude_tab_guide.md",
+        "target": "Section::2. 전용 탭으로 고정하기",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "claude_tab_guide.md",
+        "target": "Section::3. 사이드바(Activity Bar)로 이동",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "claude_tab_guide.md",
+        "target": "Section::4. (선택) 모델 선택창에 Claude 추가",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "02_System_Development/V2_Core_Engine/06_인프라_도구/60-Paperclip/60_Paperclip_Guide.md": {
+    "hash": "616813ed59c6de9efef156a43c636048f224da2f19b77fddbab681505c8df61b",
+    "nodes": [
+      {
+        "id": "Section::60-Paperclip 이용 및 링크 가이드",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔗 참고자료를 필요한 목표 지점으로 [[Wikilink]] 연결하기",
+        "type": "section"
+      },
+      {
+        "id": "Wikilink",
+        "type": "concept"
+      },
+      {
+        "id": "프로젝트 노트",
+        "type": "concept"
+      },
+      {
+        "id": "결정 노트",
+        "type": "concept"
+      },
+      {
+        "id": "10-Projects/Q4 북미 시장 진출 전략안",
+        "type": "concept"
+      },
+      {
+        "id": "30-Meetings/2023-11-05 전략회의",
+        "type": "concept"
+      }
+    ],
+    "edges": [
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "Section::60-Paperclip 이용 및 링크 가이드",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "Section::🔗 참고자료를 필요한 목표 지점으로 [[Wikilink]] 연결하기",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "Wikilink",
+        "relation": "REFERENCES",
+        "confidence": 0.8
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "프로젝트 노트",
+        "relation": "REFERENCES",
+        "confidence": 0.8
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "결정 노트",
+        "relation": "REFERENCES",
+        "confidence": 0.8
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "10-Projects/Q4 북미 시장 진출 전략안",
+        "relation": "REFERENCES",
+        "confidence": 0.8
+      },
+      {
+        "source": "60_Paperclip_Guide.md",
+        "target": "30-Meetings/2023-11-05 전략회의",
+        "relation": "REFERENCES",
+        "confidence": 0.8
       }
     ]
   },
@@ -67147,7 +67157,7 @@
     ]
   },
   "01_Company_Operations/04_HR_온보딩/POLICY_INDEX.md": {
-    "hash": "50b3e60581117b8ca06151fd9af857c2b8d2d9cf038e65346040ef600e1e8f53",
+    "hash": "94a9aedbb695b4a8268d182d56df88fbdd93cd7d1bf157a062e6e71a771da087",
     "nodes": [
       {
         "id": "Section::MyCrew POLICY_INDEX v1.0",

@@ -11,8 +11,7 @@ const __dirname = path.dirname(__filename);
 class SystemWatchdog {
   constructor() {
     this.systemRoot = path.resolve(__dirname, '../../../../../');
-    this.architectureDir = path.join(this.systemRoot, '02_System_Development', '00_아키텍처_문서');
-    this.systemWikiDir = path.join(this.architectureDir, 'System_WIKI');
+    this.systemWikiDir = path.join(this.systemRoot, '09_MyCrew_Wiki');
     this.graphOutDir = path.join(this.systemWikiDir, '99_System_Graph');
   }
 

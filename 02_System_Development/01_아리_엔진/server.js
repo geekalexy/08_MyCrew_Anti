@@ -2549,6 +2549,8 @@ app.post('/api/tasks/:id/sprint/next', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // [Phase 41] 미팅 로그 (회의록) 자동 저장 헬퍼
+// [H-002 Fix] 간이 Lock 맵으로 동일 파일에 대한 동시 쓰기를 직렬화(Serial Queue)
+const _meetingWriteLocks = new Map();
 async function appendMeetingLog(projectId, taskId, author, content) {
   try {
     if (!projectId) return;
@@ -2568,9 +2570,13 @@ async function appendMeetingLog(projectId, taskId, author, content) {
     const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false });
     const logEntry = `\n### [${timeStr}] ${author}\n${content}\n`;
     
-    await fs.promises.appendFile(filePath, logEntry, 'utf-8');
+    // [H-002 Fix] Serial Queue — 이전 쓰기가 완료될 때까지 대기
+    const prevLock = _meetingWriteLocks.get(filePath) || Promise.resolve();
+    const writeLock = prevLock.then(() => fs.promises.appendFile(filePath, logEntry, 'utf-8')).catch(() => {});
+    _meetingWriteLocks.set(filePath, writeLock);
+    await writeLock;
     
-    // [Phase 41] Watchdog Trigger (온톨로지 업데이트) - 비동기 처리
+    // [H-001 Fix] 디바운스는 WikiEngine 내부에서 처리 (매 댓글마다 LLM 호출 방지)
     wikiEngine.generateOntology(projectId).catch(e => console.error('[Phase 41] Watchdog Error:', e.message));
   } catch (err) {
     console.error('[Phase 41] 회의록 자동 저장 오류:', err.message);

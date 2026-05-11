@@ -169,13 +169,21 @@ def build_graph(project_dir):
         edge_data = {"id": f"e{i}", "source": edge['source'], "target": edge['target'], "relation": edge['relation'], "confidence": edge['confidence']}
         elements.append({"data": edge_data})
         
-    # [P2] Save new cache
+    # [C-002 Fix] Atomic Write — tmp 파일에 기록 후 os.replace()로 원자적 교체
+    # Kill 시에도 캐시 파일이 깨지지(Corrupted) 않음을 보장합니다.
     try:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        with open(cache_path, 'w', encoding='utf-8') as f:
+        tmp_path = cache_path + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
             json.dump(new_cache, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, cache_path)  # POSIX atomic rename
     except Exception:
-        pass
+        # tmp 파일 잔여물 정리
+        try:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
         
     return {"elements": elements}
 
@@ -480,10 +488,14 @@ def execute_query_cli(query, project_dir="./"):
             if not src or not dst:
                 return "❌ 노드를 찾을 수 없습니다."
                 
+            # [M-001 Fix] BFS Depth 제한 (MAX_DEPTH=50) — OOM/Hang 방어
+            MAX_DEPTH = 50
             queue = [(src, [src])]
             visited = set([src])
             while queue:
                 curr, p = queue.pop(0)
+                if len(p) > MAX_DEPTH:
+                    return f"⚠️ 최대 탐색 깊이({MAX_DEPTH})를 초과했습니다. 경로가 너무 깊습니다."
                 if curr == dst:
                     return " -> ".join(p)
                 for nxt in adj.get(curr, []):

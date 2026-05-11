@@ -80,13 +80,16 @@ def get_file_hash(file_path):
     except Exception:
         return None
 
-def build_graph(project_dir):
+def build_graph(project_dir, out_dir=None, is_system=False):
     elements = []
     nodes_dict = {}
     edges_list = []
     
     # [Phase 41 P2] 증분 업데이트 (Incremental) 캐시 로드
-    cache_path = os.path.join(project_dir, 'Project_WIKI', '99_Graph_Data', 'wiki_cache.json')
+    if out_dir:
+        cache_path = os.path.join(out_dir, 'wiki_cache.json')
+    else:
+        cache_path = os.path.join(project_dir, 'Project_WIKI', '99_Graph_Data', 'wiki_cache.json')
     wiki_cache = {}
     if os.path.exists(cache_path):
         try:
@@ -101,6 +104,10 @@ def build_graph(project_dir):
     for root, dirs, files in os.walk(project_dir):
         if 'node_modules' in root or '.git' in root:
             continue
+            
+        if is_system:
+            if '04_Users' in root or '06_소시안자료' in root or '채널분석' in root or '/outputs' in root:
+                continue
             
         # .mycrewignore 유사 처리 (빌드 폴더 등 제외)
         if 'dist' in root or 'build' in root or 'Project_WIKI' in root:
@@ -161,6 +168,30 @@ def build_graph(project_dir):
                     src = rel_path if e['source'] == file else e['source']
                     edges_list.append({"source": src, "target": e['target'], "relation": e.get('relation', 'RELATES_TO'), "confidence": e.get('confidence', 1.0)})
                         
+    
+    # [System Mode] 추가 스캔: Antigravity Brain
+    if is_system:
+        brain_dir = os.path.expanduser('~/.gemini/antigravity/brain')
+        if os.path.exists(brain_dir):
+            for root, dirs, files in os.walk(brain_dir):
+                for file in files:
+                    if file.endswith(('.md', '.txt')):
+                        file_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(file_path, project_dir).replace("\\", "/")
+                        
+                        f_hash = get_file_hash(file_path)
+                        if not f_hash: continue
+                        
+                        nodes_dict[rel_path] = {"id": rel_path, "label": file, "type": "document"}
+                        m_nodes, m_edges = parse_markdown(file_path)
+                        
+                        for n in m_nodes:
+                            if n['id'] not in nodes_dict:
+                                nodes_dict[n['id']] = {"id": n['id'], "label": n['id'].split('::')[-1], "type": n['type']}
+                        for e in m_edges:
+                            src = rel_path if e['source'] == file else e['source']
+                            edges_list.append({"source": src, "target": e['target'], "relation": e.get('relation', 'RELATES_TO'), "confidence": e.get('confidence', 0.8)})
+
     # 3. Build (Cytoscape Elements 변환)
     for n_id, n_data in nodes_dict.items():
         elements.append({"data": n_data})
@@ -187,7 +218,7 @@ def build_graph(project_dir):
         
     return {"elements": elements}
 
-def generate_graph_html(project_dir, graph_data):
+def generate_graph_html(project_dir, graph_data, out_dir=None):
     html_content = """<!DOCTYPE html>
 <html>
 <head>
@@ -520,14 +551,16 @@ if __name__ == "__main__":
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument("--update", type=str, help="Update graph for project_dir")
+        parser.add_argument("--out-dir", type=str, help="Optional output directory for graph.json and graph.html")
+        parser.add_argument("--system", action="store_true", help="Run in System Wiki Mode")
         parser.add_argument("--query", type=str, help="Query graph (e.g., shortest_path(A, B))")
         parser.add_argument("--dir", type=str, default="./", help="Project dir for query")
         args = parser.parse_args()
         
         if args.update:
-            graph_data = build_graph(args.update)
-            generate_graph_html(args.update, graph_data)
-            print(f"Graph updated for {args.update}")
+            graph_data = build_graph(args.update, args.out_dir, args.system)
+            generate_graph_html(args.update, graph_data, args.out_dir)
+            print(f"Graph updated for {args.update} -> {args.out_dir or 'Project_WIKI'}")
         elif args.query:
             print(execute_query_cli(args.query, args.dir))
     else:

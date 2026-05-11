@@ -30,14 +30,27 @@
   * 단순 LLM 요약기를 탈피하여 `Detect -> Extract -> Build -> Cluster -> Analyze -> Export`의 6단계 알고리즘 분리 파이프라인으로 전면 개편.
   * Node/Edge 스키마에 `relation`과 `confidence` 속성을 강제하여, "AI 추론"과 "원본(raw) 명시"를 완벽히 역추적할 수 있도록 설계.
   * AI 가공 산출물은 `10_Product`, `50_Business_Rules`, `90_Decisions` 등 비즈니스 온톨로지(Ontology) 기반의 넘버링 폴더 체계로 철저히 분산 라우팅되어 Export됨.
+- **[구현 완료] Python Graphify 백엔드 (`graphify_mcp.py`)**:
+  - 마크다운 파서 및 헤더(`Section`), 결정사항(`Decision`), 링크(`Concept`) 추출 로직 추가.
+  - `relation`과 `confidence` 필드를 도입하여 신뢰도 기반의 지식 그래프(`graph.json`) 구축.
+- **[구현 완료] Node.js Ontology 엑스포터 (`wikiEngine.js`)**:
+  - `graphify_mcp.py`를 서브프로세스로 트리거하여 최신 그래프 수집.
+  - LLM 모델을 통한 군집별 마크다운 문서 포매팅 및 `90_Decisions/DECISION_LOG.md`, `20_Domain/Glossary.md`, `00_Index/PROJECT_WIKI.md` 생성 로직 완성.
+- **[구현 완료] Read Graph First 주입 (`executor.js`)**:
+  - 구형 `.mycrew/wiki` 경로 대신 신규 구조인 `Project_WIKI/00_Index/PROJECT_WIKI.md` 문서를 에이전트의 System Prompt에 하드 인젝션하여 문맥 파악 우선 처리.
 - **🚨 핫픽스 (모델 환각 버그)**:
   - 위키 생성 로직 호출 시 기존 에이전트(소넷)가 하드코딩한 무효 식별자(`gemini-1.5-pro`)로 인해 무한 대기(Stuck) 상태가 발생하는 치명적 오류를 발견.
   - 정책 `P-005`, `P-006`에 입각하여 `modelRegistry.js`의 공식 상수인 `MODEL.PRO`를 Import 하도록 수정해 안정적 작동 보장.
 
+### 4. 🛡️ Supreme Review 대응 (Phase 41 리팩토링)
+- **🟡 B (조건부 승인)** → **🟢 A 승격 목표** 달성을 위해 Prime Advisor가 지적한 7건 전량 패치.
+- **🔴 C-001 (Shell Injection)**: `wikiEngine.js`에서 `exec()` → `execFile()`로 전면 교체. Shell을 거치지 않아 명령어 주입 공격 완전 차단.
+- **🔴 C-002 (Atomic Write)**: `graphify_mcp.py`의 `wiki_cache.json` 저장 로직을 `.tmp` 파일 기록 → `os.replace()` 원자적 교체로 전환. Kill 시에도 캐시 무결성 보장.
+- **🟠 H-001 (LLM 비용 폭탄)**: `wikiEngine.js`에서 Gemini Pro **3회 호출을 완전 제거**하고 순수 알고리즘 기반 마크다운 템플릿(`_buildDecisionLog`, `_buildGlossary`, `_buildProjectIndex`)으로 전환. 기획서 §4 "수학적 알고리즘으로 LLM 요약기를 배제" 정책과 코드 동기화 완료. 추가로 `generateOntology`에 **10초 디바운스** 도입하여 빈번한 댓글에도 과잉 트리거 방지.
+- **🟠 H-002 (Race Condition)**: `server.js`의 `appendMeetingLog`에 **파일별 Serial Queue Lock 맵**(`_meetingWriteLocks`)을 적용하여 동일 회의록 파일에 대한 동시 appendFile 충돌 방지.
+- **🟡 M-001 (BFS Depth)**: `graphify_mcp.py`의 `shortest_path` BFS에 `MAX_DEPTH=50` 제한 추가. 초대형 그래프에서도 OOM/Hang 방지.
+- **🟡 M-003 (graph.json 원본 파괴)**: `fs.rename()` → `fs.copyFile()`로 변경하여 Graphify 엔진의 원본 `graph.json`이 보존되도록 수정.
+
 ## 📌 다음 단계 (Next Steps)
-- **Phase 41 잔여 과제 구현 (Project Wiki 고도화 - Graphify Native)**:
-  - **Extractor 기반 수집 연동**: 단순 요약이 아닌, 칸반 카드, 댓글, PRD 등에서 Dict와 NetworkX 자료구조로 Node/Edge를 추출(P0).
-  - **메타인지 연동 및 "Read Graph First" 프롬프트 인젝션**: `executor.js` 실행 시 에이전트가 코드베이스를 탐색하기 전 가장 먼저 `PROJECT_WIKI.md`와 온톨로지 지식 인덱스를 강제 주입(Install) (P0).
-  - **의사결정 기록 자동 추적 및 클러스터링**: `DECISION_LOG.md` 파일에 4단 ADR 구조 로그 누적 및 Graphify Query를 통한 구조 기반 탐색(P1).
-  - **증분 업데이트 최적화**: SHA256 해시 기반(`wiki.json`)으로 변경된 소스 엣지만 감지하여 재생성하는 토큰 최적화 로직 (P2).
-- Phase 40 기획서에 명시된 `graphify_mcp.py` 스크립트 및 `graphifyWatchdog.js` Stdio 브릿지 본격 연동 개발 착수.
+- Phase 41 Supreme Review 재심사 요청 (🟢 A 승격 확인).
+- Phase 42 기획 착수 준비.

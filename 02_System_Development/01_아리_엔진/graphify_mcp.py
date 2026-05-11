@@ -25,43 +25,105 @@ def parse_js_imports(file_path):
         pass
     return imports
 
+def parse_markdown(file_path):
+    nodes = []
+    edges = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            file_node = os.path.basename(file_path)
+            
+            # 헤더 추출 (섹션 노드)
+            headers = re.findall(r'^(#{1,3})\s+(.+)$', content, re.MULTILINE)
+            for h_level, h_text in headers:
+                topic_node = f"Section::{h_text.strip()}"
+                nodes.append({"id": topic_node, "type": "section"})
+                edges.append({
+                    "source": file_node, 
+                    "target": topic_node, 
+                    "relation": "CONTAINS_SECTION", 
+                    "confidence": 1.0
+                })
+                
+            # 미팅 로그 특화 파싱 (결정사항 추출)
+            if 'meetings' in file_path or '회의록' in file_path:
+                decisions = re.findall(r'(결정사항|Decision|결정|합의):\s*(.+)', content)
+                for label, decision_text in decisions:
+                    dec_node = f"Decision::{decision_text.strip()[:30]}"
+                    nodes.append({"id": dec_node, "type": "decision"})
+                    edges.append({
+                        "source": file_node,
+                        "target": dec_node,
+                        "relation": "MADE_DECISION",
+                        "confidence": 0.95
+                    })
+                    
+            # 일반 위키 링크 파싱 [[Link]]
+            wiki_links = re.findall(r'\[\[(.*?)\]\]', content)
+            for link in wiki_links:
+                nodes.append({"id": link.strip(), "type": "concept"})
+                edges.append({
+                    "source": file_node,
+                    "target": link.strip(),
+                    "relation": "REFERENCES",
+                    "confidence": 0.8
+                })
+    except Exception:
+        pass
+    return nodes, edges
+
 def build_graph(project_dir):
     elements = []
-    nodes = set()
-    edges = []
+    nodes_dict = {}
+    edges_list = []
     
-    # scan for .js, .jsx
+    # 1. Detect (스캔 및 파서 라우팅)
     for root, dirs, files in os.walk(project_dir):
         if 'node_modules' in root or '.git' in root:
             continue
+            
+        # .mycrewignore 유사 처리 (빌드 폴더 등 제외)
+        if 'dist' in root or 'build' in root:
+            continue
+            
         for file in files:
+            file_path = os.path.join(root, file)
+            rel_path = os.path.relpath(file_path, project_dir).replace("\\", "/")
+            
+            # 2. Extract
+            # 코드 파싱
             if file.endswith(('.js', '.jsx', '.ts', '.tsx')):
-                file_path = os.path.join(root, file)
-                rel_path = os.path.relpath(file_path, project_dir)
-                rel_path = rel_path.replace("\\", "/")
-                
-                nodes.add(rel_path)
-                
+                nodes_dict[rel_path] = {"id": rel_path, "label": file, "type": "code"}
                 imports = parse_js_imports(file_path)
                 for imp in imports:
                     if imp.startswith('.'):
-                        # resolve relative to current dir
                         curr_dir = os.path.dirname(rel_path)
                         target_path = os.path.normpath(os.path.join(curr_dir, imp)).replace("\\", "/")
-                        # Simple heuristic: if it doesn't have an extension, we just keep the resolved path
-                        # In cytoscape it's fine to have nodes without extensions.
-                        edges.append((rel_path, target_path))
-                        nodes.add(target_path)
+                        edges_list.append({"source": rel_path, "target": target_path, "relation": "IMPORTS", "confidence": 1.0})
+                        if target_path not in nodes_dict:
+                            nodes_dict[target_path] = {"id": target_path, "label": os.path.basename(target_path), "type": "code"}
                     else:
-                        # external module
-                        nodes.add(imp)
-                        edges.append((rel_path, imp))
+                        nodes_dict[imp] = {"id": imp, "label": imp, "type": "module"}
+                        edges_list.append({"source": rel_path, "target": imp, "relation": "IMPORTS", "confidence": 1.0})
+            
+            # 마크다운/문서 파싱 (raw/ 문서 포함)
+            elif file.endswith(('.md', '.txt')):
+                nodes_dict[rel_path] = {"id": rel_path, "label": file, "type": "document"}
+                m_nodes, m_edges = parse_markdown(file_path)
+                for n in m_nodes:
+                    if n['id'] not in nodes_dict:
+                        nodes_dict[n['id']] = {"id": n['id'], "label": n['id'].split('::')[-1], "type": n['type']}
+                for e in m_edges:
+                    src = rel_path if e['source'] == file else e['source']
+                    edges_list.append({"source": src, "target": e['target'], "relation": e.get('relation', 'RELATES_TO'), "confidence": e.get('confidence', 1.0)})
                         
-    for n in nodes:
-        elements.append({"data": {"id": n, "label": os.path.basename(n)}})
+    # 3. Build (Cytoscape Elements 변환)
+    for n_id, n_data in nodes_dict.items():
+        elements.append({"data": n_data})
     
-    for i, (source, target) in enumerate(edges):
-        elements.append({"data": {"id": f"e{i}", "source": source, "target": target}})
+    for i, edge in enumerate(edges_list):
+        edge_data = {"id": f"e{i}", "source": edge['source'], "target": edge['target'], "relation": edge['relation'], "confidence": edge['confidence']}
+        elements.append({"data": edge_data})
         
     return {"elements": elements}
 

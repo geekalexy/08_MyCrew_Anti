@@ -3,7 +3,7 @@
 ## 🎯 세션 목표
 1. **Phase 39 Mode Auto-Routing 보완**: In Progress 상태에서도 기획 모드 및 `/plan_master` 커맨드 허용.
 2. **Phase 40 My-Graph 내재화 아키텍처 기획**: 외부 통신 없이 로컬 Stdio 기반 초경량 파이썬 데몬(graphify_mcp.py) 통합 방식 정의.
-3. **Phase 41 Project LLM Wiki 시스템 개발**: 프로젝트 문맥 자동 수집 및 위키 문서(PROJECT_WIKI.md) 자동 갱신 시스템 구축 및 안정화.
+3. **Phase 41 Project Wiki 시스템 개발**: 프로젝트 문맥 자동 수집 및 위키 문서(PROJECT_WIKI.md) 자동 갱신 시스템 구축 및 안정화.
 
 ## 🛠️ 주요 작업 내용
 
@@ -21,20 +21,23 @@
   - **최단 경로 쿼리(BFS)**: 에러 추적 시 파일 전체 스캔을 지양하고, 연관된 3~4개의 파일만 핀포인트로 타겟팅하여 토큰 소모량을 90% 이상 획기적으로 절감하는 원리 명시.
 - **문서 동기화**: 기존 `Phase40_Graphify_연동_기획서.md` 상단에 새 문서로 연결되는 상호 백링크(Backlink) 처리 완료.
 
-### 3. Phase 41: Project LLM Wiki 시스템 통합 및 긴급 버그 픽스
+### 3. Phase 41: Project Wiki 시스템 통합 및 긴급 버그 픽스
 - `database.js`: `projects` 테이블에 `project_type` 컬럼을 추가하여 추후 다양한 Wiki 규칙 템플릿 대응 기반 마련.
 - `wikiEngine.js` 구현: `raw/` 디렉토리 파일들을 읽어들여 3-Layer 규칙(`WIKI_RULES_{TYPE}.md`)을 바탕으로 자율적인 프로젝트 위키(`PROJECT_WIKI.md`)를 작성 및 갱신하는 엔진 개발.
 - `server.js`: 첨부파일 API 호출 시 `raw/` 디렉토리 자동 복사 및 칸반 상태가 승인(approve) 시 Wiki 갱신 워치독 작동.
 - `executor.js`: `executorPersona` 프롬프트에 `PROJECT_WIKI.md` 내용을 주입하여 Agent에게 프로젝트 히스토리를 자동으로 각인.
+- **메타인지 분석 및 지식 위키 구조화 (Graphify Native 이식)**:
+  * 단순 LLM 요약기를 탈피하여 `Detect -> Extract -> Build -> Cluster -> Analyze -> Export`의 6단계 알고리즘 분리 파이프라인으로 전면 개편.
+  * Node/Edge 스키마에 `relation`과 `confidence` 속성을 강제하여, "AI 추론"과 "원본(raw) 명시"를 완벽히 역추적할 수 있도록 설계.
+  * AI 가공 산출물은 `10_Product`, `50_Business_Rules`, `90_Decisions` 등 비즈니스 온톨로지(Ontology) 기반의 넘버링 폴더 체계로 철저히 분산 라우팅되어 Export됨.
 - **🚨 핫픽스 (모델 환각 버그)**:
   - 위키 생성 로직 호출 시 기존 에이전트(소넷)가 하드코딩한 무효 식별자(`gemini-1.5-pro`)로 인해 무한 대기(Stuck) 상태가 발생하는 치명적 오류를 발견.
   - 정책 `P-005`, `P-006`에 입각하여 `modelRegistry.js`의 공식 상수인 `MODEL.PRO`를 Import 하도록 수정해 안정적 작동 보장.
 
 ## 📌 다음 단계 (Next Steps)
-- **Phase 41 잔여 과제 구현 (Project LLM Wiki 고도화)**:
-  - **WikiCollector 통합 수집 연동**: 현재 생략/Mocking된 칸반 카드 및 댓글 DB 조회 로직 구현 및 `.mycrew/docs/roadmaps/` (PRD), `graph.json`, `리뷰_아카이브/` 문서 수집 파이프라인 추가 (P0).
-  - **의사결정 기록 자동 추적**: `DECISION_LOG.md` 파일에 4단 ADR 구조(Context-Decision-Alternatives-Consequences) 기반 로그 자동 누적 생성 (P1).
-  - **증분 업데이트 최적화**: SHA256 해시 기반(`wiki.json`)으로 변경된 소스만 감지하여 재생성하는 토큰 최적화 로직 (P2).
-  - **Vision API 연동**: `raw/images/` 내 사용자 업로드 이미지에 대한 자동 캡션 생성 (P1).
-- 서버 재시작 후 Phase 41 위키 갱신 파이프라인 안정화 테스트.
+- **Phase 41 잔여 과제 구현 (Project Wiki 고도화 - Graphify Native)**:
+  - **Extractor 기반 수집 연동**: 단순 요약이 아닌, 칸반 카드, 댓글, PRD 등에서 Dict와 NetworkX 자료구조로 Node/Edge를 추출(P0).
+  - **메타인지 연동 및 "Read Graph First" 프롬프트 인젝션**: `executor.js` 실행 시 에이전트가 코드베이스를 탐색하기 전 가장 먼저 `PROJECT_WIKI.md`와 온톨로지 지식 인덱스를 강제 주입(Install) (P0).
+  - **의사결정 기록 자동 추적 및 클러스터링**: `DECISION_LOG.md` 파일에 4단 ADR 구조 로그 누적 및 Graphify Query를 통한 구조 기반 탐색(P1).
+  - **증분 업데이트 최적화**: SHA256 해시 기반(`wiki.json`)으로 변경된 소스 엣지만 감지하여 재생성하는 토큰 최적화 로직 (P2).
 - Phase 40 기획서에 명시된 `graphify_mcp.py` 스크립트 및 `graphifyWatchdog.js` Stdio 브릿지 본격 연동 개발 착수.

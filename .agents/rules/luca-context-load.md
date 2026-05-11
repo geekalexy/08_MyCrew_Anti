@@ -28,8 +28,12 @@ Read: `02_System_Development/SESSION_LOG_*.md` (최신 파일)
 → 직전 세션에서 완료된 것 / 다음 작업 예정 항목 파악
 
 ### Step 3 — 현재 Phase 확인
-Read: 최근 `02_System_Development/00_아키텍처_문서/Phase*.md`
+Read: 최근 `02_System_Development/V2_Core_Engine/00_아키텍처_문서/Phase*.md`
 → 현재 진행 단계 및 스프린트 목표 확인
+
+### Step 4 — 코어 아키텍처 스캔 (Phase 42)
+Use: `mcp_server.js`의 `query_graph` 도구 (scope="system")
+→ 엔진 의존성(ex. server.js) 파악 시 반드시 System Graphify 쿼리 사용
 
 ---
 

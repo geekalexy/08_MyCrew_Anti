@@ -60,9 +60,9 @@
 | 파일 | 경로 |
 |------|------|
 | 정책 레지스트리 (기계용) | `01_Company_Operations/04_HR_온보딩/policy_registry.json` |
-| 에이전트 ID 규격서 | `02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md` |
-| 엔진 ID 사양 | `02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md` |
-| 모델 레지스트리 | `02_System_Development/01_아리_엔진/ai-engine/modelRegistry.js` |
+| 에이전트 ID 규격서 | `02_System_Development/V2_Core_Engine/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md` |
+| 엔진 ID 사양 | `02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md` |
+| 모델 레지스트리 | `02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/modelRegistry.js` |
 | M-FDS 규칙 | `01_Company_Operations/04_HR_온보딩/rule_document_structure.md` |
 
 ---

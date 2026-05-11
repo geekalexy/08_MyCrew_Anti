@@ -14,7 +14,7 @@
       "title": "구 에이전트 ID 폐기",
       "summary": "Phase 33 이전 ID 사용 절대 금지",
       "forbidden_values": ["marketing_lead", "visual_director", "copywriter", "researcher", "data_analyst", "strategy_advisor", "luca", "lumi", "nova", "sonnet", "opus", "dev_lead"],
-      "source_doc": "02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md",
       "updated": "2026-05-03",
       "updated_by": "Sonnet"
     },
@@ -26,7 +26,7 @@
       "summary": "신규 에이전트 ID는 반드시 {팀코드}_{역할코드} 형식",
       "valid_prefixes": ["dev_", "mkt_", "sales_", "ops_", "hr_"],
       "platform_exception": ["assistant"],
-      "source_doc": "02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
       "updated": "2026-05-03",
       "updated_by": "Sonnet"
     },
@@ -36,7 +36,7 @@
       "severity": "STRICT",
       "title": "팀 격리 원칙",
       "summary": "같은 역할이라도 팀이 다르면 다른 ID — 동일 ID를 여러 팀에서 공유 금지",
-      "source_doc": "02_System_Development/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/03_운영가이드/에이전트_ID_체계_운영가이드_v2.md",
       "updated": "2026-05-03",
       "updated_by": "Sonnet"
     },
@@ -68,7 +68,7 @@
       "severity": "STRICT",
       "title": "모델 식별자 환각 금지",
       "summary": "모델 식별자는 반드시 modelRegistry.js 상수 참조 — 직접 문자열 하드코딩 금지",
-      "source_doc": "02_System_Development/01_아리_엔진/ai-engine/modelRegistry.js",
+      "source_doc": "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/modelRegistry.js",
       "updated": "2026-04-20",
       "updated_by": "Luca"
     },
@@ -163,7 +163,7 @@
       "severity": "STRICT",
       "title": "파괴적 함수 dangerously 접두사 필수",
       "summary": "데이터 삭제·초기화·전체 삭제 함수에는 dangerously 접두사 필수 (예: dangerouslyPurgeAllLogs)",
-      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/clearLogs_사건",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/clearLogs_사건",
       "updated": "2026-05-03",
       "updated_by": "Prime"
     },
@@ -173,7 +173,7 @@
       "severity": "STRICT",
       "title": "프로젝트 전환 시 AbortController 필수",
       "summary": "프로젝트 전환 시 이전 프로젝트의 비동기 작업을 AbortController로 정리 필수",
-      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/26_Phase32_Bugdog_파이프라인_리뷰요청서_Prime.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/26_Phase32_Bugdog_파이프라인_리뷰요청서_Prime.md",
       "updated": "2026-05-03",
       "updated_by": "Prime"
     },
@@ -183,7 +183,7 @@
       "severity": "STRICT",
       "title": "시스템 에이전트 제외는 ID 배열 기반",
       "summary": "시스템 에이전트 제외 로직은 하드코딩 금지 — 반드시 ID 배열 기반으로 처리",
-      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/29_Phase31_ZeroConfig_버그수정_리뷰요청서_Prime.md",
       "updated": "2026-05-03",
       "updated_by": "Prime"
     },
@@ -193,7 +193,7 @@
       "severity": "STRICT",
       "title": "무단 데이터 파괴 금지",
       "summary": "CEO의 명시적 승인 없이 원본 데이터를 무단 삭제(DB Delete, Drop 등)하는 파괴적 행위 절대 금지",
-      "source_doc": "02_System_Development/00_아키텍처_문서/리뷰_아카이브/Data_Deletion_사건.md",
+      "source_doc": "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/Data_Deletion_사건.md",
       "updated": "2026-05-05",
       "updated_by": "Sonnet"
     }

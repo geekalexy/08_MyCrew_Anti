@@ -1,0 +1,7 @@
+{
+  "taskId": "task_1777951692728_159",
+  "requestedModel": "anti-gemini-3.1-pro-high",
+  "text": "```css\n/* /src/components/Dashboard/Widget.css */\n\n.widget-container {\n  background-color: #ffffff;\n  border: 1px solid #e0e0e0;\n  border-radius: 8px;\n  padding: 16px;\n  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);\n}\n\n.widget-title {\n  font-size: 1.1rem;\n  font-weight: 600;\n  color: #333;\n  margin: 0 0 12px 0;\n}\n\n.widget-content {\n  /* Styles for widget content area */\n}\n\n/* v1.4.0 QA Bug Fix: 모바일 뷰 제목 오버플로우 방지 */\n@media (max-width: 360px) {\n  .widget-title {\n    overflow-wrap: break-word;\n    word-break: break-word; /* IE & Legacy Edge */\n  }\n}\n```\n\n<next_sprint>\n{\n  \"title\": \"대시보드 위젯 CSS 버그 수정 코드 리뷰 요청\",\n  \"content\": \"모바일 뷰(360px 이하)에서 위젯 제목이 컨테이너를 벗어나는 현상을 수정했습니다. `/src/components/Dashboard/Widget.css` 파일에 `overflow-wrap: break-word;` 속성을 추가했으니 코드 리뷰 부탁드립니다.\",\n  \"assignee\": \"dev_advisor\"\n}\n</next_sprint>",
+  "processedBy": "ariDaemon-bridge (gemini-2.5-pro)",
+  "timestamp": "2026-05-05T03:28:26.347Z"
+}

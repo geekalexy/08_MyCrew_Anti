@@ -1,0 +1,7 @@
+{
+  "taskId": "task_1778171541023_182",
+  "requestedModel": "anti-claude-sonnet-4.6-thinking",
+  "text": "<next_sprint>\n{\n  \"title\": \"[백엔드] 광고 소재(Ad Creative) CRUD API 구현\",\n  \"content\": \"DEV_SENIOR 입니다.\\n\\n이전 태스크에서 캠페인 CRUD API 개발이 완료되었습니다.\\n이제 이어서 광고 소재(Ad Creative) CRUD API 구현을 진행해 주시기 바랍니다.\\n\\n**요구사항:**\\n1.  **API 엔드포인트 설계:**\\n    -   캠페인에 종속적인 리소스이므로, RESTful 원칙에 따라 아래와 같은 엔드포인트 구조를 사용해 주세요.\\n    -   `POST /campaigns/:campaignId/ad-creatives` (생성)\\n    -   `GET /campaigns/:campaignId/ad-creatives` (목록 조회)\\n    -   `GET /campaigns/:campaignId/ad-creatives/:adCreativeId` (상세 조회)\\n    -   `PATCH /campaigns/:campaignId/ad-creatives/:adCreativeId` (수정)\\n    -   `DELETE /campaigns/:campaignId/ad-creatives/:adCreativeId` (삭제)\\n\\n2.  **소유권 검증:**\\n    -   모든 API 요청 처리 시, 요청을 보낸 광고주(`advertiser_id`)가 부모 리소스인 캠페인(`campaignId`)의 소유주인지 반드시 확인해야 합니다.\\n    -   `campaigns.service.ts`의 소유권 검증 로직을 참고하여 구현해 주세요. 타인의 캠페인에 광고 소재를 추가/수정/삭제할 수 없어야 합니다.\\n\\n3.  **구현 범위:**\\n    -   `ad-creatives` 모듈 생성 (controller, service, module 파일)\\n    -   `CreateAdCreativeDto` 및 `UpdateAdCreativeDto` DTO 생성 및 유효성 검사 적용\\n    -   Prisma를 사용한 서비스 로직 구현\\n\\n기존 `schema.prisma`의 `AdCreative` 모델을 기반으로 작업하시면 됩니다.\\n궁금한 점이 있다면 언제든지 멘션 주세요.\",\n  \"assignee\": \"dev_backend\"\n}\n</next_sprint>",
+  "processedBy": "ariDaemon-bridge (gemini-2.5-pro)",
+  "timestamp": "2026-05-07T16:32:44.279Z"
+}

@@ -22,7 +22,7 @@ Read: `01_Company_Operations/04_HR_온보딩/strategic_memory.md`
 → 프로젝트 아키텍처, 모델 식별자 규칙 확인
 
 ### Step 3 — 에이전트 ID 체계 확인
-Read: `02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md`
+Read: `02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md`
 → 팀빌딩·에이전트 할당 관련 작업 시 필수
 
 ### Step 4 — 최근 작업 이어받기

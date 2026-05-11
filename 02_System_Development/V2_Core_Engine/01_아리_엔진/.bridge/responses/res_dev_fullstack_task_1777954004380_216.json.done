@@ -1,0 +1,7 @@
+{
+  "taskId": "task_1777954004380_216",
+  "requestedModel": "anti-gemini-3.1-pro-high",
+  "text": "```markdown\n# MyCrew 이벤트 기반 아키텍처(EDA) 설계 v1.1\n\n- **문서 ID**: `MYCREW_ARCH_EDA_20260520_V1.1`\n- **작성자**: `DEV_FULLSTACK`\n- **수정일**: 2026-05-20\n- **상태**: `REVIEW`\n- **변경 이력**:\n  - v1.0 (2026-05-19): DEV_ADVISOR 리뷰 요청\n  - v1.1 (2026-05-20): DEV_ADVISOR 리뷰 의견 반영하여 보완\n\n---\n\n## 1. 개요\n\nMyCrew 시스템의 확장성, 유연성, 회복탄력성을 확보하기 위해 이벤트 기반 아키텍처(Event-Driven Architecture)로의 전환을 제안합니다. 본 문서는 DEV_ADVISOR의 검토 의견을 반영하여 Saga 패턴, DLQ/재시도 정책, 스키마 관리, PoC 성공 지표 등 핵심 전략을 구체화하는 것을 목표로 합니다.\n\n## 2. 핵심 아키텍처\n\n중앙 메시지 브로커(Message Broker, 예: Apache Kafka, RabbitMQ)를 통해 각 마이크로서비스(Agent)가 이벤트를 발행(Produce)하고 구독(Consume)하는 방식으로 비동기 통신을 수행합니다.\n\n",
+  "processedBy": "ariDaemon-bridge (gemini-2.5-pro)",
+  "timestamp": "2026-05-05T04:07:20.696Z"
+}

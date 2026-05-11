@@ -3483,6 +3483,9 @@ app.post('/api/projects/:id/plan-master/confirm', async (req, res) => {
   const { action, feedback } = req.body; // action: 'confirm' | 'revise'
   try {
     if (action === 'confirm') {
+      // [DB Update] 상태를 확정(LOCKED)으로 변경
+      await dbManager.updateProjectPlanMasterStatus(projectId, 'LOCKED', false);
+
       broadcastLog('success', `[Plan Master] ✅ MVP v1.0 기획이 최종 확정(Locked-on)되었습니다.`, 'system', null, 'DASHBOARD', projectId);
       try {
         const lockPath = path.resolve(process.cwd(), '.mycrew/docs/roadmaps/v1.0_MVP_PRD.locked');
@@ -3494,6 +3497,9 @@ app.post('/api/projects/:id/plan-master/confirm', async (req, res) => {
       }
       res.json({ status: 'confirmed', message: 'MVP 기획이 확정되었습니다. 개발 모드로 전환할 수 있습니다.' });
     } else if (action === 'revise') {
+      // [DB Update] 상태 변경(REVISING) 및 수정 카운트 1 증가
+      await dbManager.updateProjectPlanMasterStatus(projectId, 'REVISING', true);
+
       broadcastLog('info', `[Plan Master] 🔄 사용자 수정 요청 수신. 스코프 재분석을 시작합니다.`, 'system', null, 'DASHBOARD', projectId);
       res.json({ status: 'revision_requested', message: '피드백을 반영하여 스코프를 재분석합니다.', feedback });
     } else {

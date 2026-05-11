@@ -121,15 +121,7 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN context_chain TEXT DEFAULT '[]'`);
       console.log('[DB] Context Chaining 마이그레이션: Task.context_chain 컬럼 추가 완료');
     }
-    // [Phase 39] Plan Master 기획 세션 상태 및 수정 횟수 추적
-    if (!names.includes('plan_master_status')) {
-      db.run(`ALTER TABLE Task ADD COLUMN plan_master_status TEXT DEFAULT NULL`);
-      console.log('[DB] Phase 39 마이그레이션: Task.plan_master_status 컬럼 추가 완료');
-    }
-    if (!names.includes('plan_master_revision_count')) {
-      db.run(`ALTER TABLE Task ADD COLUMN plan_master_revision_count INTEGER DEFAULT 0`);
-      console.log('[DB] Phase 39 마이그레이션: Task.plan_master_revision_count 컬럼 추가 완료');
-    }
+    // (plan_master_status와 revision_count는 Task가 아닌 projects 테이블로 이동됨)
   });
 
   db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
@@ -305,6 +297,15 @@ db.serialize(() => {
     if (!names.includes('project_type')) {
       db.run(`ALTER TABLE projects ADD COLUMN project_type TEXT DEFAULT 'development'`);
       console.log('[DB] Phase 41 마이그레이션: projects.project_type 컬럼 추가 완료');
+    }
+    // [Phase 39] Plan Master 기획 세션 상태 및 수정 횟수 추적
+    if (!names.includes('plan_master_status')) {
+      db.run(`ALTER TABLE projects ADD COLUMN plan_master_status TEXT DEFAULT NULL`);
+      console.log('[DB] Phase 39 마이그레이션: projects.plan_master_status 컬럼 추가 완료');
+    }
+    if (!names.includes('plan_master_revision_count')) {
+      db.run(`ALTER TABLE projects ADD COLUMN plan_master_revision_count INTEGER DEFAULT 0`);
+      console.log('[DB] Phase 39 마이그레이션: projects.plan_master_revision_count 컬럼 추가 완료');
     }
   });
 
@@ -1883,6 +1884,25 @@ class DatabaseManager {
         [taskId],
         err => err ? reject(err) : resolve()
       );
+    });
+  }
+
+  // ─── [Phase 39] Plan Master Project Status Management ────────
+  updateProjectPlanMasterStatus(projectId, status, incrementRevision = false) {
+    return new Promise((resolve, reject) => {
+      let query = `UPDATE projects SET plan_master_status = ?`;
+      let params = [status];
+      
+      if (incrementRevision) {
+        query += `, plan_master_revision_count = plan_master_revision_count + 1`;
+      }
+      query += ` WHERE id = ?`;
+      params.push(projectId);
+
+      db.run(query, params, function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      });
     });
   }
 

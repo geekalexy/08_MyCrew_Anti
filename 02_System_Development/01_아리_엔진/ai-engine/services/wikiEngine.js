@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import dbManager from '../../database.js';
 import geminiAdapter from '../adapters/geminiAdapter.js';
+import { MODEL } from '../modelRegistry.js';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -112,7 +113,7 @@ ${sources.raw || '(자료 없음)'}
 
       // 생성 (비서 모델 대신 좀 더 큰 모델 혹은 빠르고 정확한 모델 사용)
       console.log(`[WikiEngine] 프로젝트 위키 갱신 시작: ${projectId}`);
-      const response = await geminiAdapter.generateResponse(userPrompt, systemPrompt, 'gemini-1.5-pro'); // 또는 flash
+      const response = await geminiAdapter.generateResponse(userPrompt, systemPrompt, MODEL.PRO); // [BugFix] 하드코딩 환각 제거 (P-006 준수)
       
       if (response && response.text) {
         const wikiPath = path.join(wikiDir, 'PROJECT_WIKI.md');

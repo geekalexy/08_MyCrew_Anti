@@ -38,7 +38,7 @@ import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.
 import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
 import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
 import { triggerGraphifyUpdate } from './ai-engine/workers/graphifyWatchdog.js';
-
+import wikiEngine from './ai-engine/services/wikiEngine.js';
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4007;
@@ -2403,6 +2403,33 @@ app.post('/api/tasks/:id/attachments', async (req, res) => {
     const result = await dbManager.createTaskAttachment(
       req.params.id, comment_id || null, file_label, file_path, file_type || null, file_size || null
     );
+
+    // [Phase 41] 프로젝트의 raw/ 폴더로 복사 (에이전트가 참조할 수 있도록)
+    try {
+      const task = await dbManager.getTaskById(req.params.id);
+      if (task && task.project_id) {
+        const projectRow = await dbManager.getProjectById(task.project_id);
+        if (projectRow) {
+          const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
+          const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+          const rawDir = path.resolve(projectRoot, '.mycrew/wiki/raw');
+          
+          if (!fs.existsSync(rawDir)) {
+            fs.mkdirSync(rawDir, { recursive: true });
+          }
+          
+          const fileName = path.basename(file_path);
+          const destPath = path.resolve(rawDir, fileName);
+          if (fs.existsSync(file_path)) {
+            fs.copyFileSync(file_path, destPath);
+            console.log(`[Phase 41] 첨부파일 복사 완료: ${destPath}`);
+          }
+        }
+      }
+    } catch (fsErr) {
+      console.warn('[Phase 41] raw/ 폴더 복사 중 오류:', fsErr.message);
+    }
+
     res.json({ status: 'ok', id: result.id });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -3103,6 +3130,13 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
       }
     })();
     
+    // [Phase 41] Task 승인(Done) 시점에 Project Wiki 갱신 (비동기)
+    if (task.project_id) {
+      wikiEngine.generateWiki(task.project_id).catch(err => {
+        console.error('[WikiEngine] 태스크 승인 중 위키 생성 실패:', err);
+      });
+    }
+
     res.json({ status: 'ok', message: '승인 완료. Obsidian에 아카이브했습니다.' });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });

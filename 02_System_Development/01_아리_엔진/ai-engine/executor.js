@@ -576,6 +576,26 @@ class Executor {
       const graphifyInstruction = `\n\n[Phase 39 Graphify 하이퍼쿼리 필수 사용 규칙]\n코드를 탐색하거나 기존 프로젝트의 구조를 파악할 때, 무조건 파일을 텍스트로 읽기(grep 등) 전에 **Graphify MCP 서버의 query_graph, update_graph 도구**를 사용하여 프로젝트의 지식 신경망(Graph) 지형을 먼저 파악하십시오. 이를 통해 불필요한 토큰 낭비를 줄이고 파일 간의 의존성(Shortest Path)을 즉각적으로 추적해야 합니다.\n`;
       const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}\n${graphifyInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
+      try {
+        if (taskId) {
+          const tInfo = await dbManager.getTaskById(taskId);
+          if (tInfo && tInfo.project_id) {
+            const pRow = await dbManager.getProjectById(tInfo.project_id);
+            if (pRow) {
+              const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
+              const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+              const wikiPath = path.resolve(pRoot, '.mycrew/wiki/PROJECT_WIKI.md');
+              if (fs.existsSync(wikiPath)) {
+                const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
+                finalSystemPrompt += `\n\n## 📚 프로젝트 위키 (자동 로드)\n${wikiContent}`;
+                console.log(`[Executor] Project LLM Wiki 자동 주입 완료: ${wikiPath}`);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Executor] Wiki 주입 실패:', err.message);
+      }
     }
 
     try {
@@ -906,6 +926,26 @@ class Executor {
       const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다. (기본 출력 폴더명은 'OUTPUT' 입니다.)\n🚨 중요: HTML 기반의 프론트엔드 웹앱을 만들 때, 메인 파일은 반드시 하위 폴더 없이 최상위 경로인 \`index.html\` 로 저장하십시오! (예: path: "index.html") 그래야만 사용자의 Live Preview 버튼이 정상적으로 활성화됩니다.\n🚨 주의: 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output",\n    "path": "index.html",\n    "content": "저장할 파일 내용 전체..."\n  }\n]\n</file_operations>\n`;
       const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. \n만약 제공된 스킬 문서나 지시사항 내에 다른 에이전트 이름(예: NOVA, LILY 등)이 기재되어 있더라도 철저히 무시하고 오직 **${agentId.toUpperCase()}** 로서 임무를 수행하십시오.\n사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '繞에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흔내를 내지 마십시오. 당신은 관리자나 기획자가 아니라 결과물을 만들어내는 직접 실행자입니다. 본인 스스로에게 지시를 내리는 행위도 엄격히 금지됩니다. 불필요한 인사말이나 서론 없이 요구받은 최종 결과물(예: 코드, 렌더링된 마크다운 이미지, 텍스트 본문 등)만 즉각적으로 출력하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
+      try {
+        if (taskId) {
+          const tInfo = await dbManager.getTaskById(taskId);
+          if (tInfo && tInfo.project_id) {
+            const pRow = await dbManager.getProjectById(tInfo.project_id);
+            if (pRow) {
+              const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
+              const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+              const wikiPath = path.resolve(pRoot, '.mycrew/wiki/PROJECT_WIKI.md');
+              if (fs.existsSync(wikiPath)) {
+                const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
+                finalSystemPrompt += `\n\n## 📚 프로젝트 위키 (자동 로드)\n${wikiContent}`;
+                console.log(`[Executor] Project LLM Wiki 자동 주입 완료 (runDirect): ${wikiPath}`);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Executor] Wiki 주입 실패 (runDirect):', err.message);
+      }
     }
 
     this._log('info', `> [${evaluation.category}] 모듈 로드 완료. ${modelToUse} 엔진으로 생성을 시작합니다...`, agentId || 'system', taskId);

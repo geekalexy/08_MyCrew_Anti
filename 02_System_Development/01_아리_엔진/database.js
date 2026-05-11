@@ -292,6 +292,11 @@ db.serialize(() => {
       db.run(`ALTER TABLE projects ADD COLUMN pipeline_mode TEXT DEFAULT 'none'`);
       console.log('[DB] Phase 36 마이그레이션: projects.pipeline_mode 컬럼 추가 완료');
     }
+    // [Phase 41] 프로젝트 유형 (development | marketing | design | general)
+    if (!names.includes('project_type')) {
+      db.run(`ALTER TABLE projects ADD COLUMN project_type TEXT DEFAULT 'development'`);
+      console.log('[DB] Phase 41 마이그레이션: projects.project_type 컬럼 추가 완료');
+    }
   });
 
 
@@ -628,7 +633,7 @@ class DatabaseManager {
   // ─── 프로젝트 조회 ──────────────────────────────────────────────────────────
   getAllProjects() {
     return new Promise((resolve, reject) => {
-      db.all(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, created_at FROM projects WHERE status = 'active' ORDER BY created_at ASC`, (err, rows) => {
+      db.all(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, project_type, created_at FROM projects WHERE status = 'active' ORDER BY created_at ASC`, (err, rows) => {
         if (err) reject(err);
         else resolve(rows || []);
       });
@@ -637,7 +642,7 @@ class DatabaseManager {
 
   getProjectById(id) {
     return new Promise((resolve, reject) => {
-      db.get(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, created_at FROM projects WHERE id = ?`, [id], (err, row) => {
+      db.get(`SELECT id, name, objective, objective_raw, workflow_raw, isolation_scope, status, project_type, created_at FROM projects WHERE id = ?`, [id], (err, row) => {
         if (err) reject(err);
         else resolve(row);
       });
@@ -645,11 +650,11 @@ class DatabaseManager {
   }
 
   // ─── [Phase 28a] 프로젝트 생성 ──────────────────────────────────────────────
-  createProject(id, name, objective, isolation_scope) {
+  createProject(id, name, objective, isolation_scope, projectType = 'development') {
     return new Promise((resolve, reject) => {
       db.run(
-        `INSERT INTO projects (id, name, objective, isolation_scope) VALUES (?, ?, ?, ?)`,
-        [id, name, objective, isolation_scope || '{"type":"strict_isolation","shared_projects":[]}'],
+        `INSERT INTO projects (id, name, objective, isolation_scope, project_type) VALUES (?, ?, ?, ?, ?)`,
+        [id, name, objective, isolation_scope || '{"type":"strict_isolation","shared_projects":[]}', projectType],
         function(err) {
           if (err) reject(err);
           else resolve(id);
@@ -697,7 +702,7 @@ class DatabaseManager {
   }
 
   // ─── [Phase 28b] Zero-Config 단일 트랜잭션 파이프라인 ──────────────────────
-  createZeroConfigProject(id, name, objective, isolation_scope, crew, initialTasks, requiredSkills = []) {
+  createZeroConfigProject(id, name, objective, isolation_scope, crew, initialTasks, requiredSkills = [], projectType = 'development') {
     // [Phase B] P-001/P-002: 크루 에이전트 ID 정책 검증
     const guardResult = validateCrewIds(crew || []);
     if (!guardResult.valid) {
@@ -727,8 +732,8 @@ class DatabaseManager {
 
         // 1. Project
         db.run(
-          `INSERT INTO projects (id, name, objective, isolation_scope, status, objective_raw, workflow_raw) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [id, name, parsedObjective, JSON.stringify(isolation_scope || {"type":"strict_isolation","shared_projects":[]}), 'active', objRaw, flowRaw],
+          `INSERT INTO projects (id, name, objective, isolation_scope, status, objective_raw, workflow_raw, project_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [id, name, parsedObjective, JSON.stringify(isolation_scope || {"type":"strict_isolation","shared_projects":[]}), 'active', objRaw, flowRaw, projectType],
           function(err) {
             if (err) return rollback(err);
           }

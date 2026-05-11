@@ -312,7 +312,9 @@ def generate_graph_html(project_dir, graph_data, out_dir=None):
     </script>
 </body>
 </html>"""
-    html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", json.dumps(graph_data))
+    # [H-004 Fix] json.dumps 결과의 </script> 이스케이프 (Stored XSS 방어)
+    safe_json_data = json.dumps(graph_data).replace("</", "<\\/")
+    html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", safe_json_data)
     
     os.makedirs(project_dir, exist_ok=True)
     

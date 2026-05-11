@@ -366,13 +366,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text", text: `[run_tasks] 자율 코딩 태스크 시작: ${args.command}` }] };
   }
   if (name === "trace_bug") {
+    // [C-003 Fix] trace_bug 입력 검증 (query_graph와 동일한 정규식 적용)
+    if (!args.error_log || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.error_log.trim())) {
+      return { content: [{ type: "text", text: `[trace_bug] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
+    }
+
     try {
       const util = await import('util');
       const { execFile } = await import('child_process');
       const execFilePromise = util.promisify(execFile);
       
       // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
-      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.error_log || '']);
+      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.error_log.trim()]);
       return { content: [{ type: "text", text: `[trace_bug] Graphify 노드 추적 결과:\n${stdout}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `[trace_bug] 추적 실패: ${e.message}` }], isError: true };

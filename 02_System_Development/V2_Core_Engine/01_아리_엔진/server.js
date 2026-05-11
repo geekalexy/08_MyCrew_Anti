@@ -2574,6 +2574,14 @@ async function appendMeetingLog(projectId, taskId, author, content) {
     const prevLock = _meetingWriteLocks.get(filePath) || Promise.resolve();
     const writeLock = prevLock.then(() => fs.promises.appendFile(filePath, logEntry, 'utf-8')).catch(() => {});
     _meetingWriteLocks.set(filePath, writeLock);
+    
+    // [H-005 Fix] finally에서 현재 lock이 큐의 마지막이면 Map에서 삭제 (메모리 누수 방지)
+    writeLock.finally(() => {
+      if (_meetingWriteLocks.get(filePath) === writeLock) {
+        _meetingWriteLocks.delete(filePath);
+      }
+    });
+    
     await writeLock;
     
     // [H-001 Fix] 디바운스는 WikiEngine 내부에서 처리 (매 댓글마다 LLM 호출 방지)
@@ -3337,7 +3345,9 @@ app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
   const { id: projectId } = req.params;
   const { requirements, deadline } = req.body;
   try {
-    broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${requirements.substring(0, 30)}...)`, 'system', null, 'DASHBOARD', projectId);
+    // [H-003 Fix] requirements null 가드 추가
+    const safeReq = requirements || '';
+    broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${safeReq.substring(0, 30)}...)`, 'system', null, 'DASHBOARD', projectId);
     
     const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
 사용자의 요구사항: "${requirements}"

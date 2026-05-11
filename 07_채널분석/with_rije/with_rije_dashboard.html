@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@with_rije 채널 분석 대시보드 — Socian</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+:root{--primary:#076CF0;--secondary:#4834FD;--gold:#FEB63A;--green:#22C55E;--red:#EF4444;--bg:#F7F9FC;--card:#FFFFFF;--border:#E2E8F0;--text:#1E2531;--text-sec:#64748B;--text-muted:#94A3B8;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans KR','Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.header{background:linear-gradient(135deg,#076CF0 0%,#4834FD 100%);padding:40px 48px 32px;position:relative;overflow:hidden;}
+.header::before{content:'';position:absolute;top:-50%;right:-5%;width:400px;height:400px;background:radial-gradient(circle,rgba(255,255,255,0.07) 0%,transparent 70%);border-radius:50%;}
+.header-inner{max-width:1200px;margin:0 auto;position:relative;z-index:1;}
+.brand-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;color:rgba(255,255,255,0.9);margin-bottom:16px;letter-spacing:0.5px;}
+.brand-tag .dot{width:6px;height:6px;background:var(--gold);border-radius:50%;}
+.header h1{font-size:24px;font-weight:700;color:#fff;margin-bottom:4px;}
+.header h1 a{color:#fff;text-decoration:none;}
+.header h1 a:hover{text-decoration:underline;}
+.header p{color:rgba(255,255,255,0.6);font-size:13px;}
+.stats-bar{display:flex;gap:1px;background:rgba(255,255,255,0.1);border-radius:14px;overflow:hidden;margin-top:24px;}
+.stat-item{flex:1;padding:16px 20px;background:rgba(255,255,255,0.06);backdrop-filter:blur(8px);text-align:center;}
+.stat-item:first-child{border-radius:14px 0 0 14px;}
+.stat-item:last-child{border-radius:0 14px 14px 0;}
+.stat-num{font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:#fff;}
+.stat-label{font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;font-weight:500;}
+.container{max-width:1200px;margin:0 auto;padding:28px 24px;}
+.section{margin-bottom:28px;}
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--border);}
+.section-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;}
+.section-title{font-size:17px;font-weight:700;}
+.section-sub{font-size:12px;color:var(--text-muted);margin-left:auto;}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;}
+.card{background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:all 0.2s;}
+.card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08);}
+.card-label{font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;}
+.card-value{font-family:'Inter';font-size:28px;font-weight:800;margin-top:6px;}
+.card-note{font-size:11px;color:var(--text-sec);margin-top:4px;}
+.blue{color:var(--primary);} .green{color:var(--green);} .gold{color:var(--gold);} .red{color:var(--red);} .purple{color:var(--secondary);}
+.profile-box{background:var(--card);border-radius:14px;padding:24px;border:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.profile-item{display:flex;flex-direction:column;gap:3px;}
+.profile-label{font-size:11px;color:var(--text-muted);font-weight:600;}
+.profile-value{font-size:14px;font-weight:500;}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.chart-box{background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.04);position:relative;}
+.chart-box canvas{max-height:280px;}
+.chart-title{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text);}
+.cta-highlight{background:linear-gradient(135deg,rgba(239,68,68,0.05) 0%,rgba(254,182,58,0.05) 100%);border:1px solid rgba(239,68,68,0.15);border-radius:14px;padding:20px;margin-top:12px;}
+.cta-item-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.cta-keyword{font-family:'Inter';font-size:14px;font-weight:700;color:var(--red);background:rgba(239,68,68,0.1);padding:4px 14px;border-radius:8px;min-width:100px;text-align:center;}
+.cta-desc{font-size:13px;color:var(--text-sec);}
+.persona-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.persona-card{background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);text-align:center;}
+.persona-emoji{font-size:36px;margin-bottom:8px;}
+.persona-name{font-size:14px;font-weight:700;margin-bottom:4px;}
+.persona-pct{font-family:'Inter';font-size:20px;font-weight:800;color:var(--primary);}
+.persona-desc{font-size:12px;color:var(--text-sec);margin-top:6px;line-height:1.5;}
+.cat-match{background:var(--card);border-radius:14px;padding:20px;border:1px solid var(--border);margin-bottom:12px;}
+.cat-match-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.cat-match-score{font-family:'Inter';font-size:16px;font-weight:800;color:var(--primary);background:rgba(7,108,240,0.08);padding:4px 12px;border-radius:8px;}
+.cat-match-name{font-size:15px;font-weight:700;}
+.cat-match-body{font-size:13px;color:var(--text-sec);line-height:1.7;}
+.score-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.score-label{font-size:13px;font-weight:600;width:140px;}
+.score-bar-bg{flex:1;height:10px;background:#EEF2F7;border-radius:5px;overflow:hidden;}
+.score-bar-fill{height:100%;border-radius:5px;transition:width 0.5s;}
+.score-num{font-family:'Inter';font-size:13px;font-weight:700;width:40px;text-align:right;}
+.insight-box{background:var(--card);border-radius:14px;padding:24px;border:1px solid var(--border);margin-bottom:16px;}
+.insight-box h3{font-size:16px;font-weight:700;margin-bottom:12px;color:var(--primary);}
+.insight-row{display:flex;gap:16px;margin-bottom:12px;}
+.insight-tag{border-radius:8px;padding:12px 16px;flex:1;font-size:13px;}
+.insight-tag.blue-bg{background:#EFF6FF;color:var(--primary);}
+.insight-tag.good{background:#F0FDF4;color:#16A34A;}
+.insight-tag.warn{background:#FFF7ED;color:#F59E0B;}
+.footer{text-align:center;padding:32px 24px;color:var(--text-muted);font-size:12px;}
+.footer a{color:var(--primary);text-decoration:none;font-weight:600;}
+@media(max-width:768px){.chart-row,.persona-grid{grid-template-columns:1fr;}.profile-box{grid-template-columns:1fr;}.stats-bar{flex-wrap:wrap;}.stat-item{min-width:45%;}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="brand-tag"><span class="dot"></span> Socian Ad Intelligence Report</div>
+    <h1><a href="https://www.instagram.com/with_rije/" target="_blank">@with_rije</a> 채널 분석 대시보드</h1>
+    <p>리제 · 예비신부 웨딩정보 크리에이터 · 100% CTA 운영 · 분석일 2026-03-26</p>
+    <div class="stats-bar">
+      <div class="stat-item"><div class="stat-num">2,005</div><div class="stat-label">팔로워</div></div>
+      <div class="stat-item"><div class="stat-num">32</div><div class="stat-label">팔로잉</div></div>
+      <div class="stat-item"><div class="stat-num">6</div><div class="stat-label">게시물</div></div>
+      <div class="stat-item"><div class="stat-num">84</div><div class="stat-label">수집 팔로워</div></div>
+      <div class="stat-item"><div class="stat-num">100.0%</div><div class="stat-label">실제사용자 비율</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#076CF0,#4834FD);">📊</div>
+      <div class="section-title">핵심 반응도 지표</div>
+    </div>
+    <div class="card-grid">
+      <div class="card"><div class="card-label">평균 좋아요</div><div class="card-value blue">61.2</div><div class="card-note"></div></div>
+      <div class="card"><div class="card-label">평균 댓글</div><div class="card-value purple">1,094.7</div><div class="card-note">100% CTA 댓글</div></div>
+      <div class="card"><div class="card-label">표면 ER</div><div class="card-value gold">57.60%</div><div class="card-note">전 게시물 CTA 기반</div></div>
+      <div class="card"><div class="card-label">순수 좋아요 ER</div><div class="card-value green">3.05%</div><div class="card-note">좋아요 기반</div></div>
+      <div class="card"><div class="card-label">전환 가능성 지수</div><div class="card-value blue">78</div><div class="card-note">/ 100 · 웨딩 CTA 특화</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#22C55E,#16A34A);">👤</div>
+      <div class="section-title">프로필 상세</div>
+    </div>
+    <div class="profile-box">
+      <div class="profile-item"><span class="profile-label">계정명</span><span class="profile-value">리제 (with_rije)</span></div>
+      <div class="profile-item"><span class="profile-label">계정 유형</span><span class="profile-value">예비신부 웨딩정보 크리에이터</span></div>
+      <div class="profile-item"><span class="profile-label">바이오</span><span class="profile-value">예비신부의 웨딩일기 · 결혼 준비 정보</span></div>
+      <div class="profile-item"><span class="profile-label">외부 링크</span><span class="profile-value">-</span></div>
+      <div class="profile-item"><span class="profile-label">DM 자동화</span><span class="profile-value" style="color:var(--green);font-weight:700;">✅ 활성 (100% CTA)</span></div>
+      <div class="profile-item"><span class="profile-label">팔로워/팔로잉 비율</span><span class="profile-value">62.7:1</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#FEB63A,#F59E0B);">📈</div>
+      <div class="section-title">게시물 반응도 분석</div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box"><div class="chart-title">게시물별 좋아요 + 댓글</div><canvas id="chart1"></canvas></div>
+      <div class="chart-box"><div class="chart-title">CTA 키워드별 댓글 반응</div><canvas id="chart2"></canvas></div>
+      <div class="chart-box"><div class="chart-title">댓글/좋아요 비율</div><canvas id="chart3"></canvas></div>
+      <div class="chart-box"><div class="chart-title">게시물 타임라인</div><canvas id="chart4"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#EF4444,#DC2626);">🎯</div>
+      <div class="section-title">CTA 전략 패턴</div>
+    </div>
+    <div class="cta-highlight">
+      <div class="cta-item-row"><div class="cta-keyword">"고고"</div><div class="cta-desc">웨딩홀 정보 DM → 3,400댓글 (팔로워의 170%)</div></div>
+      <div class="cta-item-row"><div class="cta-keyword">"견적"</div><div class="cta-desc">웨딩홀 견적 자료 DM → 2,100댓글 (팔로워의 105%)</div></div>
+      <div class="cta-item-row"><div class="cta-keyword">"웨딩링"</div><div class="cta-desc">20% 할인링크 DM → 485댓글</div></div>
+      <div class="cta-item-row"><div class="cta-keyword">"스드메"</div><div class="cta-desc">노션 정리본 DM → 287댓글</div></div>
+      <div class="cta-item-row"><div class="cta-keyword">"정리본"</div><div class="cta-desc">본식스냅 정보 DM → 206댓글</div></div>
+      <div class="cta-item-row"><div class="cta-keyword">"캠코더"</div><div class="cta-desc">지인추천할인 DM → 90댓글</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#076CF0,#4834FD);">💡</div>
+      <div class="section-title">핵심 인사이트</div>
+    </div>
+    <div class="insight-box">
+    <div class="insight-row"><div class="insight-tag good">✅ 6개 게시물 전부 CTA — 팔로워 대비 170% 댓글</div><div class="insight-tag good">✅ 운영 2주 만에 2,005 팔로워 확보, 급성장 중</div></div>
+    <div class="insight-row"><div class="insight-tag warn">⚠️ 극초기 계정 — 지속성 미검증 (결혼 후?)</div><div class="insight-tag warn">⚠️ 100% 협찬 구조 — 순수 정보성 콘텐츠 없음</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#EC4899,#DB2777);">👥</div>
+      <div class="section-title">팔로워 페르소나</div>
+      <div class="section-sub">84명 샘플 기반 추정</div>
+    </div>
+    <div class="persona-grid">
+      <div class="persona-card"><div class="persona-emoji">💍</div><div class="persona-name">예비신부 (바이럴)</div><div class="persona-pct">~65%</div><div class="persona-desc">웨딩정보 탐색<br>CTA 적극 반응</div></div>
+      <div class="persona-card"><div class="persona-emoji">👰</div><div class="persona-name">결혼 준비 중</div><div class="persona-pct">~20%</div><div class="persona-desc">구체적 견적 관심<br>전환 잠재력 높음</div></div>
+      <div class="persona-card"><div class="persona-emoji">💐</div><div class="persona-name">웨딩업체 관계자</div><div class="persona-pct">~10%</div><div class="persona-desc">업체 홍보 목적<br>B2B 잠재층</div></div>
+      <div class="persona-card"><div class="persona-emoji">📸</div><div class="persona-name">지인/친구</div><div class="persona-pct">~5%</div><div class="persona-desc">초기 팔로워<br>코어 서포터</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#F59E0B,#D97706);">🏷️</div>
+      <div class="section-title">카테고리 매칭 추천</div>
+    </div>
+    <div class="cat-match"><div class="cat-match-header"><div class="cat-match-score">10/10</div><div class="cat-match-name">🏆 웨딩/결혼준비서비스</div></div><div class="cat-match-body">100% 웨딩 콘텐츠 · 예비신부 오디언스 · 바이럴 검증</div></div>
+    <div class="cat-match"><div class="cat-match-header"><div class="cat-match-score">9/10</div><div class="cat-match-name">🥈 스드메/웨딩촬영</div></div><div class="cat-match-body">스냅/DVD 업체 추천 높은 반응</div></div>
+    <div class="cat-match"><div class="cat-match-header"><div class="cat-match-score">7/10</div><div class="cat-match-name">🥉 신혼살림/가전</div></div><div class="cat-match-body">예비신부→신혼부부 전환 잠재력</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#076CF0,#4834FD);">⭐</div>
+      <div class="section-title">종합 평가</div>
+      <div class="section-sub">Overall Score: 7.8 / 10</div>
+    </div>
+    <div class="card" style="padding:28px;">
+      <div class="score-row"><div class="score-label">팔로워 품질</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:85%;background:linear-gradient(90deg,#076CF0,#4834FD);"></div></div><div class="score-num" style="color:var(--primary);">8.5</div></div>
+      <div class="score-row"><div class="score-label">콘텐츠 반응도</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:90%;background:linear-gradient(90deg,#FEB63A,#F59E0B);"></div></div><div class="score-num" style="color:gold;">9.0</div></div>
+      <div class="score-row"><div class="score-label">성장성</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:80%;background:linear-gradient(90deg,#22C55E,#16A34A);"></div></div><div class="score-num" style="color:green;">8.0</div></div>
+      <div class="score-row"><div class="score-label">커뮤니티 지수</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:70%;background:linear-gradient(90deg,#EC4899,#DB2777);"></div></div><div class="score-num" style="color:#EC4899;">7.0</div></div>
+      <div class="score-row"><div class="score-label">광고 효율성</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:75%;background:linear-gradient(90deg,#8B5CF6,#7C3AED);"></div></div><div class="score-num" style="color:#8B5CF6;">7.5</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Powered by <a href="https://socian.alocados.io" target="_blank">Socian</a> Ad Intelligence · 분석일 2026-03-26 · 범용 분석</div>
+
+<script>
+
+new Chart(document.getElementById('chart1').getContext('2d'), {
+  type:'bar',
+  data:{labels:['웨딩홀①\n"고고"','웨딩홀②\n"견적"','웨딩반지\n"웨딩링"','스드메\n"스드메"','본식스냅\n"정리본"','캠코더DVD\n"캠코더"'],
+    datasets:[{label:'좋아요',data:[158,60,90,18,28,13],backgroundColor:'#076CF0',borderRadius:3},
+              {label:'댓글',data:[3400,2100,485,287,206,90],backgroundColor:'#FEB63A',borderRadius:3}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Inter'}}}},scales:{y:{beginAtZero:true}}}
+});
+new Chart(document.getElementById('chart2').getContext('2d'), {
+  type:'doughnut',
+  data:{labels:['"고고"','"견적"','"웨딩링"','"스드메"','"정리본"','"캠코더"'],
+    datasets:[{data:[3400,2100,485,287,206,90],backgroundColor:['#076CF0','#4834FD','#FEB63A','#22C55E','#F59E0B','#EF4444'],borderWidth:0}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10,family:'Inter'}}}}}
+});
+new Chart(document.getElementById('chart3').getContext('2d'), {
+  type:'bar',
+  data:{labels:['웨딩홀①','웨딩홀②','웨딩반지','스드메','본식스냅','캠코더'],
+    datasets:[{label:'댓글/좋아요 비율',data:[21.5,35.0,5.4,15.9,7.4,6.9],
+      backgroundColor:['#076CF0','#4834FD','#FEB63A','#22C55E','#F59E0B','#EF4444'],borderRadius:6}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'배율'}}}}
+});
+new Chart(document.getElementById('chart4').getContext('2d'), {
+  type:'line',
+  data:{labels:['3/12','3/13','3/15','3/17','3/20','3/24'],
+    datasets:[{label:'댓글',data:[3400,2100,90,206,287,485],borderColor:'#4834FD',backgroundColor:'rgba(72,52,253,0.1)',fill:true,tension:0.3},
+              {label:'좋아요',data:[158,60,13,28,18,90],borderColor:'#076CF0',backgroundColor:'rgba(7,108,240,0.1)',fill:true,tension:0.3}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:11,family:'Inter'}}}},scales:{y:{beginAtZero:true}}}
+});
+
+</script>
+</body>
+</html>

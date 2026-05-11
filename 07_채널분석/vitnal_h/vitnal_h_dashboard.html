@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@vitnal_h 채널 분석 대시보드 — Socian</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+  :root {
+    --primary: #076CF0;
+    --secondary: #4834FD;
+    --gold: #FEB63A;
+    --green: #22C55E;
+    --red: #EF4444;
+    --bg: #F7F9FC;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --text: #1E2531;
+    --text-sec: #64748B;
+    --text-muted: #94A3B8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #076CF0 0%, #4834FD 100%);
+    padding: 40px 48px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -5%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+  .brand-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+  .brand-tag .dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .header h1 a { color: #fff; text-decoration: none; }
+  .header h1 a:hover { text-decoration: underline; }
+  .header p { color: rgba(255,255,255,0.6); font-size: 13px; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: flex;
+    gap: 1px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-top: 24px;
+  }
+  .stat-item {
+    flex: 1;
+    padding: 16px 20px;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px);
+    text-align: center;
+  }
+  .stat-item:first-child { border-radius: 14px 0 0 14px; }
+  .stat-item:last-child { border-radius: 0 14px 14px 0; }
+  .stat-num {
+    font-family: 'Inter', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+    font-weight: 500;
+  }
+
+  /* Container */
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+  /* Section */
+  .section { margin-bottom: 28px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border);
+  }
+  .section-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #fff;
+  }
+  .section-title { font-size: 17px; font-weight: 700; }
+  .section-sub { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+
+  /* Cards */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: all 0.2s;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  .card-label { font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card-value { font-family: 'Inter'; font-size: 28px; font-weight: 800; margin-top: 6px; }
+  .card-note { font-size: 11px; color: var(--text-sec); margin-top: 4px; }
+  .blue { color: var(--primary); }
+  .green { color: var(--green); }
+  .gold { color: var(--gold); }
+  .red { color: var(--red); }
+
+  /* Profile info */
+  .profile-box {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .profile-item { display: flex; flex-direction: column; gap: 3px; }
+  .profile-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .profile-value { font-size: 14px; font-weight: 500; }
+
+  /* Chart containers */
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-box {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .chart-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
+
+  /* Table */
+  .table-box {
+    background: var(--card);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--bg);
+    padding: 12px 14px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border);
+  }
+  tbody td { padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #F1F5F9; }
+  tbody tr:hover td { background: rgba(7,108,240,0.03); }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-cta { background: rgba(239,68,68,0.1); color: var(--red); }
+  .tag-organic { background: rgba(34,197,94,0.1); color: var(--green); }
+
+  /* Persona cards */
+  .persona-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .persona-card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+  .persona-emoji { font-size: 36px; margin-bottom: 8px; }
+  .persona-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .persona-pct { font-family: 'Inter'; font-size: 20px; font-weight: 800; color: var(--primary); }
+  .persona-desc { font-size: 12px; color: var(--text-sec); margin-top: 6px; line-height: 1.5; }
+
+  /* Category match */
+  .cat-match {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .cat-match-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .cat-match-score {
+    font-family: 'Inter';
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--primary);
+    background: rgba(7,108,240,0.08);
+    padding: 4px 12px;
+    border-radius: 8px;
+  }
+  .cat-match-name { font-size: 15px; font-weight: 700; }
+  .cat-match-body { font-size: 13px; color: var(--text-sec); line-height: 1.7; }
+
+  /* Score bar */
+  .score-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .score-label { font-size: 13px; font-weight: 600; width: 140px; }
+  .score-bar-bg { flex: 1; height: 10px; background: #EEF2F7; border-radius: 5px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 5px; transition: width 0.5s; }
+  .score-num { font-family: 'Inter'; font-size: 13px; font-weight: 700; width: 40px; text-align: right; }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 32px 24px;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .chart-row, .persona-grid { grid-template-columns: 1fr; }
+    .profile-box { grid-template-columns: 1fr; }
+    .stats-bar { flex-wrap: wrap; }
+    .stat-item { min-width: 45%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="brand-tag"><span class="dot"></span> Socian Ad Intelligence Report</div>
+    <h1><a href="https://www.instagram.com/vitnal_h/" target="_blank">@vitnal_h</a> 채널 분석 대시보드</h1>
+    <p>math CHERRY.T 🍒 · 대치동 수학 입시 전문가 · 분석일 2026-03-26</p>
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-num">46,000</div>
+        <div class="stat-label">팔로워</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">321</div>
+        <div class="stat-label">게시물</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">1.87%</div>
+        <div class="stat-label">순수 ER</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">84%</div>
+        <div class="stat-label">진성 유저</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num">72</div>
+        <div class="stat-label">전환지수</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- SCORE CARDS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#076CF0,#4834FD);">📊</div>
+      <div class="section-title">핵심 지표</div>
+      <div class="section-sub">Key Metrics</div>
+    </div>
+    <div class="card-grid">
+      <div class="card">
+        <div class="card-label">표면 ER (Surface)</div>
+        <div class="card-value blue">4.86%</div>
+        <div class="card-note">CTA 댓글 포함 · 과대 평가 주의</div>
+      </div>
+      <div class="card">
+        <div class="card-label">순수 좋아요 ER</div>
+        <div class="card-value green">1.87%</div>
+        <div class="card-note">광고주 보고 기준 권장</div>
+      </div>
+      <div class="card">
+        <div class="card-label">비CTA 순수 ER</div>
+        <div class="card-value gold">0.64%</div>
+        <div class="card-note">일상 콘텐츠 실제 반응</div>
+      </div>
+      <div class="card">
+        <div class="card-label">감성 점수</div>
+        <div class="card-value blue">8.5</div>
+        <div class="card-note">/ 10 — 매우 긍정적</div>
+      </div>
+      <div class="card">
+        <div class="card-label">광고 효율 점수</div>
+        <div class="card-value green">7.2</div>
+        <div class="card-note">/ 10 — 양호</div>
+      </div>
+      <div class="card">
+        <div class="card-label">2차 도달 추정</div>
+        <div class="card-value gold">15K~50K</div>
+        <div class="card-note">CTA 공유 기반 추정치</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE INFO -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#FEB63A,#F97316);">👤</div>
+      <div class="section-title">프로필 정보</div>
+      <div class="section-sub">Profile Info</div>
+    </div>
+    <div class="profile-box">
+      <div class="profile-item"><span class="profile-label">프로필명</span><span class="profile-value">math CHERRY.T 🍒</span></div>
+      <div class="profile-item"><span class="profile-label">바이오</span><span class="profile-value">Mom's life × My life = Our story</span></div>
+      <div class="profile-item"><span class="profile-label">전문 분야</span><span class="profile-value">대치동 수학 입시 1n년 차 수학 전공</span></div>
+      <div class="profile-item"><span class="profile-label">태그 계정</span><span class="profile-value">@madesayno</span></div>
+      <div class="profile-item"><span class="profile-label">외부 링크</span><span class="profile-value">네이버 스마트스토어 (thingseeds)</span></div>
+      <div class="profile-item"><span class="profile-label">팔로워/팔로잉</span><span class="profile-value">46,000 / 224 (비율 205:1)</span></div>
+      <div class="profile-item"><span class="profile-label">CTA 전략</span><span class="profile-value">댓글 "공유완료" → DM 워크지 전송</span></div>
+      <div class="profile-item"><span class="profile-label">콘텐츠 타입</span><span class="profile-value">수학 워크지 나눔 + 입시정보 릴스 + 일상</span></div>
+    </div>
+  </div>
+
+  <!-- POST ENGAGEMENT CHART -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#22C55E,#16A34A);">📈</div>
+      <div class="section-title">게시물 반응도</div>
+      <div class="section-sub">Post Engagement (24 posts)</div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">좋아요 vs 댓글 (최근 23개 게시물)</div>
+      <canvas id="postChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW -->
+  <div class="section">
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="chart-title">ER 비교 (표면 vs 순수)</div>
+        <canvas id="erChart" height="160"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">CTA vs 비CTA 평균 좋아요</div>
+        <canvas id="ctaChart" height="160"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORY DONUT + KEYWORD BAR -->
+  <div class="section">
+    <div class="chart-row">
+      <div class="chart-box">
+        <div class="chart-title">팔로워 카테고리 분포 (참여 유저 기준)</div>
+        <canvas id="catChart" height="200"></canvas>
+      </div>
+      <div class="chart-box">
+        <div class="chart-title">유저네임 키워드 빈도 Top 10</div>
+        <canvas id="kwChart" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- PERSONAS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#A855F7,#7C3AED);">🎯</div>
+      <div class="section-title">팔로워 페르소나</div>
+      <div class="section-sub">Audience Persona</div>
+    </div>
+    <div class="persona-grid">
+      <div class="persona-card">
+        <div class="persona-emoji">👩‍🏫</div>
+        <div class="persona-name">워크지 맘</div>
+        <div class="persona-pct">60~70%</div>
+        <div class="persona-desc">30~45세 여성 학부모<br>초등~중등 자녀 보유<br>수학 학습 자료 적극 활용</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-emoji">📚</div>
+        <div class="persona-name">입시 정보 팔로워</div>
+        <div class="persona-pct">15~20%</div>
+        <div class="persona-desc">중고등 학부모/입시 종사자<br>수능/입시 릴스에 반응<br>좋아요/저장 위주 참여</div>
+      </div>
+      <div class="persona-card">
+        <div class="persona-emoji">👨‍👩‍👧‍👦</div>
+        <div class="persona-name">일상 공감 팔로워</div>
+        <div class="persona-pct">10~15%</div>
+        <div class="persona-desc">동네맘/육아맘 커뮤니티<br>일상·운동·가족 콘텐츠 반응<br>상대적 낮은 ER 기여</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORY MATCH -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#076CF0,#4834FD);">🏷️</div>
+      <div class="section-title">카테고리 매칭 추천</div>
+      <div class="section-sub">Category Match Recommendation</div>
+    </div>
+    <div class="cat-match">
+      <div class="cat-match-header">
+        <span class="cat-match-score">9/10</span>
+        <span class="cat-match-name">교육/학습 서비스</span>
+      </div>
+      <div class="cat-match-body">수학 교재, 학습 앱, 온라인 학원, 학습 플래너 — 핵심 콘텐츠가 수학 교육이므로 가장 자연스러운 광고 맥락. 워크지 브랜디드 콘텐츠 형태 추천.</div>
+    </div>
+    <div class="cat-match">
+      <div class="cat-match-header">
+        <span class="cat-match-score">8/10</span>
+        <span class="cat-match-name">육아/교육용품</span>
+      </div>
+      <div class="cat-match-body">학용품, 책상/의자, 독서등, 책 구독 서비스 — 학부모 대상 제품으로 자연스러운 맥락. 실용적 가격대(3~10만원) 제품 추천.</div>
+    </div>
+    <div class="cat-match">
+      <div class="cat-match-header">
+        <span class="cat-match-score">8/10</span>
+        <span class="cat-match-name">문구/학용품</span>
+      </div>
+      <div class="cat-match-body">프린터, 색연필, 학습 타이머 — 워크지 출력 맥락에서 자연스러운 PPL 가능. "이 프린터로 워크지 출력해요" 형태 추천.</div>
+    </div>
+    <div class="cat-match">
+      <div class="cat-match-header">
+        <span class="cat-match-score" style="background:rgba(254,182,58,0.15);color:#F59E0B;">6/10</span>
+        <span class="cat-match-name">건강식품/영양제</span>
+      </div>
+      <div class="cat-match-body">어린이 영양제, 멀티비타민 — 직접적 연관은 낮으나 학부모 타겟의 구매력 활용 가능.</div>
+    </div>
+  </div>
+
+  <!-- OVERALL SCORE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,#FEB63A,#F97316);">⭐</div>
+      <div class="section-title">종합 평가</div>
+      <div class="section-sub">Overall Score: 7.4 / 10</div>
+    </div>
+    <div class="chart-box">
+      <div class="score-row">
+        <span class="score-label">팔로워 품질</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:75%;background:linear-gradient(90deg,#076CF0,#4834FD);"></div></div>
+        <span class="score-num blue">7.5</span>
+      </div>
+      <div class="score-row">
+        <span class="score-label">콘텐츠 반응도</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:68%;background:linear-gradient(90deg,#076CF0,#4834FD);"></div></div>
+        <span class="score-num blue">6.8</span>
+      </div>
+      <div class="score-row">
+        <span class="score-label">커뮤니티 감성</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:85%;background:linear-gradient(90deg,#22C55E,#16A34A);"></div></div>
+        <span class="score-num green">8.5</span>
+      </div>
+      <div class="score-row">
+        <span class="score-label">광고 효율성</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:72%;background:linear-gradient(90deg,#076CF0,#4834FD);"></div></div>
+        <span class="score-num blue">7.2</span>
+      </div>
+      <div class="score-row">
+        <span class="score-label">성장성</span>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:70%;background:linear-gradient(90deg,#FEB63A,#F97316);"></div></div>
+        <span class="score-num gold">7.0</span>
+      </div>
+      <div style="margin-top:16px;padding:16px;background:rgba(7,108,240,0.04);border-radius:10px;font-size:13px;color:var(--text-sec);line-height:1.7;">
+        <strong style="color:var(--text);">종합 의견:</strong> 교육/학습 카테고리 광고에 매우 적합한 채널. DM 전환 구조가 검증되어 있고 타겟 정확도가 높음. 표면 ER과 순수 ER의 괴리가 크므로 순수 ER 기준 KPI 설정 권장. 추천 등급 ⭐⭐⭐⭐ (4/5)
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  분석일: 2026-03-26 | 수집 샘플: 팔로워/참여자 126명 · 게시물 24개 | Powered by <a href="https://socian.alocados.io" target="_blank">Socian</a>
+</div>
+
+<!-- CHARTS -->
+<script>
+// Post engagement chart
+const postLabels = ['P2','P3','P4','P5','P6','P7','P8','P9','P10','P11','P12','P13','P14','P15','P16','P17','P18','P19','P20','P21','P22','P23','P24'];
+const likes = [1031,1205,497,606,119,1675,1458,2357,3065,77,101,2254,40,67,1112,100,405,1968,61,1406,35,67,1183];
+const comments = [4,25,1155,1300,5,4351,0,5217,7420,2,193,5739,0,8,2602,229,781,4361,0,3428,9,6,2518];
+const isCTA = [0,0,1,1,0,1,0,1,1,0,1,1,0,0,1,1,1,1,0,1,0,0,1];
+const bgColors = isCTA.map(c => c ? 'rgba(239,68,68,0.7)' : 'rgba(7,108,240,0.7)');
+
+new Chart(document.getElementById('postChart'), {
+  type: 'bar',
+  data: {
+    labels: postLabels,
+    datasets: [
+      { label: '좋아요', data: likes, backgroundColor: 'rgba(7,108,240,0.7)', borderRadius: 3 },
+      { label: '댓글', data: comments, backgroundColor: bgColors, borderRadius: 3 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+    scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 9 } } } }
+  }
+});
+
+// ER comparison
+new Chart(document.getElementById('erChart'), {
+  type: 'bar',
+  data: {
+    labels: ['표면 ER\n(전체)', '순수 ER\n(전체)', 'CTA\n순수 ER', '비CTA\n순수 ER'],
+    datasets: [{
+      data: [4.86, 1.87, 2.99, 0.64],
+      backgroundColor: ['rgba(7,108,240,0.7)', 'rgba(34,197,94,0.7)', 'rgba(254,182,58,0.7)', 'rgba(148,163,184,0.7)'],
+      borderRadius: 6
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } }
+  }
+});
+
+// CTA vs non-CTA
+new Chart(document.getElementById('ctaChart'), {
+  type: 'bar',
+  data: {
+    labels: ['CTA 게시물', '비CTA 게시물'],
+    datasets: [
+      { label: '평균 좋아요', data: [1377, 296], backgroundColor: 'rgba(7,108,240,0.7)', borderRadius: 6 },
+      { label: '평균 댓글', data: [3123, 5], backgroundColor: 'rgba(239,68,68,0.7)', borderRadius: 6 }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+    scales: { y: { beginAtZero: true } }
+  }
+});
+
+// Category donut
+new Chart(document.getElementById('catChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['개인/일반', '육아/맘', '뷰티/패션', '교육/학습', '기타'],
+    datasets: [{
+      data: [77.8, 8.7, 8.7, 4.0, 0.8],
+      backgroundColor: ['#076CF0', '#FEB63A', '#A855F7', '#22C55E', '#94A3B8'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    cutout: '55%',
+    plugins: { legend: { position: 'right', labels: { font: { size: 11 }, padding: 12 } } }
+  }
+});
+
+// Keyword frequency
+new Chart(document.getElementById('kwChart'), {
+  type: 'bar',
+  data: {
+    labels: ['luv', 'yoon', 'ii', 'mom', 'baby', 'hee', 'jj', 'lee', 'love', 'math'],
+    datasets: [{
+      data: [4, 4, 3, 2, 2, 2, 2, 2, 2, 2],
+      backgroundColor: 'rgba(7,108,240,0.6)',
+      borderRadius: 4
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+  }
+});
+</script>
+
+</body>
+</html>

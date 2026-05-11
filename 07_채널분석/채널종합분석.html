@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>채널 종합 분석 — Socian</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+  :root {
+    --primary: #076CF0;
+    --secondary: #4834FD;
+    --gold: #FEB63A;
+    --green: #22C55E;
+    --red: #EF4444;
+    --bg: #F7F9FC;
+    --card: #FFFFFF;
+    --border: #E2E8F0;
+    --text: #1E2531;
+    --text-sec: #64748B;
+    --text-muted: #94A3B8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #076CF0, #4834FD);
+    padding: 36px 48px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -5%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .brand-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  .brand-tag .dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; }
+
+  .header h1 { font-size: 22px; font-weight: 700; color: #fff; }
+  .header p { color: rgba(255,255,255,0.6); font-size: 13px; margin-top: 6px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .summary-card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  .summary-card .num {
+    font-family: 'Inter', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--primary);
+  }
+
+  .summary-card .lbl { font-size: 12px; color: var(--text-muted); margin-top: 4px; font-weight: 500; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+  }
+
+  thead th {
+    background: var(--bg);
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    border-bottom: 2px solid var(--border);
+  }
+
+  tbody td {
+    padding: 16px;
+    font-size: 13px;
+    border-bottom: 1px solid #F1F5F9;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover td { background: rgba(7,108,240,0.03); }
+
+  .profile-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .profile-name {
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .profile-name a {
+    color: var(--text);
+    text-decoration: none;
+  }
+
+  .profile-name a:hover {
+    color: var(--primary);
+  }
+
+  .profile-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .metric { font-family: 'Inter', sans-serif; font-weight: 700; }
+  .metric-primary { color: var(--primary); }
+  .metric-green { color: var(--green); }
+  .metric-gold { color: var(--gold); }
+
+  .metric-sub { font-size: 11px; color: var(--text-muted); }
+
+  .tag-group { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(7,108,240,0.08);
+    color: var(--primary);
+  }
+
+  .dashboard-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .dashboard-link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(7,108,240,0.3);
+  }
+
+  .footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 12px;
+  }
+
+  .footer a { color: var(--primary); text-decoration: none; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="brand-tag"><span class="dot"></span> Socian Channel Intelligence</div>
+    <h1>채널 종합 분석</h1>
+    <p>분석된 모든 Instagram 채널의 핵심 지표 및 대시보드 바로가기</p>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="summary-row">
+    <div class="summary-card">
+      <div class="num">12</div>
+      <div class="lbl">분석 완료 채널</div>
+    </div>
+    <div class="summary-card">
+      <div class="num">324,657</div>
+      <div class="lbl">총 팔로워</div>
+    </div>
+    <div class="summary-card">
+      <div class="num">3,763</div>
+      <div class="lbl">수집 팔로워</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>채널</th>
+        <th>팔로워</th>
+        <th>순수 ER</th>
+        <th>진성 유저</th>
+        <th>전환지수</th>
+        <th>추천 카테고리</th>
+        <th>대시보드</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar">돈</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/donsmell87/" target="_blank">@donsmell87</a></div>
+              <div class="profile-sub">크리에이터 돈스멜 · 디지털 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">13,000</div>
+          <div class="metric-sub">팔로잉 852</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">0.73%</div>
+          <div class="metric-sub">표면 6.78%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">81.7%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">62</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">여행/숙박</span>
+            <span class="tag">육아/교육</span>
+            <span class="tag">반려동물</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="donsmell87/donsmell87_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#FEB63A,#F97316);">잇</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/it_tem_ida/" target="_blank">@it_tem_ida</a></div>
+              <div class="profile-sub">잇템이다 · 살림/생활템 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">708</div>
+          <div class="metric-sub">팔로잉 586</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">3.88%</div>
+          <div class="metric-sub">표면 11.69%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">96.9%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">70</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">주방수납</span>
+            <span class="tag">청소용품</span>
+            <span class="tag">주방가전</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="it_tem_ida/it_tem_ida_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#22C55E,#16A34A);">수</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/vitnal_h/" target="_blank">@vitnal_h</a></div>
+              <div class="profile-sub">math CHERRY.T · 대치동 수학 입시 전문가</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">46,000</div>
+          <div class="metric-sub">팔로잉 224</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">1.87%</div>
+          <div class="metric-sub">표면 4.86%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">84.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">72</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">교육/학습</span>
+            <span class="tag">육아/교육</span>
+            <span class="tag">문구/학용품</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="vitnal_h/vitnal_h_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#EC4899,#DB2777);">소</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/tiding_of_joy/" target="_blank">@tiding_of_joy</a></div>
+              <div class="profile-sub">소뮤맘 · 공구 셀러 + 육아 인플루언서</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">53,000</div>
+          <div class="metric-sub">팔로잉 927</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">0.30%</div>
+          <div class="metric-sub">표면 2.34%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">80.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">78</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">육아용품</span>
+            <span class="tag">유아식/식품</span>
+            <span class="tag">교육/학습</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="tiding_of_joy/tiding_of_joy_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#1E2531,#4834FD);">헌</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/ape_vujade/" target="_blank">@ape_vujade</a></div>
+              <div class="profile-sub">헌우 · 게이머 / 스트릿 패션 / 바이크</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">10,000</div>
+          <div class="metric-sub">팔로잉 1,575</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">1.07%</div>
+          <div class="metric-sub">표면 1.45%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">85.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">65</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">스트릿패션</span>
+            <span class="tag">바이크</span>
+            <span class="tag">라이프스타일</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="ape_vujade/ape_vujade_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#EC4899,#DB2777);">엘</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/lyj.lpd/" target="_blank">@lyj.lpd</a></div>
+              <div class="profile-sub">엘피디 LPD · 통통녀 패션 코디 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">126,000</div>
+          <div class="metric-sub">팔로잉 1,171</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">0.40%</div>
+          <div class="metric-sub">표면 1.57%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">89.8%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">72</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">빅사이즈패션</span>
+            <span class="tag">뷰티</span>
+            <span class="tag">공구</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="lyj.lpd/lyj.lpd_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#F59E0B,#EF4444);">인</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/in__hwaa/" target="_blank">@in__hwaa</a></div>
+              <div class="profile-sub">인화 · 예신이의 웨딩일기 · 호두맘</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">3,020</div>
+          <div class="metric-sub">팔로잉 501</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">9.44%</div>
+          <div class="metric-sub">표면 26.70%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">93.2%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">75</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">웨딩</span>
+            <span class="tag">뷰티</span>
+            <span class="tag">반려동물</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="in__hwaa/in__hwaa_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#FF6B9D,#C44DFF);">커</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/comely_nail_beauty/" target="_blank">@comely_nail_beauty</a></div>
+              <div class="profile-sub">코멜리 · 로컬 네일샵 + 공구 셀러</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">7,333</div>
+          <div class="metric-sub">팔로잉 509</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">3.46%</div>
+          <div class="metric-sub">표면 14.96%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">100.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">68</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">네일재료</span>
+            <span class="tag">네일교육</span>
+            <span class="tag">뷰티도구</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="comely_nail_beauty/comely_nail_beauty_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#FF9A9E,#FAD0C4);">리</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/with_rije/" target="_blank">@with_rije</a></div>
+              <div class="profile-sub">리제 · 예비신부 웨딩정보 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">2,005</div>
+          <div class="metric-sub">팔로잉 32</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">3.05%</div>
+          <div class="metric-sub">표면 57.60%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">100.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">78</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">웨딩</span>
+            <span class="tag">스드메</span>
+            <span class="tag">신혼살림</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="with_rije/with_rije_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#A78BFA,#60A5FA);">예</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/uknow_yeaji/" target="_blank">@uknow_yeaji</a></div>
+              <div class="profile-sub">예지 · 30대 라이프스타일/유머 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">49,000</div>
+          <div class="metric-sub">팔로잉 987</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">1.50%</div>
+          <div class="metric-sub">표면 1.59%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">100.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">70</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">웰니스</span>
+            <span class="tag">뷰티</span>
+            <span class="tag">여행</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="uknow_yeaji/uknow_yeaji_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#86EFAC,#34D399);">드</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/eden_mom_vely/" target="_blank">@eden_mom_vely</a></div>
+              <div class="profile-sub">이든맘 · 육아정보/발달/육아템 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">9,230</div>
+          <div class="metric-sub">팔로잉 54</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">0.45%</div>
+          <div class="metric-sub">표면 2.20%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">100.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">76</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">육아용품</span>
+            <span class="tag">이유식</span>
+            <span class="tag">수면교육</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="eden_mom_vely/eden_mom_vely_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <div class="profile-cell">
+            <div class="profile-avatar" style="background:linear-gradient(135deg,#F472B6,#EC4899);">나</div>
+            <div>
+              <div class="profile-name"><a href="https://www.instagram.com/ssunyyzzoo/" target="_blank">@ssunyyzzoo</a></div>
+              <div class="profile-sub">임나나 · 패션/코디 크리에이터</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <div class="metric metric-primary">5,361</div>
+          <div class="metric-sub">팔로잉 995</div>
+        </td>
+        <td>
+          <div class="metric metric-primary">3.58%</div>
+          <div class="metric-sub">표면 13.69%</div>
+        </td>
+        <td>
+          <div class="metric metric-green">100.0%</div>
+        </td>
+        <td>
+          <div class="metric metric-gold">75</div>
+          <div class="metric-sub">/ 100</div>
+        </td>
+        <td>
+          <div class="tag-group">
+            <span class="tag">여성패션</span>
+            <span class="tag">패션잡화</span>
+            <span class="tag">여행</span>
+          </div>
+        </td>
+        <td>
+          <a class="dashboard-link" href="ssunyyzzoo/ssunyyzzoo_dashboard.html" target="_blank">대시보드 열기 →</a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  마지막 업데이트: 2026-03-27 | Powered by <a href="https://socian.alocados.io" target="_blank">Socian</a>
+</div>
+
+</body>
+</html>

@@ -62,14 +62,14 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // ─── 정적 파일 제공 (NanoBanana 등 미디어 아웃풋 서빙용) ────────
-const outputsDir = path.resolve(process.cwd(), 'outputs');
+const outputsDir = path.resolve(process.cwd(), '05_Outputs');
 if (!fs.existsSync(outputsDir)) {
   fs.mkdirSync(outputsDir, { recursive: true });
 }
-app.use('/outputs', express.static(outputsDir));
+app.use('/05_Outputs', express.static(outputsDir));
 app.use('/api/imagelab', imageLabRouter);
 app.use('/api/videolab', videoLabRouter);
-app.use('/lab-assets', express.static(path.join(process.cwd(), 'skill-library/05_design/lab-assets')));
+app.use('/lab-assets', express.static(path.join(process.cwd(), '06_Skill_Library/05_design/lab-assets')));
 
 // ─── [Phase 37] Live Split Preview 정적 서빙 라우트 (Multi-tenant & I/O 통합) ───
 app.use('/preview/:projectId', async (req, res, next) => {
@@ -1318,7 +1318,7 @@ reviewNs.on('connection', (socket) => {
     console.log(`[Socket/review] ${socket.id} → 세션 [${sessionId}] 참여`);
 
     // 기존 판정 이력 즉시 전송 (fs/path 는 상단 import 사용)
-    const verdictFilePath = path.resolve(process.cwd(), `outputs/review_verdicts/${sessionId}.json`);
+    const verdictFilePath = path.resolve(process.cwd(), `05_Outputs/review_verdicts/${sessionId}.json`);
     if (fs.existsSync(verdictFilePath)) {
       try {
         const history = JSON.parse(fs.readFileSync(verdictFilePath, 'utf8'));

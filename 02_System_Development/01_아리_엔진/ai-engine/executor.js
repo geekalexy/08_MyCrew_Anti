@@ -718,7 +718,7 @@ class Executor {
               const targetFolder = (op.type === 'input') ? 'INPUT' : 'OUTPUT';
               let safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
               // [Fix] 에이전트가 path에 'OUTPUT/...' 형식으로 폴더명을 중복 작성하는 경우 제거
-              safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|04_IO\/inputs|outputs|inputs)[\\/]/i, '');
+              safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|08_IO\/inputs|outputs|inputs)[\\/]/i, '');
               const absolutePath = path.join(projectRoot, targetFolder, safePath);
 
               // [Fix] Path Traversal 이중 방어 — projectRoot 외부 접근 차단
@@ -1063,7 +1063,7 @@ class Executor {
             const targetFolder = (op.type === 'input') ? 'INPUT' : 'OUTPUT';
             let safePath = path.normalize(op.path).replace(/^(\.\.[\\/])+/, '');
             // [Fix] 에이전트가 path에 'OUTPUT/...' 형식으로 폴더명을 중복 작성하는 경우 제거
-            safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|04_IO\/inputs|outputs|inputs)[\\/]/i, '');
+            safePath = safePath.replace(/^(OUTPUT|INPUT|07_OUTPUT|08_IO\/inputs|outputs|inputs)[\\/]/i, '');
             const absolutePath = path.join(projectRoot, targetFolder, safePath);
             if (!absolutePath.startsWith(projectRoot)) {
               ioLogs.push(`- ⛔ \`${op.path}\` 경로 탈출 시도 차단됨 (보안 정책)`);

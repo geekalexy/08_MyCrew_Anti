@@ -584,10 +584,10 @@ app.post('/api/tasks', async (req, res) => {
     const { title, content, assignee, priority, column, category, projectId } = req.body;
     const requester = 'CEO';
     const targetProjectId = projectId || 'proj-1';
-    let targetModel = 'gemini-2.5-flash';
+    let targetModel = MODEL.FLASH;
     if (assignee && assignee !== '미할당') {
       const roleId = assignee.startsWith(targetProjectId + '-') ? assignee.replace(targetProjectId + '-', '') : assignee;
-      targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
+      targetModel = getAgentSignatureModel(roleId) || MODEL.FLASH;
     }
     
     const contextChain = await contextChainService.calculateNewChain(content, targetProjectId);
@@ -808,7 +808,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
         result = await antigravityAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, 'extension', model, 60000);
       } else {
         // 내장 Gemini 어댑터 직접 호출
-        result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, model || 'gemini-2.5-flash');
+        result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, model || MODEL.FLASH);
       }
       
       // ── [Sprint 7 — Step 1] System Action Backend Interceptor ──────────
@@ -981,10 +981,10 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
     try {
       const requester = 'CEO';
       const targetProjectId = projectId || 'proj-1';
-      let targetModel = 'gemini-2.5-flash';
+      let targetModel = MODEL.FLASH;
       if (assignee && assignee !== '미할당') {
         const roleId = assignee.startsWith(targetProjectId + '-') ? assignee.replace(targetProjectId + '-', '') : assignee;
-        targetModel = getAgentSignatureModel(roleId) || 'gemini-2.5-flash';
+        targetModel = getAgentSignatureModel(roleId) || MODEL.FLASH;
       }
       const taskId = await dbManager.createTask(title, content, requester, targetModel, assignee && assignee !== '미할당' ? assignee : null, 'QUICK_CHAT', targetProjectId);
       const newTask = await dbManager.getTaskById(taskId);
@@ -1568,8 +1568,8 @@ if (token && token.length > 10) {
         }
         const taskTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
         const targetModel = assignedAgent 
-          ? (getAgentSignatureModel(assignedAgent) || 'gemini-2.5-flash') 
-          : 'gemini-2.5-flash';
+          ? (getAgentSignatureModel(assignedAgent) || MODEL.FLASH) 
+          : MODEL.FLASH;
         taskId = await dbManager.createTask(taskTitle, text, author, targetModel, assignedAgent);
         broadcastLog('info', `태스크 생성됨: ${text}`, assignedAgent, taskId, 'TELEGRAM');
         io.emit('task:created', { taskId: String(taskId), title: taskTitle, content: text, column: 'todo', agentId: assignedAgent });
@@ -2290,8 +2290,8 @@ app.post('/api/tasks/mention', async (req, res) => {
     
     // [W1 Fix] 대표님 직접 멘션은 항상 'CEO' 작성자로 생성
     const targetModel = targetAgent 
-      ? (getAgentSignatureModel(targetAgent) || 'gemini-2.5-flash') 
-      : 'gemini-2.5-flash';
+      ? (getAgentSignatureModel(targetAgent) || MODEL.FLASH) 
+      : MODEL.FLASH;
     const taskId = await dbManager.createTask(content.slice(0,30), content, 'CEO', targetModel, targetAgent);
     
     // 생성 직후 In Progress로 강제 진입
@@ -2766,17 +2766,18 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
           let forceModel = null;
           if (resolvedMode === 'ARCHITECT') {
             fullContextText += `[System Mode Directive]\n사용자가 '기획 모드'로 실행했습니다. '/plan_master' 스코프 분석 및 로드맵 자동 생성을 수행하세요.\n\n`;
-            forceModel = 'claude-opus-4-6';
+            forceModel = MODEL.OPUS;
           } else if (resolvedMode === 'DEV') {
             fullContextText += `[System Mode Directive]\n사용자가 '개발 모드'로 실행했습니다. '/auto_run' 태스크 기반 자율 연속 파이프라인 실행을 수행하세요.\n`;
             fullContextText += `⚠️ 주의 (Cross-Mode Handoff): 만약 기획 내용(PRD)과 기존에 작성된 코드가 모두 주입되었다면, 무작정 코딩을 시작하지 마세요. 최신 기획 내용과 기존 코드의 차이(Diff)를 비교하여, "이전 작업물에서 무엇을 제거하고 수정해야 하는지"를 먼저 분석 및 계획한 뒤 개발을 진행하세요.\n\n`;
-            forceModel = 'gemini-3.1-pro-high';
+            // [P-006] gemini-3.1-pro-high는 존재하지 않는 식별자 → ANTI 상수로 교체
+            forceModel = MODEL.ANTI_GEMINI_PRO_HIGH;
           } else if (resolvedMode === 'QA') {
             fullContextText += `[System Mode Directive]\n사용자가 '리뷰 모드'로 실행했습니다. '/auto_test' 시나리오 기반 자율 테스트 및 검증을 수행하세요.\n\n`;
-            forceModel = 'claude-opus-4-6';
+            forceModel = MODEL.OPUS;
           } else if (resolvedMode === 'DEBUG') {
             fullContextText += `[System Mode Directive]\n사용자가 '디버깅 모드'로 실행했습니다. '/auto_debug' 로그 추적 및 에러 자율 수정을 수행하세요.\n\n`;
-            forceModel = 'claude-sonnet-4-6';
+            forceModel = MODEL.SONNET;
           }
 
           // [Fix] 댓글 응답은 즉각적이어야 하므로 runDirect() 사용 (filePollingAdapter 우회)
@@ -3019,7 +3020,7 @@ app.patch('/api/tasks/:id', async (req, res) => {
     // [P-21 Fix & BugFix] 각 필드가 전달되지 않은 경우 기존 값으로 폴백
     const finalContent = content !== undefined ? content : (prevTask?.content || '');
     const finalTitle   = title   !== undefined ? title   : (prevTask?.title   || '');
-    const finalModel   = model   !== undefined ? model   : (prevTask?.model   || (parsedAssignee ? getAgentSignatureModel(parsedAssignee) || 'gemini-2.5-flash' : 'gemini-2.5-flash'));
+    const finalModel   = model   !== undefined ? model   : (prevTask?.model   || (parsedAssignee ? getAgentSignatureModel(parsedAssignee) || MODEL.FLASH : MODEL.FLASH));
     
     await dbManager.updateTaskDetails(taskId, finalTitle, finalContent, parsedAssignee, finalModel);
     
@@ -3521,16 +3522,17 @@ app.post('/api/tasks/:id/run', async (req, res) => {
     
     if (mode === 'ARCHITECT') {
       routeResult = { mode: 'ARCHITECT', intent: 'plan_master', extractedPayload: intent || '/plan_master' };
-      forceModel = 'claude-opus-4-6';
+      forceModel = MODEL.OPUS;
     } else if (mode === 'DEV') {
       routeResult = { mode: 'DEV', intent: 'auto_run', extractedPayload: intent || '/auto_run' };
-      forceModel = 'gemini-3.1-pro-high';
+      // [P-006] gemini-3.1-pro-high는 존재하지 않는 식별자 → ANTI 상수로 교체
+      forceModel = MODEL.ANTI_GEMINI_PRO_HIGH;
     } else if (mode === 'QA') {
       routeResult = { mode: 'QA', intent: 'auto_test', extractedPayload: intent || '/auto_test' };
-      forceModel = 'claude-opus-4-6';
+      forceModel = MODEL.OPUS;
     } else if (mode === 'DEBUG') {
       routeResult = { mode: 'DEBUG', intent: 'auto_debug', extractedPayload: intent || '/auto_debug' };
-      forceModel = 'claude-sonnet-4-6';
+      forceModel = MODEL.SONNET;
     } else {
       routeResult = await intentRouter.routeIntent(intent || mode);
     }

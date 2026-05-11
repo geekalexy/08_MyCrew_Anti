@@ -121,6 +121,15 @@ db.serialize(() => {
       db.run(`ALTER TABLE Task ADD COLUMN context_chain TEXT DEFAULT '[]'`);
       console.log('[DB] Context Chaining 마이그레이션: Task.context_chain 컬럼 추가 완료');
     }
+    // [Phase 39] Plan Master 기획 세션 상태 및 수정 횟수 추적
+    if (!names.includes('plan_master_status')) {
+      db.run(`ALTER TABLE Task ADD COLUMN plan_master_status TEXT DEFAULT NULL`);
+      console.log('[DB] Phase 39 마이그레이션: Task.plan_master_status 컬럼 추가 완료');
+    }
+    if (!names.includes('plan_master_revision_count')) {
+      db.run(`ALTER TABLE Task ADD COLUMN plan_master_revision_count INTEGER DEFAULT 0`);
+      console.log('[DB] Phase 39 마이그레이션: Task.plan_master_revision_count 컬럼 추가 완료');
+    }
   });
 
   db.all("PRAGMA table_info(TaskComment)", (err, rows) => {

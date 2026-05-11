@@ -9,6 +9,28 @@ import {
 
 // Hijack console.log to prevent breaking the MCP stdio JSON-RPC protocol
 const originalConsoleLog = console.log;
+
+// ── [Phase 39 Patch: P-006 & Loop Guard] ────────────────────────────────────
+import { MODEL } from './ai-engine/modelRegistry.js';
+
+/** Plan Master 최대 수정 횟수 루프 가드 (Sonnet Prime 처방 #2) */
+const MAX_REVISIONS = 5;
+
+/**
+ * Prompt Injection 방어용 범위 문자열 정제 (Sonnet Prime 처방 #3)
+ * - 개행, 태그, SQL 메타 문자 제거
+ * - 최대 길이 1000자 제한
+ */
+function sanitizeScope(input) {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/<[^>]*>/g, '')          // HTML/XML 태그 제거
+    .replace(/[\r\n]+/g, ' ')         // 개행 → 공백
+    .replace(/[;\-\-\'"\\]/g, '')     // SQL/shell 메타 문자 제거
+    .trim()
+    .slice(0, 1000);
+}
+
 console.log = function(...args) {
   console.error(...args);
 };
@@ -239,11 +261,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (args.needs_clarification) {
       result.status = 'needs_clarification';
-      result.options = args.options || [];
+      // [P-Injection 방어] 옵션 문자열 정제
+      result.options = (args.options || []).map(sanitizeScope);
     } else {
       result.status = 'scope_analyzed';
-      result.must_have = args.must_have || [];
-      result.nice_to_have = args.nice_to_have || [];
+      // [P-Injection 방어] 스코프 항목 정제
+      result.must_have = (args.must_have || []).map(sanitizeScope);
+      result.nice_to_have = (args.nice_to_have || []).map(sanitizeScope);
     }
 
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
@@ -291,14 +315,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   if (name === "confirm_mvp") {
     // [Task 2.1] 사용자 브리핑 + 대기 상태 전환 + Iterative Review 루프 지원
+    const revisionCount = typeof args.thoughtNumber === 'number' ? args.thoughtNumber : 1;
+
+    // [Phase 39 Patch #2] MAX_REVISIONS 루프 가드 — 무한 수정 루프 방지
+    if (revisionCount > MAX_REVISIONS) {
+      return { content: [{ type: "text", text: JSON.stringify({
+        status: 'revision_limit_exceeded',
+        message_to_user: `⛔ 최대 수정 횟수(${MAX_REVISIONS}회)를 초과했습니다. 기획 세션을 종료하고 현재까지의 PRD로 확정하거나, 처음부터 새 세션을 시작해주세요.`,
+        action_required: 'force_confirm_or_restart',
+      }) }], isError: false };
+    }
+
     const result = {
       status: 'pending_user_confirm',
       thought: args.thought || '',
-      thoughtNumber: args.thoughtNumber || 3,
+      thoughtNumber: revisionCount,
       nextThoughtNeeded: args.nextThoughtNeeded || false,
       message_to_user: args.message_to_user || '',
       action_required: 'confirm_or_revise',
-      instructions: '사용자가 Confirm(확정) 시 기획 세션이 종료되고 PRD가 락온됩니다. 수정 요청 시 analyze_scope부터 재실행됩니다.',
+      revisions_remaining: MAX_REVISIONS - revisionCount,
+      instructions: `사용자가 Confirm(확정) 시 기획 세션이 종료되고 PRD가 락온됩니다. 수정 요청 시 analyze_scope부터 재실행됩니다. (남은 수정 횟수: ${MAX_REVISIONS - revisionCount}회)`,
     };
 
     return { content: [{ type: "text", text: JSON.stringify(result) }] };

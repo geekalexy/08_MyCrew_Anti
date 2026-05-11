@@ -155,7 +155,8 @@ const ALL_TOOLS = [
     inputSchema: { 
       type: "object", 
       properties: { 
-        query: { type: "string", description: "예: dependencies(App.jsx) 또는 shortest_path(A, B)" } 
+        query: { type: "string", description: "예: dependencies(App.jsx) 또는 shortest_path(A, B)" },
+        scope: { type: "string", description: "'project' (현재 사용자 프로젝트) 또는 'system' (MyCrew 엔진 아키텍처)", default: "project" }
       }, 
       required: ["query"] 
     }
@@ -313,8 +314,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { execFile } = await import('child_process');
       const execFilePromise = util.promisify(execFile);
       
+      const isSystemScope = args.scope === 'system';
+      const targetDir = isSystemScope 
+        ? '/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/00_아키텍처_문서/System_WIKI/99_System_Graph'
+        : './';
+        
       // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
-      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.query.trim()]);
+      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.query.trim(), '--dir', targetDir]);
       return { content: [{ type: "text", text: `[query_graph] Graphify 지식망 쿼리 결과:\n${stdout}` }] };
     } catch (e) {
       return { content: [{ type: "text", text: `[query_graph] 쿼리 실패: ${e.message}` }], isError: true };

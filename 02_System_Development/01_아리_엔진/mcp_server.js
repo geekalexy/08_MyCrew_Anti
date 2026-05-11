@@ -150,8 +150,8 @@ const ALL_TOOLS = [
   },
   // ── [기존 도구들] ──
   {
-    name: "query_architecture",
-    description: "[기획 모드 전용] 프로젝트의 전체 아키텍처 문서 및 의존성 지식 그래프를 쿼리하여 구조를 파악합니다.",
+    name: "query_graph",
+    description: "프로젝트의 전체 아키텍처 문서 및 의존성 지식 그래프를 쿼리하여 구조를 파악합니다.",
     inputSchema: { 
       type: "object", 
       properties: { 
@@ -200,13 +200,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   let filteredTools = ALL_TOOLS;
   
   if (mode === 'ARCHITECT' || mode === 'PLAN_MASTER') {
-    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'make_roadmaps', 'confirm_mvp', 'query_architecture'].includes(t.name));
+    filteredTools = ALL_TOOLS.filter(t => ['analyze_scope', 'make_roadmaps', 'confirm_mvp', 'query_graph'].includes(t.name));
   } else if (mode === 'DEV') {
-    filteredTools = ALL_TOOLS.filter(t => ['run_tasks', 'trace_bug'].includes(t.name));
+    filteredTools = ALL_TOOLS.filter(t => ['run_tasks', 'trace_bug', 'query_graph'].includes(t.name));
   } else if (mode === 'REVIEW') {
-    filteredTools = ALL_TOOLS.filter(t => ['extract_graph', 'audit_code'].includes(t.name));
+    filteredTools = ALL_TOOLS.filter(t => ['extract_graph', 'audit_code', 'query_graph'].includes(t.name));
   } else if (mode === 'DEBUG') {
-    filteredTools = ALL_TOOLS.filter(t => ['trace_bug', 'audit_code'].includes(t.name));
+    filteredTools = ALL_TOOLS.filter(t => ['trace_bug', 'audit_code', 'query_graph'].includes(t.name));
   }
 
   // 기본 연결 확인용 ping 추가
@@ -302,11 +302,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
-  if (name === "query_architecture") {
+  if (name === "query_graph") {
     try {
       // [H-002] 입력 파라미터 정규식 검증
       if (!args.query || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.query.trim())) {
-        return { content: [{ type: "text", text: `[query_architecture] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
+        return { content: [{ type: "text", text: `[query_graph] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
       }
 
       const util = await import('util');
@@ -315,9 +315,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
       const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.query.trim()]);
-      return { content: [{ type: "text", text: `[query_architecture] Graphify 지식망 쿼리 결과:\n${stdout}` }] };
+      return { content: [{ type: "text", text: `[query_graph] Graphify 지식망 쿼리 결과:\n${stdout}` }] };
     } catch (e) {
-      return { content: [{ type: "text", text: `[query_architecture] 쿼리 실패: ${e.message}` }], isError: true };
+      return { content: [{ type: "text", text: `[query_graph] 쿼리 실패: ${e.message}` }], isError: true };
     }
   }
   if (name === "run_tasks") {

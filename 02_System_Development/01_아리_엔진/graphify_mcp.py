@@ -2,6 +2,7 @@ import sys
 import json
 import os
 import re
+import hashlib
 
 # 초소형 Python 기반 MCP 서버 (Graphify 연동용)
 # 표준 입출력(stdio)을 통해 Node.js 서버나 Antigravity와 통신합니다.
@@ -72,10 +73,29 @@ def parse_markdown(file_path):
         pass
     return nodes, edges
 
+def get_file_hash(file_path):
+    try:
+        with open(file_path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except Exception:
+        return None
+
 def build_graph(project_dir):
     elements = []
     nodes_dict = {}
     edges_list = []
+    
+    # [Phase 41 P2] 증분 업데이트 (Incremental) 캐시 로드
+    cache_path = os.path.join(project_dir, 'Project_WIKI', '99_Graph_Data', 'wiki_cache.json')
+    wiki_cache = {}
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                wiki_cache = json.load(f)
+        except Exception:
+            pass
+            
+    new_cache = {}
     
     # 1. Detect (스캔 및 파서 라우팅)
     for root, dirs, files in os.walk(project_dir):
@@ -83,18 +103,33 @@ def build_graph(project_dir):
             continue
             
         # .mycrewignore 유사 처리 (빌드 폴더 등 제외)
-        if 'dist' in root or 'build' in root:
-            continue
+        if 'dist' in root or 'build' in root or 'Project_WIKI' in root:
+            # 단, raw/meetings는 포함
+            if 'Project_WIKI' in root and 'raw' not in root:
+                continue
             
         for file in files:
             file_path = os.path.join(root, file)
             rel_path = os.path.relpath(file_path, project_dir).replace("\\", "/")
             
+            # [P2] Hash check
+            f_hash = get_file_hash(file_path)
+            if not f_hash: continue
+            
+            cached_data = wiki_cache.get(rel_path)
+            
             # 2. Extract
-            # 코드 파싱
             if file.endswith(('.js', '.jsx', '.ts', '.tsx')):
                 nodes_dict[rel_path] = {"id": rel_path, "label": file, "type": "code"}
-                imports = parse_js_imports(file_path)
+                
+                imports = []
+                if cached_data and cached_data.get('hash') == f_hash and 'imports' in cached_data:
+                    imports = cached_data['imports']
+                else:
+                    imports = parse_js_imports(file_path)
+                    
+                new_cache[rel_path] = {"hash": f_hash, "imports": imports}
+                
                 for imp in imports:
                     if imp.startswith('.'):
                         curr_dir = os.path.dirname(rel_path)
@@ -109,7 +144,16 @@ def build_graph(project_dir):
             # 마크다운/문서 파싱 (raw/ 문서 포함)
             elif file.endswith(('.md', '.txt')):
                 nodes_dict[rel_path] = {"id": rel_path, "label": file, "type": "document"}
-                m_nodes, m_edges = parse_markdown(file_path)
+                
+                m_nodes, m_edges = [], []
+                if cached_data and cached_data.get('hash') == f_hash and 'nodes' in cached_data:
+                    m_nodes = cached_data['nodes']
+                    m_edges = cached_data['edges']
+                else:
+                    m_nodes, m_edges = parse_markdown(file_path)
+                    
+                new_cache[rel_path] = {"hash": f_hash, "nodes": m_nodes, "edges": m_edges}
+                
                 for n in m_nodes:
                     if n['id'] not in nodes_dict:
                         nodes_dict[n['id']] = {"id": n['id'], "label": n['id'].split('::')[-1], "type": n['type']}
@@ -124,6 +168,14 @@ def build_graph(project_dir):
     for i, edge in enumerate(edges_list):
         edge_data = {"id": f"e{i}", "source": edge['source'], "target": edge['target'], "relation": edge['relation'], "confidence": edge['confidence']}
         elements.append({"data": edge_data})
+        
+    # [P2] Save new cache
+    try:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(new_cache, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
         
     return {"elements": elements}
 

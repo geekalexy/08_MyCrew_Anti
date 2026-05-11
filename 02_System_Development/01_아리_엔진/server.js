@@ -2548,6 +2548,35 @@ app.post('/api/tasks/:id/sprint/next', async (req, res) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// [Phase 41] 미팅 로그 (회의록) 자동 저장 헬퍼
+async function appendMeetingLog(projectId, taskId, author, content) {
+  try {
+    if (!projectId) return;
+    const projectRow = await dbManager.getProjectById(projectId).catch(() => null);
+    if (!projectRow) return;
+    
+    const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
+    const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+    const meetingsDir = path.resolve(projectRoot, 'Project_WIKI/raw/meetings');
+    
+    await fs.promises.mkdir(meetingsDir, { recursive: true });
+    
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `${dateStr}_Task${taskId}_회의록.md`;
+    const filePath = path.resolve(meetingsDir, fileName);
+    
+    const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+    const logEntry = `\n### [${timeStr}] ${author}\n${content}\n`;
+    
+    await fs.promises.appendFile(filePath, logEntry, 'utf-8');
+    
+    // [Phase 41] Watchdog Trigger (온톨로지 업데이트) - 비동기 처리
+    wikiEngine.generateOntology(projectId).catch(e => console.error('[Phase 41] Watchdog Error:', e.message));
+  } catch (err) {
+    console.error('[Phase 41] 회의록 자동 저장 오류:', err.message);
+  }
+}
+
 /** POST /api/tasks/:id/comments — 댓글 추가 */
 app.post('/api/tasks/:id/comments', async (req, res) => {
   try {
@@ -2564,6 +2593,9 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
     // 실시간 브로드캐스트 — author를 agentId로 전달해 채팅 버블 방향 식별
     io.emit('task:comment_added', { taskId: sid, author, text: content, createdAt: new Date().toISOString() });
     broadcastLog('info', content, author, sid);
+
+    // [Phase 41] 사용자 채팅을 회의록으로 덤프
+    appendMeetingLog(projectId, sid, author, content);
 
     // [Phase 36-B] CEO가 코멘트 작성 시 파이프라인(워치독) 강제 종료
     if (author === 'CEO' && projectId) {
@@ -2837,6 +2869,9 @@ app.post('/api/tasks/:id/comments', async (req, res) => {
             await dbManager.createComment(sid, agentToTrigger, cleanText, thoughtProcess);
             io.emit('task:comment_added', { taskId: sid, author: agentToTrigger, text: cleanText, thought_process: thoughtProcess, createdAt: new Date().toISOString() });
             broadcastLog('info', cleanText, agentToTrigger, sid);
+            
+            // [Phase 41] 에이전트 채팅을 회의록으로 덤프
+            appendMeetingLog(task.project_id, sid, agentToTrigger, cleanText);
           }
           
           if (hasReviewRequest3) {

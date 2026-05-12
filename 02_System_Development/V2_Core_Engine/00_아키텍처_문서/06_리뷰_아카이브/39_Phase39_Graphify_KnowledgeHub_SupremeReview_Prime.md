@@ -55,7 +55,7 @@
 
 **🟡 개선 사항 1: `execute_query_cli()`와 `handle_request().query_graph`의 코드 중복**
 
-```python
+```text
 # L254-312: handle_request 내부 BFS 로직
 # L335-390: execute_query_cli 함수 — 거의 동일한 BFS 로직 복제
 ```
@@ -66,7 +66,7 @@ BFS 그래프 탐색 + `find_node()` 로직이 두 곳에 복사되어 있습니
 
 **🟡 개선 사항 2: 확장자 미매칭 시 그래프 누수**
 
-```python
+```text
 # L50-53: 상대 경로 import 해석
 target_path = os.path.normpath(os.path.join(curr_dir, imp)).replace("\\", "/")
 edges.append((rel_path, target_path))

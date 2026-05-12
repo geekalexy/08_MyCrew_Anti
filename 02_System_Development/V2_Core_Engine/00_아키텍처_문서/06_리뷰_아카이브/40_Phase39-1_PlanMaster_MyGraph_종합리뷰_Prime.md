@@ -283,7 +283,7 @@ const isQuotaCritical = claudeUsageToday > (CLAUDE_DAILY_LIMIT_MS * 0.875); // 8
 
 ### 권고
 
-```python
+```text
 def _execute_query_on_graph(graph_data, query):
     """공통 쿼리 실행 엔진 (DRY)"""
     elements = graph_data.get('elements', [])

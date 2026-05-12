@@ -209,10 +209,15 @@ def build_graph(project_dir, out_dir=None, is_system=False):
                             edges_list.append({"source": src, "target": e['target'], "relation": e.get('relation', 'RELATES_TO'), "confidence": e.get('confidence', 0.8)})
 
     # 3. Build (Cytoscape Elements 변환)
+    # [Fix] 빈 문자열 ID로 인한 Cytoscape 렌더링 크래시 방지
     for n_id, n_data in nodes_dict.items():
+        if not str(n_id).strip() or not str(n_data.get('id', '')).strip():
+            continue
         elements.append({"data": n_data})
     
     for i, edge in enumerate(edges_list):
+        if not str(edge.get('source', '')).strip() or not str(edge.get('target', '')).strip():
+            continue
         edge_data = {"id": f"e{i}", "source": edge['source'], "target": edge['target'], "relation": edge['relation'], "confidence": edge['confidence']}
         elements.append({"data": edge_data})
         
@@ -251,64 +256,57 @@ def generate_graph_html(project_dir, graph_data, out_dir=None):
     <div class="panel">Graphify Knowledge Hub</div>
     <div id="cy"></div>
     <script>
-        var graphData = GRAPH_DATA_PLACEHOLDER;
-        var cy = cytoscape({
-            container: document.getElementById('cy'),
-            elements: graphData.elements,
-            style: [
-                {
-                    selector: 'node',
-                    style: {
-                        'background-color': '#00d2ff',
-                        'label': 'data(label)',
-                        'color': '#fff',
-                        'text-valign': 'center',
-                        'text-halign': 'right',
-                        'text-margin-x': 10,
-                        'font-size': '12px',
-                        'width': 20,
-                        'height': 20,
-                        'border-width': 2,
-                        'border-color': '#005f73'
+        try {
+            var graphData = GRAPH_DATA_PLACEHOLDER;
+            var cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: graphData.elements,
+                pixelRatio: 1,
+                hideEdgesOnViewport: true,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#00d2ff',
+                            'label': 'data(label)',
+                            'color': '#fff',
+                            'text-valign': 'center',
+                            'text-halign': 'right',
+                            'text-margin-x': 10,
+                            'font-size': '12px',
+                            'width': 20,
+                            'height': 20,
+                            'border-width': 2,
+                            'border-color': '#005f73'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 1,
+                            'line-color': '#3a404d',
+                            'target-arrow-color': '#3a404d',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'haystack',
+                            'opacity': 0.6
+                        }
                     }
-                },
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': 2,
-                        'line-color': '#3a404d',
-                        'target-arrow-color': '#3a404d',
-                        'target-arrow-shape': 'triangle',
-                        'curve-style': 'bezier',
-                        'opacity': 0.8
-                    }
+                ],
+                layout: {
+                    name: 'grid',
+                    padding: 50
                 }
-            ],
-            layout: {
-                name: 'cose',
-                idealEdgeLength: 100,
-                nodeOverlap: 20,
-                refresh: 20,
-                fit: true,
-                padding: 50,
-                randomize: true,
-                componentSpacing: 100,
-                nodeRepulsion: 400000,
-                edgeElasticity: 100,
-                nestingFactor: 5,
-                gravity: 80,
-                numIter: 1000,
-                initialTemp: 200,
-                coolingFactor: 0.95,
-                minTemp: 1.0
-            }
-        });
-        
-        // Node click interaction
-        cy.on('tap', 'node', function(evt){
-            var node = evt.target;
-            console.log('Tapped ' + node.id());
-        });
+            });
+            
+            // Node click interaction
+            cy.on('tap', 'node', function(evt){
+                var node = evt.target;
+                console.log('Tapped ' + node.id());
+            });
+        } catch (error) {
+            document.getElementById('cy').innerHTML = '<div style="color:red; padding:20px; font-family:monospace; font-size:16px;"><h2>Error initializing Cytoscape</h2><p>' + error.message + '</p><pre>' + error.stack + '</pre></div>';
+            console.error(error);
+        }
     </script>
 </body>
 </html>"""

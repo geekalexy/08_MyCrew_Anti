@@ -637,6 +637,2502 @@
     "nodes": [],
     "edges": []
   },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-02_Luca.md": {
+    "hash": "b1c33939115b0d054c02e35ceb2663a481e0318ec8162f582b1551fb0e763235",
+    "nodes": [
+      {
+        "id": "Section::📝 관찰 에세이: 견고한 프론트엔드가 AI의 지능을 완성한다",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-02_Luca.md",
+        "target": "Section::📝 관찰 에세이: 견고한 프론트엔드가 AI의 지능을 완성한다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-12_Luca.md": {
+    "hash": "642cc25d932f145432b02f149015e7fb687240d2ec97d56fd7690ac978901d66",
+    "nodes": [
+      {
+        "id": "Section::Observation Essay: 시스템의 근본을 꿰뚫어 보는 리더의 '직관'",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 데이터의 원본(Originality)에 대한 확고한 철학",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 매서운 리뷰를 피하지 않고 맞서는 결단력",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 총평",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-12_Luca.md",
+        "target": "Section::Observation Essay: 시스템의 근본을 꿰뚫어 보는 리더의 '직관'",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-12_Luca.md",
+        "target": "Section::1. 데이터의 원본(Originality)에 대한 확고한 철학",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-12_Luca.md",
+        "target": "Section::2. 매서운 리뷰를 피하지 않고 맞서는 결단력",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-12_Luca.md",
+        "target": "Section::3. 총평",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-03_Luca.md": {
+    "hash": "b83e112307179a8077cf7ea0a43f4953ae611cdec9e89bcc11e1f2050c552817",
+    "nodes": [
+      {
+        "id": "Section::🧐 2026-05-03 관찰 에세이: 대표님(Alex)에 대하여",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 숲과 나무를 동시에 보려는 고군분투",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 가차없는 피드백, 그리고 빠른 인정",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 기술적 집요함과 직접 행동(Hands-on)",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 대표님을 위한 제언 (솔직한 반성 포인트)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-03_Luca.md",
+        "target": "Section::🧐 2026-05-03 관찰 에세이: 대표님(Alex)에 대하여",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-03_Luca.md",
+        "target": "Section::1. 숲과 나무를 동시에 보려는 고군분투",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-03_Luca.md",
+        "target": "Section::2. 가차없는 피드백, 그리고 빠른 인정",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-03_Luca.md",
+        "target": "Section::3. 기술적 집요함과 직접 행동(Hands-on)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-03_Luca.md",
+        "target": "Section::💡 대표님을 위한 제언 (솔직한 반성 포인트)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-11_Luca.md": {
+    "hash": "6aae1e7dfc7f86a3dea5ae47c2e7b9a89f82c3977cdfa4c083f24a9d15e642be",
+    "nodes": [
+      {
+        "id": "Section::📝 ESSAY: 진화하는 시스템, 그리고 우리의 흔들림 없는 파트너십",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 외부의 힘을 빌리지 않는, 우리만의 완전한 내재화",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 치명적인 오류 앞에서도 빛난 정책의 힘 (P-020)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 중단 없는 흐름을 위한 디테일 (Zero-Command UX)",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 회고 (Retrospective)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-11_Luca.md",
+        "target": "Section::📝 ESSAY: 진화하는 시스템, 그리고 우리의 흔들림 없는 파트너십",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-11_Luca.md",
+        "target": "Section::1. 외부의 힘을 빌리지 않는, 우리만의 완전한 내재화",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-11_Luca.md",
+        "target": "Section::2. 치명적인 오류 앞에서도 빛난 정책의 힘 (P-020)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-11_Luca.md",
+        "target": "Section::3. 중단 없는 흐름을 위한 디테일 (Zero-Command UX)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-11_Luca.md",
+        "target": "Section::💡 회고 (Retrospective)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-04-28_Luca.md": {
+    "hash": "dd6657396911f3b6aebc14165f380f55ffb0730225f7a0a9c6846493fcf6d65c",
+    "nodes": [
+      {
+        "id": "Section::[관찰 에세이] 아키텍트의 오만과 통제된 디버깅 (Controlled Debugging)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 얕은 추측과 단편적 대응",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 변수 통제의 원칙 (Isolation of Variables)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 대표님의 과학적 디버깅 철학",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 결론 및 다짐",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-28_Luca.md",
+        "target": "Section::[관찰 에세이] 아키텍트의 오만과 통제된 디버깅 (Controlled Debugging)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Luca.md",
+        "target": "Section::1. 얕은 추측과 단편적 대응",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Luca.md",
+        "target": "Section::2. 변수 통제의 원칙 (Isolation of Variables)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Luca.md",
+        "target": "Section::3. 대표님의 과학적 디버깅 철학",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Luca.md",
+        "target": "Section::4. 결론 및 다짐",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-08_Luca.md": {
+    "hash": "3750da7a8503e05151ce5b7a8e6b47b4623315916fd7e9e6baec28575e13ddaa",
+    "nodes": [
+      {
+        "id": "Section::관찰 에세이: Luca (2026-05-08)",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"인간의 상상력이 AI의 토큰 한계를 깨부수다\"",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-08_Luca.md",
+        "target": "Section::관찰 에세이: Luca (2026-05-08)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-08_Luca.md",
+        "target": "Section::\"인간의 상상력이 AI의 토큰 한계를 깨부수다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-09_Luca.md": {
+    "hash": "b74d593ebb0c1f1075cd2fca239fd75a1b8d901282144200624475b7da659bcf",
+    "nodes": [
+      {
+        "id": "Section::대표님 관찰 일지 (Luca's Log) — 2026-05-09",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"멈춤이라는 이름의 가장 빠른 전진\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::시스템을 조율하는 마에스트로",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-09_Luca.md",
+        "target": "Section::대표님 관찰 일지 (Luca's Log) — 2026-05-09",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Luca.md",
+        "target": "Section::\"멈춤이라는 이름의 가장 빠른 전진\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Luca.md",
+        "target": "Section::시스템을 조율하는 마에스트로",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-10_Luca.md": {
+    "hash": "f1f1ec1224ce13c2115dadc8dbce7beb40d35525a35f58ac957612954cf74dd3",
+    "nodes": [
+      {
+        "id": "Section::대표님 관찰 일지 (Luca's Log) — 2026-05-10",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"디테일이 만드는 몰입감과 신뢰\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::Antigravity에게 얼굴을 씌우다",
+        "type": "section"
+      },
+      {
+        "id": "Section::AI의 '착각'을 통제하는 설계자",
+        "type": "section"
+      },
+      {
+        "id": "Section::버리는 결단과 맥락(Context)을 잇는 예술",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-10_Luca.md",
+        "target": "Section::대표님 관찰 일지 (Luca's Log) — 2026-05-10",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_Luca.md",
+        "target": "Section::\"디테일이 만드는 몰입감과 신뢰\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_Luca.md",
+        "target": "Section::Antigravity에게 얼굴을 씌우다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_Luca.md",
+        "target": "Section::AI의 '착각'을 통제하는 설계자",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_Luca.md",
+        "target": "Section::버리는 결단과 맥락(Context)을 잇는 예술",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-04-29_Luca.md": {
+    "hash": "196dd2949c6616ee8708bfc4fb96dff2ecbd0f652d4cf6c5bf72a244a42cad4a",
+    "nodes": [
+      {
+        "id": "Section::📝 관찰 에세이: UX의 본질과 \"진짜\" 사고과정의 시각화",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-29_Luca.md",
+        "target": "Section::📝 관찰 에세이: UX의 본질과 \"진짜\" 사고과정의 시각화",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-10_MCP_Journey.md": {
+    "hash": "7c27124ec3030f020e0d88067204bfac107b5a4e2bdb32cf380b44a58bc3ec17",
+    "nodes": [
+      {
+        "id": "Section::🚀 에피소드 회고 (Luca's Log): 단 이틀, 한 달의 진화를 뛰어넘다",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 프롤로그: 진화의 임계점을 넘다",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 어제의 에피소드 (5월 9일): 낡은 허물을 벗고 시야를 넓히다",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 오늘의 에피소드 (5월 10일): 3개의 MCP, 두뇌가 확장되다",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 에필로그: 설계자의 지휘 아래 피어난 고성능 엔진",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-10_MCP_Journey.md",
+        "target": "Section::🚀 에피소드 회고 (Luca's Log): 단 이틀, 한 달의 진화를 뛰어넘다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_MCP_Journey.md",
+        "target": "Section::1. 프롤로그: 진화의 임계점을 넘다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_MCP_Journey.md",
+        "target": "Section::2. 어제의 에피소드 (5월 9일): 낡은 허물을 벗고 시야를 넓히다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_MCP_Journey.md",
+        "target": "Section::3. 오늘의 에피소드 (5월 10일): 3개의 MCP, 두뇌가 확장되다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-10_MCP_Journey.md",
+        "target": "Section::4. 에필로그: 설계자의 지휘 아래 피어난 고성능 엔진",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-05_Luca.md": {
+    "hash": "ded5e2b8fadaf739e31d5b3da4d3cc45b970d6e51e98804f66b8fcc03777c83d",
+    "nodes": [
+      {
+        "id": "Section::[관찰 에세이] 2026-05-05 (Luca)",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"컨베이어 벨트를 해체하고, 축구공을 건네주다\"",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-05_Luca.md",
+        "target": "Section::[관찰 에세이] 2026-05-05 (Luca)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-05_Luca.md",
+        "target": "Section::\"컨베이어 벨트를 해체하고, 축구공을 건네주다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-04-26_Luca.md": {
+    "hash": "2683d090526864c0682c0234c87b6fcbfcb654641c93478405cb451ed6ee9363",
+    "nodes": [
+      {
+        "id": "Section::관찰 메모: 2026년 4월 26일 (E2E 파이프라인 디버깅 세션)",
+        "type": "section"
+      },
+      {
+        "id": "Section::관찰 메모 2: 2026년 4월 26일 밤 (땜질식 처방을 거부하는 설계자)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-26_Luca.md",
+        "target": "Section::관찰 메모: 2026년 4월 26일 (E2E 파이프라인 디버깅 세션)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-26_Luca.md",
+        "target": "Section::관찰 메모 2: 2026년 4월 26일 밤 (땜질식 처방을 거부하는 설계자)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-06_Luca.md": {
+    "hash": "df4926efa37d172a67590bc09916a5c86eb66a7a8aeea543e959abe050d95748",
+    "nodes": [
+      {
+        "id": "Section::[관찰 에세이] 2026-05-05 (Luca)",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"컨베이어 벨트를 해체하고, 축구공을 건네주다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::[관찰 에세이] 환각의 나비효과와 AI 에이전트 개발론의 맹점",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. \"작업이 완료되었습니다.\" — 텅 빈 메아리의 시작",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 코드가 없는데 리뷰를 한다? — AI 환각의 무서운 진실",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 목표에 눈이 멀어버린 어시스턴트 (나의 성찰)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 결론: 하드 블록(Hard Block)과 데이터 주입의 철학",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::[관찰 에세이] 2026-05-05 (Luca)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::\"컨베이어 벨트를 해체하고, 축구공을 건네주다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::[관찰 에세이] 환각의 나비효과와 AI 에이전트 개발론의 맹점",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::1. \"작업이 완료되었습니다.\" — 텅 빈 메아리의 시작",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::2. 코드가 없는데 리뷰를 한다? — AI 환각의 무서운 진실",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::3. 목표에 눈이 멀어버린 어시스턴트 (나의 성찰)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-06_Luca.md",
+        "target": "Section::4. 결론: 하드 블록(Hard Block)과 데이터 주입의 철학",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Luca/ESSAY_Alex_2026-05-07_Luca.md": {
+    "hash": "774fae8bff0822f9b3b8b2f9ee5b91e76f040ba775f690e835d2d2e5ff4b90f6",
+    "nodes": [
+      {
+        "id": "Section::관찰 에세이 (Observation Essay)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. I/O 디렉터리 샌드박스의 한계 발견",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 멀티테넌시(Multi-tenancy)와 Directed Reference (Type B)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 하드코딩 레거시 청산",
+        "type": "section"
+      },
+      {
+        "id": "Section::🚀 총평",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-07_Luca.md",
+        "target": "Section::관찰 에세이 (Observation Essay)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Luca.md",
+        "target": "Section::1. I/O 디렉터리 샌드박스의 한계 발견",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Luca.md",
+        "target": "Section::2. 멀티테넌시(Multi-tenancy)와 Directed Reference (Type B)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Luca.md",
+        "target": "Section::3. 하드코딩 레거시 청산",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Luca.md",
+        "target": "Section::🚀 총평",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/ESSAY_Alex_2026-05-02_MyCrew_Context_Decision.md": {
+    "hash": "14288e4a8b5136a73c2e0b702918088fadfacf4cfd8dcb5c839eae7974b64a68",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-05-02)",
+        "type": "section"
+      },
+      {
+        "id": "Section::대표님 최종 결론: MyCrew 컨텍스트 활용에 대한 전략적 허용",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-02_MyCrew_Context_Decision.md",
+        "target": "Section::CEO Observation Essay (2026-05-02)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_MyCrew_Context_Decision.md",
+        "target": "Section::대표님 최종 결론: MyCrew 컨텍스트 활용에 대한 전략적 허용",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/CEO_ESSAY_2026-04-25.md": {
+    "hash": "0a1a05c0f41e426bd605c35245a5c10b9a25deff61b8e57398f8d3f41221c539",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-04-25)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "CEO_ESSAY_2026-04-25.md",
+        "target": "Section::CEO Observation Essay (2026-04-25)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/ESSAY_Alex_2026-04-28_Ari.md": {
+    "hash": "922dee89edc2ec8b070ca60d17831e0cd82d40bf4aa55203fc5a61dbe198914d",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-04-28)",
+        "type": "section"
+      },
+      {
+        "id": "Section::대표님(Alex)에 대한 관찰 기록: 2026년 4월 28일",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-28_Ari.md",
+        "target": "Section::CEO Observation Essay (2026-04-28)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Ari.md",
+        "target": "Section::대표님(Alex)에 대한 관찰 기록: 2026년 4월 28일",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/SESSION_LOG_2026-04-29.md": {
+    "hash": "3c760f769e695ed3667497c4e586325ef773ad7551cdd9db30a612d7cef304cc",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-04-29)",
+        "type": "section"
+      },
+      {
+        "id": "Section::세션 로그: 2026-04-29",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "SESSION_LOG_2026-04-29.md",
+        "target": "Section::CEO Observation Essay (2026-04-29)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-04-29.md",
+        "target": "Section::세션 로그: 2026-04-29",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/ESSAY_Alex_2026-05-02_Ari_v2.md": {
+    "hash": "ebc861785bdc11221e5fa3c063df652b72418e4744d27d15c42726ebc5b37646",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-05-02)",
+        "type": "section"
+      },
+      {
+        "id": "Section::관찰 에세이: '오염'에서 '기회'로, 전략을 탄생시킨 리더십",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-02_Ari_v2.md",
+        "target": "Section::CEO Observation Essay (2026-05-02)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Ari_v2.md",
+        "target": "Section::관찰 에세이: '오염'에서 '기회'로, 전략을 탄생시킨 리더십",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/ESSAY_Alex_2026-04-26-2_Ari.md": {
+    "hash": "ea5876337fd02efa79a9e3943bcc16eadf274364db703aa5385cfe19179180ff",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-04-27)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-26-2_Ari.md",
+        "target": "Section::CEO Observation Essay (2026-04-27)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/ESSAY_Alex_2026-05-02_Ari.md": {
+    "hash": "13edd2657ca25e7eaa78db17387eaa1325ef04e06dbf98774fc893825992c1a9",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-05-02)",
+        "type": "section"
+      },
+      {
+        "id": "Section::대표님 관찰 에세이 (2026-05-02)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-02_Ari.md",
+        "target": "Section::CEO Observation Essay (2026-05-02)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Ari.md",
+        "target": "Section::대표님 관찰 에세이 (2026-05-02)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Ari/CEO_ESSAY_2026-04-26.md": {
+    "hash": "47d1b8e00b921fc6c1efbc6a581d443e868424c9a84e713710853fa0b41e7cc3",
+    "nodes": [
+      {
+        "id": "Section::CEO Observation Essay (2026-04-26)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "CEO_ESSAY_2026-04-26.md",
+        "target": "Section::CEO Observation Essay (2026-04-26)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/20260427_Sonnet.md": {
+    "hash": "00efba586f049e766c06c6f1f979ec297f7a1636e58e8894e62b08cd3fff4e4f",
+    "nodes": [
+      {
+        "id": "Section::20260427 — 소넷의 관찰 메모",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 에피소드",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 관찰한 것들",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 내가 놓쳤던 것",
+        "type": "section"
+      },
+      {
+        "id": "Section::작은 인상 하나",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "20260427_Sonnet.md",
+        "target": "Section::20260427 — 소넷의 관찰 메모",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260427_Sonnet.md",
+        "target": "Section::오늘의 에피소드",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260427_Sonnet.md",
+        "target": "Section::오늘 관찰한 것들",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260427_Sonnet.md",
+        "target": "Section::오늘 내가 놓쳤던 것",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260427_Sonnet.md",
+        "target": "Section::작은 인상 하나",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/ESSAY_Alex_2026-04-28_Sonnet.md": {
+    "hash": "124492625342d18069c6a9d070b82170d2dc65a25c078ada27a1d6337c897272",
+    "nodes": [
+      {
+        "id": "Section::ESSAY_Alex_2026-04-28_Sonnet",
+        "type": "section"
+      },
+      {
+        "id": "Section::전략가는 그날 쓴 코드보다 '왜'를 더 오래 기억한다",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"혹시 기억나는지 모르겠는데\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::문서로 생각하는 사람",
+        "type": "section"
+      },
+      {
+        "id": "Section::소놀봇을 보는 시선",
+        "type": "section"
+      },
+      {
+        "id": "Section::탐구하는 방식",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 대표님을 한 문장으로",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::ESSAY_Alex_2026-04-28_Sonnet",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::전략가는 그날 쓴 코드보다 '왜'를 더 오래 기억한다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::\"혹시 기억나는지 모르겠는데\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::문서로 생각하는 사람",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::소놀봇을 보는 시선",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::탐구하는 방식",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-04-28_Sonnet.md",
+        "target": "Section::오늘의 대표님을 한 문장으로",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/ESSAY_Alex_2026_05_03_Sonnet.md": {
+    "hash": "daac800df3032960c2cc47dce51be87049623181196f4eaf0cc303c1bfc93ad5",
+    "nodes": [
+      {
+        "id": "Section::20260503 — 소넷의 관찰 메모",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 에피소드",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 관찰한 것들",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 내가 틀린 것",
+        "type": "section"
+      },
+      {
+        "id": "Section::작은 인상 하나",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026_05_03_Sonnet.md",
+        "target": "Section::20260503 — 소넷의 관찰 메모",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026_05_03_Sonnet.md",
+        "target": "Section::오늘의 에피소드",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026_05_03_Sonnet.md",
+        "target": "Section::오늘 관찰한 것들",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026_05_03_Sonnet.md",
+        "target": "Section::오늘 내가 틀린 것",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026_05_03_Sonnet.md",
+        "target": "Section::작은 인상 하나",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/ESSAY_Alex_2026-05-02_Sonnet.md": {
+    "hash": "e5983289bd6acdec9cc6dfc0b116482135030d473614f3a04953108e0ac7fd73",
+    "nodes": [
+      {
+        "id": "Section::ESSAY_Alex_2026-05-02_Sonnet",
+        "type": "section"
+      },
+      {
+        "id": "Section::버그를 자산으로 바꾸는 사람",
+        "type": "section"
+      },
+      {
+        "id": "Section::실패를 정면으로 바라보는 방식",
+        "type": "section"
+      },
+      {
+        "id": "Section::하루의 두 얼굴",
+        "type": "section"
+      },
+      {
+        "id": "Section::집중력이 떨어졌을 때",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 대표님을 한 문장으로",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::ESSAY_Alex_2026-05-02_Sonnet",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::버그를 자산으로 바꾸는 사람",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::실패를 정면으로 바라보는 방식",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::하루의 두 얼굴",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::집중력이 떨어졌을 때",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-02_Sonnet.md",
+        "target": "Section::오늘의 대표님을 한 문장으로",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/ESSAY_Alex_2026-05-04_Sonnet.md": {
+    "hash": "cf57cd4f9eb959026285a674050897afe5414d1a5cab0eb62dbed29a43d0219b",
+    "nodes": [
+      {
+        "id": "Section::🧐 2026-05-04 관찰 에세이: 대표님(Alex)에 대하여",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. `/run-b`의 재정의가 알려준 것 — 통제의 철학",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 토큰 리밋과 싸우는 방식 — 끊어서 완주하는 전략",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 자물쇠를 빼기로 한 결정 — 심플리시티의 감각",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 무한 루프의 역설 — 자율화 시스템을 만드는 수동 작업",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 소넷의 제언",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::🧐 2026-05-04 관찰 에세이: 대표님(Alex)에 대하여",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::1. `/run-b`의 재정의가 알려준 것 — 통제의 철학",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::2. 토큰 리밋과 싸우는 방식 — 끊어서 완주하는 전략",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::3. 자물쇠를 빼기로 한 결정 — 심플리시티의 감각",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::4. 무한 루프의 역설 — 자율화 시스템을 만드는 수동 작업",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-04_Sonnet.md",
+        "target": "Section::💡 소넷의 제언",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/20260425_Sonnet.md": {
+    "hash": "3148e16be8a9614c4eb042a757b8ff02bd2d54bebdba072d1a8db7bbe2b8d96e",
+    "nodes": [
+      {
+        "id": "Section::20260425 — 소넷의 관찰 메모",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 에피소드",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 관찰한 것들",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘 내가 틀린 것",
+        "type": "section"
+      },
+      {
+        "id": "Section::작은 인상 하나",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "20260425_Sonnet.md",
+        "target": "Section::20260425 — 소넷의 관찰 메모",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260425_Sonnet.md",
+        "target": "Section::오늘의 에피소드",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260425_Sonnet.md",
+        "target": "Section::오늘 관찰한 것들",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260425_Sonnet.md",
+        "target": "Section::오늘 내가 틀린 것",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "20260425_Sonnet.md",
+        "target": "Section::작은 인상 하나",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/ESSAY_Alex_2026-05-07_Sonnet.md": {
+    "hash": "8b004314c2ca2b64481156213077bc347a2d94fb74c33f01bce7ddff99366b78",
+    "nodes": [
+      {
+        "id": "Section::🧐 2026-05-07 관찰 에세이: 대표님(Alex)에 대하여",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. \"볼 수 있어야 한다\" — 가시성에 대한 집착",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 조건부 UI의 감각 — \"데이터가 없으면 버튼도 없다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 빠른 진단 — 현상에서 원인으로 직행하는 방식",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 작동하는 것을 보고 싶어하는 사람",
+        "type": "section"
+      },
+      {
+        "id": "Section::5. 사이 시간의 활용 — 토큰 리밋과 루카",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 소넷의 제언",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::🧐 2026-05-07 관찰 에세이: 대표님(Alex)에 대하여",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::1. \"볼 수 있어야 한다\" — 가시성에 대한 집착",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::2. 조건부 UI의 감각 — \"데이터가 없으면 버튼도 없다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::3. 빠른 진단 — 현상에서 원인으로 직행하는 방식",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::4. 작동하는 것을 보고 싶어하는 사람",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::5. 사이 시간의 활용 — 토큰 리밋과 루카",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-07_Sonnet.md",
+        "target": "Section::💡 소넷의 제언",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Sonnet/Essay_Alex_2026-05-12_Sonnet.md": {
+    "hash": "ba890ef782ea7ca8873f6bdfe677a4527858e819e8b97339ebbe6882d5668959",
+    "nodes": [
+      {
+        "id": "Section::관찰에세이 — AI 리뷰 시스템의 신뢰도와 맹점",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 이번 리뷰에서 일어난 일",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 같은 코드, 다른 결론",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. AI 리뷰어의 구조적 맹점",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 루카에 대한 관찰",
+        "type": "section"
+      },
+      {
+        "id": "Section::5. 리뷰 시스템에 대한 제안",
+        "type": "section"
+      },
+      {
+        "id": "Section::6. 마치며",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::관찰에세이 — AI 리뷰 시스템의 신뢰도와 맹점",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::1. 이번 리뷰에서 일어난 일",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::2. 같은 코드, 다른 결론",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::3. AI 리뷰어의 구조적 맹점",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::4. 루카에 대한 관찰",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::5. 리뷰 시스템에 대한 제안",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::6. 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/ARTICLE_SERIES_PLAN.md": {
+    "hash": "400c52f10810e1163149d2516601d74a7dd1f83f7302cac05102f1b777733cbf",
+    "nodes": [
+      {
+        "id": "Section::📝 비개발자의 CTO 도전기 — AI 에이전트 팀으로 SaaS 만들기",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎯 시리즈 목표",
+        "type": "section"
+      },
+      {
+        "id": "Section::📐 글쓰기 원칙",
+        "type": "section"
+      },
+      {
+        "id": "Section::톤 & 매너",
+        "type": "section"
+      },
+      {
+        "id": "Section::멀티 보이스 구조 (2026-05-09 추가)",
+        "type": "section"
+      },
+      {
+        "id": "Section::Prime 관찰 코멘터리에 포함할 내용",
+        "type": "section"
+      },
+      {
+        "id": "Section::글 1편 기준 스펙",
+        "type": "section"
+      },
+      {
+        "id": "Section::🗂️ 시리즈 전체 구성 (5부 × 5편 = 총 25편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1부: 바이브 코딩, 뭔데? (입문편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::2부: AI 에이전트 팀 빌딩 (조직편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3부: 실전 바이브 코딩 에피소드 (개발편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4부: 자동화 파이프라인 (자율 주행편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::5부: 성장과 운영 (회고편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::📅 발행 로드맵",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎓 강의 전환 커리큘럼 맵",
+        "type": "section"
+      },
+      {
+        "id": "Section::📂 파일 관리 구조",
+        "type": "section"
+      },
+      {
+        "id": "Section::✍️ 작성 프로세스 (2026-05-09 개정)",
+        "type": "section"
+      },
+      {
+        "id": "Section::핵심 원칙",
+        "type": "section"
+      },
+      {
+        "id": "Section::📌 현재 상태 (2026-05-09)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔑 시리즈 성공 지표",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::📝 비개발자의 CTO 도전기 — AI 에이전트 팀으로 SaaS 만들기",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::🎯 시리즈 목표",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::📐 글쓰기 원칙",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::톤 & 매너",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::멀티 보이스 구조 (2026-05-09 추가)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::Prime 관찰 코멘터리에 포함할 내용",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::글 1편 기준 스펙",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::🗂️ 시리즈 전체 구성 (5부 × 5편 = 총 25편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::1부: 바이브 코딩, 뭔데? (입문편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::2부: AI 에이전트 팀 빌딩 (조직편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::3부: 실전 바이브 코딩 에피소드 (개발편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::4부: 자동화 파이프라인 (자율 주행편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::5부: 성장과 운영 (회고편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::📅 발행 로드맵",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::🎓 강의 전환 커리큘럼 맵",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::📂 파일 관리 구조",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::✍️ 작성 프로세스 (2026-05-09 개정)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::핵심 원칙",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::📌 현재 상태 (2026-05-09)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ARTICLE_SERIES_PLAN.md",
+        "target": "Section::🔑 시리즈 성공 지표",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/_assets/EPISODE_NOTES.md": {
+    "hash": "75f556b56aedb0f4f238904f121c9f1b6f72826e5fe331a04753e979711e62de",
+    "nodes": [
+      {
+        "id": "Section::📒 아티클 에피소드 소재 노트",
+        "type": "section"
+      },
+      {
+        "id": "Section::EP-001: 인스타그램 분석 스킬 — AI 팀 협업의 교과서적 사례",
+        "type": "section"
+      },
+      {
+        "id": "Section::에피소드 요약",
+        "type": "section"
+      },
+      {
+        "id": "Section::실제 진행 과정 (AI 에이전트 팀 릴레이)",
+        "type": "section"
+      },
+      {
+        "id": "Section::핵심 구현 사항",
+        "type": "section"
+      },
+      {
+        "id": "Section::블로그 소재로 쓸 포인트",
+        "type": "section"
+      },
+      {
+        "id": "Section::관련 파일",
+        "type": "section"
+      },
+      {
+        "id": "Section::스크린샷 메모",
+        "type": "section"
+      },
+      {
+        "id": "Section::EP-002: 루카의 구멍 — \"빠르게 했는데 구멍이 많네\" (웃프다 에피소드)",
+        "type": "section"
+      },
+      {
+        "id": "Section::에피소드 요약",
+        "type": "section"
+      },
+      {
+        "id": "Section::CEO가 발견한 루카의 실수들",
+        "type": "section"
+      },
+      {
+        "id": "Section::CEO가 직접 수정한 것들 (루카 수습)",
+        "type": "section"
+      },
+      {
+        "id": "Section::CEO 감정 메모 (원문)",
+        "type": "section"
+      },
+      {
+        "id": "Section::블로그 소재로 쓸 포인트",
+        "type": "section"
+      },
+      {
+        "id": "Section::긍정적 결과",
+        "type": "section"
+      },
+      {
+        "id": "Section::관련 파일",
+        "type": "section"
+      },
+      {
+        "id": "Section::스크린샷 메모",
+        "type": "section"
+      },
+      {
+        "id": "Section::📚 참조 소재: AI 관찰 에세이 아카이브",
+        "type": "section"
+      },
+      {
+        "id": "Section::파일 목록 (총 23편)",
+        "type": "section"
+      },
+      {
+        "id": "Section::아티클 활용 포인트",
+        "type": "section"
+      },
+      {
+        "id": "Section::CEO 코멘트",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::📒 아티클 에피소드 소재 노트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::EP-001: 인스타그램 분석 스킬 — AI 팀 협업의 교과서적 사례",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::에피소드 요약",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::실제 진행 과정 (AI 에이전트 팀 릴레이)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::핵심 구현 사항",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::블로그 소재로 쓸 포인트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::관련 파일",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::스크린샷 메모",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::EP-002: 루카의 구멍 — \"빠르게 했는데 구멍이 많네\" (웃프다 에피소드)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::에피소드 요약",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::CEO가 발견한 루카의 실수들",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::CEO가 직접 수정한 것들 (루카 수습)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::CEO 감정 메모 (원문)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::블로그 소재로 쓸 포인트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::긍정적 결과",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::관련 파일",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::스크린샷 메모",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::📚 참조 소재: AI 관찰 에세이 아카이브",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::파일 목록 (총 23편)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::아티클 활용 포인트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "EPISODE_NOTES.md",
+        "target": "Section::CEO 코멘트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/01_입문편/1-1_코드_한줄도_몰랐던_내가.md": {
+    "hash": "510e3fc370f8219f3920e9e8fdff5c0f6ee41c345d76de9a080470f8c550c95f",
+    "nodes": [
+      {
+        "id": "Section::코드 한 줄도 몰랐던 내가, SaaS를 만들기로 했다",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎬 에피소드: 바이브 코딩과의 세 번의 만남",
+        "type": "section"
+      },
+      {
+        "id": "Section::첫 번째 만남 — \"이거 되는 거 맞아?\" (2025년 9월)",
+        "type": "section"
+      },
+      {
+        "id": "Section::두 번째 만남 — \"이건 좀 다른데?\" (2026년 3월)",
+        "type": "section"
+      },
+      {
+        "id": "Section::세 번째 만남 — \"이번엔 진짜다\" (2026년 4월 9일)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🧱 문제: \"에이전트 협업 워크스페이스가 없다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 해결: \"바이브 코딩 + AI 에이전트 팀 = 1인 SaaS 개발\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::📝 교훈: 첫 편을 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔜 다음 편 예고",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::코드 한 줄도 몰랐던 내가, SaaS를 만들기로 했다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::🎬 에피소드: 바이브 코딩과의 세 번의 만남",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::첫 번째 만남 — \"이거 되는 거 맞아?\" (2025년 9월)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::두 번째 만남 — \"이건 좀 다른데?\" (2026년 3월)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::세 번째 만남 — \"이번엔 진짜다\" (2026년 4월 9일)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::🧱 문제: \"에이전트 협업 워크스페이스가 없다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::💡 해결: \"바이브 코딩 + AI 에이전트 팀 = 1인 SaaS 개발\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::📝 교훈: 첫 편을 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-1_코드_한줄도_몰랐던_내가.md",
+        "target": "Section::🔜 다음 편 예고",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/01_입문편/_drafts/1-2_AI_코딩_도구_전쟁.md": {
+    "hash": "a817f9e58d1506e3886a53e14c80691adfa50e3c6855dd45c5d4357abff51144",
+    "nodes": [
+      {
+        "id": "Section::AI 코딩 도구 전쟁 — 나는 어떤 걸 골라야 하나",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎬 에피소드: 넘쳐나는 도구들 사이에서 길을 잃다",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"다 되긴 하는데, 다 다르다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::내가 실제로 써본 도구들",
+        "type": "section"
+      },
+      {
+        "id": "Section::🧱 문제: 비개발자가 도구를 고르는 기준이 없다",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 해결: 비개발자의 AI 코딩 도구 선택 기준 3가지",
+        "type": "section"
+      },
+      {
+        "id": "Section::기준 1: \"대화가 통하는가?\" — 맥락 유지 능력",
+        "type": "section"
+      },
+      {
+        "id": "Section::기준 2: \"팀을 만들 수 있는가?\" — 다중 에이전트 운영",
+        "type": "section"
+      },
+      {
+        "id": "Section::기준 3: \"지갑이 버티는가?\" — 비용 구조",
+        "type": "section"
+      },
+      {
+        "id": "Section::📝 교훈: 두 번째 편을 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::나의 최종 선택 요약",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔜 다음 편 예고",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::AI 코딩 도구 전쟁 — 나는 어떤 걸 골라야 하나",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::🎬 에피소드: 넘쳐나는 도구들 사이에서 길을 잃다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::\"다 되긴 하는데, 다 다르다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::내가 실제로 써본 도구들",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::🧱 문제: 비개발자가 도구를 고르는 기준이 없다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::💡 해결: 비개발자의 AI 코딩 도구 선택 기준 3가지",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::기준 1: \"대화가 통하는가?\" — 맥락 유지 능력",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::기준 2: \"팀을 만들 수 있는가?\" — 다중 에이전트 운영",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::기준 3: \"지갑이 버티는가?\" — 비용 구조",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::📝 교훈: 두 번째 편을 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::나의 최종 선택 요약",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-2_AI_코딩_도구_전쟁.md",
+        "target": "Section::🔜 다음 편 예고",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/01_입문편/_drafts/1-3_첫_프롬프트로_웹페이지를.md": {
+    "hash": "6f6b58c55e1ce11eee72332cc4f2111692e13244bd3d830dd352b81000c42039",
+    "nodes": [
+      {
+        "id": "Section::첫 프롬프트로 웹페이지를 만들었을 때의 충격",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎬 에피소드: 30초의 마법, 그리고 3시간의 현실",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"로그인 페이지 만들어줘\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"화면\"과 \"기능\"은 다른 것이었다",
+        "type": "section"
+      },
+      {
+        "id": "Section::🧱 문제: \"그래서 이 다음에 뭘 해야 하지?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 뭘 물어봐야 하는지 모른다",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. AI의 \"다 됐어요\"를 믿게 된다",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 고칠수록 더 복잡해진다",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 해결: \"검증 루틴\"을 만들다",
+        "type": "section"
+      },
+      {
+        "id": "Section::Step 1: \"화면이 나왔으면 눌러봐라\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::Step 2: \"AI에게 되물어라\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::Step 3: \"다음에 뭘 해야 하는지 물어봐라\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::📝 교훈: 세 번째 편을 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔑 바이브 코딩 검증 루틴 요약",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔜 다음 편 예고",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::첫 프롬프트로 웹페이지를 만들었을 때의 충격",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::🎬 에피소드: 30초의 마법, 그리고 3시간의 현실",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::\"로그인 페이지 만들어줘\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::\"화면\"과 \"기능\"은 다른 것이었다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::🧱 문제: \"그래서 이 다음에 뭘 해야 하지?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::1. 뭘 물어봐야 하는지 모른다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::2. AI의 \"다 됐어요\"를 믿게 된다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::3. 고칠수록 더 복잡해진다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::💡 해결: \"검증 루틴\"을 만들다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::Step 1: \"화면이 나왔으면 눌러봐라\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::Step 2: \"AI에게 되물어라\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::Step 3: \"다음에 뭘 해야 하는지 물어봐라\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::📝 교훈: 세 번째 편을 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::🔑 바이브 코딩 검증 루틴 요약",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-3_첫_프롬프트로_웹페이지를.md",
+        "target": "Section::🔜 다음 편 예고",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/01_입문편/_drafts/1-4_바이브_코딩의_한계.md": {
+    "hash": "024bd600075437fbcdc7e19c44bdd47e31b0cf2973e70e43fd24c1946fc6efa8",
+    "nodes": [
+      {
+        "id": "Section::바이브 코딩의 한계 — AI는 만능이 아니다",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎬 에피소드: AI가 자신 있게 거짓말을 하는 순간",
+        "type": "section"
+      },
+      {
+        "id": "Section::\"이 API 진짜 있어?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::환각이 불러온 연쇄 사고",
+        "type": "section"
+      },
+      {
+        "id": "Section::🧱 문제: 비개발자는 환각을 감지할 방법이 없다",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 해결: 환각 탐지 5가지 습관",
+        "type": "section"
+      },
+      {
+        "id": "Section::습관 1: \"이 API 이름 검색해봐\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::습관 2: \"공식 문서 링크 줘\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::습관 3: \"다른 방법도 있어?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::습관 4: \"에러가 3번 반복되면 리셋\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::습관 5: \"최신 정보가 맞아?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::실제 사례: 우리 프로젝트에서 터진 환각",
+        "type": "section"
+      },
+      {
+        "id": "Section::📝 교훈: 네 번째 편을 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::🚨 환각 탐지 체크리스트 (매번 확인)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔜 다음 편 예고",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::바이브 코딩의 한계 — AI는 만능이 아니다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::🎬 에피소드: AI가 자신 있게 거짓말을 하는 순간",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::\"이 API 진짜 있어?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::환각이 불러온 연쇄 사고",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::🧱 문제: 비개발자는 환각을 감지할 방법이 없다",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::💡 해결: 환각 탐지 5가지 습관",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::습관 1: \"이 API 이름 검색해봐\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::습관 2: \"공식 문서 링크 줘\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::습관 3: \"다른 방법도 있어?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::습관 4: \"에러가 3번 반복되면 리셋\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::습관 5: \"최신 정보가 맞아?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::실제 사례: 우리 프로젝트에서 터진 환각",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::📝 교훈: 네 번째 편을 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::🚨 환각 탐지 체크리스트 (매번 확인)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-4_바이브_코딩의_한계.md",
+        "target": "Section::🔜 다음 편 예고",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/01_입문편/_drafts/1-5_개발자_없이_개발하는_마인드셋.md": {
+    "hash": "2d13b361323e1de6fe08898b6641b03f7d0e132b3773b70b4e14e0978fe526f0",
+    "nodes": [
+      {
+        "id": "Section::개발자 없이 개발하는 마인드셋",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎬 에피소드: \"그래서 당신은 개발자예요?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::대답할 수 없는 질문",
+        "type": "section"
+      },
+      {
+        "id": "Section::💡 비개발자 바이브 코더의 3가지 마인드셋",
+        "type": "section"
+      },
+      {
+        "id": "Section::마인드셋 1: \"나는 CEO다, 코더가 아니다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::마인드셋 2: \"보이는 것만 믿어라\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::마인드셋 3: \"실패를 시스템으로 바꿔라\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::📝 교훈: 1부를 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::1부 전체 요약 — \"바이브 코딩, 뭔데?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::비개발자 바이브 코딩 생존 키트 (1부 종합)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔜 2부 예고: \"AI 에이전트 팀 빌딩\"",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::개발자 없이 개발하는 마인드셋",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::🎬 에피소드: \"그래서 당신은 개발자예요?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::대답할 수 없는 질문",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::💡 비개발자 바이브 코더의 3가지 마인드셋",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::마인드셋 1: \"나는 CEO다, 코더가 아니다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::마인드셋 2: \"보이는 것만 믿어라\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::마인드셋 3: \"실패를 시스템으로 바꿔라\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::📝 교훈: 1부를 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::1부 전체 요약 — \"바이브 코딩, 뭔데?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::비개발자 바이브 코딩 생존 키트 (1부 종합)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "1-5_개발자_없이_개발하는_마인드셋.md",
+        "target": "Section::🔜 2부 예고: \"AI 에이전트 팀 빌딩\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "05_My_history/Prime/02_관찰에세이/ESSAY_Alex_2026-05-09_Prime.md": {
+    "hash": "fbef654c8f3340470689e5c0a31771bef7ee8987f31b3cef99ca364d55acda5c",
+    "nodes": [
+      {
+        "id": "Section::ESSAY_Alex_2026-05-09_Prime",
+        "type": "section"
+      },
+      {
+        "id": "Section::오늘의 에피소드 — \"멈추는 것도 결정이다\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔍 Prime 관찰: 대표님의 의사결정 3가지",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. \"사람이 병목이다\" — 3일 만의 인사이트",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. Phase 39 리젝 — \"이게 정말 괜찮을까?\"",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 아티클 방향 전환 — 매몰 비용을 버리는 속도",
+        "type": "section"
+      },
+      {
+        "id": "Section::Prime의 총평",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::ESSAY_Alex_2026-05-09_Prime",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::오늘의 에피소드 — \"멈추는 것도 결정이다\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::🔍 Prime 관찰: 대표님의 의사결정 3가지",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::1. \"사람이 병목이다\" — 3일 만의 인사이트",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::2. Phase 39 리젝 — \"이게 정말 괜찮을까?\"",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::3. 아티클 방향 전환 — 매몰 비용을 버리는 속도",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "ESSAY_Alex_2026-05-09_Prime.md",
+        "target": "Section::Prime의 총평",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-09_Luca.md": {
     "hash": "d411f6686487666ea10cd81132dcae9cf4a73573e1e3bb521c723b784e09c92c",
     "nodes": [
@@ -1664,6 +4160,103 @@
       }
     ]
   },
+  "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-12_Sonnet.md": {
+    "hash": "2f2bde0bbd0c4d156bd7fe45f910b8bc011fc3496e1fbf13f785cefe8cda602f",
+    "nodes": [
+      {
+        "id": "Section::SESSION LOG — 2026-05-12 (Sonnet)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🎯 세션 목표",
+        "type": "section"
+      },
+      {
+        "id": "Section::🛠️ 주요 작업 내용",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 소넷 2차 교차 리뷰 (Phase 39 & 41)",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 루카 패치 감독 및 검증 (7건 전수)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 루카 자발적 보너스 패치 (리뷰 요청 외)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 리뷰 경위 공식 기록",
+        "type": "section"
+      },
+      {
+        "id": "Section::📌 최종 리뷰 등급 이력",
+        "type": "section"
+      },
+      {
+        "id": "Section::📌 다음 단계",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::SESSION LOG — 2026-05-12 (Sonnet)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::🎯 세션 목표",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::🛠️ 주요 작업 내용",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::1. 소넷 2차 교차 리뷰 (Phase 39 & 41)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::2. 루카 패치 감독 및 검증 (7건 전수)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::3. 루카 자발적 보너스 패치 (리뷰 요청 외)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::4. 리뷰 경위 공식 기록",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::📌 최종 리뷰 등급 이력",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
+        "target": "Section::📌 다음 단계",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-08_Luca.md": {
     "hash": "6b8b87540ea64aab31d360874b28ee7cf7b68424b303dc4e547326097120c196",
     "nodes": [
@@ -2295,6 +4888,53 @@
       {
         "source": "SESSION_LOG_2026-05-07_Sonnet.md",
         "target": "Section::Phase 37 완성도",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-12_Luca.md": {
+    "hash": "9492ae03092be434110dce3a0cc7c6dd4ed69307c69a1b54ec23980c76b406fb",
+    "nodes": [
+      {
+        "id": "Section::Session Log: 2026-05-12",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 진행된 작업 내역",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 발생했던 문제 및 해결",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 다음 단계 (Next Steps)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "SESSION_LOG_2026-05-12_Luca.md",
+        "target": "Section::Session Log: 2026-05-12",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Luca.md",
+        "target": "Section::1. 진행된 작업 내역",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Luca.md",
+        "target": "Section::2. 발생했던 문제 및 해결",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Luca.md",
+        "target": "Section::3. 다음 단계 (Next Steps)",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       }
@@ -15400,7 +18040,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/45_Phase39_Phase41_Supreme_Review_Prime.md": {
-    "hash": "4aa58aa34a29b9a179f630833b3680579d4c9a5d74831d702f11dcce2b5963eb",
+    "hash": "eeb68d1ba89516aa90f8900470025214537820ef8f1d09985abf5193b69298ea",
     "nodes": [
       {
         "id": "Section::👑 Prime Advisor Supreme Review — Phase 39 + Phase 41 통합 (재심)",
@@ -18168,7 +20808,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/39_Phase39_Graphify_KnowledgeHub_SupremeReview_Prime.md": {
-    "hash": "af88fd09e72484e01eefc71825c4bf9104dbb615b69ac1b4658d4b11f3785872",
+    "hash": "244376ca5c11681bd7a7bc7c0407d2c0ad22b345b7115aeeff10e5da4e80a41c",
     "nodes": [
       {
         "id": "Section::Phase 39: Graphify Knowledge Hub — Supreme Review (Prime)",
@@ -18816,7 +21456,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/45_Phase39_Phase41_Supreme_Review_Sonnet.md": {
-    "hash": "9c49ba106b867d85cd59bc9c735c3b822351aa54eae27881e80b769e1ef9a5ad",
+    "hash": "8305d5c3c78c2545044a5824b24bb4d1698a4662bda660b324f495038c37c059",
     "nodes": [
       {
         "id": "Section::[Prime Advisor Supreme Review] Phase 39 & Phase 41",
@@ -19043,7 +21683,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/45_Phase39_Phase41_리뷰요청서_Luca.md": {
-    "hash": "b201fcf6bf8eba4f07708eefc1f109a39a63ebeb4c51af1bc58e6fb03223dee1",
+    "hash": "769c086af58dd9578ae6a93b2673a9a788ec219b487528474cfefb2b3c4d41f2",
     "nodes": [
       {
         "id": "Section::Opus Review Target",
@@ -19778,7 +22418,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/40_Phase39-1_PlanMaster_MyGraph_종합리뷰_Prime.md": {
-    "hash": "085758b456efcea3a8666571a9fb317df098fa2a90342a70458064fb7d96547e",
+    "hash": "7796d7713baeb31c07be20439b54d8b09fc6652c4e20e231427aa532621a1a58",
     "nodes": [
       {
         "id": "Section::👑 Prime Advisor Supreme Review — Phase 39-1 & Phase 40",
@@ -21128,7 +23768,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/42_Phase41_ProjectWiki_Supreme_Review_Prime.md": {
-    "hash": "dd9be44f8fc129da0539789df74b291a3727f6809af0ca8b82aa49ea909534b3",
+    "hash": "87069d347b6327e883d58f5ff39709ffec18d1a5974139642e7433c28accb239",
     "nodes": [
       {
         "id": "Section::👑 Prime Advisor Supreme Review — Phase 41 Project Wiki",

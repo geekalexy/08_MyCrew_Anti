@@ -17,6 +17,16 @@
 ## 2. 발생했던 문제 및 해결
 * 위키 그래프 생성기(`graphify_mcp.py`)의 CLI 인자 버그(`--out-dir` 무시 현상)를 현장에서 즉각 디버깅하여 해결함.
 * 과거 에세이 데이터가 유실될 뻔한 치명적인 이슈를 대표님의 직관적인 지적으로 포착하여 완벽 복구.
+* `graph.html`의 거대 노드(12,000+) 렌더링 최적화 및 프리징 이슈 해결은 프론트엔드 장인인 소넷(Sonnet)에게 완벽히 위임(바통 터치) 완료.
+* Node.js 포트 충돌(EADDRINUSE 5174, 5050) 문제를 파악하고 대처 방안(프로세스 종료 가이드) 제시.
 
-## 3. 다음 단계 (Next Steps)
-* Phase 42 (Agent-driven DB Migration Architecture) 기획 착수 준비 완료.
+## 3. 새로 진행된 작업 (Phase 42)
+* **Phase 42 Agent-driven DB Migration Architecture 구현**
+  * `Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md` 기획서 작성 완료.
+  * `db_migrator.js` 모듈 개발: 데이터베이스 자동 백업(`.bak`) 및 트랜잭션 기반 롤백 메커니즘 탑재.
+  * 마이그레이션 이력 관리용 `_migrations` 테이블 생성 및 적용된 스크립트 중복 방지 로직 완성.
+  * `database.js` 진입점에 Top-level await로 Migrator를 연결하여 서버 부트 시 스키마 무결성 검증을 Blocking 방식으로 강제.
+
+## 4. 다음 단계 (Next Steps)
+* 소넷(Sonnet): `graph.html` 프론트엔드 렌더링 퍼포먼스 및 UI/UX 인터랙션 최적화 완료하기.
+* 루카(Luca): 소넷의 작업 완료 후, Phase 42-Sprint 2에 해당하는 기존 스키마들의 `.sql` 이관 작업 마저 진행.

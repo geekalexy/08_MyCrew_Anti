@@ -52,7 +52,7 @@ app.post('/api/projects/:id/plan-master/confirm', async (req, res) => {
 * **아키텍처**: 증분 업데이트 캐싱(`wiki_cache.json`) 지원 및 원자적 쓰기(`os.replace()`)로 파일 손상 방지 처리.
 * **OOM 방어**: `shortest_path` 그래프 쿼리에서 `MAX_DEPTH=50`을 주어 행(Hang) 발생 방어.
 
-```python
+```text
 # graphify_mcp.py (원자적 쓰기 & 캐시 저장부)
 try:
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)

@@ -4,10 +4,19 @@ import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
 import { validateCrewIds } from './ai-engine/policyGuard.js';
 import { MODEL } from './ai-engine/modelRegistry.js';
+import { runMigrations } from './db_migrator.js';
 
 const sqlite3Verbose = sqlite3.verbose();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// [Phase 42] 에이전트 주도형 마이그레이션 적용 (Startup Blocking)
+try {
+  await runMigrations();
+} catch (e) {
+  console.error('[DB] 마이그레이션 실패로 시스템 구동을 중단합니다:', e);
+  process.exit(1);
+}
 
 // [S2-1] agents.json 기반 동적 에이전트 ID Set — KNOWN_AGENTS 하드코딩 제거
 const AGENT_IDS = (() => {

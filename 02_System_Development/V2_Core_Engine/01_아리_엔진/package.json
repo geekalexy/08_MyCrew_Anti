@@ -11,6 +11,7 @@
     "dev:legacy": "PORT=4000 node --watch server.js",
     "start:mcp-backend": "PORT=4010 node server.js",
     "dev:mcp-backend": "PORT=4010 node --watch server.js",
+    "sm": "PORT=4010 node server.js",
     "start:mcp": "node mcp_server.js"
   },
   "dependencies": {

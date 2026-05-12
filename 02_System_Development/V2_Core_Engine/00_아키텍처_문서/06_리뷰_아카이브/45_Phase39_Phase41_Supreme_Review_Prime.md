@@ -111,7 +111,7 @@ if (!requirements.trim()) {
 
 **파일**: [graphify_mcp.py L299](file:///Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_아리_엔진/graphify_mcp.py#L299)
 
-```python
+```text
 html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", json.dumps(graph_data))
 ```
 
@@ -119,7 +119,7 @@ html_content = html_content.replace("GRAPH_DATA_PLACEHOLDER", json.dumps(graph_d
 
 그래프 데이터의 노드 `label`과 `id`는 **파일 이름과 마크다운 헤더에서 직접 추출**됩니다:
 
-```python
+```text
 # L38 — 마크다운 헤더가 그대로 노드 ID가 됨
 headers = re.findall(r'^(#{1,3})\s+(.+)$', content, re.MULTILINE)
 topic_node = f"Section::{h_text.strip()}"  # h_text가 label로 사용
@@ -133,7 +133,7 @@ topic_node = f"Section::{h_text.strip()}"  # h_text가 label로 사용
 이 문자열이 `json.dumps()`를 통해 HTML의 `<script>` 블록 안에 삽입됩니다. `json.dumps()`는 `<`, `>` 등을 이스케이프하지 않으므로, 사용자가 `graph.html`을 브라우저에서 열면 **Stored XSS가 실행**됩니다.
 
 **처방**:
-```python
+```text
 # json.dumps에 ensure_ascii=True를 사용하여 non-ASCII 및 특수문자 이스케이프
 # 또는 별도 이스케이프 적용
 import html
@@ -201,7 +201,7 @@ const targetDir = isSystemScope
 
 **파일**: [graphify_mcp.py L108-110](file:///Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_아리_엔진/graphify_mcp.py#L108)
 
-```python
+```text
 if is_system:
     if '04_Users' in root or '06_소시안자료' in root or '채널분석' in root or '/outputs' in root:
         continue
@@ -330,7 +330,7 @@ broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${saf
 
 ### ✅ H-004 검증: graph.html XSS 방어 — **PASS**
 
-```python
+```text
 # graphify_mcp.py L315-317 — 수정 확인
 # [H-004 Fix] json.dumps 결과의 </script> 이스케이프 (Stored XSS 방어)
 safe_json_data = json.dumps(graph_data).replace("</", "<\\/")

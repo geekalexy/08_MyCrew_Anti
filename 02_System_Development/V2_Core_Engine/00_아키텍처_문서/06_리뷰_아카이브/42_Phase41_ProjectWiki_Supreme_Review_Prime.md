@@ -79,7 +79,7 @@ await execAsync(`python3 "${scriptPath}" --update "${projectRoot}"`);
 
 ### 문제
 
-```python
+```text
 # graphify_mcp.py L173-176
 with open(cache_path, 'w', encoding='utf-8') as f:
     json.dump(new_cache, f, ensure_ascii=False, indent=2)
@@ -92,7 +92,7 @@ with open(cache_path, 'w', encoding='utf-8') as f:
 
 ### 수정안 (Atomic Write)
 
-```python
+```text
 import tempfile
 
 # Atomic write: tmp 파일에 먼저 쓰고 rename (POSIX rename은 원자적)
@@ -221,7 +221,7 @@ async function appendMeetingLog(projectId, taskId, author, content) {
 
 ### 권고
 
-```python
+```text
 MAX_BFS_DEPTH = 15  # 실용적 한계치
 
 def bfs_shortest_path(adj, start, end, max_depth=MAX_BFS_DEPTH):
@@ -273,7 +273,7 @@ await fs.rename(graphPath, path.join(wikiRoot, '99_Graph_Data', 'graph.json'));
 
 기존 `query_architecture` MCP 도구는 **프로젝트 루트의 `graph.json`**을 읽습니다:
 
-```python
+```text
 # graphify_mcp.py — query_graph 핸들러
 graph_path = os.path.join(project_dir, 'graph.json')
 ```
@@ -346,7 +346,7 @@ await execFileAsync('python3', [scriptPath, '--update', projectRoot]); // ← �
 
 ### ✅ C-002 검증: Atomic Write — **PASS**
 
-```python
+```text
 # graphify_mcp.py L172-186 — 수정 확인
 tmp_path = cache_path + '.tmp'
 with open(tmp_path, 'w', encoding='utf-8') as f:
@@ -391,7 +391,7 @@ await writeLock;
 
 ### ✅ M-001 검증: BFS Depth 제한 — **PASS**
 
-```python
+```text
 # graphify_mcp.py L491-498 — 수정 확인
 MAX_DEPTH = 50
 if len(p) > MAX_DEPTH:

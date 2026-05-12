@@ -37,13 +37,19 @@ class WikiEngine {
     }
   }
 
-  async updateGraphify(projectRoot) {
+  async updateGraphify(projectRoot, projectId = null) {
+    const graphifyPath = '/Users/alex/.local/bin/graphify';
+    
     try {
-      const scriptPath = path.resolve(__dirname, '../../graphify_mcp.py');
-      await execFileAsync('python3', [scriptPath, '--update', projectRoot]);
+      // [Phase 42-4] 로컬 graphify 바이너리로 프로젝트별 개별 그래프만 업데이트
+      // [CEO 정책] global add 전면 폐기 — B타입 포함 모든 프로젝트 간 그래프 병합 금지
+      // 각 프로젝트는 독립적인 graphify-out/graph.json만 유지합니다.
+      await execFileAsync(graphifyPath, ['update', projectRoot]);
+
       return true;
     } catch (e) {
       console.error('[WikiEngine] Graphify update failed:', e.message);
+      if (e.stderr) console.error('[WikiEngine] Graphify stderr:', e.stderr);
       return false;
     }
   }
@@ -127,11 +133,11 @@ class WikiEngine {
     await this.ensureOntologyDirectories(wikiRoot);
 
     console.log(`[WikiEngine] Graphify 엔진 트리거: ${projectId}`);
-    const graphUpdated = await this.updateGraphify(projectRoot);
+    const graphUpdated = await this.updateGraphify(projectRoot, projectId);
     if (!graphUpdated) throw new Error('그래프 추출에 실패했습니다.');
 
-    // Read extracted graph.json
-    const graphPath = path.join(projectRoot, 'graph.json');
+    // Read extracted graph.json (공식 Graphify 출력 경로는 graphify-out 폴더)
+    const graphPath = path.join(projectRoot, 'graphify-out', 'graph.json');
     let graphData;
     try {
       const raw = await fs.readFile(graphPath, 'utf-8');
@@ -140,12 +146,15 @@ class WikiEngine {
       // [Fix D-003] Zero-Copy 원칙: SQLite DB 칸반 데이터를 직접 조회하여 동적 노드로 추가 (파일 쓰기 없음)
       try {
         const tasks = await dbManager.getAllTasksByProjectId(projectId) || [];
+        graphData.nodes = graphData.nodes || [];
+        graphData.links = graphData.links || [];
+        
         tasks.forEach(task => {
           const taskNodeId = `Task::[${task.status}] ${task.title}`;
-          graphData.elements.push({ data: { id: taskNodeId, type: 'task', label: task.title } });
+          graphData.nodes.push({ id: taskNodeId, type: 'task', label: task.title, file_type: 'task' });
           // 태스크와 연관된 에이전트를 엣지로 연결
           if (task.assigned_agent) {
-            graphData.elements.push({ data: { id: `e_task_${task.id}`, source: taskNodeId, target: task.assigned_agent, relation: 'ASSIGNED_TO', confidence: 1.0 } });
+            graphData.links.push({ source: taskNodeId, target: task.assigned_agent, relation: 'ASSIGNED_TO', confidence: 1.0 });
           }
         });
         console.log(`[WikiEngine] Zero-Copy DB 인젝션: 칸반 태스크 ${tasks.length}개 추가`);
@@ -159,17 +168,17 @@ class WikiEngine {
       throw new Error('graph.json 파일을 읽을 수 없습니다: ' + e.message);
     }
 
-    const elements = graphData.elements || [];
+    const elements = graphData.nodes || [];
     const decisions = [];
     const concepts = [];
     const sections = [];
 
     // Cluster nodes by type
-    for (const el of elements) {
-      const data = el.data || {};
-      if (data.type === 'decision') decisions.push(data.label || data.id);
-      if (data.type === 'concept') concepts.push(data.id);
-      if (data.type === 'section') sections.push(data.label || data.id);
+    for (const data of elements) {
+      const type = data.type || data.file_type || '';
+      if (type === 'decision') decisions.push(data.label || data.id);
+      if (type === 'concept') concepts.push(data.id);
+      if (type === 'section') sections.push(data.label || data.id);
     }
 
     console.log(`[WikiEngine] 노드 분류 완료. Decisions: ${decisions.length}, Concepts: ${concepts.length}, Sections: ${sections.length}`);

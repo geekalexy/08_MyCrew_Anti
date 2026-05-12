@@ -47,8 +47,8 @@ class B4System {
       const result = analysisRaw.text.trim();
 
       if (result !== 'NONE') {
-        // 3. RuleHarvester를 통해 TEAM 룰로 승격 시도
-        await ruleHarvester.classifyAndHarvest(`!! ${result}`, 'B4 System', taskId);
+        // [Phase 42.5 Step 4] RuleHarvester를 통해 TEAM 룰로 승격 시도 시 projectId 전달
+        await ruleHarvester.classifyAndHarvest(`!! ${result}`, 'B4 System', taskId, task.project_id);
         console.log(`[B4 System] 새로운 인사이트 발견 및 룰 동기화 완료: ${result}`);
         return result;
       }

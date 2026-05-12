@@ -18,6 +18,16 @@ description: Luca의 코드를 Claude Opus 등 고성능 모델에게 교차 검
 **리뷰 대상이 에이전트 ID / 팀빌딩 관련이면 추가 참조**:
 - `02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md`
 
+## 0.5 📊 [필수] Graphify 기반 영향도 분석 (CEO 지시, 2026-05-13)
+
+> 🔴 **리뷰 시 반드시 Graphify 그래프를 활용해야 합니다.** grep/파일 읽기만으로 리뷰를 완료하는 것은 불충분합니다.
+
+**리뷰 착수 전 필수 수행**:
+1. `graphify-out/GRAPH_REPORT.md` 읽기 — God Nodes, Community 구조 파악
+2. `graphify-out/graph.json`에서 변경 대상 파일의 **파급 반경(Blast Radius)** 추출 — import하는/import되는 파일 목록
+3. 변경 대상이 God Node(상위 10개)에 해당하면 **추가 주의 판정** 부여
+4. 의존성 경로(`imports_from`, `calls`, `contains`)를 통해 변경 전파 경로 분석
+
 ---
 
 ## 1. 📝 리뷰 타겟(Target) 자동 생성

@@ -125,21 +125,25 @@ export function clearSkillCache(category) {
 }
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5분 TTL
 
-// [DRY Fix] Prime 9th Review 권고 대응: SKILL_PATH_MAP 중복 선언 모듈 스코프로 통합
-export const SKILL_PATH_MAP = {
-  'MARKETING':  'skill-library/02_marketing/SKILL.md',
-  'CONTENT':    'skill-library/03_content/SKILL.md',
-  'ANALYSIS':   'skill-library/04_analysis/SKILL.md',
-  'DESIGN':     'skill-library/05_design/SKILL.md',
-  'ROUTING':    'skill-library/01_routing/SKILL.md',
-  'KNOWLEDGE':  'skill-library/06_research/SKILL.md',
-  'WORKFLOW':   'skill-library/08_workflow/SKILL.md',
-};
+// [Phase 42.5 Step 4] 프로젝트별 SKILL 경로 분리
+export function getSkillPathMap(projectId = null) {
+  const prefix = projectId ? `${projectId}_` : 'LEGACY_GLOBAL_';
+  return {
+    'MARKETING':  `skill-library/02_marketing/${prefix}SKILL.md`,
+    'CONTENT':    `skill-library/03_content/${prefix}SKILL.md`,
+    'ANALYSIS':   `skill-library/04_analysis/${prefix}SKILL.md`,
+    'DESIGN':     `skill-library/05_design/${prefix}SKILL.md`,
+    'ROUTING':    `skill-library/01_routing/${prefix}SKILL.md`,
+    'KNOWLEDGE':  `skill-library/06_research/${prefix}SKILL.md`,
+    'WORKFLOW':   `skill-library/08_workflow/${prefix}SKILL.md`,
+  };
+}
 
 /** SKILL.md 로드 함수 (외부 도구에서도 사용 가능하도록 내보내기) */
-export function loadSkillDocument(category) {
+export function loadSkillDocument(category, projectId = null) {
   const now = Date.now();
-  const cached = skillCache.get(category);
+  const cacheKey = `${projectId || 'LEGACY'}_${category}`;
+  const cached = skillCache.get(cacheKey);
   
   // Hit: 캐시가 유효하면 즉시 반환
   if (cached && (now - cached.loadedAt) < CACHE_TTL_MS) {
@@ -147,7 +151,7 @@ export function loadSkillDocument(category) {
   }
   
   // Miss: 파일 로드 후 캐시에 저장
-  const relativePath = SKILL_PATH_MAP[category];
+  const relativePath = getSkillPathMap(projectId)[category];
   if (!relativePath) return null;
   
   try {
@@ -164,7 +168,7 @@ export function loadSkillDocument(category) {
       ? body.slice(0, 500) + '\n\n[...truncated for token budget]'
       : body;
     
-    skillCache.set(category, { content: truncated, loadedAt: now });
+    skillCache.set(cacheKey, { content: truncated, loadedAt: now });
     return truncated;
   } catch (err) {
     console.warn(`[SkillLoader] ${category} SKILL.md 로드 실패:`, err.message);
@@ -544,14 +548,20 @@ class Executor {
     }
 
     // 4. 라우터를 통해 적절한 스킬(전용 프롬프트) 선택
+    let taskInfo = null;
+    if (taskId) {
+      try { taskInfo = await dbManager.getTaskById(taskId); } catch(e) {}
+    }
+    const projectId = taskInfo ? taskInfo.project_id : null;
+
     const skill = router.route(actualContent, evaluation.category);
-    let systemPrompt = loadSkillDocument(evaluation.category);
+    let systemPrompt = loadSkillDocument(evaluation.category, projectId);
     if (!systemPrompt) {
       systemPrompt = skill.getSystemPrompt(); // 기존 Fallback 보장
     }
 
     // [Phase 22] 🧠 Context Injector를 통한 완벽한 문맥 캡슐화
-    const livingRules = ruleHarvester.getAppliedRules();
+    const livingRules = ruleHarvester.getAppliedRules(projectId);
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
     let taskInfo = null;
@@ -658,7 +668,7 @@ class Executor {
       }
 
       // [Week 2: Self-Learning 흡수] - 성공/실패 패턴을 SKILL.md에 로깅하여 자가성장 유도
-      const activeSkillPath = SKILL_PATH_MAP[evaluation.category];
+      const activeSkillPath = getSkillPathMap(projectId)[evaluation.category];
       if (result.text && activeSkillPath) {
         try {
           const fullSkillPath = path.resolve(process.cwd(), activeSkillPath);
@@ -905,9 +915,15 @@ class Executor {
     // ─────────────────────────────────────────────────────────────────────────
 
     // 2. 스킬 문서 로드
+    let taskInfo = null;
+    if (taskId) {
+      try { taskInfo = await dbManager.getTaskById(taskId); } catch(e) {}
+    }
+    const projectId = taskInfo ? taskInfo.project_id : null;
+
     const skill = router.route(taskContent, evaluation.category);
-    let systemPrompt = loadSkillDocument(evaluation.category) || skill.getSystemPrompt();
-    const livingRules = ruleHarvester.getAppliedRules();
+    let systemPrompt = loadSkillDocument(evaluation.category, projectId) || skill.getSystemPrompt();
+    const livingRules = ruleHarvester.getAppliedRules(projectId);
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
     if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'assistant') {

@@ -10,14 +10,6 @@ const sqlite3Verbose = sqlite3.verbose();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// [Phase 42] 에이전트 주도형 마이그레이션 적용 (Startup Blocking)
-try {
-  await runMigrations();
-} catch (e) {
-  console.error('[DB] 마이그레이션 실패로 시스템 구동을 중단합니다:', e);
-  process.exit(1);
-}
-
 // [S2-1] agents.json 기반 동적 에이전트 ID Set — KNOWN_AGENTS 하드코딩 제거
 const AGENT_IDS = (() => {
   try {
@@ -49,321 +41,11 @@ function classifyRiskLevel(content) {
 
 db.serialize(() => {
   db.run("PRAGMA foreign_keys = ON");
-  // Task 테이블 생성 (최초 설치 시)
-  db.run(`CREATE TABLE IF NOT EXISTS Task (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    content    TEXT    NOT NULL,
-    status     TEXT    NOT NULL,
-    requester  TEXT,
-    model      TEXT,
-    risk_level TEXT    NOT NULL DEFAULT 'SAFE',
-    execution_mode TEXT DEFAULT 'ari',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+});
 
-  // 기존 DB 마이그레이션: pragma로 컬럼 존재 여부 확인 후, 없을 때만 ADD COLUMN
-  // SQLite는 ALTER TABLE ADD COLUMN IF NOT EXISTS 미지원 → PRAGMA table_info 활용
-  db.all(`PRAGMA table_info(Task)`, (err, columns) => {
-    if (err) return console.error('[DB] PRAGMA 오류:', err.message);
-    const names = columns.map((c) => c.name);
-
-    if (!names.includes('risk_level')) {
-      db.run(`ALTER TABLE Task ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'SAFE'`);
-    }
-    if (!names.includes('updated_at')) {
-      db.run(`ALTER TABLE Task ADD COLUMN updated_at DATETIME`);
-    }
-    if (!names.includes('execution_mode')) {
-      db.run(`ALTER TABLE Task ADD COLUMN execution_mode TEXT DEFAULT 'ari'`);
-    }
-    if (!names.includes('deleted_at')) {
-      db.run(`ALTER TABLE Task ADD COLUMN deleted_at DATETIME`);
-    }
-    // [Phase 14 W1] 에이전트 ID를 model 컬럼에서 완전 분리
-    if (!names.includes('assigned_agent')) {
-      db.run(`ALTER TABLE Task ADD COLUMN assigned_agent TEXT DEFAULT NULL`);
-      console.log('[DB] Phase 14 마이그레이션: assigned_agent 컬럼 추가 완료');
-    }
-    // [v3.2] 워크플로우 분류를 위한 category 컬럼 추가
-    if (!names.includes('category')) {
-      db.run(`ALTER TABLE Task ADD COLUMN category TEXT DEFAULT 'QUICK_CHAT'`);
-      console.log('[DB] v3.2 마이그레이션: category 컬럼 추가 완료');
-    }
-    if (!names.includes('title')) {
-      db.run(`ALTER TABLE Task ADD COLUMN title TEXT DEFAULT ''`);
-      console.log('[DB] Phase 27 마이그레이션: title 컬럼 추가 완료');
-    }
-    // [S4-3] 실패 이력 카운터
-    if (!names.includes('failure_count')) {
-      db.run(`ALTER TABLE Task ADD COLUMN failure_count INTEGER DEFAULT 0`);
-      console.log('[DB] S4-3 마이그레이션: failure_count 컬럼 추가 완료');
-    }
-    // [PROJECT-SEQ] 프로젝트별 태스크 순번 (#1부터 시작)
-    if (!names.includes('project_task_num')) {
-      db.run(`ALTER TABLE Task ADD COLUMN project_task_num INTEGER DEFAULT NULL`);
-      // 기존 데이터 소급: 프로젝트별 생성 순서대로 순번 부여
-      db.run(`
-        UPDATE Task SET project_task_num = (
-          SELECT COUNT(*) FROM Task t2
-          WHERE t2.project_id = Task.project_id
-            AND t2.id <= Task.id
-            AND t2.deleted_at IS NULL
-        ) WHERE project_task_num IS NULL
-      `);
-      console.log('[DB] PROJECT-SEQ 마이그레이션: project_task_num 컬럼 추가 및 소급 완료');
-    }
-    // [Phase 36 /run] 파이프라인 릴레이 순번 컬럼
-    // NULL = 일반 카드, 1~N = 파이프라인 카드 (자동 릴레이 대상)
-    if (!names.includes('pipeline_step')) {
-      db.run(`ALTER TABLE Task ADD COLUMN pipeline_step INTEGER DEFAULT NULL`);
-      console.log('[DB] Phase 36 마이그레이션: Task.pipeline_step 컬럼 추가 완료');
-    }
-    // [Phase 36 /run] 파이프라인 카드 상태: PLANNED = 잠금(실행 불가)
-    // PENDING/IN_PROGRESS/DONE 은 기존과 동일
-    if (!names.includes('pipeline_is_review_stop')) {
-      db.run(`ALTER TABLE Task ADD COLUMN pipeline_is_review_stop INTEGER DEFAULT 0`);
-      console.log('[DB] Phase 36 마이그레이션: Task.pipeline_is_review_stop 컬럼 추가 완료');
-    }
-    // [Context Chaining] 컨텍스트 체이닝 (PRD v1.3)
-    if (!names.includes('context_chain')) {
-      db.run(`ALTER TABLE Task ADD COLUMN context_chain TEXT DEFAULT '[]'`);
-      console.log('[DB] Context Chaining 마이그레이션: Task.context_chain 컬럼 추가 완료');
-    }
-    // (plan_master_status와 revision_count는 Task가 아닌 projects 테이블로 이동됨)
-  });
-
-  db.all("PRAGMA table_info(TaskComment)", (err, rows) => {
-    if (err) return;
-    const names = rows.map((r) => r.name);
-    if (!names.includes('meta_data')) {
-      db.run(`ALTER TABLE TaskComment ADD COLUMN meta_data TEXT DEFAULT NULL`);
-      console.log('[DB] Phase 22.6 마이그레이션: TaskComment meta_data 컬럼 추가 완료');
-    }
-    // [Phase 36b] 카드 링크: 코멘트 순번 컬럼 추가
-    if (!names.includes('comment_idx')) {
-      db.run(`ALTER TABLE TaskComment ADD COLUMN comment_idx INTEGER DEFAULT NULL`);
-      // 소급: 카드별 생성 순서대로 순번 부여
-      db.run(`
-        UPDATE TaskComment SET comment_idx = (
-          SELECT COUNT(*) FROM TaskComment t2
-          WHERE t2.task_id = TaskComment.task_id AND t2.id <= TaskComment.id
-        ) WHERE comment_idx IS NULL
-      `);
-      console.log('[DB] Phase 36b 마이그레이션: TaskComment.comment_idx 컬럼 추가 및 소급 완료');
-    }
-    // [Context Chaining] 컨텍스트 체이닝 (PRD v1.3)
-    if (!names.includes('context_chain')) {
-      db.run(`ALTER TABLE TaskComment ADD COLUMN context_chain TEXT DEFAULT '[]'`);
-      console.log('[DB] Context Chaining 마이그레이션: TaskComment.context_chain 컬럼 추가 완료');
-    }
-  });
-
-  // Log 테이블 생성 (Phase 12: 1시간 배치 보고용 데이터 저장)
-  db.run(`CREATE TABLE IF NOT EXISTS Log (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    level      TEXT,
-    message    TEXT NOT NULL,
-    agent_id   TEXT,
-    task_id    TEXT,
-    source     TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // TaskComment 테이블 생성 (Prime W2 반영: 별도 테이블 설계)
-  db.run(`CREATE TABLE IF NOT EXISTS TaskComment (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id    INTEGER NOT NULL,
-    author     TEXT NOT NULL,
-    content    TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (task_id) REFERENCES Task(id) ON DELETE CASCADE
-  )`);
-
-  // [Phase 36b] 카드링크 첨부 파일 테이블
-  db.run(`CREATE TABLE IF NOT EXISTS task_attachments (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id      INTEGER NOT NULL REFERENCES Task(id) ON DELETE CASCADE,
-    comment_id   INTEGER DEFAULT NULL REFERENCES TaskComment(id) ON DELETE SET NULL,
-    file_idx     INTEGER NOT NULL,
-    file_label   TEXT NOT NULL,
-    file_path    TEXT NOT NULL,
-    file_type    TEXT,
-    file_size    INTEGER,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  db.run(`CREATE INDEX IF NOT EXISTS idx_attachments_task ON task_attachments(task_id, file_idx)`);
-
-  // 사용자 설정 테이블 (Active Heartbeat 2.0 설정 저장소)
-  db.run(`CREATE TABLE IF NOT EXISTS user_settings (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-  )`);
-
-  // 기본값 삽입 (이미 존재하면 무시)
-  db.run(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('heartbeat_auto_resume_level', 'SAFE_ONLY')`);
-  db.run(`INSERT OR IGNORE INTO user_settings (key, value) VALUES ('batch_report_interval_min', '30')`);
-
-  // CKS 연구 프레임워크 지표 테이블 (Phase 4 도입)
-  db.run(`CREATE TABLE IF NOT EXISTS CksMetrics (
-    task_id     TEXT PRIMARY KEY,
-    team_type   TEXT,
-    tei_tokens  INTEGER DEFAULT 0,
-    ksi_r_score INTEGER DEFAULT 0,
-    ksi_s_score REAL DEFAULT 0.0,
-    her_count   INTEGER DEFAULT 0,
-    eii_score   REAL DEFAULT 0.0,
-    irc_count   INTEGER DEFAULT 0,
-    uxs_rating  INTEGER DEFAULT 0,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  db.run(`ALTER TABLE CksMetrics ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP`, () => {});
-
-
-  // DB 와치독 조회 효율화: 복합 인덱스 (Opus 권고)
-  db.run(`CREATE INDEX IF NOT EXISTS idx_task_watchdog ON Task(status, updated_at)`);
-
-  // [Phase 17-4] AgentSkill 테이블 생성 (에이전트별 장착된 스킬 기록)
-  db.run(`CREATE TABLE IF NOT EXISTS AgentSkill (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id   TEXT NOT NULL,
-    skill_id   TEXT NOT NULL,
-    is_active  INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(agent_id, skill_id)
-  )`);
-
-  // [S2-1] 동적 AGENT_IDS로 고아 스킬 레코드 클린업
-  const agentList = [...AGENT_IDS].filter(id => id !== 'system' && id !== 'devteam');
-  const placeholders = agentList.map(() => '?').join(',');
-  db.run(
-    `DELETE FROM AgentSkill WHERE agent_id NOT IN (${placeholders})`,
-    agentList,
-    function(err) {
-      if (err) console.error('[DB] AgentSkill 클린업 실패:', err.message);
-      else if (this.changes > 0) console.log(`[DB] 고아 스킬 레코드 ${this.changes}건 삭제 완료`);
-    }
-  );
-
-  // ─── [Week 3: Memory 흡수] FTS5 전문 검색 데이블 및 트리거 생성 ───────────────
-  db.run(`CREATE VIRTUAL TABLE IF NOT EXISTS TaskFTS USING fts5(id UNINDEXED, content, tokenize='unicode61')`);
-
-  // Task 테이블과 TaskFTS 동기화 트리거
-  db.run(`CREATE TRIGGER IF NOT EXISTS task_ai_insert AFTER INSERT ON Task
-          BEGIN
-            INSERT INTO TaskFTS(rowid, id, content) VALUES (new.id, new.id, new.content);
-          END`);
-  
-  db.run(`CREATE TRIGGER IF NOT EXISTS task_ai_update AFTER UPDATE OF content ON Task
-          BEGIN
-            UPDATE TaskFTS SET content = new.content WHERE rowid = old.id;
-          END`);
-          
-  db.run(`CREATE TRIGGER IF NOT EXISTS task_ai_delete AFTER DELETE ON Task
-          BEGIN
-            DELETE FROM TaskFTS WHERE rowid = old.id;
-          END`);
-
-  // ─── [v2.0] Multi-Team 아키텍스쳐: projects / teams / team_agents 테이블 ────────
-  db.run(`CREATE TABLE IF NOT EXISTS projects (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    objective  TEXT,
-    isolation_scope TEXT DEFAULT '{"type":"strict_isolation","shared_projects":[]}',
-    status     TEXT DEFAULT 'active',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.all(`PRAGMA table_info(projects)`, (err, cols) => {
-    if (err) return;
-    const names = (cols || []).map(c => c.name);
-    if (!names.includes('objective')) {
-      db.run(`ALTER TABLE projects ADD COLUMN objective TEXT`);
-      console.log('[DB] Phase 28a 마이그레이션: objective 컬럼 추가 완료');
-    }
-    if (!names.includes('isolation_scope')) {
-      db.run(`ALTER TABLE projects ADD COLUMN isolation_scope TEXT DEFAULT '{"type":"strict_isolation","shared_projects":[]}'`);
-      console.log('[DB] Phase 28a 마이그레이션: isolation_scope 컬럼 추가 완료');
-    }
-    // [CP-4 / PRD#32] objective_raw, workflow_raw 분리 컬럼 추가
-    if (!names.includes('objective_raw')) {
-      db.run(`ALTER TABLE projects ADD COLUMN objective_raw TEXT`);
-      console.log('[DB] Phase 33 마이그레이션: projects.objective_raw 컬럼 추가 완료');
-    }
-    if (!names.includes('workflow_raw')) {
-      db.run(`ALTER TABLE projects ADD COLUMN workflow_raw TEXT`);
-      console.log('[DB] Phase 33 마이그레이션: projects.workflow_raw 컬럼 추가 완료');
-    }
-    // [Phase 36 /run] 파이프라인 실행 모드
-    // 'none': 비활성 | 'run': 자율 릴레이 | 'run-b': 단계별 확인
-    if (!names.includes('pipeline_mode')) {
-      db.run(`ALTER TABLE projects ADD COLUMN pipeline_mode TEXT DEFAULT 'none'`);
-      console.log('[DB] Phase 36 마이그레이션: projects.pipeline_mode 컬럼 추가 완료');
-    }
-    // [Phase 41] 프로젝트 유형 (development | marketing | design | general)
-    if (!names.includes('project_type')) {
-      db.run(`ALTER TABLE projects ADD COLUMN project_type TEXT DEFAULT 'development'`);
-      console.log('[DB] Phase 41 마이그레이션: projects.project_type 컬럼 추가 완료');
-    }
-    // [Phase 39] Plan Master 기획 세션 상태 및 수정 횟수 추적
-    if (!names.includes('plan_master_status')) {
-      db.run(`ALTER TABLE projects ADD COLUMN plan_master_status TEXT DEFAULT NULL`);
-      console.log('[DB] Phase 39 마이그레이션: projects.plan_master_status 컬럼 추가 완료');
-    }
-    if (!names.includes('plan_master_revision_count')) {
-      db.run(`ALTER TABLE projects ADD COLUMN plan_master_revision_count INTEGER DEFAULT 0`);
-      console.log('[DB] Phase 39 마이그레이션: projects.plan_master_revision_count 컬럼 추가 완료');
-    }
-  });
-
-
-  db.run(`CREATE TABLE IF NOT EXISTS teams (
-    id          TEXT PRIMARY KEY,
-    project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
-    name        TEXT NOT NULL,
-    group_type  TEXT,
-    icon        TEXT,
-    color       TEXT,
-    created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS team_agents (
-    team_id         TEXT REFERENCES teams(id) ON DELETE CASCADE,
-    agent_id        TEXT NOT NULL,
-    experiment_role TEXT,
-    nickname        TEXT,
-    PRIMARY KEY (team_id, agent_id)
-  )`);
-
-  // [Phase 31+] team_agents nickname 컬럼 마이그레이션
-  db.all(`PRAGMA table_info(team_agents)`, (err, cols) => {
-    if (err) return;
-    const names = (cols || []).map(c => c.name);
-    if (!names.includes('nickname')) {
-      db.run(`ALTER TABLE team_agents ADD COLUMN nickname TEXT`);
-      console.log('[DB] Phase 31+ 마이그레이션: team_agents.nickname 컬럼 추가 완료');
-    }
-  });
-
-  // ─── [Phase 35] Dynamic Team Instantiation: project_agents 테이블 ────────
-  db.run(`CREATE TABLE IF NOT EXISTS project_agents (
-    id              TEXT PRIMARY KEY,
-    project_id      TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    role_id         TEXT NOT NULL,
-    model_id        TEXT NOT NULL,
-    nickname        TEXT,
-    avatar          TEXT,
-    role_description TEXT,
-    status          TEXT DEFAULT 'active',
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-  
-  db.run(`CREATE INDEX IF NOT EXISTS idx_project_agents_project ON project_agents(project_id)`);
-
-  // ─── [Phase 35] 마이그레이션: 기존 team_agents 데이터를 project_agents로 복제 (Dual Write 준비)
+// [ADM 잔류: W-001, W-002] 동적 시딩 로직
+function _initDynamicSeeds() {
+  // [W-001] Phase 35: team_agents 데이터를 project_agents로 복제 (Dual Write 준비)
   db.get(`SELECT COUNT(*) as cnt FROM project_agents`, (err, row) => {
     if (!err && row && row.cnt === 0) {
       db.all(`SELECT ta.team_id, ta.agent_id, ta.experiment_role, ta.nickname, t.project_id 
@@ -384,15 +66,13 @@ db.serialize(() => {
               VALUES (?, ?, ?, ?, ?, ?, ?)`);
 
             rows.forEach(r => {
-              // project_id가 없으면 스킵 (예: team_independent 등 global_mycrew에 속하지 않는 고아 팀)
               if (!r.project_id) return;
-              
               const baseAgent = agentMap[r.agent_id] || {};
               const projAgentId = `${r.project_id}-${r.agent_id}`;
               const roleId = r.agent_id;
               const modelId = baseAgent.antiModel || MODEL.ANTI_GEMINI_PRO_HIGH;
               const nickname = r.nickname || baseAgent.nickname || '';
-              const avatar = '👤'; // Default fallback
+              const avatar = '👤';
               const roleDesc = r.experiment_role || baseAgent.role || '팀원';
 
               stmt.run(projAgentId, r.project_id, roleId, modelId, nickname, avatar, roleDesc);
@@ -400,175 +80,68 @@ db.serialize(() => {
 
             stmt.finalize();
             db.run('COMMIT', (commitErr) => {
-              if (commitErr) {
-                console.error('[DB] Phase 35 마이그레이션 실패:', commitErr.message);
-              } else {
-                console.log(`[DB] Phase 35 마이그레이션 완료: 기존 에이전트 인스턴스 복제됨`);
-              }
+              if (commitErr) console.error('[DB] W-001 동적 시딩 실패:', commitErr.message);
+              else console.log(`[DB] W-001 동적 시딩 완료: 기존 에이전트 인스턴스 복제됨`);
             });
           });
         } catch (e) {
-          console.error('[DB] Phase 35 마이그레이션 에러:', e.message);
+          console.error('[DB] W-001 동적 시딩 에러:', e.message);
         }
       });
     }
   });
 
-  // ─── [v2.0] 시더(종자) 데이터 (PRAGMA 전에 미리 삽입하여 외래키 만족) ────────────
-  // (Phase 28b: Zero-Config 연동 완료로, 더미 프로젝트 시딩 로직은 제거됨)
-
-  // ─── [v2.0] 콜럼 마이그레이션: priority + has_artifact + project_id ────────────
-  // Task와 Log 마이그레이션을 단일 트랜잭션으로 통합하여 데드락 경합 방지
-  db.all(`PRAGMA table_info(Task)`, (err, taskCols) => {
-    if (err) return;
-    const taskNames = (taskCols || []).map(c => c.name);
-    
-    db.all(`PRAGMA table_info(Log)`, (err, logCols) => {
-      if (err) return;
-      const logNames = (logCols || []).map(c => c.name);
-      
-      db.serialize(() => {
-        if (!taskNames.includes('priority'))     db.run(`ALTER TABLE Task ADD COLUMN priority TEXT DEFAULT 'medium'`);
-        if (!taskNames.includes('has_artifact')) db.run(`ALTER TABLE Task ADD COLUMN has_artifact INTEGER DEFAULT 0`);
-        if (!taskNames.includes('artifact_url')) db.run(`ALTER TABLE Task ADD COLUMN artifact_url TEXT DEFAULT NULL`);
-        if (!taskNames.includes('sprint_no')) {
-          db.run(`ALTER TABLE Task ADD COLUMN sprint_no INTEGER DEFAULT NULL`);
-          console.log('[DB] Phase 36-A 마이그레이션: Task.sprint_no 컬럼 추가 완료');
-        }
-        
-        const alterTask = !taskNames.includes('project_id');
-        const alterLog = !logNames.includes('project_id');
-
-        if (alterTask) db.run(`ALTER TABLE Task ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`);
-        if (alterLog)  db.run(`ALTER TABLE Log ADD COLUMN project_id TEXT REFERENCES projects(id) ON DELETE SET NULL`);
-
-        if (alterTask || alterLog) {
-          db.run("BEGIN TRANSACTION");
-          // [BUG-05 FIX] FK 무결성 보장: UPDATE 전에 부모 레코드 시딩
-          db.run(`INSERT OR IGNORE INTO projects (id, name, objective, isolation_scope, status)
-                  VALUES ('global_mycrew', 'MyCrew 운영센터', '시스템 전역 태스크 및 로그 저장소', '{"type":"global_knowledge"}', 'active')`);
-          if (alterTask) db.run(`UPDATE Task SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
-          if (alterLog)  db.run(`UPDATE Log SET project_id = 'global_mycrew' WHERE project_id IS NULL`);
-          
-          db.run("COMMIT", function(err) {
-            if (err) {
-              console.error("[DB] Legacy backfill failed, rolling back:", err.message);
-              db.run("ROLLBACK");
-            } else {
-              console.log(`[DB] Successfully backfilled legacy tasks & logs to 'global_mycrew' project.`);
-            }
-          });
-        }
-      });
-    });
-  });
-
-  // ─── [v3.2] Final Global Roster
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_independent','ari','공유 라우터 (Gemini Flash)')`);
-
-  // Team B 맴버 (LUNA, PICO, LUMI)
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','luna','Team B — 최종 합성자 (Claude Opus)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','backend_engineer','Team B — 영상 담당 (Claude Sonnet)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_B','ux_designer','Team B — 이미지 담당 (Gemini Flash)')`);
-  
-  // Team A 맴버 (OLLIE, LILY, NOVA)
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','ollie','Team A — 적대적 판관 (Claude Opus)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','lily', 'Team A — 영상 담당 (Claude Sonnet)')`);
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_A','nova', 'Team A — 이미지 담당 (Gemini Flash)')`);
-
-  // ─── [v2.0] 독립
-  db.run(`INSERT OR IGNORE INTO team_agents (team_id, agent_id, experiment_role) VALUES ('team_independent','ari','독립 판관 (GPT-4o 심사 보조)')`);
-
-  // [Phase 18] Image Lab 전용 테이블
-  db.run(`CREATE TABLE IF NOT EXISTS image_lab_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT UNIQUE NOT NULL,
-    ref_path TEXT,
-    analysis_json TEXT,
-    prompt TEXT,
-    result_url TEXT,
-    score_avg REAL,
-    is_learned INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // ─── [Phase 27] Bugdog CS 리포트 테이블 ────────────────────────────────
-  db.run(`CREATE TABLE IF NOT EXISTS cs_reports (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    report_no        TEXT    NOT NULL,
-    severity         TEXT    NOT NULL CHECK(severity IN ('WARNING','CRITICAL')),
-    service          TEXT    NOT NULL,
-    affected_service TEXT,
-    error_code       TEXT,
-    error_msg        TEXT,
-    stack_trace      TEXT,
-    status           TEXT    NOT NULL DEFAULT 'OPEN' CHECK(status IN ('OPEN','IN_PROGRESS','RESOLVED')),
-    auto_generated   INTEGER NOT NULL DEFAULT 1,
-    reporter         TEXT    NOT NULL DEFAULT 'bugdog',
-    created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-    resolved_at      TEXT
-  )`);
-
-  // ─── [Phase 30] 에이전트 프로필 테이블 (Prime 검수 A- 승인) ──────────────
-  // - agents.json 이 SSOT → DB가 SSOT로 전환 (agents.json은 읽기 전용 시드 역할)
-  // - bridge: 파일 브릿지 vs API 직접 라우팅 구분 (executor.js 라우팅 핵심)
-  // - default_category: 텔레그램 자동 할당 카테고리 매핑
-  // - role: agents.json의 role이 정본 (team_agents.experiment_role 우선 아님)
-  db.run(`CREATE TABLE IF NOT EXISTS agent_profiles (
-    id               TEXT PRIMARY KEY,
-    nickname         TEXT,
-    role             TEXT,
-    model            TEXT,
-    bridge           INTEGER NOT NULL DEFAULT 0,
-    default_category TEXT,
-    team_id          TEXT REFERENCES teams(id) ON DELETE SET NULL,
-    project_id       TEXT REFERENCES projects(id) ON DELETE SET NULL,
-    updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-
-  // [Phase 30] agents.json → agent_profiles 시드 마이그레이션
-  // INSERT OR IGNORE: 기존 레코드 보존, 최초 부팅 시에만 삽입
-  // role 정본: agents.json (team_agents.experiment_role 아님 — Prime 검수 확정)
-  // team_id 매핑: team_agents 테이블에서 JOIN으로 가져옴
+  // [W-002] Phase 30: agents.json → agent_profiles 시드 마이그레이션
   try {
     const _agentsRaw = readFileSync(path.resolve(__dirname, 'agents.json'), 'utf-8');
     const _agentsSeed = JSON.parse(_agentsRaw);
-    _agentsSeed.forEach(a => {
-      db.run(
-        `INSERT OR IGNORE INTO agent_profiles (id, nickname, role, model, bridge, default_category)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          a.id,
-          a.nickname || a.id,           // nickname 초기값: nickname (한글 이름)
-          a.role || null,
-          a.antiModel || null,        // model 초기값: antiModel
-          a.bridge ? 1 : 0,
-          a.defaultCategory || null,
-        ],
-        (err) => { if (err) console.error(`[DB] agent_profiles 시드 실패 (${a.id}):`, err.message); }
-      );
-      // team_id 매핑: team_agents에서 이미 존재하는 레코드를 참조 (별도 UPDATE)
-      db.run(
-        `UPDATE agent_profiles
-         SET team_id    = (SELECT team_id    FROM team_agents WHERE agent_id = ? LIMIT 1),
-             project_id = (SELECT t.project_id FROM team_agents ta JOIN teams t ON t.id = ta.team_id WHERE ta.agent_id = ? LIMIT 1)
-         WHERE id = ? AND team_id IS NULL`,
-        [a.id, a.id, a.id],
-        (err) => { if (err) console.error(`[DB] agent_profiles team_id 매핑 실패 (${a.id}):`, err.message); }
-      );
+    db.serialize(() => {
+        _agentsSeed.forEach(a => {
+        db.run(
+            `INSERT OR IGNORE INTO agent_profiles (id, nickname, role, model, bridge, default_category)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [a.id, a.nickname || a.id, a.role || null, a.antiModel || null, a.bridge ? 1 : 0, a.defaultCategory || null],
+            (err) => { if (err) console.error(`[DB] agent_profiles 시드 실패 (${a.id}):`, err.message); }
+        );
+        db.run(
+            `UPDATE agent_profiles
+             SET team_id    = (SELECT team_id    FROM team_agents WHERE agent_id = ? LIMIT 1),
+                 project_id = (SELECT t.project_id FROM team_agents ta JOIN teams t ON t.id = ta.team_id WHERE ta.agent_id = ? LIMIT 1)
+             WHERE id = ? AND team_id IS NULL`,
+            [a.id, a.id, a.id],
+            (err) => { if (err) console.error(`[DB] agent_profiles team_id 매핑 실패 (${a.id}):`, err.message); }
+        );
+        });
     });
-    console.log('[DB] Phase 30: agent_profiles 시드 완료');
+    console.log('[DB] W-002 동적 시딩 완료: agent_profiles');
   } catch (e) {
-    console.warn('[DB] Phase 30: agents.json 시드 실패 —', e.message);
+    console.warn('[DB] W-002 동적 시딩 실패 —', e.message);
   }
+}
 
-  // ─── [Phase 38-1] Chrome Extension 세션 저장소 (Sprint 5) ────────
-  db.run(`CREATE TABLE IF NOT EXISTS extension_sessions (
-    session_id TEXT PRIMARY KEY,
-    history    TEXT NOT NULL,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
-});
+// [ADM 잔류: W-003] 고아 스킬 클린업
+function _cleanupOrphanSkills() {
+  const agentList = [...AGENT_IDS].filter(id => id !== 'system' && id !== 'devteam');
+  const placeholders = agentList.map(() => '?').join(',');
+  db.run(
+    `DELETE FROM AgentSkill WHERE agent_id NOT IN (${placeholders})`,
+    agentList,
+    function(err) {
+      if (err) console.error('[DB] AgentSkill 클린업 실패:', err.message);
+      else if (this.changes > 0) console.log(`[DB] 고아 스킬 레코드 ${this.changes}건 삭제 완료`);
+    }
+  );
+}
+
+// [Phase 42] 에이전트 주도형 마이그레이션 적용 (Startup Blocking)
+try {
+  await runMigrations();
+  _initDynamicSeeds();
+  _cleanupOrphanSkills();
+} catch (e) {
+  console.error('[DB] 마이그레이션 실패로 시스템 구동을 중단합니다:', e);
+  process.exit(1);
+}
 
 
 class DatabaseManager {
@@ -1620,6 +1193,10 @@ class DatabaseManager {
 
   // ─── [v2.0] 칸반 보드 전용 경량 DTO (콘텐츠 미포함) ───────────────────
   async getAllTasksLight(projectId = null) {
+    // [Phase 42.5 Step 2] Prime Rec #2: projectId 누락 시 경고 로그 (오염 추적용)
+    if (!projectId && process.env.NODE_ENV === 'development') {
+      console.warn(`⚠️ [DB Warning] getAllTasksLight 호출 시 projectId 누락. 전사 카드가 로드되어 컨텍스트 오염을 유발할 수 있습니다. (Trace: ${new Error().stack.split('\\n')[2]})`);
+    }
     try {
       let targetIds = null;
       if (projectId) {
@@ -2138,6 +1715,9 @@ class DatabaseManager {
    * - isolation_type B/C → 접근 가능한 프로젝트 범위 내 탐색
    */
   async getTaskByProjectNumAcrossScopes(requestingProjectId, taskNum, isolationType) {
+    // [Phase 42.5 Step 1] Prime Rec #1: requestingProjectId NULL 방어
+    if (!requestingProjectId) return null; 
+
     const accessibleIds = await this.getAccessibleProjectIds(requestingProjectId);
     return new Promise((resolve, reject) => {
       if (!accessibleIds || accessibleIds.length === 0) return resolve(null);
@@ -2146,9 +1726,9 @@ class DatabaseManager {
         `SELECT id, title, content, status, assigned_agent, project_id, project_task_num
          FROM Task
          WHERE project_id IN (${placeholders}) AND project_task_num = ? AND deleted_at IS NULL
-         ORDER BY created_at ASC
+         ORDER BY CASE WHEN project_id = ? THEN 1 ELSE 2 END ASC, created_at DESC
          LIMIT 1`,
-        [...accessibleIds, taskNum],
+        [...accessibleIds, taskNum, requestingProjectId],
         (err, row) => {
           if (err) reject(err);
           else resolve(row || null);

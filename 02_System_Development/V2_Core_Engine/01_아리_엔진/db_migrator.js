@@ -70,77 +70,115 @@ export async function runMigrations() {
                     return resolve();
                 }
                 
-                // 백업 수행
-                try {
-                    backupDatabase();
-                } catch(e) {
-                    db.close();
-                    return reject(e);
-                }
-                
-                console.log(`[Migrator] Found ${pendingMigrations.length} pending migrations.`);
-                
-                // 트랜잭션 기반 순차 실행
-                db.run('BEGIN TRANSACTION');
-                
-                let hasError = false;
-                
-                const executeNext = (index) => {
-                    if (index >= pendingMigrations.length) {
-                        if (!hasError) {
+                // [Phase 42 ADM] 레거시 DB 감지: _migrations가 비었지만 Task 테이블이 이미 존재
+                // → 기존 인라인 마이그레이션으로 구축된 DB이므로 SQL 실행 없이 이력만 등록
+                if (appliedMigrations.size === 0) {
+                    db.get(`SELECT name FROM sqlite_master WHERE type='table' AND name='Task'`, (err, row) => {
+                        if (row) {
+                            console.log('[Migrator] 🔍 레거시 DB 감지 — 기존 스키마가 이미 존재합니다.');
+                            console.log('[Migrator] SQL 실행을 건너뛰고 이력만 등록합니다.');
+                            
+                            db.run('BEGIN TRANSACTION');
+                            const stmt = db.prepare(`INSERT OR IGNORE INTO _migrations (filename) VALUES (?)`);
+                            pendingMigrations.forEach(f => stmt.run(f));
+                            stmt.finalize();
+                            
                             db.run('COMMIT', (commitErr) => {
                                 if (commitErr) {
-                                    console.error('[Migrator] Failed to commit migrations:', commitErr);
+                                    console.error('[Migrator] 레거시 이력 등록 실패:', commitErr);
                                     db.run('ROLLBACK');
                                     db.close();
                                     return reject(commitErr);
                                 }
-                                console.log('[Migrator] Successfully applied all migrations.');
+                                console.log(`[Migrator] ✅ 레거시 이력 ${pendingMigrations.length}건 등록 완료.`);
                                 db.close();
                                 resolve();
                             });
-                        }
-                        return;
-                    }
-                    
-                    const filename = pendingMigrations[index];
-                    const filepath = path.resolve(migrationsDir, filename);
-                    const sql = fs.readFileSync(filepath, 'utf-8');
-                    
-                    console.log(`[Migrator] Executing ${filename}...`);
-                    
-                    db.exec(sql, (execErr) => {
-                        if (execErr) {
-                            hasError = true;
-                            console.error(`[Migrator] CRITICAL: Error executing ${filename}`, execErr.message);
-                            db.run('ROLLBACK', () => {
-                                console.log(`[Migrator] Rolled back transaction due to error in ${filename}`);
-                                db.close();
-                                reject(execErr);
-                            });
                             return;
                         }
-                        
-                        // 이력 기록
-                        db.run(`INSERT INTO _migrations (filename) VALUES (?)`, [filename], (insertErr) => {
-                            if (insertErr) {
-                                hasError = true;
-                                console.error(`[Migrator] CRITICAL: Failed to record ${filename} in _migrations`, insertErr.message);
-                                db.run('ROLLBACK', () => {
-                                    db.close();
-                                    reject(insertErr);
-                                });
-                                return;
-                            }
-                            // 다음 파일 실행
-                            executeNext(index + 1);
-                        });
+                        // Task 테이블도 없으면 완전히 새로운 DB → 정상 마이그레이션 실행
+                        executeMigrations(db, pendingMigrations, resolve, reject);
                     });
-                };
+                    return;
+                }
                 
-                // 첫 파일 실행 시작
-                executeNext(0);
+                // 신규 마이그레이션 실행 (기존 DB에 새로운 SQL 파일이 추가된 경우)
+                executeMigrations(db, pendingMigrations, resolve, reject);
             });
         });
     });
+}
+
+// [Phase 42 ADM] 마이그레이션 순차 실행 헬퍼
+function executeMigrations(db, pendingMigrations, resolve, reject) {
+    // 백업 수행
+    try {
+        backupDatabase();
+    } catch(e) {
+        db.close();
+        return reject(e);
+    }
+    
+    console.log(`[Migrator] Found ${pendingMigrations.length} pending migrations.`);
+    
+    // 트랜잭션 기반 순차 실행
+    db.run('BEGIN TRANSACTION');
+    
+    let hasError = false;
+    
+    const executeNext = (index) => {
+        if (index >= pendingMigrations.length) {
+            if (!hasError) {
+                db.run('COMMIT', (commitErr) => {
+                    if (commitErr) {
+                        console.error('[Migrator] Failed to commit migrations:', commitErr);
+                        db.run('ROLLBACK');
+                        db.close();
+                        return reject(commitErr);
+                    }
+                    console.log('[Migrator] Successfully applied all migrations.');
+                    db.close();
+                    resolve();
+                });
+            }
+            return;
+        }
+        
+        const filename = pendingMigrations[index];
+        const filepath = path.resolve(migrationsDir, filename);
+        const sql = fs.readFileSync(filepath, 'utf-8');
+        
+        console.log(`[Migrator] Executing ${filename}...`);
+        
+        db.exec(sql, (execErr) => {
+            if (execErr) {
+                hasError = true;
+                console.error(`[Migrator] CRITICAL: Error executing ${filename}`, execErr.message);
+                db.run('ROLLBACK', () => {
+                    console.log(`[Migrator] Rolled back transaction due to error in ${filename}`);
+                    db.close();
+                    reject(execErr);
+                });
+                return;
+            }
+            
+            // 이력 기록
+            db.run(`INSERT INTO _migrations (filename) VALUES (?)`, [filename], (insertErr) => {
+                if (insertErr) {
+                    hasError = true;
+                    console.error(`[Migrator] CRITICAL: Failed to record ${filename} in _migrations`, insertErr.message);
+                    db.run('ROLLBACK', () => {
+                        db.close();
+                        reject(insertErr);
+                    });
+                    return;
+                }
+                // 다음 파일 실행
+                executeNext(index + 1);
+            });
+        });
+    };
+    
+    // 첫 파일 실행 시작
+    executeNext(0);
 }

@@ -4,7 +4,8 @@ import {
   CallToolRequestSchema, 
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
-  ReadResourceRequestSchema
+  ReadResourceRequestSchema,
+  ListResourceTemplatesRequestSchema
 } from "@modelcontextprotocol/sdk/types.js";
 
 // Hijack console.log to prevent breaking the MCP stdio JSON-RPC protocol
@@ -56,17 +57,25 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         name: "All Projects",
         description: "Returns all projects in MyCrew",
         mimeType: "application/json"
-      },
+      }
+    ]
+  };
+});
+
+// [Phase 42.5 Step 2] P1-001 픽스: 전사 태스크 조회를 차단하고 projectId 기반 템플릿 리소스로 전환
+server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+  return {
+    resourceTemplates: [
       {
-        uri: "resources://mycrew/tasks/all",
-        name: "All Kanban Tasks",
-        description: "Returns all tasks currently on the MyCrew Kanban board",
+        uriTemplate: "resources://mycrew/projects/{projectId}/tasks/all",
+        name: "Project Tasks",
+        description: "Returns all tasks for a specific project",
         mimeType: "application/json"
       },
       {
-        uri: "resources://mycrew/tasks/pending",
-        name: "Pending Kanban Tasks",
-        description: "Returns tasks that are TODO or IN_PROGRESS on the MyCrew Kanban board",
+        uriTemplate: "resources://mycrew/projects/{projectId}/tasks/pending",
+        name: "Project Pending Tasks",
+        description: "Returns tasks that are TODO or IN_PROGRESS on the specific project",
         mimeType: "application/json"
       }
     ]
@@ -85,11 +94,13 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
 
-  if (request.params.uri === "resources://mycrew/tasks/all") {
-    const tasks = await dbManager.getAllTasksLight();
-    const projects = await dbManager.getAllProjects();
-    const projMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
-    tasks.forEach(t => t.project_name = projMap[t.project_id] || 'Unknown');
+  // [Phase 42.5 Step 2] P1-001 픽스: 템플릿 URI 매칭 및 projectId 추출
+  const matchAll = request.params.uri.match(/^resources:\/\/mycrew\/projects\/([^\/]+)\/tasks\/all$/);
+  if (matchAll) {
+    const projectId = matchAll[1];
+    const tasks = await dbManager.getAllTasksLight(projectId);
+    const project = await dbManager.getProjectById(projectId);
+    tasks.forEach(t => t.project_name = project ? project.name : 'Unknown');
     
     return {
       contents: [{
@@ -100,14 +111,15 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     };
   }
   
-  if (request.params.uri === "resources://mycrew/tasks/pending") {
-    const tasks = await dbManager.getAllTasksLight();
-    const projects = await dbManager.getAllProjects();
-    const projMap = Object.fromEntries(projects.map(p => [p.id, p.name]));
+  const matchPending = request.params.uri.match(/^resources:\/\/mycrew\/projects\/([^\/]+)\/tasks\/pending$/);
+  if (matchPending) {
+    const projectId = matchPending[1];
+    const tasks = await dbManager.getAllTasksLight(projectId);
+    const project = await dbManager.getProjectById(projectId);
     
     const pendingTasks = tasks.filter(t => 
       ['todo', 'PENDING', 'in_progress', 'IN_PROGRESS'].includes(t.status)
-    ).map(t => ({...t, project_name: projMap[t.project_id] || 'Unknown'}));
+    ).map(t => ({...t, project_name: project ? project.name : 'Unknown'}));
     
     return {
       contents: [{

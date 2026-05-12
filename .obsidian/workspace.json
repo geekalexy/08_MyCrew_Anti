@@ -25,14 +25,30 @@
             "id": "a3a1e312f28b07b4",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "그래프 뷰"
+              "type": "image",
+              "state": {
+                "file": "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png"
+              },
+              "icon": "lucide-image",
+              "title": "스크린샷 2026-05-10 오전 10.57.09"
+            }
+          },
+          {
+            "id": "009cdc7d6e0f3302",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "07_MyCrew_Wiki/raw/그래피파이 명령어 보기.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "그래피파이 명령어 보기"
             }
           }
         ],
-        "currentTab": 1
+        "currentTab": 2
       }
     ],
     "direction": "vertical"
@@ -89,7 +105,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 334.50271224975586
+    "width": 383.50271224975586
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -192,54 +208,54 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "a3a1e312f28b07b4",
+  "active": "73276ca47e98c954",
   "lastOpenFiles": [
-    "02_System_Development/00_아키텍처_문서/01_PRD/Phase36_RunB_반자율완주모드_기획서.md",
-    "02_System_Development/00_아키텍처_문서/01_PRD/Phase36_RunB_단계별확인모드_기획서.md",
-    "채널분석/with_rije/with_rije_followers_20260326.csv",
-    "채널분석/with_rije/with_rije_data_20260326.csv",
-    "채널분석/with_rije/with_rije_dashboard.html",
-    "채널분석/with_rije/with_rije_ad_report_20260326.md",
-    "채널분석/vitnal_h/vitnal_h_followers_20260326.csv",
-    "채널분석/vitnal_h/vitnal_h_data_20260326.csv",
-    "채널분석/vitnal_h/vitnal_h_dashboard.html",
-    "채널분석/vitnal_h/vitnal_h_ad_report_20260326.md",
-    "채널분석/uknow_yeaji/uknow_yeaji_followers_20260327.csv",
-    "채널분석/uknow_yeaji/uknow_yeaji_data_20260327.csv",
-    "채널분석/uknow_yeaji/uknow_yeaji_dashboard.html",
-    "채널분석/uknow_yeaji/uknow_yeaji_ad_report_20260327.md",
-    "채널분석/tiding_of_joy/tiding_of_joy_followers_20260326.csv",
-    "채널분석/tiding_of_joy/tiding_of_joy_ad_report_20260326.md",
-    "채널분석/ssunyyzzoo/ssunyyzzoo_ad_report_20260327.md",
-    "채널분석/lyj.lpd/lyj.lpd_ad_report_20260326.md",
-    "채널분석/it_tem_ida/it_tem_ida_ad_report_20260319.md",
-    "채널분석/in__hwaa/in__hwaa_ad_report_20260326.md",
-    "채널분석/eden_mom_vely/eden_mom_vely_ad_report_20260327.md",
-    "채널분석/donsmell87/donsmell87_ad_report_20260319.md",
-    "채널분석/comely_nail_beauty/comely_nail_beauty_ad_report_20260326.md",
-    "채널분석/ape_vujade/ape_vujade_ad_report_20260326.md",
+    "05_My_history/Luca/ESSAY_Alex_2026-05-13_Luca.md",
+    "02_System_Development/_SESSION_LOGS/OBSERVATION_ESSAY_2026-05-13_Luca_Database_Architecture.md",
+    "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_ADM_Implementation.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/test_migrator.js",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/010_legacy_backfill.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/009_seed_data.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/008_indexes_and_triggers.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/007_utility_tables.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/006_phase36_pipeline.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/005_agent_skill_table.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/004_project_columns.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/003_comment_columns.sql",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/002_task_columns.sql",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_Phase42_ADM_SupremeReview_Prime.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_ADM_Agent_Driven_DB_Migration_PRD.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_4_Phase42_4_WikiEngine_Refactoring_SupremeReview_Prime.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_4_WikiEngine_Refactoring_PRD.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_5_Phase42_5_AbsoluteIsolation_최종승인_Prime.md",
+    "graphify-out/GRAPH_REPORT.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_5_Phase42_5_AbsoluteIsolation_코드리뷰_Prime.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/00_team/LEGACY_GLOBAL_GROUND_RULES.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/socian/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/mycrew-core-protocol/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/instagram-analysis/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/dev_autonomous_relay/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/11_orchestrator/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/10_secretary/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/09_video/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/08_workflow/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/07_system_shield/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/06_research/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/05_design/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/04_analysis/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/03_content/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/02_marketing/LEGACY_GLOBAL_SKILL.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/01_routing/LEGACY_GLOBAL_SKILL.md",
+    "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778052368882.png",
-    "05_My_history/Prime/01_입문편/1-1_코드_한줄도_몰랐던_내가.md",
-    "05_My_history/Prime/ARTICLE_SERIES_PLAN.md",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778050952157.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778050085335.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049858883.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049839024.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_sossian.official_1778049819073.png",
     "02_System_Development/01_아리_엔진/outputs/debug_01_login_page.png",
-    "02_System_Development/01_아리_엔진/docs/ARI_BRAIN.md",
-    "02_System_Development/SESSION_LOG_2026-04-25_Sonnet.md",
-    "02_System_Development/SESSION_LOG_2026-04-25_Luca.md",
-    "02_System_Development/00_아키텍처_문서/Phase25_Sonnet_프론트엔드_UI_의뢰서.md",
-    "02_System_Development/00_아키텍처_문서/Phase25_에이전트_업무_이벤트_워크플로우.md",
-    "02_System_Development/01_아리_엔진/docs/ARI_BRAIN_v1.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_고성능어댑터전략_기획서_확정.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_어댑터전략_PRD_Luca.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_추가요청_Sonnet→Luca.md",
-    "01_Company_Operations/01_전략_및_로드맵/v2.5_고성능어댑터/Phase22_프론트엔드_PRD_Sonnet.md",
     "무제.canvas",
     "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/pico.png",
-    "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/ari.png",
-    "02_System_Development/01_아리_엔진/outputs/brand-archive/socian_proof_1776873727223.png"
+    "02_System_Development/01_아리_엔진/remotion-poc/public/캐릭터이미지/ari.png"
   ]
 }

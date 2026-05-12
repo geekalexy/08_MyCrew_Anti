@@ -37,7 +37,6 @@ import imageLabRouter from './routes/imageLabRouter.js';
 import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.js';
 import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
 import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
-import { triggerGraphifyUpdate } from './ai-engine/workers/graphifyWatchdog.js';
 import wikiEngine from './ai-engine/services/wikiEngine.js';
 const app = express();
 const httpServer = createServer(app);
@@ -185,10 +184,10 @@ setInterval(() => {
 }, 5000);
 
 // ─── [Phase 25] Event-Driven Task Dispatcher (이벤트 기반 Pull 모델) ───
-async function dispatchNextTaskForAgent(agentId) {
+async function dispatchNextTaskForAgent(agentId, projectId = null) {
   if (!dbManager || !agentId || agentId === '미할당' || agentId === 'system') return;
   try {
-    const tasks = await dbManager.getAllTasksLight();
+    const tasks = await dbManager.getAllTasksLight(projectId);
     
     // 1. 해당 에이전트가 현재 진행 중인 작업이 있는지 확인 (Busy 체크)
     const isBusy = tasks.some(t => t.assigned_agent === agentId && (t.status === 'in_progress' || t.status === 'IN_PROGRESS' || t.status === 'REVIEW'));
@@ -310,7 +309,7 @@ async function dispatchNextTaskForAgent(agentId) {
             }
 
             // Case 3: 완료 후 다음 대기 카드 자동 Pull
-            setTimeout(() => dispatchNextTaskForAgent(agentId), 1000);
+            setTimeout(() => dispatchNextTaskForAgent(agentId, fullTask.project_id), 1000);
             
             agentStates.set(agentId, { status: 'idle', lastHeartbeat: Date.now() });
             io.emit('agent:status_change', { agentId, status: 'idle' });
@@ -625,11 +624,11 @@ app.post('/api/tasks', async (req, res) => {
 
 // ariDaemon 등 외부 프로세스에서 할당 이벤트를 트리거할 수 있는 엔드포인트
 app.post('/api/tasks/dispatch', async (req, res) => {
-  const { agentId } = req.body;
+  const { agentId, projectId } = req.body;
   if (agentId) {
     // 즉각 응답 후 비동기 처리
     res.json({ status: 'ok', message: 'Dispatch triggered' });
-    await dispatchNextTaskForAgent(agentId);
+    await dispatchNextTaskForAgent(agentId, projectId);
   } else {
     res.status(400).json({ status: 'error', message: 'agentId required' });
   }
@@ -894,7 +893,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
       const crew = await dbManager.getProjectCrew(projectId);
       for (const member of crew) {
         if (member.agent_id) {
-          dispatchNextTaskForAgent(member.agent_id);
+          dispatchNextTaskForAgent(member.agent_id, projectId);
         }
       }
     } catch (e) {
@@ -948,7 +947,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
           const agentId = task.assigned_agent || 'system';
 
           // 기존 진행 중인 다른 작업이 있다면 일시정지(todo로 강제 강등)하여 인터럽트 수행
-          const allTasks = await dbManager.getAllTasksLight();
+          const allTasks = await dbManager.getAllTasksLight(task.project_id);
           const activeTasks = allTasks.filter(t => t.assigned_agent === agentId && (t.status === 'in_progress' || t.status === 'IN_PROGRESS') && String(t.id) !== String(taskId));
           
           for (const at of activeTasks) {
@@ -967,7 +966,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
       if (fromColumn === 'in_progress' && (toColumn === 'done' || toColumn === 'review')) {
         const task = await dbManager.getTaskById(taskId);
         if (task && task.assigned_agent) {
-          setTimeout(() => dispatchNextTaskForAgent(task.assigned_agent), 1000);
+          setTimeout(() => dispatchNextTaskForAgent(task.assigned_agent, task.project_id), 1000);
         }
       }
     } catch (err) {
@@ -1002,7 +1001,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
       
       // 새로 할당된 에이전트가 있으면 Dispatcher 트리거
       if (assignee && assignee !== '미할당') {
-        setTimeout(() => dispatchNextTaskForAgent(assignee), 500); // DB 갱신 대기 후 트리거
+        setTimeout(() => dispatchNextTaskForAgent(assignee, targetProjectId), 500); // DB 갱신 대기 후 트리거
       }
     } catch (err) {
       console.error('[Socket] task:create 오류:', err.message);
@@ -3098,16 +3097,10 @@ app.patch('/api/tasks/:id', async (req, res) => {
         try {
           const freshTask = await dbManager.getTaskById(taskId);
           if (freshTask && freshTask.project_id) {
-            const pData = await dbManager.getProjectById(freshTask.project_id);
-            if (pData && pData.name) {
-              const projectDirName = `${pData.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pData.id.slice(-5)}`;
-              // 주의: process.cwd()는 01_아리_엔진 이므로 상대 경로로 04_Users 계산
-              const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
-              triggerGraphifyUpdate(projectRoot);
-            }
+            wikiEngine.generateOntology(freshTask.project_id);
           }
         } catch (e) {
-          console.error('[GraphifyWatchdog] 트리거 실패:', e.message);
+          console.error('[WikiEngine] 온톨로지 생성 트리거 실패:', e.message);
         }
       }
 

@@ -4,31 +4,34 @@ import geminiAdapter from '../adapters/geminiAdapter.js';
 import dbManager from '../../database.js';
 import { MODEL } from '../modelRegistry.js';
 
-const TEAM_RULE_FILE = path.resolve(process.cwd(), 'skill-library/00_team/TEAM_GROUND_RULES.md');
-
 /**
  * [Living Playbook] Rule Harvester
- * 유저의 피드백을 분석하여 팀 전체 룰(Global)과 태스크 전용 룰(Local)을 구분하고 저장합니다.
+ * 유저의 피드백을 분석하여 프로젝트 전용 룰(Local)을 구분하고 저장합니다.
  */
 class RuleHarvester {
-  constructor() {
-    this._ensureDir();
+  constructor() {}
+
+  // [Phase 42.5 Step 3] 전사 글로벌 변수 제거 및 프로젝트별 동적 경로 생성
+  _getTeamRuleFile(projectId) {
+    if (!projectId) return path.resolve(process.cwd(), 'skill-library/00_team/LEGACY_GLOBAL_GROUND_RULES.md');
+    return path.resolve(process.cwd(), `skill-library/00_team/${projectId}_GROUND_RULES.md`);
   }
 
-  _ensureDir() {
-    const dir = path.dirname(TEAM_RULE_FILE);
+  _ensureDir(projectId) {
+    const file = this._getTeamRuleFile(projectId);
+    const dir = path.dirname(file);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    if (!fs.existsSync(TEAM_RULE_FILE)) {
-      fs.writeFileSync(TEAM_RULE_FILE, '# 🌐 MyCrew Team Global Ground Rules\n\n- 이 파일은 대표님의 피드백을 통해 자동 갱신되는 팀의 헌법입니다.\n', 'utf-8');
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, `# 🌐 MyCrew Project Ground Rules\n\n- 이 파일은 대표님의 피드백을 통해 자동 갱신되는 프로젝트 단위 팀 규칙입니다.\n`, 'utf-8');
     }
   }
 
   /**
    * 유저의 입력(댓글/채팅)이 '규칙'으로서의 가치가 있는지 분석하고 분류합니다.
    */
-  async classifyAndHarvest(content, agentId, taskId = null) {
+  async classifyAndHarvest(content, agentId, taskId = null, projectId = null) {
     // 1. AI를 통한 의도 분석 (Ari Filter)
     const systemPrompt = `당신은 MyCrew의 비서실장 ARI입니다. 대표님의 피드백을 분석하여 팀의 운영 규칙(Ground Rules)으로 만들 가치가 있는지 판단하세요.
 
@@ -57,7 +60,7 @@ class RuleHarvester {
       if (parsed.scope === 'IGNORE') return null;
 
       if (parsed.scope === 'TEAM') {
-        await this._appendToTeamRules(parsed.rule, agentId);
+        await this._appendToTeamRules(parsed.rule, agentId, projectId);
       } else {
         // TASK 스코프는 현재로서는 로그 기록 및 해당 컨텍스트에서만 유효하도록 처리 (DB 저장 등 확장 가능)
       }
@@ -69,28 +72,31 @@ class RuleHarvester {
     }
   }
 
-  async _appendToTeamRules(rule, agentId) {
+  async _appendToTeamRules(rule, agentId, projectId) {
+    this._ensureDir(projectId);
+    const file = this._getTeamRuleFile(projectId);
     const timestamp = new Date().toISOString().slice(0, 10);
     const entry = `\n- [${timestamp}] ${rule} (by @${agentId} feedback mechanism)`;
     
     // 중복 체크 (단순 문자열 포함 여부)
-    const current = fs.readFileSync(TEAM_RULE_FILE, 'utf-8');
+    const current = fs.readFileSync(file, 'utf-8');
     if (current.includes(rule)) {
       console.log(`[RuleHarvester] 중복된 규칙 스킵: ${rule}`);
       return;
     }
 
-    fs.appendFileSync(TEAM_RULE_FILE, entry);
-    console.log(`[RuleHarvester] 팀 글로벌 룰 추가 완료: ${rule}`);
+    fs.appendFileSync(file, entry);
+    console.log(`[RuleHarvester] 팀 글로벌 룰 추가 완료: ${rule} (Project: ${projectId || 'LEGACY'})`);
   }
 
   /**
    * 실행 시점에 모든 룰(Global + Local)을 컨텍스트용 텍스트로 반환
    */
-  getAppliedRules() {
+  getAppliedRules(projectId = null) {
     try {
-      if (fs.existsSync(TEAM_RULE_FILE)) {
-        return fs.readFileSync(TEAM_RULE_FILE, 'utf-8');
+      const file = this._getTeamRuleFile(projectId);
+      if (fs.existsSync(file)) {
+        return fs.readFileSync(file, 'utf-8');
       }
     } catch (e) {
       return '';

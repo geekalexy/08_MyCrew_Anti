@@ -1,4 +1,8 @@
 {
+  "07_MyCrew_Wiki/99_System_Graph/graph_data.js": {
+    "hash": "4db25d396dd85ae6f20337c14503e2e22c9995b2b8d1d499d0b34598b6c05a12",
+    "imports": []
+  },
   ".agents/workflows/supreme_review_workflow.md": {
     "hash": "f7953cc39df3dd7ae6548b142e01bc9c0e8d616afbdf0150313e2c07a8d8f1ab",
     "nodes": [
@@ -1901,7 +1905,7 @@
     ]
   },
   "05_My_history/Sonnet/Essay_Alex_2026-05-12_Sonnet.md": {
-    "hash": "ba890ef782ea7ca8873f6bdfe677a4527858e819e8b97339ebbe6882d5668959",
+    "hash": "893ecffe6debc66e1450fed1bba532c716f0e822139b007f205d2e63ac9dbe79",
     "nodes": [
       {
         "id": "Section::관찰에세이 — AI 리뷰 시스템의 신뢰도와 맹점",
@@ -1929,6 +1933,10 @@
       },
       {
         "id": "Section::6. 마치며",
+        "type": "section"
+      },
+      {
+        "id": "Section::7. [추가 관찰] 체크박스의 함정 — Phase 41 Wiki PRD 교차 대조 (오후 세션)",
         "type": "section"
       }
     ],
@@ -1972,6 +1980,12 @@
       {
         "source": "Essay_Alex_2026-05-12_Sonnet.md",
         "target": "Section::6. 마치며",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Essay_Alex_2026-05-12_Sonnet.md",
+        "target": "Section::7. [추가 관찰] 체크박스의 함정 — Phase 41 Wiki PRD 교차 대조 (오후 세션)",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       }
@@ -4160,103 +4174,6 @@
       }
     ]
   },
-  "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-12_Sonnet.md": {
-    "hash": "2f2bde0bbd0c4d156bd7fe45f910b8bc011fc3496e1fbf13f785cefe8cda602f",
-    "nodes": [
-      {
-        "id": "Section::SESSION LOG — 2026-05-12 (Sonnet)",
-        "type": "section"
-      },
-      {
-        "id": "Section::🎯 세션 목표",
-        "type": "section"
-      },
-      {
-        "id": "Section::🛠️ 주요 작업 내용",
-        "type": "section"
-      },
-      {
-        "id": "Section::1. 소넷 2차 교차 리뷰 (Phase 39 & 41)",
-        "type": "section"
-      },
-      {
-        "id": "Section::2. 루카 패치 감독 및 검증 (7건 전수)",
-        "type": "section"
-      },
-      {
-        "id": "Section::3. 루카 자발적 보너스 패치 (리뷰 요청 외)",
-        "type": "section"
-      },
-      {
-        "id": "Section::4. 리뷰 경위 공식 기록",
-        "type": "section"
-      },
-      {
-        "id": "Section::📌 최종 리뷰 등급 이력",
-        "type": "section"
-      },
-      {
-        "id": "Section::📌 다음 단계",
-        "type": "section"
-      }
-    ],
-    "edges": [
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::SESSION LOG — 2026-05-12 (Sonnet)",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::🎯 세션 목표",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::🛠️ 주요 작업 내용",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::1. 소넷 2차 교차 리뷰 (Phase 39 & 41)",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::2. 루카 패치 감독 및 검증 (7건 전수)",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::3. 루카 자발적 보너스 패치 (리뷰 요청 외)",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::4. 리뷰 경위 공식 기록",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::📌 최종 리뷰 등급 이력",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      },
-      {
-        "source": "SESSION_LOG_2026-05-12_Sonnet.md",
-        "target": "Section::📌 다음 단계",
-        "relation": "CONTAINS_SECTION",
-        "confidence": 1.0
-      }
-    ]
-  },
   "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-08_Luca.md": {
     "hash": "6b8b87540ea64aab31d360874b28ee7cf7b68424b303dc4e547326097120c196",
     "nodes": [
@@ -4652,6 +4569,83 @@
       }
     ]
   },
+  "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-12_Prime.md": {
+    "hash": "952bacba843f42220f7e578927347608d29e1257f0175227f46e559e81bee1fd",
+    "nodes": [
+      {
+        "id": "Section::SESSION_LOG_2026-05-12_Prime (Prime Advisor)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 세션 목표",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 완료 작업",
+        "type": "section"
+      },
+      {
+        "id": "Section::2.1 Phase 39 + Phase 41 Supreme Review (초회 → 재심)",
+        "type": "section"
+      },
+      {
+        "id": "Section::2.2 Phase 41 Wiki PRD 교차 대조 리뷰 (신규)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 생성/수정된 파일",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 다음 작업 (루카 전달 사항)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::SESSION_LOG_2026-05-12_Prime (Prime Advisor)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::1. 세션 목표",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::2. 완료 작업",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::2.1 Phase 39 + Phase 41 Supreme Review (초회 → 재심)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::2.2 Phase 41 Wiki PRD 교차 대조 리뷰 (신규)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::3. 생성/수정된 파일",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Prime.md",
+        "target": "Section::4. 다음 작업 (루카 전달 사항)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/_SESSION_LOGS/SESSION_LOG_20260425_Luca.md": {
     "hash": "217b2f314b4cba978ec312d87bc618b44414f7d5423c4f694f6ad597569ced88",
     "nodes": [
@@ -4894,7 +4888,7 @@
     ]
   },
   "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-12_Luca.md": {
-    "hash": "9492ae03092be434110dce3a0cc7c6dd4ed69307c69a1b54ec23980c76b406fb",
+    "hash": "9f3e2fdaabb24da405537ea90d19a3046916eab94f8de6146e87997da94da59c",
     "nodes": [
       {
         "id": "Section::Session Log: 2026-05-12",
@@ -4909,7 +4903,11 @@
         "type": "section"
       },
       {
-        "id": "Section::3. 다음 단계 (Next Steps)",
+        "id": "Section::3. 새로 진행된 작업 (Phase 42)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 다음 단계 (Next Steps)",
         "type": "section"
       }
     ],
@@ -4934,7 +4932,13 @@
       },
       {
         "source": "SESSION_LOG_2026-05-12_Luca.md",
-        "target": "Section::3. 다음 단계 (Next Steps)",
+        "target": "Section::3. 새로 진행된 작업 (Phase 42)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "SESSION_LOG_2026-05-12_Luca.md",
+        "target": "Section::4. 다음 단계 (Next Steps)",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       }
@@ -7113,14 +7117,15 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/database.js": {
-    "hash": "7acf0bd100bdfa8f1903c7973bbcc2b94c5a5439473b55597b4ab16191ea3a08",
+    "hash": "1b705fbb088bc426b1cc8ad0ec5acefb1d2d90d499317daec9ec51cb415c3c98",
     "imports": [
       "sqlite3",
       "path",
       "url",
       "fs",
       "./ai-engine/policyGuard.js",
-      "./ai-engine/modelRegistry.js"
+      "./ai-engine/modelRegistry.js",
+      "./db_migrator.js"
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/scratch2.js": {
@@ -7164,7 +7169,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/server.js": {
-    "hash": "cfad9bf07d8473abaa0569b4e7eac6f122a3e46f9822f54cdfc8aa1140946049",
+    "hash": "f6028e3068f52f504464d14e79e4cec729bbfa7e569a696c435de057c5af0289",
     "imports": [
       "express",
       "fs",
@@ -7202,6 +7207,15 @@
       "./ai-engine/workers/graphifyWatchdog.js",
       "./ai-engine/services/wikiEngine.js",
       "dotenv/config"
+    ]
+  },
+  "02_System_Development/V2_Core_Engine/01_아리_엔진/db_migrator.js": {
+    "hash": "b8fed46df7f58da3abaf2237e9e8f947aa9fefd1d9ef2cc275cbf1b9b82c1f4d",
+    "imports": [
+      "sqlite3",
+      "path",
+      "url",
+      "fs"
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/mcp_server.js": {
@@ -11456,7 +11470,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/executor.js": {
-    "hash": "12aa0c689ebff098bc21130b6f4a15be030664cc0147fff52cd155d6d639a27f",
+    "hash": "70c25328106224da53446d2a186036e99d693b67167a18f7a85f1ea74446c4a4",
     "imports": [
       "fs",
       "path",
@@ -11749,7 +11763,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/systemWatchdog.js": {
-    "hash": "d73b8720632460c5b366af90a349acee3f16fd4a0c9fae0abdae3701c34c1bd1",
+    "hash": "12225a48002e8f907fe63d722bb90e9013ad1af2de80f0c591c0ba31276d60f0",
     "imports": [
       "fs/promises",
       "path",
@@ -11780,7 +11794,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/services/wikiEngine.js": {
-    "hash": "767fa59aa7ffd70e1ff759d146ad6bf16e3db45589b3b36e453601e083d8598c",
+    "hash": "8451a274baac62485d6d1b6218b510ce7b3750a558f8a8771a06f495d9d8a7de",
     "imports": [
       "fs/promises",
       "path",
@@ -23493,6 +23507,73 @@
       }
     ]
   },
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/46_Phase41_Wiki_PRD_Supreme_Review_Prime.md": {
+    "hash": "742adab6dea9e7835bc46007da3240dcdbd3087871a88f53ef98b3f17734b29a",
+    "nodes": [
+      {
+        "id": "Section::🛡️ Supreme Review Target: Phase 41 Project Wiki Architecture (Fix Review)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 개요",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 발생했던 문제와 수정 내역 (Prime 리뷰 지적사항 전면 수정)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔴 CRITICAL (치명적 결함)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🟠 HIGH (심각한 결함)",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. Prime Advisor에게 기대하는 역할",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::🛡️ Supreme Review Target: Phase 41 Project Wiki Architecture (Fix Review)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::1. 개요",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::2. 발생했던 문제와 수정 내역 (Prime 리뷰 지적사항 전면 수정)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::🔴 CRITICAL (치명적 결함)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::🟠 HIGH (심각한 결함)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "46_Phase41_Wiki_PRD_Supreme_Review_Prime.md",
+        "target": "Section::3. Prime Advisor에게 기대하는 역할",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/Phase39-1_Plan_Master_리뷰요청서.md": {
     "hash": "c8e1218ed71b490a61a28b114e46f2b344d31f725bf14bbc0546fd05a7ab0535",
     "nodes": [
@@ -28443,6 +28524,123 @@
       }
     ]
   },
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md": {
+    "hash": "3da765844c46325d5726429e6928fd7325ed0806a83d8d4c454a31bc2cfda56f",
+    "nodes": [
+      {
+        "id": "Section::Phase 42: Agent-driven DB Migration Architecture (에이전트 주도형 DB 마이그레이션)",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 개요 및 문제 정의",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 해결 방안: 에이전트 주도형 마이그레이션",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 시스템 아키텍처",
+        "type": "section"
+      },
+      {
+        "id": "Section::3.1 디렉토리 및 파일 구조 설계",
+        "type": "section"
+      },
+      {
+        "id": "Section::3.2 데이터 흐름 (Workflow)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 코어 컴포넌트 명세",
+        "type": "section"
+      },
+      {
+        "id": "Section::4.1 `db_migrator.js` (마이그레이션 엔진)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4.2 `database.js` 연동",
+        "type": "section"
+      },
+      {
+        "id": "Section::5. 단계별 구현 로드맵 (Phase 42)",
+        "type": "section"
+      },
+      {
+        "id": "Section::6. 보안 및 정책 (Policy Compliance)",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::Phase 42: Agent-driven DB Migration Architecture (에이전트 주도형 DB 마이그레이션)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::1. 개요 및 문제 정의",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::2. 해결 방안: 에이전트 주도형 마이그레이션",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::3. 시스템 아키텍처",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::3.1 디렉토리 및 파일 구조 설계",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::3.2 데이터 흐름 (Workflow)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::4. 코어 컴포넌트 명세",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::4.1 `db_migrator.js` (마이그레이션 엔진)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::4.2 `database.js` 연동",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::5. 단계별 구현 로드맵 (Phase 42)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase42_Agent_Driven_DB_Migration_Architecture_PRD.md",
+        "target": "Section::6. 보안 및 정책 (Policy Compliance)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase38_MCP_Server_아키텍처_기획서.md": {
     "hash": "bc23665569bfff7be22991d0e36f9bd38c8fa84743ea3d799b0cb9bb13f68cf6",
     "nodes": [
@@ -30599,6 +30797,133 @@
       }
     ]
   },
+  "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_디버깅리포트_v1.md": {
+    "hash": "b96ee751d0e8d303d6405df03e136aa2943ced0927f82ed8e47b145583e19657",
+    "nodes": [
+      {
+        "id": "Section::Phase 39-1: Plan Master 디버깅 리포트 v1.0",
+        "type": "section"
+      },
+      {
+        "id": "Section::1. 버그 발견 경위",
+        "type": "section"
+      },
+      {
+        "id": "Section::2. 버그 상세 분석",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔴 Bug 1: 모드 변경 시 담당자(Assignee) 자동 배정 누락",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔴 Bug 2: 실행 버튼 비활성화 (Bug 1의 연쇄 결과)",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔴 Bug 3: `handleStartTask`가 ARCHITECT 모드를 일반 실행과 동일하게 처리",
+        "type": "section"
+      },
+      {
+        "id": "Section::🟡 Bug 4: `task:bulk_created` 소켓 이벤트 핸들러 누락",
+        "type": "section"
+      },
+      {
+        "id": "Section::🔵 추가 수정: PlanMasterModal confirm API 미연동",
+        "type": "section"
+      },
+      {
+        "id": "Section::3. 패치 적용 파일 목록",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 수정 후 기대 동작 흐름",
+        "type": "section"
+      },
+      {
+        "id": "Section::5. 미검증 항목 (후속 테스트 필요)",
+        "type": "section"
+      },
+      {
+        "id": "Section::6. 관련 이슈 레퍼런스",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::Phase 39-1: Plan Master 디버깅 리포트 v1.0",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::1. 버그 발견 경위",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::2. 버그 상세 분석",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::🔴 Bug 1: 모드 변경 시 담당자(Assignee) 자동 배정 누락",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::🔴 Bug 2: 실행 버튼 비활성화 (Bug 1의 연쇄 결과)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::🔴 Bug 3: `handleStartTask`가 ARCHITECT 모드를 일반 실행과 동일하게 처리",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::🟡 Bug 4: `task:bulk_created` 소켓 이벤트 핸들러 누락",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::🔵 추가 수정: PlanMasterModal confirm API 미연동",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::3. 패치 적용 파일 목록",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::4. 수정 후 기대 동작 흐름",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::5. 미검증 항목 (후속 테스트 필요)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_디버깅리포트_v1.md",
+        "target": "Section::6. 관련 이슈 레퍼런스",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/MODEL_CONTROL_ARCHITECTURE.md": {
     "hash": "c3b7b06cdbfafdd2ea2ba5076667c308e78304cdb41d3e9923defff180a0a6d6",
     "nodes": [
@@ -31964,7 +32289,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase41_Project_Wiki_개발구현계획서.md": {
-    "hash": "e9e145902f03ae8f2e8c775dbbd30dc667baba9edb782a18e04029ad399fc1ec",
+    "hash": "c5dbaa4504416e0ed234f7e0c5caef260b06fd85ebe5d3b3ad3cc84b5b529060",
     "nodes": [
       {
         "id": "Section::Phase 41: Project Wiki 개발구현계획서 (Task List)",
@@ -32455,7 +32780,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-1_Plan_Master_개발구현계획서.md": {
-    "hash": "be3830a9921324dbb4baecace1b273c66a6f78ea3118e494eabae68a0cf84b20",
+    "hash": "1239aeaf30e5089fd4bed24115b8d232c2c1a7fc33e30aae9d79dbfb81c44076",
     "nodes": [
       {
         "id": "Section::Phase 39-1: Plan Master 개발구현계획서 (Task List)",
@@ -32486,7 +32811,23 @@
         "type": "section"
       },
       {
+        "id": "Section::📌 2.5 프론트엔드: Plan Master 모드 전환 연동 버그 패치 ← **2026-05-12 추가**",
+        "type": "section"
+      },
+      {
         "id": "Section::3. 테스트 시나리오",
+        "type": "section"
+      },
+      {
+        "id": "Section::✅ 기존 시나리오",
+        "type": "section"
+      },
+      {
+        "id": "Section::🆕 버그 패치 후속 테스트 시나리오 (2026-05-12 추가)",
+        "type": "section"
+      },
+      {
+        "id": "Section::4. 백로그 (Backlog)",
         "type": "section"
       }
     ],
@@ -32535,7 +32876,31 @@
       },
       {
         "source": "Phase39-1_Plan_Master_개발구현계획서.md",
+        "target": "Section::📌 2.5 프론트엔드: Plan Master 모드 전환 연동 버그 패치 ← **2026-05-12 추가**",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_개발구현계획서.md",
         "target": "Section::3. 테스트 시나리오",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_개발구현계획서.md",
+        "target": "Section::✅ 기존 시나리오",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_개발구현계획서.md",
+        "target": "Section::🆕 버그 패치 후속 테스트 시나리오 (2026-05-12 추가)",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "Phase39-1_Plan_Master_개발구현계획서.md",
+        "target": "Section::4. 백로그 (Backlog)",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       }
@@ -39825,7 +40190,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/TaskDetailModal.jsx": {
-    "hash": "2fd18901a6bf084a64b44b872e2dff71f813e0168caf614f0f3912496a1b18e4",
+    "hash": "217907d98968a34e65660d2558f7aef3f6c1555cb86087ff4380006b27bd9750",
     "imports": [
       "react",
       "../../store/uiStore",
@@ -39837,7 +40202,8 @@
       "remark-gfm",
       "../../utils/TagRenderer",
       "../../hooks/useContextChain",
-      "./ContextChainPanel"
+      "./ContextChainPanel",
+      "./PlanMasterModal"
     ]
   },
   "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/TaskCreateModal.jsx": {
@@ -39848,7 +40214,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/components/Modal/PlanMasterModal.jsx": {
-    "hash": "9fc490e590d56d2ba0de20b5124cf938f34d0a8cd59cf1b1d325f38caba2063d",
+    "hash": "0f2ccdb8aa702d05045ac373a4b29b110cddbe59cde25da6ff0815a96049a1dd",
     "imports": [
       "react"
     ]
@@ -39954,7 +40320,7 @@
     ]
   },
   "02_System_Development/V2_Core_Engine/03_워크스페이스_대시보드/src/hooks/useSocket.js": {
-    "hash": "bcd842469b624095cd69c12ce6e03f449e06546831c468c30fb8df9d5dddf3c8",
+    "hash": "61f2a38af645ede5f41395874ee5c60eb1af1761fb9a8677e8e5c904ad182cf0",
     "imports": [
       "react",
       "socket.io-client",
@@ -59710,6 +60076,33 @@
       {
         "source": "SaaS-확장-검토안.md",
         "target": "Section::수정된 로드맵",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      }
+    ]
+  },
+  "04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/raw/meetings/2026-05-12_Task1777811330668120_회의록.md": {
+    "hash": "d86e55e430ca3c6fb285d70c61775e430d52e8fac1125c1f8a491fd17a7aa072",
+    "nodes": [
+      {
+        "id": "Section::[15시 28분 20초] system",
+        "type": "section"
+      },
+      {
+        "id": "Section::[15시 35분 20초] system",
+        "type": "section"
+      }
+    ],
+    "edges": [
+      {
+        "source": "2026-05-12_Task1777811330668120_회의록.md",
+        "target": "Section::[15시 28분 20초] system",
+        "relation": "CONTAINS_SECTION",
+        "confidence": 1.0
+      },
+      {
+        "source": "2026-05-12_Task1777811330668120_회의록.md",
+        "target": "Section::[15시 35분 20초] system",
         "relation": "CONTAINS_SECTION",
         "confidence": 1.0
       }

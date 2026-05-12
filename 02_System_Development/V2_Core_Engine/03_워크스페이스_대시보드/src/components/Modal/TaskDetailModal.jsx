@@ -10,6 +10,7 @@ import remarkGfm from 'remark-gfm';
 import { renderTaggedText, renderChainRefText } from '../../utils/TagRenderer';
 import { useContextChain, extractChainRefs } from '../../hooks/useContextChain';
 import ContextChainPanel from './ContextChainPanel';
+import PlanMasterModal from './PlanMasterModal';
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -361,6 +362,8 @@ export default function TaskDetailModal() {
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
   const [copiedCommentIdx, setCopiedCommentIdx] = useState(null); // [Phase 36b] 복사 피드백 상태
+  // [Plan Master Fix] ARCHITECT 모드 실행 시 PlanMasterModal 제어
+  const [showPlanMasterModal, setShowPlanMasterModal] = useState(false);
 
   // ── [Phase 37] Live Split Preview ────────────────────────────────────────
   const [isPreviewMode, setIsPreviewMode] = useState(false);
@@ -860,12 +863,20 @@ export default function TaskDetailModal() {
       return;
     }
     const finalMode = checkAutoFallback();
+
+    // [Bug 3 Fix] ARCHITECT 모드: Plan Master 전용 기획 파이프라인 실행
+    // → PlanMasterModal 오픈 (1차 Sonnet 분석 → 2차 Opus 로드맵 생성 → 백로그 카드 자동 생성)
+    if (finalMode === 'ARCHITECT') {
+      setShowPlanMasterModal(true);
+      return;
+    }
+
+    // 그 외 모드: /api/tasks/:id/run 엔드포인트로 모드 기반 실행 (Zero-Command Router)
     setIsStarting(true);
-    // PATCH → server가 task:updated 소켓 emit → 모달의 onTaskUpdated에서 Activity 자동 추가
-    fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
-      method: 'PATCH',
+    fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ column: 'in_progress' }),
+      body: JSON.stringify({ mode: finalMode }),
     })
       .then((r) => r.json())
       .then(() => patchTask(task.id, { column: 'in_progress', status: 'IN_PROGRESS' }))
@@ -1349,20 +1360,48 @@ export default function TaskDetailModal() {
                   const newMode = newModeRaw === 'NONE' ? null : newModeRaw;
                   const prevMode = task.mode || 'NONE';
                   
-                  // 모드에 따른 LLM 강제 할당 (Phase 39)
-                  let newModel = task.model; // 기본값 유지
-                  if (newMode === 'ARCHITECT') newModel = 'Claude Opus 4.6 (Thinking)';
-                  else if (newMode === 'DEV') newModel = 'Gemini 3.1 Pro (High)';
-                  else if (newMode === 'QA') newModel = 'Claude Opus 4.6 (Thinking)';
-                  else if (newMode === 'DEBUG') newModel = 'Claude Sonnet 4.6 (Thinking)';
+                  // [Bug 1+2 Fix] 모드에 따른 LLM 및 담당자 강제 할당 (Phase 39)
+                  let newModel = task.model;
+                  let newAssignee = null; // null = 현재 값 유지
+
+                  if (newMode === 'ARCHITECT') {
+                    newModel = 'Claude Opus 4.6 (Thinking)';
+                    // CEO 또는 미할당 상태면 자동으로 dev_senior 배정 → 실행 버튼 활성화
+                    if (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo') {
+                      newAssignee = 'dev_senior';
+                    }
+                  } else if (newMode === 'DEV') {
+                    newModel = 'Gemini 3.1 Pro (High)';
+                    if (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo') {
+                      newAssignee = 'dev_senior';
+                    }
+                  } else if (newMode === 'QA') {
+                    newModel = 'Claude Opus 4.6 (Thinking)';
+                    if (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo') {
+                      newAssignee = 'dev_advisor';
+                    }
+                  } else if (newMode === 'DEBUG') {
+                    newModel = 'Claude Sonnet 4.6 (Thinking)';
+                    if (!task.assignee || task.assignee === '미할당' || task.assignee.toLowerCase() === 'ceo') {
+                      newAssignee = 'dev_senior';
+                    }
+                  }
+
+                  const patch = { mode: newMode, model: newModel };
+                  if (newAssignee) patch.assignee = newAssignee;
 
                   // 모드 변경 API 및 Store 업데이트
-                  patchTask(task.id, { mode: newMode, model: newModel });
+                  patchTask(task.id, patch);
                   fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: newMode, model: newModel })
+                    body: JSON.stringify(patch)
                   }).catch(console.error);
+
+                  // 담당자 변경 토스트 알림
+                  if (newAssignee) {
+                    showToast(`✅ ${newModeRaw === 'NONE' ? '선택안함' : newModeRaw} 모드: 모델·담당자가 자동 설정되었습니다.`);
+                  }
                   // 모드 변경 시 타임라인(액티비티) 시스템 로그 기록
                   if (prevMode !== newModeRaw) {
                     const modeNames = { 'NONE': '선택하지 않음', 'ARCHITECT': '기획 모드', 'DEV': '개발 모드', 'QA': '리뷰 모드', 'DEBUG': '디버깅 모드' };
@@ -2600,6 +2639,26 @@ export default function TaskDetailModal() {
           <span className="material-symbols-outlined" style={{ color: 'var(--brand)', fontSize: '1.2rem' }}>info</span>
           {toastMsg}
         </div>
+      )}
+
+      {/* [Bug 3 Fix] ARCHITECT 모드 실행 시 Plan Master 기획 파이프라인 전용 모달 */}
+      {showPlanMasterModal && task && (
+        <PlanMasterModal
+          projectId={task.projectId || task.project_id}
+          taskId={task.id}
+          onClose={() => setShowPlanMasterModal(false)}
+          onSubmit={(roadmap) => {
+            // 기획 완료 → 현재 태스크를 REVIEW로 이동 (CEO 검토 요청)
+            setShowPlanMasterModal(false);
+            patchTask(task.id, { column: 'review', status: 'REVIEW' });
+            fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ column: 'review' }),
+            }).catch(console.error);
+            showToast(`✅ Plan Master 기획 완료! ${roadmap?.mvp_tasks?.length || 0}개 MVP 카드가 백로그에 생성되었습니다.`);
+          }}
+        />
       )}
     </div>
   );

@@ -339,58 +339,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
-  if (name === "query_graph") {
-    try {
-      // [H-002] 입력 파라미터 정규식 검증
-      if (!args.query || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.query.trim())) {
-        return { content: [{ type: "text", text: `[query_graph] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
-      }
 
-      const util = await import('util');
-      const { execFile } = await import('child_process');
-      const execFilePromise = util.promisify(execFile);
-      
-      const isSystemScope = args.scope === 'system';
-      const targetDir = isSystemScope 
-        ? '/Users/alex/Documents/08_MyCrew_Anti/07_MyCrew_Wiki/99_System_Graph'
-        : './';
-        
-      // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
-      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.query.trim(), '--dir', targetDir]);
-      return { content: [{ type: "text", text: `[query_graph] Graphify 지식망 쿼리 결과:\n${stdout}` }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `[query_graph] 쿼리 실패: ${e.message}` }], isError: true };
-    }
-  }
   if (name === "run_tasks") {
     return { content: [{ type: "text", text: `[run_tasks] 자율 코딩 태스크 시작: ${args.command}` }] };
-  }
-  if (name === "trace_bug") {
-    // [C-003 Fix] trace_bug 입력 검증 (query_graph와 동일한 정규식 적용)
-    if (!args.error_log || !/^(shortest_path|dependencies)\([a-zA-Z0-9_.\-,\s]+\)$/.test(args.error_log.trim())) {
-      return { content: [{ type: "text", text: `[trace_bug] 쿼리 거부됨: 잘못된 포맷입니다. (허용: shortest_path(A,B), dependencies(A))` }], isError: true };
-    }
-
-    try {
-      const util = await import('util');
-      const { execFile } = await import('child_process');
-      const execFilePromise = util.promisify(execFile);
-      
-      // [C-001] .catch() 제거로 환각 방지 및 에러 정상 전파
-      const { stdout } = await execFilePromise('python3', ['./graphify_mcp.py', '--query', args.error_log.trim()]);
-      return { content: [{ type: "text", text: `[trace_bug] Graphify 노드 추적 결과:\n${stdout}` }] };
-    } catch (e) {
-      return { content: [{ type: "text", text: `[trace_bug] 추적 실패: ${e.message}` }], isError: true };
-    }
-  }
-  if (name === "extract_graph") {
-    try {
-      const { triggerGraphifyUpdate } = await import('./ai-engine/workers/graphifyWatchdog.js');
-      await triggerGraphifyUpdate(args.file_path || './');
-      return { content: [{ type: "text", text: `[extract_graph] 지식망 업데이트 완료: ${args.file_path || './'}` }] };
-    } catch(e) {
-      return { content: [{ type: "text", text: `[extract_graph] 업데이트 에러: ${e.message}` }], isError: true };
-    }
   }
   if (name === "audit_code") {
     return { content: [{ type: "text", text: `[audit_code] 코드 취약점 및 예외처리 검토 완료.` }] };

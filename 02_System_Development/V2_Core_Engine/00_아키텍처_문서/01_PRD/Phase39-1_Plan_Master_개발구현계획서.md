@@ -1,9 +1,10 @@
 # Phase 39-1: Plan Master 개발구현계획서 (Task List)
 
-**작성일**: 2026-05-11
-**작성자**: Luca
-**상태**: ✅ 구현 완료
-**기준 문서**: [Phase39-1_Plan_Master_관련_기획서](Phase39-1_Plan_Master_관련_기획서.md)
+**작성일**: 2026-05-11  
+**작성자**: Luca  
+**상태**: 🔧 패치 완료 — 통합 테스트 대기  
+**기준 문서**: [Phase39-1_Plan_Master_관련_기획서](Phase39-1_Plan_Master_관련_기획서.md)  
+**디버깅 리포트**: [Phase39-1_Plan_Master_디버깅리포트_v1](Phase39-1_Plan_Master_디버깅리포트_v1.md)
 
 ---
 
@@ -46,9 +47,53 @@
   - Confirm 클릭 → `/plan-master/confirm` API(`action: 'confirm'`) 호출 + 토스트 알림.
   - 수정 요청 클릭 → `prompt()` 입력창에서 피드백 수집 → `/plan-master/confirm` API(`action: 'revise'`) 호출 + 토스트 알림.
 
+### 📌 2.5 프론트엔드: Plan Master 모드 전환 연동 버그 패치 ← **2026-05-12 추가**
+> 상세 내역: [Phase39-1_Plan_Master_디버깅리포트_v1](Phase39-1_Plan_Master_디버깅리포트_v1.md)
+
+- [x] **[BUG-01] ARCHITECT 모드 선택 시 담당자(Assignee) 미자동 배정 수정** (`TaskDetailModal.jsx`):
+  - 모드 onChange 핸들러에서 `model`만 변경하고 `assignee`를 누락하던 버그 수정.
+  - CEO/미할당 상태일 경우 모드별 기본 에이전트 자동 배정 (ARCHITECT/DEV → `dev_senior`, QA → `dev_advisor`).
+- [x] **[BUG-02] CEO 담당자 상태에서 실행 버튼 비활성화 (BUG-01 연쇄)** (`TaskDetailModal.jsx`):
+  - BUG-01 수정으로 자동 해소.
+- [x] **[BUG-03] `handleStartTask`가 ARCHITECT 모드를 일반 실행과 동일하게 처리** (`TaskDetailModal.jsx`):
+  - 기존: 단순 `PATCH column: in_progress` → plan-master 파이프라인 미호출.
+  - 수정: ARCHITECT 모드 시 `PlanMasterModal` 오픈 → Sonnet→Opus 파이프라인 정상 진입.
+  - 기획 완료 후 `onSubmit` 콜백에서 태스크 자동 REVIEW 이동.
+  - 그 외 모드: `POST /api/tasks/:id/run` (Zero-Command Router) 경유로 변경.
+- [x] **[BUG-04] `task:bulk_created` 소켓 이벤트 핸들러 누락** (`useSocket.js`):
+  - 핸들러 부재로 generate-roadmaps 결과 카드들이 즉시 칸반에 반영 안 되는 문제 수정.
+  - 신규 핸들러: `GET /api/tasks?projectId=xxx` fetch → 신규 taskIds 필터 → `kanbanStore.addTask()` 즉시 반영.
+- [x] **[BUG-05] `PlanMasterModal` confirm API 미연동** (`PlanMasterModal.jsx`):
+  - "이대로 확정" 버튼 클릭 시 `POST /plan-master/confirm { action: 'confirm' }` 호출 추가.
+  - DB `plan_master_status: LOCKED` + `v1.0_MVP_PRD.locked` 파일 생성 정상화.
+
 ---
 
 ## 3. 테스트 시나리오
+
+### ✅ 기존 시나리오
 - [ ] **시나리오 A (정상 스코프 분리)**: "결제, 소셜 로그인, 게시판, 채팅 기능이 들어간 앱을 1주일 안에 만들어줘" 요청 시, 에이전트가 게시판 위주의 MVP를 제안하고 나머지를 Backlog 카드 및 v2.0 PRD로 정상 분리하는지 확인.
 - [ ] **시나리오 B (반복 협상 루프)**: MVP 제안을 거절하고 "채팅은 무조건 1.0에 들어가야 해"라고 피드백 시, 에이전트가 다시 스코프를 재조정하여 컨펌을 대기하는 루프 검증.
 - [ ] **시나리오 C (Graphify 렌더링)**: 분리된 2.0 스코프가 Preview 스플릿 뷰에서 Graphify 노드로 정상 렌더링되는지 확인.
+
+### 🆕 버그 패치 후속 테스트 시나리오 (2026-05-12 추가)
+- [ ] **[T-01] 모드 전환 담당자 자동 배정**: ARCHITECT 선택 → 담당자가 `dev_senior`로 즉시 변경 + 토스트 알림 + 실행 버튼 즉시 활성화.
+- [ ] **[T-02] 실행 버튼 → PlanMasterModal 오픈**: ARCHITECT + dev_senior 상태에서 실행 클릭 → PlanMasterModal 정상 오픈.
+- [ ] **[T-03] 칸반 즉시 반영**: generate-roadmaps 완료 후 새로고침 없이 백로그 카드 즉시 표시.
+- [ ] **[T-04] confirm LOCKED 상태**: "이대로 확정" 후 DB `plan_master_status = LOCKED` 확인 + 원래 태스크 REVIEW 이동 확인.
+- [ ] **[T-05] 피드백 재기획 루프**: revise 요청 → 스코프 재분석 → 새 로드맵 제안 → 반복 (MAX 5회).
+- [ ] **[T-06] 멀티 프로젝트 격리**: 다른 프로젝트의 bulk_created 이벤트가 현재 프로젝트 칸반에 混入되지 않는지.
+
+---
+
+## 4. 백로그 (Backlog)
+
+> 이번 세션에서 수정하지 않았거나, 추가 검토가 필요한 항목
+
+- [ ] **[BACKLOG-01] Sonnet API 응답 타임아웃 모니터링**: 2분 타임아웃이 실제 운영에서 충분한지 측정 후 조정 필요.
+- [ ] **[BACKLOG-02] needs_clarification 옵션 선택 후 자동 재분석**: 현재 옵션 선택 → 텍스트 append 후 수동 재분석 버튼 클릭 필요. 자동 재분석 트리거로 UX 개선 가능.
+- [ ] **[BACKLOG-03] PlanMasterModal 기존 task.content 자동 prefill**: ARCHITECT 모드 실행 시 카드 본문(요구사항)이 이미 있다면 요구사항 입력창에 자동 입력.
+- [ ] **[BACKLOG-04] Opus JSON 파싱 실패율 모니터링**: Fallback 진입 빈도 추적을 위한 로그 메트릭 추가.
+- [ ] **[BACKLOG-05] bulk_created 중복 addTask 방지 로직 강화**: 이미 kanbanStore에 존재하는 taskId 필터링 추가.
+- [ ] **[BACKLOG-06] `task:bulk_created` 이벤트에 토스트 알림 추가**: 사용자에게 "N개 카드가 백로그에 추가되었습니다" 알림 노출.
+

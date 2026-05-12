@@ -3182,7 +3182,7 @@ app.patch('/api/tasks/:id/approve', async (req, res) => {
     
     // [Phase 41] Task 승인(Done) 시점에 Project Wiki 갱신 (비동기)
     if (task.project_id) {
-      wikiEngine.generateWiki(task.project_id).catch(err => {
+      wikiEngine.generateOntology(task.project_id).catch(err => {
         console.error('[WikiEngine] 태스크 승인 중 위키 생성 실패:', err);
       });
     }

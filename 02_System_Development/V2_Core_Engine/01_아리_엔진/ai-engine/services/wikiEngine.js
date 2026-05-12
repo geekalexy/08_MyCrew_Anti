@@ -22,24 +22,16 @@ class WikiEngine {
     const projectRow = await dbManager.getProjectById(projectId);
     if (!projectRow) return null;
     const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
-    return path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+    // Fix: Use __dirname to reliably locate the 04_Users folder. 5 times '..' reaches 08_MyCrew_Anti.
+    return path.resolve(__dirname, '../../../../../04_Users/01_Company/01_Projects', projectDirName);
   }
 
   async ensureOntologyDirectories(wikiRoot) {
     const dirs = [
-      '00_Index',
-      '10_Product',
-      '20_Domain',
-      '30_Requirements',
-      '40_Flows',
-      '50_Business_Rules',
-      '60_Roles_Permissions',
-      '70_External_Integrations',
-      '90_Decisions',
-      '99_Graph_Data',
-      'raw/meetings'
+      '00_Index', '10_Product', '20_Domain', '30_Requirements',
+      '40_Flows', '50_Business_Rules', '60_Roles_Permissions',
+      '70_External_Integrations', '90_Decisions', '99_Graph_Data', 'raw/meetings'
     ];
-    
     for (const d of dirs) {
       await fs.mkdir(path.join(wikiRoot, d), { recursive: true });
     }
@@ -47,7 +39,6 @@ class WikiEngine {
 
   async updateGraphify(projectRoot) {
     try {
-      // [C-001 Fix] execFile()은 인자를 배열로 전달하므로 Shell을 거치지 않음.
       const scriptPath = path.resolve(__dirname, '../../graphify_mcp.py');
       await execFileAsync('python3', [scriptPath, '--update', projectRoot]);
       return true;
@@ -57,28 +48,25 @@ class WikiEngine {
     }
   }
 
-  /**
-   * [H-001 Fix] LLM 호출 0회 — 알고리즘 기반 마크다운 템플릿 생성
-   * 기획서 §4 "수학적 알고리즘으로 LLM 요약기를 배제" 정책 준수.
-   */
   _buildDecisionLog(decisions) {
     const now = new Date().toISOString().slice(0, 10);
-    let md = `# 📋 의사결정 기록 (Decision Log)\n\n`;
-    md += `> 자동 생성일: ${now} | 총 ${decisions.length}건\n\n`;
+    let md = `# 📋 의사결정 기록 (Decision Log)\n\n> 자동 생성일: ${now} | 총 ${decisions.length}건\n\n`;
     md += `| # | 결정사항 | 추출 신뢰도 |\n|---|---------|------------|\n`;
-    decisions.forEach((d, i) => {
-      md += `| ${i + 1} | ${d} | ● Algorithm Extracted |\n`;
-    });
+    decisions.forEach((d, i) => { md += `| ${i + 1} | ${d} | ● Algorithm Extracted |\n`; });
     return md;
   }
 
   _buildGlossary(concepts) {
     const now = new Date().toISOString().slice(0, 10);
-    let md = `# 📖 도메인 용어 사전 (Glossary)\n\n`;
-    md += `> 자동 생성일: ${now} | 총 ${concepts.length}건\n\n`;
-    concepts.forEach(c => {
-      md += `### ${c}\n- *Graph에서 자동 추출된 도메인 개념 노드입니다.*\n\n`;
-    });
+    let md = `# 📖 도메인 용어 사전 (Glossary)\n\n> 자동 생성일: ${now} | 총 ${concepts.length}건\n\n`;
+    concepts.forEach(c => { md += `### ${c}\n- *Graph에서 자동 추출된 도메인 개념 노드입니다.*\n\n`; });
+    return md;
+  }
+
+  _buildCategoryMarkdown(title, sections) {
+    const now = new Date().toISOString().slice(0, 10);
+    let md = `# 📑 ${title}\n\n> 자동 생성일: ${now} | 총 ${sections.length}개 항목\n\n`;
+    sections.forEach(s => { md += `### ${s}\n- *Graph 구조에서 탐지된 섹션입니다.*\n\n`; });
     return md;
   }
 
@@ -148,10 +136,27 @@ class WikiEngine {
     try {
       const raw = await fs.readFile(graphPath, 'utf-8');
       graphData = JSON.parse(raw);
+      
+      // [Fix D-003] Zero-Copy 원칙: SQLite DB 칸반 데이터를 직접 조회하여 동적 노드로 추가 (파일 쓰기 없음)
+      try {
+        const tasks = await dbManager.getAllTasksByProjectId(projectId) || [];
+        tasks.forEach(task => {
+          const taskNodeId = `Task::[${task.status}] ${task.title}`;
+          graphData.elements.push({ data: { id: taskNodeId, type: 'task', label: task.title } });
+          // 태스크와 연관된 에이전트를 엣지로 연결
+          if (task.assigned_agent) {
+            graphData.elements.push({ data: { id: `e_task_${task.id}`, source: taskNodeId, target: task.assigned_agent, relation: 'ASSIGNED_TO', confidence: 1.0 } });
+          }
+        });
+        console.log(`[WikiEngine] Zero-Copy DB 인젝션: 칸반 태스크 ${tasks.length}개 추가`);
+      } catch (dbErr) {
+        console.warn('[WikiEngine] 칸반 DB Zero-Copy 연동 실패:', dbErr.message);
+      }
+      
       // [M-003 Fix] rename → copyFile: 원본 graph.json을 파괴하지 않고 복사
-      await fs.copyFile(graphPath, path.join(wikiRoot, '99_Graph_Data', 'graph.json'));
+      await fs.writeFile(path.join(wikiRoot, '99_Graph_Data', 'graph.json'), JSON.stringify(graphData, null, 2));
     } catch (e) {
-      throw new Error('graph.json 파일을 읽을 수 없습니다.');
+      throw new Error('graph.json 파일을 읽을 수 없습니다: ' + e.message);
     }
 
     const elements = graphData.elements || [];
@@ -167,9 +172,23 @@ class WikiEngine {
       if (data.type === 'section') sections.push(data.label || data.id);
     }
 
-    console.log(`[WikiEngine] 노드 분류 완료. Decisions: ${decisions.length}, Concepts: ${concepts.length}`);
+    console.log(`[WikiEngine] 노드 분류 완료. Decisions: ${decisions.length}, Concepts: ${concepts.length}, Sections: ${sections.length}`);
 
-    // [H-001 Fix] Export — LLM 0회 호출, 순수 알고리즘 템플릿
+    // Categorize sections
+    const ontology = {
+      product: [], requirements: [], flows: [], rules: [], external: [], other: []
+    };
+
+    sections.forEach(s => {
+      const lower = s.toLowerCase();
+      if (lower.match(/(목표|비전|가치|타겟|개요|product|vision)/)) ontology.product.push(s);
+      else if (lower.match(/(요구사항|명세|기능|requirements|feature)/)) ontology.requirements.push(s);
+      else if (lower.match(/(흐름|여정|flow|journey|상태)/)) ontology.flows.push(s);
+      else if (lower.match(/(로직|규칙|제약|정책|rule|policy)/)) ontology.rules.push(s);
+      else if (lower.match(/(연동|외부|api|integration|인터페이스)/)) ontology.external.push(s);
+      else ontology.other.push(s);
+    });
+
     if (decisions.length > 0) {
       const adrMd = this._buildDecisionLog(decisions);
       await fs.writeFile(path.join(wikiRoot, '90_Decisions', 'DECISION_LOG.md'), adrMd, 'utf-8');
@@ -178,6 +197,22 @@ class WikiEngine {
     if (concepts.length > 0) {
       const glossaryMd = this._buildGlossary(concepts);
       await fs.writeFile(path.join(wikiRoot, '20_Domain', 'Glossary.md'), glossaryMd, 'utf-8');
+    }
+
+    if (ontology.product.length > 0) {
+      await fs.writeFile(path.join(wikiRoot, '10_Product', 'Product_Vision.md'), this._buildCategoryMarkdown('Product Vision & Target', ontology.product), 'utf-8');
+    }
+    if (ontology.requirements.length > 0) {
+      await fs.writeFile(path.join(wikiRoot, '30_Requirements', 'Requirements.md'), this._buildCategoryMarkdown('Requirements & Features', ontology.requirements), 'utf-8');
+    }
+    if (ontology.flows.length > 0) {
+      await fs.writeFile(path.join(wikiRoot, '40_Flows', 'Flows.md'), this._buildCategoryMarkdown('User Flows & States', ontology.flows), 'utf-8');
+    }
+    if (ontology.rules.length > 0) {
+      await fs.writeFile(path.join(wikiRoot, '50_Business_Rules', 'Business_Rules.md'), this._buildCategoryMarkdown('Business Rules & Policies', ontology.rules), 'utf-8');
+    }
+    if (ontology.external.length > 0) {
+      await fs.writeFile(path.join(wikiRoot, '70_External_Integrations', 'Integrations.md'), this._buildCategoryMarkdown('External Integrations & APIs', ontology.external), 'utf-8');
     }
 
     const indexMd = this._buildProjectIndex(

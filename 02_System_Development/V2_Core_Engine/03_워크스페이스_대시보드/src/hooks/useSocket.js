@@ -79,6 +79,48 @@ export function useSocket() {
         });
       });
 
+      // [Bug 4 Fix] Plan Master가 생성한 다수 카드 일괄 반영 (task:bulk_created)
+      // generate-roadmaps API가 io.to(`project_${projectId}`).emit('task:bulk_created')를 보내면
+      // 서버에서 개별 task:created 없이 bulk로 전달하므로 별도 핸들러 필요
+      socketInstance.on('task:bulk_created', async ({ projectId, taskIds, count }) => {
+        if (!taskIds || taskIds.length === 0) return;
+        const currentProjectId = useProjectStore.getState().selectedProjectId;
+        if (projectId && projectId !== currentProjectId) return; // 다른 프로젝트 이벤트 무시
+
+        // 서버에서 생성된 카드 전체를 즉시 fetch해 스토어에 반영
+        try {
+          const res = await fetch(`${SERVER_URL}/api/tasks?projectId=${projectId}`);
+          if (!res.ok) throw new Error('task fetch 실패');
+          const data = await res.json();
+          const tasks = data.tasks || data || [];
+          // 새로 생성된 taskIds만 필터링해 addTask
+          const newTaskIds = new Set(taskIds.map(String));
+          tasks
+            .filter(t => newTaskIds.has(String(t.id)))
+            .forEach(t => {
+              useKanbanStore.getState().addTask({
+                id: String(t.id),
+                content: t.content || '',
+                title: t.title || '',
+                column: t.column || 'todo',
+                agentId: t.assigned_agent || null,
+                assignee: t.assigned_agent || null,
+                priority: t.priority || 'medium',
+                riskLevel: 'SAFE',
+                status: t.status || 'PENDING',
+                latestComment: null,
+                projectId: t.project_id || projectId,
+                project_task_num: t.project_task_num,
+                category: t.category || null,
+              });
+            });
+          console.log(`[Plan Master] task:bulk_created — ${count}개 카드 칸반 반영 완료`);
+        } catch (e) {
+          console.warn('[Plan Master] bulk_created 후 태스크 fetch 실패:', e.message);
+        }
+      });
+
+
       socketInstance.on('task:moved', ({ taskId, toColumn }) => {
         useKanbanStore.getState().confirmTaskMove(String(taskId), toColumn);
       });

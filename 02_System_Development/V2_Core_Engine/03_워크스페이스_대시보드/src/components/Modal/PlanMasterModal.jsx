@@ -81,6 +81,16 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
   };
 
   const handleConfirm = async () => {
+    try {
+      // [Fix] PRD 명세: confirm 시 서버에 LOCKED 상태 기록 (MVP lock-on)
+      await fetch(`${SERVER_URL}/api/projects/${projectId}/plan-master/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'confirm' }),
+      });
+    } catch (e) {
+      console.warn('[Plan Master] confirm API 호출 실패 (무시하고 계속):', e.message);
+    }
     // [USER 피드백] 최종 컨펌 카드는 파이널(FINAL) 컬럼으로 이동
     await updateTaskStatus('FINAL');
     onSubmit && onSubmit(roadmap);

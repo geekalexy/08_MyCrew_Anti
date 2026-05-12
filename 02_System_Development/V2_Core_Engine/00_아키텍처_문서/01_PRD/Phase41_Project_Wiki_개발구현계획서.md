@@ -33,8 +33,12 @@
 - [x] **도메인 온톨로지(10~90) 파이프라인 (P0)**:
   - `raw/meetings/` 및 타 원본 데이터가 갱신될 경우 Watchdog을 통해 분석 파이프라인 트리거.
   - 알고리즘 및 모델을 통해 기획 의도는 `10_Product/`, 정책은 `50_Business_Rules/`, 의사결정은 `90_Decisions/` 등으로 자동 라우팅 및 Export.
+  - **[Fix D-001]** 기획서 상의 Leiden 클러스터링 알고리즘은 성능 최적화를 위해 순수 정규식 키워드 기반의 매핑 알고리즘(Keyword Matching)으로 대체 반영되었음을 명시.
+  - **[Fix]** `wikiEngine.js` 절대경로 탐색 깊이 버그 완벽 해결 (프로젝트 폴더 이탈 방지).
+  - **[Fix]** LLM 제거 시 누락됐던 10~90번대 폴더용 '키워드 매핑 알고리즘(순수 정규식)' 복구 완료.
 - [x] **에이전트 System Prompt 하드 인젝션 로직 (P0)**:
   - `executor.js` 실행 시 에이전트가 코드베이스를 탐색하기 전, 가장 먼저 `00_Index/PROJECT_WIKI.md`의 구조화된 지식 인덱스를 강제 주입(Install).
+  - **[Fix D-002]** `__dirname` 경로 수정 및 "Read Graph First" 문구를 명시하여 인젝션 무결성 확보.
 - [x] **Graphify Query용 MCP 도구 연동 (P1)**:
   - 에이전트가 시스템 프롬프트를 읽은 후 특정 모듈 간의 경로나 의존성을 물어볼 수 있는 `mcp_mycrew_query_graph` 툴 제공.
 

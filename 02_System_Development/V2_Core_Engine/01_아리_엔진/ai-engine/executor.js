@@ -583,12 +583,16 @@ class Executor {
             const pRow = await dbManager.getProjectById(tInfo.project_id);
             if (pRow) {
               const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
-              const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+              // [Fix D-002] Use __dirname and correct depth (5) to guarantee folder hit.
+              const pRoot = path.resolve(__dirname, '../../../../../04_Users/01_Company/01_Projects', pDirName);
               const wikiPath = path.resolve(pRoot, 'Project_WIKI/00_Index/PROJECT_WIKI.md');
               if (fs.existsSync(wikiPath)) {
                 const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
-                finalSystemPrompt += `\n\n## 📚 프로젝트 위키 (자동 로드)\n${wikiContent}`;
-                console.log(`[Executor] Project LLM Wiki 자동 주입 완료: ${wikiPath}`);
+                // [Fix D-002] "Read Graph First" 프롬프트 인젝션
+                finalSystemPrompt += `\n\n## 📚 프로젝트 구조화 지식 인덱스 (Read Graph First)\n아래 지식은 이 프로젝트의 중심 구조입니다. 작업을 시작하기 전 가장 먼저 참고하세요:\n${wikiContent}`;
+                console.log(`[Executor] Project_WIKI.md (Read Graph First) 하드 인젝션 완료: ${wikiPath}`);
+              } else {
+                console.warn(`[Executor] Project_WIKI.md 파일을 찾을 수 없습니다: ${wikiPath}`);
               }
             }
           }

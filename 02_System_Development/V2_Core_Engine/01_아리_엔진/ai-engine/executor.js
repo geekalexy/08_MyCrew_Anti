@@ -564,7 +564,6 @@ class Executor {
     const livingRules = ruleHarvester.getAppliedRules(projectId);
     let finalSystemPrompt = contextInjector.buildInjectionPayload(systemPrompt, livingRules);
 
-    let taskInfo = null;
     if (agentId && agentId !== 'system' && agentId.toLowerCase() !== 'assistant') {
       let projectSpecificRole = '';
       if (taskId) {

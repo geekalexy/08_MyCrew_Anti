@@ -97,7 +97,7 @@ class AntigravityAdapter extends BaseAdapter {
         };
     }
 
-    async generateResponse(userPrompt, systemPrompt, agentId = 'ollie', overrideModel = null, overrideTimeoutMs = null) {
+    async generateResponse(userPrompt, systemPrompt, agentId = 'ollie', overrideModel = null, overrideTimeoutMs = null, tools = null) {
         // agentId: 실제 에이전트 ID (ollie, luna, lily, pico)
         const agentKey = agentId; // 파일 키로 직접 사용 → req_ollie_*.json 등
         const effectiveTimeout = overrideTimeoutMs ?? TIMEOUT_MS; // 호출자가 타임아웃 직접 지정 가능
@@ -151,6 +151,7 @@ class AntigravityAdapter extends BaseAdapter {
                 protocol: "CKS_ANTI_BRIDGE_v3",
                 systemInstruction: systemPrompt,
                 taskPayload: userPrompt,
+                tools: tools,
                 instructions: `지시사항에 따른 결괏값을 생각한 뒤, JSON 형태로 작성하여 지정 경로에 저장할 것. 
 [에이전트 공통 지시사항]
 - 결과물(코드, 이미지, 문서 등)을 저장해야 할 경우, 기본 저장 경로는 소속된 프로젝트 루트 하위의 'OUTPUT' 폴더를 사용하라. (절대경로 대신 './OUTPUT' 처럼 상대경로로 작성하면 시스템이 알아서 격리된 프로젝트 폴더로 라우팅한다.)

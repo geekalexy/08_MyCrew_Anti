@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSocket } from '../../hooks/useSocket';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
@@ -10,6 +11,38 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
   const [step, setStep] = useState(1);
   const [roadmap, setRoadmap] = useState(null);
   const [feedback, setFeedback] = useState('');
+  
+  const { socket } = useSocket();
+  const [thinkingLogs, setThinkingLogs] = useState([]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleThoughtUpdate = (data) => {
+      if (String(data.projectId) === String(projectId)) {
+        setThinkingLogs(prev => {
+          const newLogs = [...prev];
+          const existingIdx = newLogs.findIndex(l => l.thoughtNumber === data.thoughtNumber);
+          if (existingIdx >= 0) {
+            newLogs[existingIdx] = data;
+          } else {
+            newLogs.push(data);
+          }
+          return newLogs;
+        });
+      }
+    };
+    const handleThinking = (data) => {
+      if (String(data.projectId) === String(projectId)) {
+        // You can update a separate status state if needed, or rely on thought_update
+      }
+    };
+    socket.on('plan-master:thought_update', handleThoughtUpdate);
+    socket.on('plan-master:thinking', handleThinking);
+    return () => {
+      socket.off('plan-master:thought_update', handleThoughtUpdate);
+      socket.off('plan-master:thinking', handleThinking);
+    };
+  }, [socket, projectId]);
 
   const updateTaskStatus = async (status) => {
     if (!taskId) return;
@@ -27,6 +60,7 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
   const handleAnalyze = async () => {
     if (!req.trim()) return;
     setLoading(true);
+    setThinkingLogs([]); // Reset logs on new analysis
     // [USER 피드백] 분석 시작하면 진행 컬럼(IN_PROGRESS) 이동
     await updateTaskStatus('IN_PROGRESS');
     
@@ -156,6 +190,26 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
                       {opt}
                     </button>
                   ))}
+                </div>
+              )}
+              
+              {thinkingLogs.length > 0 && (
+                <div style={{ marginTop: '16px', padding: '16px', background: 'rgba(124,110,248,0.1)', border: '1px solid rgba(124,110,248,0.3)', borderRadius: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px', color: '#7c6ef8' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px', animation: loading ? 'spin 2s linear infinite' : 'none' }}>psychology</span>
+                    사고 과정 스트리밍...
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '150px', overflowY: 'auto', paddingRight: '8px' }}>
+                    {thinkingLogs.map((log, i) => (
+                      <div key={i} style={{ fontSize: '13px', color: '#ccc', lineHeight: '1.5', background: '#222', padding: '10px', borderRadius: '6px' }}>
+                        <span style={{ color: '#60a5fa', fontWeight: 600, marginRight: '8px' }}>[Step {log.thoughtNumber}]</span>
+                        {log.thought}
+                        <div style={{ marginTop: '6px', fontSize: '11px', color: log.nextThoughtNeeded ? '#fb923c' : '#4ade80' }}>
+                          {log.nextThoughtNeeded ? '⏳ 계속 분석 중...' : '✅ 사고 완료'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>

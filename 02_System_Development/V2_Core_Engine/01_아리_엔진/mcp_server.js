@@ -133,7 +133,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   throw new Error(`Resource not found: ${request.params.uri}`);
 });
 
-const ALL_TOOLS = [
+export const ALL_TOOLS = [
   // ── [Phase 39-1] Plan Master 전용 기획 도구 (Sequential Thinking 적용) ──
   {
     name: "analyze_scope",

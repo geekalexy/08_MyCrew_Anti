@@ -3338,55 +3338,77 @@ app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
   const { id: projectId } = req.params;
   const { requirements, deadline } = req.body;
   try {
-    // [H-003 Fix] requirements null 가드 추가
     const safeReq = requirements || '';
     broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${safeReq.substring(0, 30)}...)`, 'system', null, 'DASHBOARD', projectId);
     
-    const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
+    let thoughtNumber = 1;
+    let nextThoughtNeeded = true;
+    let parsedResult = null;
+    let accumulatedThoughts = [];
+
+    while (nextThoughtNeeded && thoughtNumber <= 5) {
+      io.emit('plan-master:thinking', { projectId, thoughtNumber, status: '사고 진행 중...' });
+      broadcastLog('info', `[Plan Master] 스코프 심층 분석 중... (Step ${thoughtNumber})`, 'system', null, 'DASHBOARD', projectId);
+
+      const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
 사용자의 요구사항: "${requirements}"
 개발 완료 희망일: "${deadline}"
 
-이 정보를 바탕으로 스코프를 분석하고, mcp_server.js에 정의된 analyze_scope 도구의 inputSchema 형식과 완벽히 일치하는 순수 JSON 객체를 반환하십시오.
-(반드시 마크다운 코드 블록이나 기타 텍스트 없이 JSON 형태만 반환할 것)
+현재까지의 사고 과정:
+${accumulatedThoughts.join('\\n')}
 
-만약 요구사항이 너무 짧거나 모호하여 스코프 산정이 불가능하다면:
+당신은 Sequential Thinking을 통해 문제를 다각도로 분석해야 합니다.
+반드시 아래 스키마에 맞는 순수 JSON 객체 하나만 반환하십시오. 마크다운 블록 없이 순수 JSON만 반환해야 합니다.
 {
-  "thought": "요구사항이 너무 짧아 의도를 파악하기 어렵다...",
-  "thoughtNumber": 1,
-  "nextThoughtNeeded": false,
-  "needs_clarification": true,
-  "options": ["A. 단순 카탈로그 형태의 랜딩 페이지", "B. 결제 연동이 포함된 풀스택 쇼핑몰"]
-}
-
-충분히 구체적이라면:
-{
-  "thought": "결제와 장바구니가 필수이므로 MVP는 결제 모듈 연동에 집중한다...",
-  "thoughtNumber": 1,
-  "nextThoughtNeeded": false,
-  "needs_clarification": false,
-  "must_have": ["상품 목록 조회", "장바구니", "결제 연동"],
-  "nice_to_have": ["위시리스트", "상품 추천 AI"]
+  "thought": "현재 단계의 분석 내용 및 근거",
+  "thoughtNumber": ${thoughtNumber},
+  "nextThoughtNeeded": true/false,
+  "needs_clarification": true/false,
+  "options": ["옵션A", "옵션B"], // needs_clarification이 true일 때만
+  "must_have": ["필수1"], // 결론이 났을 때만 (nextThoughtNeeded가 false일 때)
+  "nice_to_have": ["확장1"] // 결론이 났을 때만
 }`;
 
-    // Priority 2: 1차 분류는 Sonnet 4.6 호출 강제 (Fallback으로 Gemini 3.1 처리 내장)
-    const result = await antigravityAdapter.generateResponse(
-      requirements, 
-      systemPrompt, 
-      'sonnet', // agentKey
-      'anti-claude-sonnet-4.6-thinking', // overrideModel
-      2 * 60 * 1000 // 2분 타임아웃
-    );
+      const promptContext = thoughtNumber === 1 
+        ? "초기 요구사항을 분석하여 첫 번째 사고를 진행하십시오." 
+        : `위 사고 과정을 이어받아 ${thoughtNumber}번째 사고를 진행하십시오. 스코프가 확정되었다면 nextThoughtNeeded를 false로 설정하세요.`;
 
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
-    } catch(e) {
-      console.warn('[Plan Master] JSON 파싱 실패, Fallback 적용');
-      parsedResult = {
-        thought: "JSON 파싱 오류로 인한 긴급 폴백",
-        needs_clarification: true,
-        options: ["요구사항을 조금 더 상세히 적어주세요.", "기능을 단계별로 나누어 설명해주세요."]
-      };
+      const result = await antigravityAdapter.generateResponse(
+        promptContext, 
+        systemPrompt, 
+        'sonnet', 
+        'anti-claude-sonnet-4.6-thinking', 
+        2 * 60 * 1000,
+        [{ name: 'analyze_scope' }] // MCP Tool 시그니처 전달 (어댑터 호환용)
+      );
+
+      try {
+        parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
+        if (parsedResult.thought) {
+          accumulatedThoughts.push(`[Step ${thoughtNumber}] ${parsedResult.thought}`);
+        }
+        
+        nextThoughtNeeded = parsedResult.nextThoughtNeeded === true;
+        
+        // 프론트에 실시간 상태 브로드캐스트
+        io.emit('plan-master:thought_update', {
+            projectId,
+            taskId: req.body.taskId, // 클라이언트에서 전달받을 수 있음
+            thoughtNumber,
+            thought: parsedResult.thought,
+            nextThoughtNeeded
+        });
+
+        thoughtNumber++;
+      } catch(e) {
+        console.warn('[Plan Master] JSON 파싱 실패, Fallback 적용 및 루프 중단', e.message);
+        parsedResult = {
+          thought: "JSON 파싱 오류로 인한 긴급 폴백",
+          needs_clarification: true,
+          options: ["요구사항을 조금 더 상세히 적어주세요.", "기능을 단계별로 나누어 설명해주세요."]
+        };
+        break;
+      }
     }
 
     res.json({ status: parsedResult.needs_clarification ? 'needs_clarification' : 'success', ...parsedResult });
@@ -3401,87 +3423,113 @@ app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
  */
 app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => {
   const { id: projectId } = req.params;
-  const { must_have, nice_to_have, thought } = req.body;
+  const { must_have, nice_to_have, feedback } = req.body;
   try {
     broadcastLog('info', `[Plan Master] MVP 로드맵 생성 중...`, 'system', null, 'DASHBOARD', projectId);
     
-    const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
+    let thoughtNumber = 1;
+    let nextThoughtNeeded = true;
+    let accumulatedThoughts = [];
+    let mvp_tasks = [];
+    let future_scope = [];
+
+    // 1. make_roadmaps 단계 루프
+    while (nextThoughtNeeded && thoughtNumber <= 5) {
+      io.emit('plan-master:thinking', { projectId, thoughtNumber, status: '로드맵 구성 중...' });
+      const systemPrompt1 = `당신은 최상위 Product Manager인 Plan Master입니다.
 이전 분석 단계에서 확정된 스코프는 다음과 같습니다:
 - 필수(Must-have): ${must_have ? must_have.join(', ') : '없음'}
 - 확장(Nice-to-have): ${nice_to_have ? nice_to_have.join(', ') : '없음'}
+사용자 피드백: ${feedback || '없음'}
 
-이 스코프를 바탕으로 다음 단계인 \`make_roadmaps\`와 \`confirm_mvp\`의 결과를 하나의 JSON 객체로 합쳐서 반환하십시오.
-(반드시 마크다운 코드 블록이나 기타 텍스트 없이 JSON 형태만 반환할 것)
+현재까지의 사고 과정:
+${accumulatedThoughts.join('\\n')}
 
-형식:
+Sequential Thinking을 통해 기능을 태스크로 분할하십시오. 
+반드시 아래 스키마에 맞는 순수 JSON 객체만 반환하십시오.
 {
   "thought": "로드맵을 구성하는 사고 과정...",
-  "thoughtNumber": 2,
-  "nextThoughtNeeded": false,
-  "mvp_tasks": ["상품 목록 조회 개발", "장바구니 API 연동", "PG 결제 모듈 부착"],
-  "future_scope": ["위시리스트", "상품 추천 AI"],
+  "thoughtNumber": ${thoughtNumber},
+  "nextThoughtNeeded": true/false,
+  "mvp_tasks": ["상품 목록 조회 개발", "장바구니 API 연동"], // 결론이 났을 때만
+  "future_scope": ["위시리스트", "상품 추천 AI"] // 결론이 났을 때만
+}`;
+      const prompt1 = thoughtNumber === 1 ? "로드맵 구성을 시작하십시오." : "추가 사고를 진행하십시오.";
+      const result1 = await antigravityAdapter.generateResponse(
+        prompt1, systemPrompt1, 'opus', 'anti-claude-opus-4.6-thinking', 3 * 60 * 1000, [{ name: 'make_roadmaps' }]
+      );
+      try {
+        const parsed1 = JSON.parse(result1.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
+        if (parsed1.thought) accumulatedThoughts.push(`[Step ${thoughtNumber}] ${parsed1.thought}`);
+        io.emit('plan-master:thought_update', { projectId, taskId: req.body.taskId, thoughtNumber, thought: parsed1.thought, nextThoughtNeeded: parsed1.nextThoughtNeeded });
+        
+        nextThoughtNeeded = parsed1.nextThoughtNeeded === true;
+        if (!nextThoughtNeeded) {
+            mvp_tasks = parsed1.mvp_tasks || [];
+            future_scope = parsed1.future_scope || [];
+        }
+        thoughtNumber++;
+      } catch (e) {
+        console.warn('[Plan Master] 로드맵 JSON 파싱 실패');
+        mvp_tasks = must_have || ["기본 기능 구현"];
+        future_scope = nice_to_have || [];
+        break;
+      }
+    }
+
+    // 2. confirm_mvp 단계 루프 (사용자 브리핑 메시지 작성)
+    let confirmThoughtNum = 1;
+    let confirmNext = true;
+    let message_to_user = "";
+
+    while (confirmNext && confirmThoughtNum <= 3) {
+      io.emit('plan-master:thinking', { projectId, thoughtNumber: confirmThoughtNum, status: '브리핑 작성 중...' });
+      const systemPrompt2 = `당신은 최상위 Product Manager입니다.
+도출된 태스크: MVP(${mvp_tasks.join(', ')}), Future(${future_scope.join(', ')})
+
+사용자에게 보고할 최종 브리핑 메시지를 작성하십시오. JSON 형식만 반환하세요.
+{
+  "thought": "보고 메시지 구성 의도...",
+  "thoughtNumber": ${confirmThoughtNum},
+  "nextThoughtNeeded": true/false,
   "message_to_user": "최소 스펙인 결제 및 장바구니 기능으로 2주 내 런칭 가능한 MVP 로드맵을 설계했습니다. 진행할까요?"
 }`;
-
-    // [Task 2.2] 심층 기획 마스터: Opus 4.6 Thinking 투입 (비즈니스 리스크 분석 + 최종 PRD 분할)
-    const result = await antigravityAdapter.generateResponse(
-      "로드맵을 생성하고 최종 확인 메시지를 작성해주세요.", 
-      systemPrompt, 
-      'opus',                              // agentKey: opus 승격
-      'anti-claude-opus-4.6-thinking',     // overrideModel: Opus 4.6
-      3 * 60 * 1000                        // 3분 타임아웃 (심층 분석)
-    );
-
-    let parsedResult;
-    try {
-      parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim());
-    } catch(e) {
-      console.warn('[Plan Master] 로드맵 JSON 파싱 실패, Fallback 적용');
-      parsedResult = {
-        mvp_tasks: must_have || ["기본 기능 구현"],
-        future_scope: nice_to_have || [],
-        message_to_user: "MVP 로드맵 생성을 완료했습니다. 진행할까요?"
-      };
+      const prompt2 = confirmThoughtNum === 1 ? "최종 보고 메시지를 작성하십시오." : "메시지 작성을 계속하십시오.";
+      const result2 = await antigravityAdapter.generateResponse(
+        prompt2, systemPrompt2, 'opus', 'anti-claude-opus-4.6-thinking', 2 * 60 * 1000, [{ name: 'confirm_mvp' }]
+      );
+      try {
+        const parsed2 = JSON.parse(result2.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
+        if (parsed2.thought) accumulatedThoughts.push(`[Confirm Step ${confirmThoughtNum}] ${parsed2.thought}`);
+        io.emit('plan-master:thought_update', { projectId, taskId: req.body.taskId, thoughtNumber: confirmThoughtNum, thought: parsed2.thought, nextThoughtNeeded: parsed2.nextThoughtNeeded });
+        
+        confirmNext = parsed2.nextThoughtNeeded === true;
+        if (!confirmNext) {
+            message_to_user = parsed2.message_to_user || "MVP 로드맵 생성을 완료했습니다. 진행할까요?";
+        }
+        confirmThoughtNum++;
+      } catch (e) {
+        message_to_user = "MVP 로드맵 생성을 완료했습니다. 진행할까요?";
+        break;
+      }
     }
 
-    // [H-001 Fix] createTask positional 시그니처로 통일 + 생성된 ID 수집
     const createdIds = [];
-
-    // 1. mvp_tasks를 칸반 보드의 Todo(Backlog)에 자동 생성
-    if (parsedResult.mvp_tasks && parsedResult.mvp_tasks.length > 0) {
-      for (const taskTitle of parsedResult.mvp_tasks) {
-        const taskId = await dbManager.createTask(
-          taskTitle,       // title
-          taskTitle,       // content
-          'plan_master',   // requester
-          null,            // model (default)
-          'dev_senior',    // assignedAgent
-          'BACKLOG',       // category
-          projectId        // projectId
-        );
-        if (taskId) createdIds.push(String(taskId));
+    if (mvp_tasks.length > 0) {
+      for (const taskTitle of mvp_tasks) {
+        const tId = await dbManager.createTask(taskTitle, taskTitle, 'plan_master', null, 'dev_senior', 'BACKLOG', projectId);
+        if (tId) createdIds.push(String(tId));
       }
     }
-    
-    // 2. future_scope도 칸반에 [확장 버전] 태그 달아서 생성
-    if (parsedResult.future_scope && parsedResult.future_scope.length > 0) {
-      for (const taskTitle of parsedResult.future_scope) {
-        const taskId = await dbManager.createTask(
-          `[확장 버전] ${taskTitle}`, // title
-          taskTitle,                  // content
-          'plan_master',              // requester
-          null,                       // model (default)
-          null,                       // assignedAgent
-          'BACKLOG',                  // category
-          projectId                   // projectId
-        );
-        if (taskId) createdIds.push(String(taskId));
+    if (future_scope.length > 0) {
+      for (const taskTitle of future_scope) {
+        const tId = await dbManager.createTask(`[확장 버전] ${taskTitle}`, taskTitle, 'plan_master', null, null, 'BACKLOG', projectId);
+        if (tId) createdIds.push(String(tId));
       }
     }
-    // [H-001 Fix] 전역 emit → 프로젝트 Room 한정 emit (다른 프로젝트 클라이언트 불필요 재렌더링 방지)
     io.to(`project_${projectId}`).emit('task:bulk_created', { projectId, taskIds: createdIds, count: createdIds.length });
 
-    res.json({ status: 'success', ...parsedResult });
+    res.json({ status: 'success', mvp_tasks, future_scope, message_to_user });
   } catch (err) {
     console.error('[API /api/projects/:id/plan-master/generate-roadmaps] Error:', err.message);
     res.status(500).json({ error: err.message });

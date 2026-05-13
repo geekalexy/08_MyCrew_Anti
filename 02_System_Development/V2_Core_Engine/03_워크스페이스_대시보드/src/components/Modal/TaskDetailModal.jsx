@@ -895,13 +895,20 @@ export default function TaskDetailModal() {
           assignedAgent: finalAssignee,
         })
       }).then(() => {
-        // [Phase 39-3] Zero-Command UX: 모드가 NONE이거나 입력 내용이 슬래시(/) 명령어 형태일 경우 자동 라우팅 실행
         if (finalMode === 'NONE' || trimmedText.startsWith('/')) {
            fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
              method: 'POST',
              headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({ mode: 'NONE', intent: trimmedText })
-           }).catch(console.error);
+           })
+           .then(r => r.json())
+           .then(data => {
+             if (data.status === 'redirect') {
+               setActiveDetailTaskId(null);
+               setTimeout(() => setActiveDetailTaskId(data.redirectTaskId), 100);
+             }
+           })
+           .catch(console.error);
         }
       }).catch(console.error);
 
@@ -942,7 +949,15 @@ export default function TaskDetailModal() {
       body: JSON.stringify({ mode: finalMode }),
     })
       .then((r) => r.json())
-      .then(() => patchTask(task.id, { column: 'in_progress', status: 'IN_PROGRESS' }))
+      .then((data) => {
+        if (data.status === 'redirect') {
+          // [Phase 44] Immutable Rerun Forking: 기존 카드 닫고 새 카드로 이동
+          setActiveDetailTaskId(null);
+          setTimeout(() => setActiveDetailTaskId(data.redirectTaskId), 100);
+        } else {
+          patchTask(task.id, { column: 'in_progress', status: 'IN_PROGRESS' });
+        }
+      })
       .catch(console.error)
       .finally(() => setIsStarting(false));
   };
@@ -1625,9 +1640,11 @@ export default function TaskDetailModal() {
 
           {/* 모드 선택 시 매크로 라벨 노출 (메타 속성 아래 위치) */}
           {task?.mode === 'ARCHITECT' && (
-            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(124, 110, 248, 0.1)', color: '#7c6ef8', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>psychology_alt</span>
-              [ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]
+            <div style={{ marginBottom: '16px', padding: '8px 14px', background: (task.status === 'ARCHIVED' || task.status === 'DONE') ? 'rgba(148, 163, 184, 0.1)' : 'rgba(124, 110, 248, 0.1)', border: (task.status === 'ARCHIVED' || task.status === 'DONE') ? '1px solid rgba(148, 163, 184, 0.2)' : 'none', color: (task.status === 'ARCHIVED' || task.status === 'DONE') ? '#94a3b8' : '#7c6ef8', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>{ (task.status === 'ARCHIVED' || task.status === 'DONE') ? 'check_circle' : 'psychology_alt' }</span>
+              <span style={{ opacity: (task.status === 'ARCHIVED' || task.status === 'DONE') ? 0.8 : 1 }}>
+                {(task.status === 'ARCHIVED' || task.status === 'DONE') ? '✅ Plan Master 기획 완료 — (읽기 전용)' : '[ /plan_master : 스코프 분석 및 로드맵 자동 생성 ]'}
+              </span>
             </div>
           )}
           {task?.mode === 'DEV' && (
@@ -1649,6 +1666,37 @@ export default function TaskDetailModal() {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>stop_circle</span>
                   Stop
+                </button>
+              </div>
+            ) : task?.last_autorun_status === 'COMPLETED' ? (
+              // [Phase 44] 이력 영속성 (Banner Persistence & Gateway) - 비활성화 느낌의 UI
+              <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(148, 163, 184, 0.1)', border: '1px solid rgba(148, 163, 184, 0.2)', color: '#94a3b8', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>check_circle</span>
+                <span style={{ flex: 1, opacity: 0.8 }}>
+                  ✅ Auto Run 완료 — Step {task.last_autorun_step}/{task.last_autorun_max_steps}
+                </span>
+                <button
+                  id="autotest-start-btn"
+                  onClick={() => {
+                    // [Phase 44] /auto_test 트리거 (게이트웨이)
+                    fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mode: 'QA', intent: '/auto_test' }),
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                      if (data.status === 'redirect') {
+                        setActiveDetailTaskId(null);
+                        setTimeout(() => setActiveDetailTaskId(data.redirectTaskId), 100);
+                      }
+                    })
+                    .catch(console.error);
+                  }}
+                  style={{ background: 'rgba(52,152,219,0.15)', border: '1px solid rgba(52,152,219,0.4)', color: '#3498db', borderRadius: '4px', padding: '3px 10px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>science</span>
+                  /auto_test 시작
                 </button>
               </div>
             ) : (

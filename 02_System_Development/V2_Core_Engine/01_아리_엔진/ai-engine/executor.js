@@ -1132,6 +1132,8 @@ class Executor {
 
     let nextTaskIdToRun = startingTaskId; // 시작 태스크가 지정되었다면 그것부터
     let currentTaskId = null;
+    let lastStepCount = 0;
+    const MAX_STEPS = 15;
 
     try {
       while (!abortController.signal.aborted) {
@@ -1144,7 +1146,7 @@ class Executor {
           nextTaskIdToRun = null; // 1회성 소모
         } else {
           // 일반적인 큐 스케줄링 로직
-          const tasks = await dbManager.getTasksByProjectId(projectId);
+          const tasks = await dbManager.getAllTasks(projectId);
           // todo 또는 pending 상태인 것 중 최우선순위 1개 선택
           nextTask = tasks.find(t => t.status.toLowerCase() === 'todo' || t.status.toLowerCase() === 'pending');
         }
@@ -1165,8 +1167,7 @@ class Executor {
         }
 
         // 3. 루프 제어 변수 및 강제 종료 기제(Max Steps)
-        let stepCount = 0;
-        const MAX_STEPS = 15;
+        lastStepCount = 0;
         let isTaskCompleted = false;
         let toolOutputs = [];
 
@@ -1178,8 +1179,8 @@ class Executor {
 
         // 4. 태스크 내 단일 루프 (Continuous Mode)
         while (!isTaskCompleted && !abortController.signal.aborted) {
-          stepCount++;
-          if (stepCount > MAX_STEPS) {
+          lastStepCount++;
+          if (lastStepCount > MAX_STEPS) {
              throw new Error('Max steps exceeded');
           }
 
@@ -1189,7 +1190,7 @@ class Executor {
           }
 
           if (this._broadcastLog) {
-            this._broadcastLog('info', `⏳ [AutoRun] Step ${stepCount}: 에이전트 사고 회로 가동 중...`, agentId, currentTaskId);
+            this._broadcastLog('info', `⏳ [AutoRun] Step ${lastStepCount}: 에이전트 사고 회로 가동 중...`, agentId, currentTaskId);
           }
 
           // [Step 5] LLM API 직접 호출 (여기서는 GeminiAdapter 활용)
@@ -1229,6 +1230,8 @@ class Executor {
                   isTaskCompleted = true; 
                   isBlocked = true;
                   await dbManager.updateTaskStatus(currentTaskId, 'BLOCKED');
+                  // Phase 44 Persistence
+                  await dbManager.updateAutoRunStatus(currentTaskId, 'BLOCKED', lastStepCount, MAX_STEPS);
                   if (this._broadcastLog) {
                     this._broadcastLog('warn', `⏸️ 사용자 응답 대기 (BLOCKED): ${resultObj.reason}`, agentId, currentTaskId);
                   }
@@ -1269,6 +1272,8 @@ class Executor {
         if (!abortController.signal.aborted && isTaskCompleted && !isBlocked) {
           await dbManager.updateTaskStatus(currentTaskId, 'REVIEW');
           await dbManager.updateTaskAssignee(currentTaskId, 'ceo');
+          // Phase 44 Persistence
+          await dbManager.updateAutoRunStatus(currentTaskId, 'COMPLETED', lastStepCount, MAX_STEPS);
           console.log(`[AutoRun] ✅ 태스크 #${currentTaskId} 완료 → REVIEW 전환 및 CEO 할당`);
           if (this._broadcastLog) {
             this._broadcastLog('info', `✅ 태스크 #${currentTaskId} 완료. CEO의 최종 검토를 대기합니다 (REVIEW).`, agentId, currentTaskId);
@@ -1282,6 +1287,7 @@ class Executor {
       // 에러 발생 시 진행 중이던 카드가 있다면 FAILED 처리
       if (currentTaskId) {
         await dbManager.updateTaskStatus(currentTaskId, 'FAILED');
+        await dbManager.updateAutoRunStatus(currentTaskId, 'FAILED', lastStepCount, MAX_STEPS);
         if (this._broadcastLog) {
           this._broadcastLog('error', `🚨 태스크 #${currentTaskId} 실행 중 치명적 에러 발생: ${err.message}`, agentId, currentTaskId);
         }

@@ -633,6 +633,7 @@ class DatabaseManager {
       return new Promise((resolve, reject) => {
         let query = `SELECT id, title, content, status, requester, model, assigned_agent, priority,
                   risk_level, execution_mode, has_artifact, artifact_url, failure_count,
+                  last_autorun_status, last_autorun_step, last_autorun_max_steps, last_autorun_at,
                   created_at, updated_at, project_id, project_task_num, sprint_no
            FROM Task 
            WHERE deleted_at IS NULL`;
@@ -674,7 +675,9 @@ class DatabaseManager {
   getTaskById(id) {
     return new Promise((resolve, reject) => {
       db.get(
-        `SELECT id, title, content, status, requester, model, assigned_agent, risk_level, execution_mode, created_at, updated_at, project_id, project_task_num, sprint_no
+        `SELECT id, title, content, status, requester, model, assigned_agent, risk_level, execution_mode, has_artifact, artifact_url, failure_count,
+         last_autorun_status, last_autorun_step, last_autorun_max_steps, last_autorun_at,
+         created_at, updated_at, project_id, project_task_num, sprint_no
          FROM Task WHERE id = ? AND deleted_at IS NULL`,
         [id],
         (err, row) => {
@@ -694,7 +697,9 @@ class DatabaseManager {
       }
       return new Promise((resolve, reject) => {
         let query = `SELECT id, title, content, status, requester, model, assigned_agent, priority,
-                risk_level, execution_mode, has_artifact, artifact_url, created_at, updated_at, project_id
+                risk_level, execution_mode, has_artifact, artifact_url,
+                last_autorun_status, last_autorun_step, last_autorun_max_steps, last_autorun_at,
+                created_at, updated_at, project_id
          FROM Task 
          WHERE status = 'ARCHIVED' AND deleted_at IS NULL`;
         const params = [];
@@ -736,6 +741,26 @@ class DatabaseManager {
       db.run(
         `UPDATE Task SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         [status, id],
+        function (err) {
+          if (err) reject(err);
+          else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 44] Auto Run 상태 저장 ───────────────────────────
+  updateAutoRunStatus(taskId, status, step, maxSteps) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE Task SET 
+          last_autorun_status = ?, 
+          last_autorun_step = ?, 
+          last_autorun_max_steps = ?, 
+          last_autorun_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+        [status, step, maxSteps, taskId],
         function (err) {
           if (err) reject(err);
           else resolve(this.changes);

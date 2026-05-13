@@ -87,9 +87,31 @@ Shrimp와 Task Master는 무한 루프(Infinite Loop)에 빠지는 것을 방지
 
 ---
 
-## 5. 결론 및 다음 단계 (Next Steps)
+## 5. Auto Run Lifecycle and UI/UX Persistence Policy (Phase 44 Architecture)
+
+CEO의 특별 지시에 따라, `/auto_run`의 이력(History) 보존과 재작업(Re-run) 시의 컨텍스트 오염 방지를 위해 다음의 아키텍처 규칙을 도입합니다. (본 규칙은 Phase 44 구현 시 백엔드 DB와 연동되어 강제됩니다.)
+
+### 5.1. 배너 영속성 및 이력 아카이빙 (Banner Persistence)
+- **목적**: 특정 카드가 `/auto_run`으로 개발되었음을 사람이 직관적으로 인지할 수 있도록, 완료 배너를 일회성 알림이 아닌 **영구적인 이력(Badge)**으로 취급합니다.
+- **구현 방식**: 
+  - 프론트엔드의 React 상태(`useState`)에 의존하지 않고, 태스크 DB 테이블에 `last_autorun_status`, `last_autorun_step`, `last_autorun_at` 컬럼을 신설합니다.
+  - 카드를 열 때 DB 값을 읽어와 `✅ Auto Run 완료 — "DB API 구현" Step 15/15` 형태의 배너를 상시 렌더링합니다.
+  - 이 배너는 다음 단계인 **CEO Review** 또는 **`/auto_test` 파이프라인 트리거**를 위한 진입점(Gateway) 역할을 수행합니다.
+
+### 5.2. 재작업 시 원본 카드 격리 (Immutable Rerun Isolation)
+- **목적**: 완료된 Auto Run 카드에서 재실행 명령(`/run` 또는 `/auto_run`)이 떨어졌을 때, 기존의 수많은 코멘트 결과물이 에이전트의 컨텍스트 윈도우를 오염시키는 현상(인지 부조화)을 원천 차단합니다.
+- **구현 방식**:
+  - `last_autorun_status === 'COMPLETED'` 인 상태의 카드에서 `/auto_run` 재작업 요청이 들어오면, **기존 카드에서 루프를 다시 돌리지 않습니다.**
+  - 백엔드 로직에서 **자동으로 새로운 태스크 카드(재작업용)를 Fork(복제) 생성**하여, 깨끗한 컨텍스트 환경에서 2차 Auto Run 파이프라인이 가동되도록 강제합니다.
+  - 원본 카드는 이력이 보존된 상태로 락(Lock) 및 아카이빙 처리됩니다.
+
+---
+
+## 6. 결론 및 다음 단계 (Next Steps)
 본 PRD는 단순한 도구를 넘어, 에이전트가 사람처럼 계획하고 실행하는 완전한 **실무자 파이프라인**을 정의했습니다. 
 
-**[Phase 39-6] 액션 아이템:**
-- `executor.js` 내부 루프에 Shrimp 스타일의 태스크 의존성 추적 및 루프 탈출(Break) 조건 추가.
-- `contextInjector.js`에 3단 모듈형 프롬프트(Persona, Tools, Rules) 동적 조립 로직 구현.
+**[Phase 44] 액션 아이템:**
+- `tasks` 테이블 스키마에 Auto Run 추적 메타데이터 컬럼 추가 (DB 마이그레이션).
+- `executor.js` 및 라우팅 계층에 재작업 시 새 카드 자동 생성(Fork) 및 원본 카드 종결 처리 로직 구현.
+- 생성된 결과물을 바탕으로 전수 테스트를 수행하는 `/auto_test` (QA 에이전트 파이프라인) 스킬 설계 및 통합.
+

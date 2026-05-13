@@ -82,3 +82,23 @@
 ### 🎯 시나리오 6: 프론트/백엔드 툴 호출 파이프라인 무결성 검증
 - **테스트 방법**: `read_file` 후 `write_file`을 연달아 수행하도록 지시하고, 프론트엔드 화면을 관찰한다.
 - **기대 결과**: 백엔드에서 정상적으로 파일 I/O가 처리되어야 하며, 프론트엔드 UI에 "도구 사용 중: read_file..." 같은 시각적 알림이 표시되고 완료 시 내역이 로그(코멘트)로 예쁘게 찍혀야 한다.
+
+---
+
+## 🚀 3. Phase 44 사전 연계 작업 (DB & 아키텍처 보강)
+CEO 검토에 따라, Auto Run 파이프라인의 **이력 영구 보존(Immutable Badge)** 및 **순수 컨텍스트 유지(Clean Context Isolation)**를 위해 다음의 개발 과제가 Phase 44로 즉시 이관되어 구현됩니다.
+
+### Step 6. Auto Run 영속성 보장 및 재작업(Re-run) 격리 아키텍처
+- **DB 스키마 마이그레이션 (`tasks` 테이블)**:
+  - `last_autorun_status` (VARCHAR)
+  - `last_autorun_step` (INTEGER)
+  - `last_autorun_max_steps` (INTEGER)
+  - `last_autorun_at` (DATETIME) 신설.
+- **배너 상태 영속성**:
+  - React State를 벗어나, DB 컬럼 기반으로 모달 진입 시 `✅ Auto Run 완료 — Step 15/15` 배너를 영구적으로 표시하도록 프론트엔드 로직 수정.
+- **Immutable Rerun Forking**:
+  - `server.js`의 라우트 계층에서, 이미 `COMPLETED`된 Auto Run 카드에 `/run` 또는 `/auto_run` 명령이 접수될 경우, 현재 카드를 아카이빙(Archived) 상태로 락(Lock) 처리.
+  - 동시에, 동일한 기획서와 부모 태스크 정보를 참조하는 **완전히 새로운 Task 카드를 Fork**하여, 깨끗한 코멘트 컨텍스트 위에서 새 루프가 시작되도록 로직 강제화.
+- **Gateway to Auto Test**:
+  - `✅ Auto Run 완료` 배너 상태에서, `/auto_test` (QA 파이프라인) 스킬을 트리거할 수 있는 UI 진입점을 마련.
+

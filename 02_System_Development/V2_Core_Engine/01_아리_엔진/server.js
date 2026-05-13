@@ -3641,8 +3641,33 @@ app.post('/api/tasks/:id/run', async (req, res) => {
   const sid = String(req.params.id);
   const { mode, intent } = req.body; // { mode: 'DEV', intent: 'run_tasks' } 혹은 일반 코멘트
   try {
-    const task = await dbManager.getTaskById(sid);
+    let task = await dbManager.getTaskById(sid);
     if (!task) return res.status(404).json({ status: 'error', message: '태스크를 찾을 수 없습니다.' });
+
+    // [Phase 44] Immutable Rerun Forking
+    // Auto Run 이력이 'COMPLETED' 이거나 이미 DONE인 상태에서 재작업(run) 요청이 올 경우
+    if (task.last_autorun_status === 'COMPLETED' || task.status === 'DONE') {
+      console.log(`[Phase 44] Task #${sid} is COMPLETED/DONE. Forking to a new task for clean rerun.`);
+      await dbManager.updateTaskStatus(sid, 'ARCHIVED');
+      
+      const forkTitle = task.title.includes('(재작업)') ? task.title : task.title + ' (재작업)';
+      const newTaskId = await dbManager.createTask(
+        forkTitle,
+        task.content,
+        task.requester,
+        task.model,
+        task.assigned_agent,
+        'QUICK_CHAT',
+        task.project_id
+      );
+      
+      // 클라이언트에게 새 태스크 ID로 모달을 이동하라는 신호 반환 (실행은 아직 안 함, 프론트에서 새 모달 열고 재요청 유도)
+      return res.json({ 
+        status: 'redirect', 
+        redirectTaskId: newTaskId, 
+        message: '컨텍스트 보호를 위해 기존 작업은 아카이브되고 새 재작업 카드가 생성되었습니다.' 
+      });
+    }
 
     broadcastLog('info', `[Zero-Command] Task #${sid} 실행 트리거 수신 (Mode: ${mode || 'Unknown'})`, 'system', sid);
 

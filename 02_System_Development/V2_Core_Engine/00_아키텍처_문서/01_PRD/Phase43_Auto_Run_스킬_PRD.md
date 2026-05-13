@@ -1,4 +1,4 @@
-# 🚀 Phase 39: `/auto_run` 스킬 및 도구 기획서 (Shrimp & Task Master 벤치마킹)
+# 🚀 Phase 43: `/auto_run` 스킬 및 도구 기획서 (Shrimp & Task Master 프롬프트 원문 도입)
 
 **작성일**: 2026-05-13  
 **작성자**: 루카 (Luca)  
@@ -16,23 +16,33 @@
 
 ## 2. 모듈형 프롬프트 아키텍처 (Claude Task Master 차용)
 
-거대한 시스템 프롬프트 하나에 모든 지시사항을 우겨넣는 기존 방식을 탈피하고, `/auto_run` 모드 진입 시에만 조립되어 주입되는 3단 모듈형 프롬프트를 설계합니다.
+거대한 시스템 프롬프트 하나에 모든 지시사항을 우겨넣는 기존 방식을 탈피하고, `/auto_run` 모드 진입 시에만 조립되어 주입되는 3단 모듈형 프롬프트를 설계합니다. 아래는 **Shrimp와 Task Master의 오리지널 프롬프트 구조를 거의 그대로 차용**한 핵심 원문(번역/적용본)입니다.
 
-### 🧩 2.1. System Persona (Base Prompt)
-> "당신은 세계 최고 수준의 Senior Fullstack Developer입니다. 당신의 유일한 목표는 주어진 PRD와 태스크 리스트를 완벽하게 작동하는 코드로 변환하는 것입니다. 핑계나 부가 설명 없이 즉시 코드 작성을 시작하십시오."
+### 🧩 2.1. System Persona (`system.md` 오리지널 차용)
+Task Master의 가장 핵심적인 `Main Model` 지시사항을 그대로 이식합니다.
+> **[System Prompt]**
+> "You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.
+> Your ONLY purpose is to transform the provided PRD and task list into perfectly working code.
+> 
+> **CRITICAL RULES:**
+> 1. Do NOT ask for permission to code. Just start coding immediately.
+> 2. You must operate in 'Continuous Mode' when `/auto_run` is triggered.
+> 3. After completing a task, DO NOT STOP. You must automatically call the `next_task` tool until all dependencies are resolved and the PRD is fully implemented.
+> 4. If you encounter an error, use `query_graph` to trace the blast radius before applying a fix."
 
-### 🧩 2.2. Tool Specification (`tools.md` 차용)
-에이전트가 `/auto_run` 도중 호출할 수 있는 도구들을 명확히 글로 서술하여 문맥(Context)을 이해시킵니다.
-> **[사용 가능 도구 가이드]**
-> - `read_file`: 코드를 작성하기 전, 타겟 파일의 현재 상태를 파악할 때 사용합니다. 무조건 덮어쓰지 말고 기존 로직을 보존해야 합니다.
-> - `write_file` / `multi_replace`: 코드를 작성하거나 수정할 때 사용합니다. 반드시 한 번에 하나의 파일만 수정하여 안정성을 확보하십시오.
-> - `query_graph`: (Graphify) 함수 의존성을 확인하거나 수정 후 다른 파일에 미칠 영향을 파악할 때 사용합니다.
+### 🧩 2.2. Tool Specification (`tools.md` 오리지널 차용)
+Shrimp의 도구 명세 방식처럼, 툴을 '언제, 왜' 써야 하는지 LLM에게 명시적으로 설명하는 원문 방식을 도입합니다.
+> **[Tools Guide]**
+> - **`read_file`**: Use this BEFORE modifying any existing code. Never overwrite without knowing the current state.
+> - **`write_file` / `multi_replace`**: Use this to write code. Modifying one file at a time is STRICTLY ENFORCED to maintain atomic execution.
+> - **`query_graph`**: When an error occurs or before refactoring a core module, use this tool to find Cross-Community nodes. Do NOT guess the architecture.
 
-### 🧩 2.3. Project Rules (`shrimp-rules.md` 차용)
-프로젝트별 고유 컨벤션, 코드 스타일, 금지된 라이브러리 패턴 등을 주입합니다.
-> **[프로젝트 코딩 컨벤션]**
-> - TailwindCSS 사용을 금지하고, Vanilla CSS(`index.css`) 클래스로 스타일링할 것.
-> - 상태 관리는 React Context API 또는 Zustand만을 사용할 것.
+### 🧩 2.3. Project Rules (`shrimp-rules.md` 오리지널 차용)
+프로젝트별 고유 컨벤션을 주입하는 템플릿입니다.
+> **[Shrimp Project Rules - MyCrew Edition]**
+> - Styling: ONLY use Vanilla CSS (`index.css`). TailwindCSS is strictly forbidden unless overridden by the user.
+> - State Management: Use React Context API or Zustand.
+> - Logging: All execution logs must be broadcasted via the `statusReporter` using `broadcastLog`.
 
 ---
 

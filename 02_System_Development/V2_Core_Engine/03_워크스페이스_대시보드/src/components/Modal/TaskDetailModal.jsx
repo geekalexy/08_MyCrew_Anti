@@ -569,6 +569,18 @@ export default function TaskDetailModal() {
     return () => socket.off('task:comment_added', handler);
   }, [socket, activeDetailTaskId]);
 
+  // [Phase 39-3] Plan Master 트리거 수신 (Zero-Command UX)
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+    const onPlanMasterTrigger = ({ taskId }) => {
+      if (String(taskId) === String(activeDetailTaskId)) {
+        setShowPlanMasterModal(true);
+      }
+    };
+    socket.on('plan-master:trigger', onPlanMasterTrigger);
+    return () => socket.off('plan-master:trigger', onPlanMasterTrigger);
+  }, [socket, activeDetailTaskId]);
+
   // [Sprint4+] 이벤트 드리븐: task:updated 수신 → IN_PROGRESS 시 Activity 자동 기록
   useEffect(() => {
     if (!socket || !activeDetailTaskId) return;
@@ -840,6 +852,15 @@ export default function TaskDetailModal() {
           model: task.model || 'Claude Sonnet 4.6 (Thinking)',
           assignedAgent: finalAssignee,
         })
+      }).then(() => {
+        // [Phase 39-3] Zero-Command UX: 모드가 NONE이거나 입력 내용이 슬래시(/) 명령어 형태일 경우 자동 라우팅 실행
+        if (finalMode === 'NONE' || trimmedText.startsWith('/')) {
+           fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ mode: 'NONE', intent: trimmedText })
+           }).catch(console.error);
+        }
       }).catch(console.error);
 
       setCommentText('');

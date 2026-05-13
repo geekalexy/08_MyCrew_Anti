@@ -313,6 +313,8 @@ export default function TaskDetailModal() {
   
 
   const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
+  // [Phase 43] Auto Run 상태 추적
+  const [autoRunStatus, setAutoRunStatus] = useState(null); // null | { taskTitle, step, maxSteps }
   const [commentColumn, setCommentColumn] = useState('');
   const [commentAssignee, setCommentAssignee] = useState('');
   const [commentPriority, setCommentPriority] = useState('medium');
@@ -607,6 +609,46 @@ export default function TaskDetailModal() {
     socket.on('task:updated', onTaskUpdated);
     return () => socket.off('task:updated', onTaskUpdated);
   }, [socket, activeDetailTaskId]);
+
+  // [Phase 43] Auto Run 상태 추적 — log:append에서 Step 정보 파싱
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+
+    const onLogAppend = (payload) => {
+      if (String(payload.taskId) !== String(activeDetailTaskId)) return;
+      const msg = payload.message || '';
+
+      // "⏳ [AutoRun] Step N: ..." 패턴 감지
+      const stepMatch = msg.match(/\[AutoRun\] Step (\d+)/i);
+      if (stepMatch) {
+        setAutoRunStatus(prev => ({
+          taskTitle: prev?.taskTitle || task?.title || '',
+          step: parseInt(stepMatch[1], 10),
+          maxSteps: 15,
+        }));
+        // 활성 시 Activity 탭으로 자동 전환
+        setActiveCommentTab('activity');
+      }
+
+      // 🛑 종료 메시지 감지
+      if (msg.includes('🛑') || msg.includes('✅') && msg.includes('REVIEW') || msg.includes('🏁')) {
+        setAutoRunStatus(null);
+      }
+    };
+
+    const onAutoRunStopped = (payload) => {
+      if (String(payload.projectId) === String(task?.project_id)) {
+        setAutoRunStatus(null);
+      }
+    };
+
+    socket.on('log:append', onLogAppend);
+    socket.on('autorun:stopped', onAutoRunStopped);
+    return () => {
+      socket.off('log:append', onLogAppend);
+      socket.off('autorun:stopped', onAutoRunStopped);
+    };
+  }, [socket, activeDetailTaskId, task?.project_id, task?.title]);
 
   const handleClose = useCallback(() => {
     // 아카이빙 완료 후 닫힉 시 카드를 스토어에서 제거
@@ -1589,10 +1631,33 @@ export default function TaskDetailModal() {
             </div>
           )}
           {task?.mode === 'DEV' && (
-            <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>rocket_launch</span>
-              [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
-            </div>
+            autoRunStatus ? (
+              // [Phase 43] Auto Run 가동 중 → 동적 상태 배너
+              <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.15)', border: '1px solid rgba(46,204,113,0.3)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', animation: 'spin 2s linear infinite' }}>robot_2</span>
+                <span style={{ flex: 1 }}>
+                  🤖 Auto Run 가동 중 — &quot;{autoRunStatus.taskTitle}&quot; Step {autoRunStatus.step}/{autoRunStatus.maxSteps}
+                </span>
+                <button
+                  id="autorun-stop-btn"
+                  onClick={async () => {
+                    try {
+                      await fetch(`${SERVER_URL}/api/projects/${encodeURIComponent(task.project_id)}/autorun/stop`, { method: 'POST' });
+                    } catch (e) { console.error('Auto Run stop 실패:', e); }
+                  }}
+                  style={{ background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.4)', color: '#e74c3c', borderRadius: '4px', padding: '3px 10px', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>stop_circle</span>
+                  Stop
+                </button>
+              </div>
+            ) : (
+              // 정적 레이블
+              <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>rocket_launch</span>
+                [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
+              </div>
+            )
           )}
           {task?.mode === 'QA' && (
             <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>

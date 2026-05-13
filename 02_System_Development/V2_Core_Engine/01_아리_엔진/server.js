@@ -1838,6 +1838,32 @@ app.post('/api/projects/:id/pipeline/stop', async (req, res) => {
   }
 });
 
+/**
+ * [Phase 43] POST /api/projects/:id/autorun/stop — Auto Run 루프 강제 종료
+ * executor.activeAutoRuns 맵에서 해당 projectId로 시작하는 runId를 찾아 abort 신호 전달
+ */
+app.post('/api/projects/:id/autorun/stop', async (req, res) => {
+  const { id: projectId } = req.params;
+  try {
+    let stoppedCount = 0;
+    for (const [runId] of executor.activeAutoRuns.entries()) {
+      if (runId.startsWith(`${projectId}_`)) {
+        executor.stopAutoRun(runId);
+        stoppedCount++;
+      }
+    }
+    // UI에 autorun 종료 신호 브로드캐스트
+    io.to(`project_${projectId}`).emit('autorun:stopped', { projectId });
+    io.emit('autorun:stopped', { projectId }); // 글로벌 fallback
+    broadcastLog('error', `🛑 Auto Run이 사용자에 의해 강제 종료되었습니다. (${stoppedCount}개 프로세스)`, 'system', null, 'DASHBOARD', projectId);
+    res.json({ ok: true, stopped: stoppedCount });
+  } catch (err) {
+    console.error('[API] /autorun/stop 오류:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // ─── [Week 3: Memory 흡수] FTS5 전문 검색 API ──────────────────────────────
 app.get('/api/search', async (req, res) => {
   try {

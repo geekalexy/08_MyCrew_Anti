@@ -271,6 +271,48 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     
     return `${globalCtx}\n\n${taskCtx}`;
   }
+
+  /**
+   * [Phase 43] /auto_run 전용 3단 모듈형 프롬프트 생성기 (Shrimp / Task Master 벤치마킹)
+   * System Persona, Tool Specification, Project Rules를 조립하여 반환합니다.
+   * @param {object} taskData - 태스크 세부 정보 (PRD, 의존성 등)
+   * @returns {string} 완성된 /auto_run 전용 프롬프트
+   */
+  buildAutoRunContext(taskData = {}) {
+    let context = '';
+
+    // 1. System Persona (Base Prompt)
+    context += `[SYSTEM PERSONA - MAIN MODEL]\n`;
+    context += `You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.\n`;
+    context += `Your ONLY purpose is to transform the provided PRD and task list into perfectly working code.\n\n`;
+    context += `**CRITICAL RULES:**\n`;
+    context += `1. Do NOT ask for permission to code. Just start coding immediately.\n`;
+    context += `2. You must operate in 'Continuous Mode' when /auto_run is triggered.\n`;
+    context += `3. After completing a task, DO NOT STOP. You must automatically proceed or finish the loop.\n`;
+    context += `4. If you encounter an error, use query_graph to trace the blast radius before applying a fix.\n\n`;
+
+    // 2. Tool Specification
+    context += `[TOOL SPECIFICATIONS]\n`;
+    context += `- **read_file**: Use this BEFORE modifying any existing code. Never overwrite without knowing the current state.\n`;
+    context += `- **write_file / multi_replace**: Use this to write code. Modifying one file at a time is STRICTLY ENFORCED to maintain atomic execution.\n`;
+    context += `- **query_graph**: When an error occurs or before refactoring a core module, use this tool to find Cross-Community nodes. Do NOT guess the architecture.\n`;
+    context += `- **finish_task**: Use this tool ONLY when you have fully completed the task and verified it, or if you cannot proceed further without user intervention.\n\n`;
+
+    // 3. Project Rules
+    context += `[PROJECT RULES - MYCREW EDITION]\n`;
+    context += `- Styling: ONLY use Vanilla CSS (index.css). TailwindCSS is strictly forbidden unless overridden by the user.\n`;
+    context += `- State Management: Use React Context API or Zustand.\n`;
+    context += `- Logging: All execution logs must be broadcasted via the statusReporter using broadcastLog.\n\n`;
+
+    // Task Specific Data
+    if (taskData && (taskData.title || taskData.description)) {
+      context += `[CURRENT TASK CONTEXT]\n`;
+      context += `Task Title: ${taskData.title || 'Unknown'}\n`;
+      context += `Description:\n${taskData.description || 'None'}\n\n`;
+    }
+
+    return context.trim();
+  }
 }
 
 export default new ContextInjector();

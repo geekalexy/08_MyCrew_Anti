@@ -18,10 +18,10 @@
 ## 🛠️ 1. 개발 구현 태스크 리스트 (Task List)
 
 ### Step 1. 모듈형 프롬프트 주입기 (Context Injector) 구축
-- [ ] `contextInjector.js` 내에 `/auto_run` 전용 프롬프트 빌더 함수(`buildAutoRunContext()`) 신설.
-- [ ] **System Persona 주입**: "Continuous Mode", "Do NOT ask for permission" 등의 강제 룰 텍스트 하드코딩.
-- [ ] **Tool Specification 주입**: `read_file`, `write_file`, `query_graph` 등의 용도 및 방어 로직 텍스트 추가.
-- [ ] **Project Rules 주입**: Tailwind 금지, Vanilla CSS 사용 등 MyCrew 커스텀 룰셋 주입.
+- [x] `contextInjector.js` 내에 `/auto_run` 전용 프롬프트 빌더 함수(`buildAutoRunContext()`) 신설.
+- [x] **System Persona 주입**: "Continuous Mode", "Do NOT ask for permission" 등의 강제 룰 텍스트 하드코딩.
+- [x] **Tool Specification 주입**: `read_file`, `write_file`, `query_graph` 등의 용도 및 방어 로직 텍스트 추가.
+- [x] **Project Rules 주입**: Tailwind 금지, Vanilla CSS 사용 등 MyCrew 커스텀 룰셋 주입.
 
 ### Step 2. 연속 실행 루프 (Continuous Mode) 및 카드 스케줄러 구현
 - [ ] `executor.js` 메인 실행 함수 내에 `Continuous Mode`를 위한 무한 루프(`while (true)`) 뼈대 구축.

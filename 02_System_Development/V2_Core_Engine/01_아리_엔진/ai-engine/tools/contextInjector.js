@@ -298,7 +298,9 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     context += `Available Tools:\n`;
     context += `- **read_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
     context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
+    context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
     context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
+    context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
     context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
 
     // 3. Project Rules

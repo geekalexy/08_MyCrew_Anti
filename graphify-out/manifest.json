@@ -28,8 +28,8 @@
     "hash": "cc8101439883a81d1604c1c1dceb2d63"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/database.js": {
-    "mtime": 1778597971.6679366,
-    "hash": "72a367273d31e79c3a8b4ca0ca38b8aa"
+    "mtime": 1778603935.8547316,
+    "hash": "9df8a974e59441d3eb30cff3c5108a13"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/scratch2.js": {
     "mtime": 1778140971.78667,
@@ -60,12 +60,16 @@
     "hash": "63e54fa619b7c0f47aabf9ccd5c4a898"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/db_migrator.js": {
-    "mtime": 1778543155.652949,
-    "hash": "5e2e3b41808abc8aafbefaf699f9ee2a"
+    "mtime": 1778603826.8730662,
+    "hash": "2fbd62c79607e70589cc88101951b35d"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/mcp_server.js": {
     "mtime": 1778599234.5609436,
     "hash": "e6af7a19c4dd4dfcdfa0bf01a45fcc18"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/test_migrator.js": {
+    "mtime": 1778603802.5339932,
+    "hash": "9912fb20942e1141a77fa265451f12bf"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/puppeteer_test.js": {
     "mtime": 1778369244.5517306,
@@ -99,9 +103,45 @@
     "mtime": 1771420082.0,
     "hash": "d92d9dee1ab16aa44a75ae7fbfb843ca"
   },
-  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/001_dummy_test.sql": {
-    "mtime": 1778543242.457136,
-    "hash": "8c9c605d60198d1cd0236a6aa000d2e7"
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/009_seed_data.sql": {
+    "mtime": 1778603633.364398,
+    "hash": "aa12d41beedadca6a3ec3079063f3fbe"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/008_indexes_and_triggers.sql": {
+    "mtime": 1778603623.6835597,
+    "hash": "a0bf8d66f683cfbbc2f2e59015cbd83d"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/004_project_columns.sql": {
+    "mtime": 1778603597.841306,
+    "hash": "067be4afc78f83b12cf68d1cf9700e3a"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/006_phase36_pipeline.sql": {
+    "mtime": 1778603609.9724376,
+    "hash": "144edf95ece639289bc85f3e4cd27486"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/010_legacy_backfill.sql": {
+    "mtime": 1778603635.380908,
+    "hash": "63b186d870d19040db7d01eb2dcdc04b"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/002_task_columns.sql": {
+    "mtime": 1778603586.7444818,
+    "hash": "14916b5c55ec1e32c9aca6d4a702bc36"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/003_comment_columns.sql": {
+    "mtime": 1778603592.6052637,
+    "hash": "13513b90e482eeaa02a29d812cc28277"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/001_initial_schema.sql": {
+    "mtime": 1778603584.6884108,
+    "hash": "a738c4d88db407cc2e09d8a0a11ce61c"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/005_agent_skill_table.sql": {
+    "mtime": 1778603600.1851518,
+    "hash": "01a74107d2892756b42b1b192a5860d3"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/migrations/007_utility_tables.sql": {
+    "mtime": 1778603615.0186062,
+    "hash": "65027395bcb798c9c3aa8d41efe10d91"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/tests/check_models.js": {
     "mtime": 1776211729.5518212,
@@ -384,8 +424,8 @@
     "hash": "497164cf7579971779614b10b4213528"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/ai-engine/services/wikiEngine.js": {
-    "mtime": 1778598261.092088,
-    "hash": "42125f18b018abd901a0e8e541f0a35e"
+    "mtime": 1778630174.2966235,
+    "hash": "ad38b166e6eb6770c4905b39b9e7bc75"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/01_\uc544\ub9ac_\uc5d4\uc9c4/ai-engine/services/youtubeUploader.js": {
     "mtime": 1777028173.394839,
@@ -939,6 +979,10 @@
     "mtime": 1778519296.9068487,
     "hash": "f62699650029c133cc5634826a5a4ad7"
   },
+  "/Users/alex/Documents/08_MyCrew_Anti/05_My_history/Luca/ESSAY_Alex_2026-05-13_Luca.md": {
+    "mtime": 1778604397.8089926,
+    "hash": "34233b58ea46286524ca4a39dec301f4"
+  },
   "/Users/alex/Documents/08_MyCrew_Anti/05_My_history/Luca/ESSAY_Alex_2026-05-03_Luca.md": {
     "mtime": 1778518990.688277,
     "hash": "c673415737499cd17500e0893c124b00"
@@ -1135,6 +1179,10 @@
     "mtime": 1776962427.24812,
     "hash": "e53593159792018fd2d72c1c7becbc3b"
   },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_Phase42-4_WikiEngine.md": {
+    "mtime": 1778630233.5545669,
+    "hash": "80b91dc3d7ddfa7d58472005781e3a10"
+  },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-03_Luca.md": {
     "mtime": 1777816721.5578158,
     "hash": "917889c551d199b745b68dee6c9d9443"
@@ -1170,6 +1218,10 @@
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-02_Luca.md": {
     "mtime": 1777657002.824314,
     "hash": "c04ef6f4dcd8aa22f73b726a0af8bda9"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_ADM_Implementation.md": {
+    "mtime": 1778604395.3977087,
+    "hash": "639d099e8162d295f5d7b570d702cef4"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-04-28_Sonnet.md": {
     "mtime": 1777392572.9207785,
@@ -1835,6 +1887,14 @@
     "mtime": 1778597821.599124,
     "hash": "8acb717818a5a40ea038c1a406e09e6b"
   },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/\ub9ac\ubdf0_\uc544\uce74\uc774\ube0c/42_5_Phase42_5_AbsoluteIsolation_\ucd5c\uc885\uc2b9\uc778_Prime.md": {
+    "mtime": 1778601979.1196525,
+    "hash": "1b2224b9cecdeba08c2736980c410e3d"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/\ub9ac\ubdf0_\uc544\uce74\uc774\ube0c/42_Phase42_ADM_SupremeReview_Prime.md": {
+    "mtime": 1778603454.0729022,
+    "hash": "780047e86ef3c287c51f572337d0ffd2"
+  },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/\ub9ac\ubdf0_\uc544\uce74\uc774\ube0c/42_5_Phase42_5_AbsoluteIsolation_\ucf54\ub4dc\ub9ac\ubdf0_Prime.md": {
     "mtime": 1778599047.2787414,
     "hash": "e8f47a713beee89317182cbc83c94d08"
@@ -1842,6 +1902,10 @@
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/\ub9ac\ubdf0_\uc544\uce74\uc774\ube0c/45_Phase39_Phase41_Supreme_Review_Prime.md": {
     "mtime": 1778518370.646787,
     "hash": "6d80d3e8caafd18cc248d4baed935ccc"
+  },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/\ub9ac\ubdf0_\uc544\uce74\uc774\ube0c/42_4_Phase42_4_WikiEngine_Refactoring_SupremeReview_Prime.md": {
+    "mtime": 1778602628.7812827,
+    "hash": "46d8598ee9007e77ec6019638aff0e6c"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Anti-Bridge_\uc544\ud0a4\ud14d\ucc98_\ud574\uc124_\ubc0f_\uad6c\ud604\ud604\ud669.md": {
     "mtime": 1778520695.9464047,
@@ -1923,6 +1987,10 @@
     "mtime": 1778520695.9909713,
     "hash": "f61b2efb633fbff30735250ea00646e1"
   },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase42_4_WikiEngine_Refactoring_PRD.md": {
+    "mtime": 1778602526.616398,
+    "hash": "53dd5781f4f2005372d2f8a321bde893"
+  },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase38_Context_Chaining_PRD_v1.4.md": {
     "mtime": 1778520695.9939628,
     "hash": "60cd6c4a63ef7e5b761773e5423a5a20"
@@ -1999,6 +2067,10 @@
     "mtime": 1778520696.0383327,
     "hash": "e550ca47bdcb5dce4febea44e7025e76"
   },
+  "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase42_ADM_Agent_Driven_DB_Migration_PRD.md": {
+    "mtime": 1778603317.4748154,
+    "hash": "05c7e6fb04f936b2850d29947c51a96a"
+  },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase39_MODE_AUTO_ROUTING_\uac1c\ubc1c\uad6c\ud604\uacc4\ud68d\uc11c.md": {
     "mtime": 1778520696.0413191,
     "hash": "9809a7d074a9c32ccb5044b6f1fbf052"
@@ -2052,8 +2124,8 @@
     "hash": "0ea94198818cfbd36698af88c653e6f9"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase42_5_Agent_Absolute_Isolation_PRD.md": {
-    "mtime": 1778600105.5953052,
-    "hash": "a9c555b7cf6993889c83eca31f29b605"
+    "mtime": 1778601872.9389136,
+    "hash": "fdcbcd6c619e37b616555f562c241feb"
   },
   "/Users/alex/Documents/08_MyCrew_Anti/02_System_Development/V2_Core_Engine/00_\uc544\ud0a4\ud14d\ucc98_\ubb38\uc11c/01_PRD/Phase32_Auto_Memory_Watchdog_PRD.md": {
     "mtime": 1778520696.0707052,

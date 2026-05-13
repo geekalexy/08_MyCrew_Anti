@@ -24,20 +24,20 @@
 - [x] **Project Rules 주입**: Tailwind 금지, Vanilla CSS 사용 등 MyCrew 커스텀 룰셋 주입.
 
 ### Step 2. 연속 실행 루프 (Continuous Mode) 및 카드 스케줄러 구현
-- [ ] `executor.js` 메인 실행 함수 내에 `Continuous Mode`를 위한 무한 루프(`while (true)`) 뼈대 구축.
-- [ ] **카드(태스크) 획득 로직 (Scheduler)**: `dbManager.js`를 통해 현재 프로젝트의 `todo` 또는 `PENDING` 상태인 카드 목록을 조회하고 최우선순위(의존성이 없는) 카드를 하나 선택.
-- [ ] **카드 상태 전이 (Lifecycle)**:
+- [x] `executor.js` 메인 실행 함수 내에 `Continuous Mode`를 위한 무한 루프(`while (true)`) 뼈대 구축.
+- [x] **카드(태스크) 획득 로직 (Scheduler)**: `dbManager.js`를 통해 현재 프로젝트의 `todo` 또는 `PENDING` 상태인 카드 목록을 조회하고 최우선순위(의존성이 없는) 카드를 하나 선택.
+- [x] **카드 상태 전이 (Lifecycle)**:
   - 시작 시: `todo` → `IN_PROGRESS`
   - 실행 중 에러(Max Steps 등) 발생 시: `IN_PROGRESS` → `FAILED`
   - 작업 완료 시 판정 (무조건 REVIEW 전환):
     - **`REVIEW` (UI상 `Review` 컬럼)**: `/auto_run`을 통한 단일 태스크 개발이 완료되면, 즉각적으로 `Done`으로 보내지 않고 **무조건 `REVIEW` 상태로 전환**합니다.
     - 전환과 동시에 담당자(Assignee)를 **`CEO`**(사용자)에게 할당하여 최종 컨펌을 받도록 강제합니다. (※ 향후 `/auto_test` 파이프라인이 개발되면 CEO 대신 QA 에이전트에게 바통을 넘기는 상황으로 확장될 예정입니다.)
-- [ ] 단일 태스크 완료 후, 다음 태스크로 재귀적(Chain-of-thought)으로 넘어가는 흐름(Workflow) 제어 로직 추가.
+- [x] 단일 태스크 완료 후, 다음 태스크로 재귀적(Chain-of-thought)으로 넘어가는 흐름(Workflow) 제어 로직 추가.
 
 ### Step 3. 강제 종료 및 탈출 기제 (Escape Hatch) 구현
-- [ ] **에이전트 주도 탈출**: `mcp_server.js` 또는 로컬 툴 스키마에 `finish_task`, `ask_user` 도구 명세 추가. 해당 툴 호출 시 루프(while문) 즉각 `break`.
-- [ ] **사용자 주도 종료**: `server.js`의 `activeProcesses` 맵을 활용해 `AbortController`를 생성하고, LLM API 스트림에 연결. `/stop` 요청 시 `abort()` 트리거.
-- [ ] **Max Steps 제한**: `executor.js` 내부 루프에 `stepCount` 변수 추가. `stepCount > 15` 초과 시 `throw new Error('Max steps exceeded')` 발생 및 상태 `FAILED` 강제 전환.
+- [x] **에이전트 주도 탈출**: `mcp_server.js` 또는 로컬 툴 스키마에 `finish_task`, `ask_user` 도구 명세 추가. 해당 툴 호출 시 루프(while문) 즉각 `break`. (에이전트 측의 툴 콜 프롬프트 준비 완료, 툴 로직은 다음 스텝에 구현)
+- [x] **사용자 주도 종료**: `executor.js`의 `activeAutoRuns` 맵을 활용해 `AbortController`를 생성하고, `/stop` 요청 시 `stopAutoRun()` 트리거.
+- [x] **Max Steps 제한**: `executor.js` 내부 루프에 `stepCount` 변수 추가. `stepCount > 15` 초과 시 `throw new Error('Max steps exceeded')` 발생 및 상태 `FAILED` 강제 전환.
 
 ### Step 4. 상태 브로드캐스팅 (UI 동기화)
 - [ ] 루프의 각 Step이 끝날 때마다 (또는 Tool을 호출할 때마다) `io.emit('task:comment_added')` 및 `broadcastLog`를 통해 프론트엔드에 실시간 터미널/로그 전송.

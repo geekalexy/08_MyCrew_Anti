@@ -274,6 +274,8 @@ function isApprovalIntent(text) {
 class Executor {
   constructor() {
     this._broadcastLog = null;
+    // [Phase 43] autoRun 활성 프로세스 관리 맵 (Escape Hatch)
+    this.activeAutoRuns = new Map();
   }
 
   setBroadcastLog(fn) {
@@ -583,7 +585,8 @@ class Executor {
       const relayInstruction = `\n\n[자율 릴레이 바통 터치 규칙 — Phase 37 MANDATORY]\n작업 완료 후, 본문 최하단에 다음 목적에 맞는 태그를 작성하세요.\n\n🚨 [dev_advisor 필수 검수 규칙 — 모든 규칙보다 우선 적용]\n아래 상황에서는 반드시 review_request로 dev_advisor에게 넘겨야 합니다:\n  ✅ 코드(백엔드/프론트엔드/API)를 직접 작성하여 완료한 경우\n  ✅ 아키텍처 설계 문서를 완성한 경우\n  ✅ 데이터베이스 스키마를 설계/완성한 경우\n  ✅ 핵심 비즈니스 로직을 구현한 경우\n  ✅ QA 테스트를 완료하고 최종 결과를 보고하는 경우\n→ 위 경우 반드시: "assignee": "dev_advisor"\n\n━━ 방법 A: 핑퐁 (같은 카드, 다른 담당자에게) ━━\n사용 시점: 동일 산출물에 대한 반복 작업\n[핑퐁 키워드 패턴 — 아래 상황에서는 반드시 <review_request> 사용]\n  • 구현 완료 → 코드 리뷰 요청 → assignee: dev_advisor (필수)\n  • 코드 리뷰 완료 → 피드백 반영 → assignee: 원래 구현자\n  • 피드백 반영 완료 → 재검토 요청 → assignee: dev_advisor\n  • 재검토 통과 → QA 요청 → assignee: dev_qa\n  • QA 완료 → QA 결과 보고 → assignee: dev_advisor (최종 승인)\n  • 문서/설계 작성 완료 → 검토 요청 → assignee: dev_advisor\n<review_request>\n{\n  "title": "[리뷰] 작업 제목 (예: 텔레그램 미니앱 백엔드 API 코드 리뷰)",\n  "assignee": "dev_advisor",\n  "message": "검토 요청 내용 및 주요 구현 사항 요약"\n}\n</review_request>\n\n━━ 방법 B: 신규 카드 (완전히 새로운 업무 단위) ━━\n사용 시점: 새로운 기능·컴포넌트·시작\n주의: PRD/아키텍처 완료 후 바로 개발 카드를 만들지 말 것. 반드시 dev_advisor 검수 먼저.\n  • 아키텍처 승인 완료 → 백엔드 개발 시작\n  • 기능 A 완료 + 리뷰 통과 → 독립적인 기능 B 시작\n  • QA 중 신규 버그 발견 → 버그 수정 카드 생성\n<next_sprint>\n{\n  "title": "새 카드 제목",\n  "content": "새 담당자가 수행할 지시사항",\n  "assignee": "다음 담당자 역할 ID"\n}\n</next_sprint>\n\n━━ 방법 C: 릴레이 종료 (프로젝트/스프린트 완전 종료) ━━\n사용 시점: 모든 요구사항이 구현되고 QA까지 통과하여 더 이상 진행할 작업이 없는 경우.\n이 태그를 사용하면 자율 릴레이가 깔끔하게 종료되며 CEO의 최종 승인을 대기합니다.\n<pipeline_end>\n{\n  "message": "최종 완성되었습니다. 승인 부탁드립니다."\n}\n</pipeline_end>\n\n🔴 절대 금지 사항:\n- 본인(현재 담당자)에게 넘기는 것 금지\n- 코드 작성 완료 후 dev_advisor 검수 없이 next_sprint로 다음 개발 카드 생성 금지\n- dev_advisor 미거침 직행 개발 릴레이 금지\n`;
       const fileIOInstruction = `\n\n[파일 I/O 저장 규칙 — 물리적 파일 생성 도구]\n코드를 작성하거나 문서를 생성할 때, 반드시 아래 <file_operations> 태그를 사용하여 실제 파일로 디스크에 저장해야 합니다. (기본 출력 폴더명은 'OUTPUT' 입니다.)\n🚨 중요: HTML 기반의 프론트엔드 웹앱을 만들 때, 메인 파일은 반드시 하위 폴더 없이 최상위 경로인 \`index.html\` 로 저장하십시오! (예: path: "index.html") 그래야만 사용자의 Live Preview 버튼이 정상적으로 활성화됩니다.\n이 태그를 사용하면 프로젝트의 input/output 폴더 구조에 맞게 시스템이 물리적으로 파일을 자동 저장합니다.\n🚨 주의: <file_operations> 태그는 시스템 백그라운드에서 처리되므로 사용자 화면에는 코드가 보이지 않습니다.\n따라서 사용자(CEO)가 코드를 쉽게 읽고 리뷰할 수 있도록, **반드시 응답 본문(채팅창)에도 마크다운 코드 블록(\`\`\`언어명 ... \`\`\`)을 사용하여 작성된 코드를 예쁘게 출력**해 주어야 합니다!\n\n<file_operations>\n[\n  {\n    "action": "write",\n    "type": "output", // "input" 또는 "output"\n    "path": "index.html", // 하위 폴더 및 파일명\n    "content": "여기에 저장할 파일 내용 전체를 작성하세요..."\n  }\n]\n</file_operations>\n`;
       const graphifyInstruction = `\n\n[Phase 39 Graphify 하이퍼쿼리 필수 사용 규칙]\n코드를 탐색하거나 기존 프로젝트의 구조를 파악할 때, 무조건 파일을 텍스트로 읽기(grep 등) 전에 **Graphify MCP 서버의 query_graph, update_graph 도구**를 사용하여 프로젝트의 지식 신경망(Graph) 지형을 먼저 파악하십시오. 이를 통해 불필요한 토큰 낭비를 줄이고 파일 간의 의존성(Shortest Path)을 즉각적으로 추적해야 합니다.\n`;
-      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}\n${graphifyInstruction}`;
+      const handoffInstruction = `\n\n[Phase 39-3 Cross-Mode Handoff & Diff Analysis 규칙]\n당신이 현재 할당받은 작업(카드 ID: ${taskId || 'N/A'})에 대해, 이전에 기획 모드(ARCHITECT/Plan Master)나 타 모드에서 작성된 산출물(PRD, 히스토리)이 주어졌다면, **반드시 기존 기획 내용과 현재 시스템 코드 간의 차이(Diff)를 선행 분석**하십시오. 무작정 코딩을 시작하지 말고, "무엇을 변경/삭제/추가할지" 명확히 계획(Handoff 병합)한 후 작업을 수행하십시오. 이전 코멘트 ID나 카드 컨텍스트 링크가 있다면 반드시 참고해야 합니다.\n`;
+      const executorPersona = `\n\n[절대 규칙: 실무자 페르소나 강제]\n당신은 현재 MyCrew의 실무자 에이전트 **${agentId.toUpperCase()}** 입니다. 사용자의 작업 지시를 받아 **즉시 실무 작업물을 생성**해야 합니다.\n절대로 자신을 제3자화하여 '~~에게 업무를 지시합니다'라고 말하거나 태스크 카드를 작성하는 흉내를 내지 마십시오. 당신은 관리자가 아니라 결과물을 만들어내는 직접 실행자입니다. 불필요한 인사말 없이 요구받은 최종 결과물(예: 코드, 디자인, 텍스트 등)만 즉시 작성하십시오.\n${projectSpecificRole}\n${relayInstruction}\n${fileIOInstruction}\n${graphifyInstruction}\n${handoffInstruction}`;
       finalSystemPrompt = executorPersona + finalSystemPrompt;
       try {
         if (taskId) {
@@ -1110,6 +1113,109 @@ class Executor {
       score: evaluation.score,
       _meta: parsed._meta,
     };
+  }
+
+  // ─── [Phase 43] Continuous Mode & Auto Run Scheduler ──────────────────────
+  /**
+   * 프로젝트 내 대기 중인(todo/PENDING) 태스크를 순차적으로 실행하는 자율 루프
+   * @param {number|string} projectId - 대상 프로젝트 ID
+   * @param {string} agentId - 실행 에이전트 ID (기본: dev_senior)
+   */
+  async autoRun(projectId, agentId = 'dev_senior') {
+    const runId = `${projectId}_${Date.now()}`;
+    const abortController = new AbortController();
+    this.activeAutoRuns.set(runId, abortController);
+
+    console.log(`[AutoRun] 🚀 프로젝트 ${projectId} 자동 릴레이 시작 (RunID: ${runId})`);
+
+    let currentTaskId = null;
+
+    try {
+      while (!abortController.signal.aborted) {
+        // 1. 카드(태스크) 획득 로직 (Scheduler)
+        const tasks = await dbManager.getTasksByProjectId(projectId);
+        // todo 또는 pending 상태인 것 중 최우선순위 1개 선택
+        const nextTask = tasks.find(t => t.status.toLowerCase() === 'todo' || t.status.toLowerCase() === 'pending');
+
+        if (!nextTask) {
+          console.log(`[AutoRun] 🏁 더 이상 처리할 todo 태스크가 없습니다. 루프 종료.`);
+          if (this._broadcastLog) this._broadcastLog('info', `🏁 모든 태스크 완료. 자동 릴레이를 종료합니다.`, agentId, null);
+          break;
+        }
+
+        currentTaskId = nextTask.id;
+        console.log(`[AutoRun] 📌 태스크 선택: #${currentTaskId} (${nextTask.title})`);
+        
+        // 2. 상태 전이 (Lifecycle): 시작 시 todo -> IN_PROGRESS
+        await dbManager.updateTaskStatus(currentTaskId, 'IN_PROGRESS');
+        if (this._broadcastLog) {
+          this._broadcastLog('info', `▶️ 태스크 #${currentTaskId} 실행 시작`, agentId, currentTaskId);
+        }
+
+        // 3. 루프 제어 변수 및 강제 종료 기제(Max Steps)
+        let stepCount = 0;
+        const MAX_STEPS = 15;
+        let isTaskCompleted = false;
+
+        // 모듈형 프롬프트 주입기 호출
+        const autoRunContext = contextInjector.buildAutoRunContext({
+          title: nextTask.title,
+          description: nextTask.content || ''
+        });
+
+        // 4. 태스크 내 단일 루프 (Continuous Mode)
+        while (!isTaskCompleted && !abortController.signal.aborted) {
+          stepCount++;
+          if (stepCount > MAX_STEPS) {
+             throw new Error('Max steps exceeded');
+          }
+
+          // TODO (Step 5): LLM API 호출(tool_calls 활성화) 및 로컬/MCP 도구 파싱 로직 구현 자리
+          // 임시: 툴 로직 구현 전까지는 시뮬레이션을 위해 즉시 완료 처리
+          console.log(`[AutoRun] ⏳ 태스크 #${currentTaskId} Step ${stepCount} 진행 중... (Step 5 구현 대기)`);
+          
+          isTaskCompleted = true; // 완료 플래그 (임시)
+        }
+
+        // 5. 작업 완료 시 판정 (Lifecycle): 무조건 REVIEW 전환 및 CEO 할당
+        if (!abortController.signal.aborted && isTaskCompleted) {
+          await dbManager.updateTaskStatus(currentTaskId, 'REVIEW');
+          await dbManager.updateTaskAssignee(currentTaskId, 'ceo');
+          console.log(`[AutoRun] ✅ 태스크 #${currentTaskId} 완료 → REVIEW 전환 및 CEO 할당`);
+          if (this._broadcastLog) {
+            this._broadcastLog('info', `✅ 태스크 #${currentTaskId} 완료. CEO의 최종 검토를 대기합니다 (REVIEW).`, agentId, currentTaskId);
+          }
+        }
+        
+        currentTaskId = null; // 루프 종료 후 리셋
+      }
+    } catch (err) {
+      console.error(`[AutoRun] 🚨 에러 발생 (RunID: ${runId}):`, err.message);
+      // 에러 발생 시 진행 중이던 카드가 있다면 FAILED 처리
+      if (currentTaskId) {
+        await dbManager.updateTaskStatus(currentTaskId, 'FAILED');
+        if (this._broadcastLog) {
+          this._broadcastLog('error', `🚨 태스크 #${currentTaskId} 실행 중 치명적 에러 발생: ${err.message}`, agentId, currentTaskId);
+        }
+      }
+    } finally {
+      this.activeAutoRuns.delete(runId);
+      console.log(`[AutoRun] 🛑 프로세스 완전 종료 (RunID: ${runId})`);
+    }
+  }
+
+  /**
+   * [Phase 43] 사용자 주도 강제 종료 (Escape Hatch)
+   * @param {string} runId - 종료할 Auto Run 프로세스 ID
+   */
+  stopAutoRun(runId) {
+    if (this.activeAutoRuns.has(runId)) {
+      this.activeAutoRuns.get(runId).abort();
+      this.activeAutoRuns.delete(runId);
+      console.log(`[AutoRun] 🛑 강제 종료 시그널 전송됨 (RunID: ${runId})`);
+      return true;
+    }
+    return false;
   }
 }
 

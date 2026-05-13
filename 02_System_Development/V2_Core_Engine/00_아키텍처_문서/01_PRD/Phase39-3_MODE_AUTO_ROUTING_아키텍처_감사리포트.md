@@ -1,4 +1,4 @@
-# 🚀 Phase 39: Mode Auto Routing Architecture Audit Report
+# 🚀 Phase 39-3: Mode Auto Routing Architecture Audit Report
 
 ## 1. 개요 및 목적
 본 문서는 `Phase39_MODE_AUTO_ROUTING_기획.md` (Zero-Command UX 및 자동 모드 라우팅)의 기획 요구사항이 실제 `intentRouter.js`, `server.js`, `TaskDetailModal.jsx`, `executor.js` 등의 코드 레벨에서 얼마나 정합성 있게 구현되었는지 감사(Audit)한 결과입니다.
@@ -32,5 +32,5 @@
 > [!TIP] 
 > **권장 수정 방향 (Phase 39-3 제안)**
 > 1. **Zero-Command 트리거 연동:** `TaskDetailModal.jsx`에서 자연어 코멘트 전송 시, 명시적 모드가 선택되지 않았다면 `/api/tasks/:id/run` 엔드포인트를 백그라운드에서 호출하도록 UI 이벤트를 연동해야 합니다.
-> 2. **Context Payload Handoff 로직 신설:** `executor.js`에서 실행 시 이전 모드의 산출물(PRD 등)을 현재 상태와 Diff(비교)하도록 강제하는 프롬프트 래퍼(Wrapper)를 신설해야 합니다.
+> 2. **Context Payload Handoff 로직 신설:** `executor.js`에서 실행 시 이전 모드의 산출물(PRD 등)을 현재 상태와 Diff(비교)하도록 강제하는 프롬프트 래퍼(Wrapper)를 신설해야 합니다. 이때 산출물의 버전과 상태 구분을 명확히 하기 위해 **카드 ID 및 코멘트 ID(컨텍스트 링크)**를 활용하여 히스토리를 주입해야 합니다.
 > 3. **Router 분기 동기화:** `intentRouter.js`가 `PLAN_MASTER`나 `ARCHITECT`를 반환할 경우, 백엔드에서 강제로 프론트엔드에 `PlanMasterModal`을 띄우라는 소켓 이벤트를 발송하거나 백엔드 단에서 Plan Master 파이프라인을 직접 구동하도록 구조를 일치시켜야 합니다.

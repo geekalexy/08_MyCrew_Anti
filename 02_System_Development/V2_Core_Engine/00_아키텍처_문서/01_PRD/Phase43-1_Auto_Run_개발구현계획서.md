@@ -25,7 +25,9 @@
 
 ### Step 2. 연속 실행 루프 (Continuous Mode) 및 카드 스케줄러 구현
 - [x] `executor.js` 메인 실행 함수 내에 `Continuous Mode`를 위한 무한 루프(`while (true)`) 뼈대 구축.
-- [x] **카드(태스크) 획득 로직 (Scheduler)**: `dbManager.js`를 통해 현재 프로젝트의 `todo` 또는 `PENDING` 상태인 카드 목록을 조회하고 최우선순위(의존성이 없는) 카드를 하나 선택.
+- [x] **카드(태스크) 획득 로직 (Scheduler)**: 
+  - 기본적으로 DB에서 현재 프로젝트의 `todo` 또는 `PENDING` 상태인 카드를 탐색.
+  - **Edge Case 대응**: 단, 유저가 `/auto_run` 명령 시 특정 카드 ID(`startingTaskId`)를 명시했다면, 상태(todo, in_progress, 등)와 무관하게 **해당 카드부터 1순위로 집어 들어** 실행하도록 오버라이딩 로직 추가.
 - [x] **카드 상태 전이 (Lifecycle)**:
   - 시작 시: `todo` → `IN_PROGRESS`
   - 실행 중 에러(Max Steps 등) 발생 시: `IN_PROGRESS` → `FAILED`

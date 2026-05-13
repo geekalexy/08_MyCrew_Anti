@@ -1120,26 +1120,37 @@ class Executor {
    * 프로젝트 내 대기 중인(todo/PENDING) 태스크를 순차적으로 실행하는 자율 루프
    * @param {number|string} projectId - 대상 프로젝트 ID
    * @param {string} agentId - 실행 에이전트 ID (기본: dev_senior)
+   * @param {number|string} [startingTaskId=null] - 유저가 특정 카드(todo/in_progress)에서 명시적으로 시작을 요청한 경우
    */
-  async autoRun(projectId, agentId = 'dev_senior') {
+  async autoRun(projectId, agentId = 'dev_senior', startingTaskId = null) {
     const runId = `${projectId}_${Date.now()}`;
     const abortController = new AbortController();
     this.activeAutoRuns.set(runId, abortController);
 
-    console.log(`[AutoRun] 🚀 프로젝트 ${projectId} 자동 릴레이 시작 (RunID: ${runId})`);
+    console.log(`[AutoRun] 🚀 프로젝트 ${projectId} 자동 릴레이 시작 (RunID: ${runId}, StartTask: ${startingTaskId || 'Auto'})`);
 
+    let nextTaskIdToRun = startingTaskId; // 시작 태스크가 지정되었다면 그것부터
     let currentTaskId = null;
 
     try {
       while (!abortController.signal.aborted) {
+        let nextTask = null;
+
         // 1. 카드(태스크) 획득 로직 (Scheduler)
-        const tasks = await dbManager.getTasksByProjectId(projectId);
-        // todo 또는 pending 상태인 것 중 최우선순위 1개 선택
-        const nextTask = tasks.find(t => t.status.toLowerCase() === 'todo' || t.status.toLowerCase() === 'pending');
+        if (nextTaskIdToRun) {
+          // 사용자가 특정 카드(PRD, IN_PROGRESS 등)에서 바로 시작하라고 명령한 경우
+          nextTask = await dbManager.getTaskById(nextTaskIdToRun);
+          nextTaskIdToRun = null; // 1회성 소모
+        } else {
+          // 일반적인 큐 스케줄링 로직
+          const tasks = await dbManager.getTasksByProjectId(projectId);
+          // todo 또는 pending 상태인 것 중 최우선순위 1개 선택
+          nextTask = tasks.find(t => t.status.toLowerCase() === 'todo' || t.status.toLowerCase() === 'pending');
+        }
 
         if (!nextTask) {
-          console.log(`[AutoRun] 🏁 더 이상 처리할 todo 태스크가 없습니다. 루프 종료.`);
-          if (this._broadcastLog) this._broadcastLog('info', `🏁 모든 태스크 완료. 자동 릴레이를 종료합니다.`, agentId, null);
+          console.log(`[AutoRun] 🏁 더 이상 처리할 대기(todo) 태스크가 없습니다. 루프 종료.`);
+          if (this._broadcastLog) this._broadcastLog('info', `🏁 처리할 태스크가 없어 자동 릴레이를 종료합니다.`, agentId, null);
           break;
         }
 

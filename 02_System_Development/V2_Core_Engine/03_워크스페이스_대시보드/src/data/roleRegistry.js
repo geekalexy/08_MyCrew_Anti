@@ -79,6 +79,20 @@ export const ROLE_REGISTRY = {
     team:        'dev',
   },
 
+  dev_qa_auto: {
+    mainRole:    '자동 검증 QA',
+    description: '코드 무결성 검증 · Graphify 정적 스캔 · 동적 에러 분석',
+    subTags:     ['Auto Test', 'Graphify Scan', 'Error Analysis'],
+    team:        'dev',
+  },
+
+  dev_debug_auto: {
+    mainRole:    '자동 디버깅 엔지니어',
+    description: 'QA 리포트 기반 근본 원인 파악 · 파급 반경 분석 · 코드 패치',
+    subTags:     ['Auto Debug', 'Root Cause Fix', 'Blast Radius Analysis'],
+    team:        'dev',
+  },
+
   // ════════════════════════════════════════════════════════════
   //  마케팅팀 (mkt_*)
   //  개발팀과 완전히 다른 메모리·컨텍스트 객체

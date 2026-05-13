@@ -46,9 +46,23 @@
               "icon": "lucide-file",
               "title": "그래피파이 명령어 보기"
             }
+          },
+          {
+            "id": "13cb3ffdc0b69854",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "07_MyCrew_Wiki/raw/G-Stack 스킬.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "G-Stack 스킬"
+            }
           }
         ],
-        "currentTab": 2
+        "currentTab": 3
       }
     ],
     "direction": "vertical"
@@ -208,8 +222,30 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "009cdc7d6e0f3302",
+  "active": "73276ca47e98c954",
   "lastOpenFiles": [
+    "05_My_history/Sonnet/ESSAY_Alex_2026-05-14_Sonnet.md",
+    "05_My_history/Luca/ESSAY_Alex_2026-05-14_Sonnet.md",
+    "05_My_history/Luca/ESSAY_Alex_2026-05-14_Luca.md",
+    "02_System_Development/_SESSION_LOGS/SESSION_LOG_Phase43_QA_Phase44_Design_2026-05-14.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/48_Phase44_2_AutoQA_GStack_Sonnet_ReEvaluation.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_3_Phase44_GStack_최종승인_Prime.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_2_Phase44_2_AutoQA_GStack_SupremeReview_Sonnet.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/47_Phase44_2_AutoQA_GStack_SupremeReview_Sonnet.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_3_Phase44_GStack_SupremeReview_Prime.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_2_Phase44_GStack_SupremeReview_Prime.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_G_Stack_Supreme_Review_Target.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_Auto_Test_QA_Pipeline_PRD_v1.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_45_자율검증_및_디버깅_파이프라인_PRD_v1.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_45_자율검증_및_디버깅_개발구현계획서_v1.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-3_Auto_QA_개발구현계획서.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-2_Auto_QA_Pipeline_GStack_통합_PRD.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-1_G-Stack_Architecture_내재화_기획서.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-3_Auto_QA_Pipeline_GStack_통합_PRD.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-2_G-Stack_Architecture_내재화_기획서.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase46_G-Stack_Architecture_내재화_기획서.md",
+    "07_MyCrew_Wiki/raw/G-Stack 스킬.md",
+    "07_MyCrew_Wiki/raw/그래피파이 명령어 보기.md",
     "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/011_autorun_persistence.sql",
     "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-1_Auto_Test_개발구현계획서.md",
     "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_Auto_Test_QA_Pipeline_PRD.md",
@@ -222,30 +258,8 @@
     "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/30_Requirements",
     "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/20_Domain",
     "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/10_Product",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/00_Index",
     "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/raw/meetings/2026-05-13_Task1777811330668120_회의록.md",
     "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/43_3_Phase43_AutoRun_재승인_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase43-3_Supreme_Review_재승인요청서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/43_Phase43_AutoRun_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase43-2_Auto_Run_QA_리포트.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase43-1_Auto_Run_개발구현계획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase43_Auto_Run_스킬_PRD.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_Auto_Run_스킬_PRD.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-4_MCP_스킬_및_모델배정_아키텍처_감사리포트.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-3_MODE_AUTO_ROUTING_개발구현계획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-3_MODE_AUTO_ROUTING_아키텍처_감사리포트.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39_MODE_AUTO_ROUTING_아키텍처_감사리포트.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-2_Plan_Master_아키텍처_감사리포트.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase39-2_Plan_Master_개발구현계획서.md",
-    "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_Phase39-2_PlanMaster.md",
-    "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_Phase42-4_WikiEngine.md",
-    "05_My_history/Luca/ESSAY_Alex_2026-05-13_Luca.md",
-    "02_System_Development/_SESSION_LOGS/OBSERVATION_ESSAY_2026-05-13_Luca_Database_Architecture.md",
-    "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-13_Luca_ADM_Implementation.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_Phase42_ADM_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_ADM_Agent_Driven_DB_Migration_PRD.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/42_4_Phase42_4_WikiEngine_Refactoring_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase42_4_WikiEngine_Refactoring_PRD.md",
     "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778052368882.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778050952157.png",

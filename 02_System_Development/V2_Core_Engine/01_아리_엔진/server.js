@@ -3705,7 +3705,12 @@ app.post('/api/tasks/:id/run', async (req, res) => {
     }
     
     // 2. 에이전트 할당 확인 (없으면 기본 개발자 또는 Assistant 할당)
-    const agentToTrigger = task.assigned_agent || 'dev_senior';
+    let agentToTrigger = task.assigned_agent || 'dev_senior';
+    if (routeResult.mode === 'QA') {
+      agentToTrigger = 'dev_qa_auto';
+    } else if (routeResult.mode === 'DEBUG') {
+      agentToTrigger = 'dev_debug_auto';
+    }
     
     // 3. 상태 변경 및 소켓 브로드캐스트
     await dbManager.updateTaskStatus(sid, 'IN_PROGRESS');

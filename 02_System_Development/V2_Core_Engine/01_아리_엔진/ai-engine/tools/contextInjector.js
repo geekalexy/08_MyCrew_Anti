@@ -249,6 +249,17 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     if (livingRules && livingRules.trim() !== '') {
       taskContext += `\n[LIVING TEAM GROUND RULES - MUST FOLLOW]\n${livingRules}\n`;
     }
+
+    if (mode === 'QA') {
+      taskContext += `\n[STRICT POLICY: QA AGENT]\n`;
+      taskContext += `You are a QA Agent. You MUST NOT modify any code. You are restricted to read-only and execution tools.\n`;
+      taskContext += `Do NOT use write_file or multi_replace. If you try, the system will REJECT them.\n`;
+      taskContext += `Use view_file, grep_search, run_command, and query_graph to gather evidence of structural and runtime errors.\n`;
+    } else if (mode === 'DEBUG') {
+      taskContext += `\n[STRICT POLICY: DEBUG AGENT]\n`;
+      taskContext += `You are a Debug Agent. Fix the errors based on the QA report.\n`;
+      taskContext += `You MUST verify fixes via run_command and Graphify before concluding.\n`;
+    }
     
     if (systemPrompt && systemPrompt.trim() !== '') {
       taskContext += `\n[SKILL LOGIC]\n${systemPrompt}\n`;
@@ -263,11 +274,12 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
    * 
    * @param {string} systemPrompt 
    * @param {string} livingRules 
+   * @param {string} mode 
    * @returns {string} 
    */
-  buildInjectionPayload(systemPrompt, livingRules) {
+  buildInjectionPayload(systemPrompt, livingRules, mode = 'DEV') {
     const globalCtx = this.getGlobalContext();
-    const taskCtx = this.getTaskContext(systemPrompt, livingRules);
+    const taskCtx = this.getTaskContext(systemPrompt, livingRules, mode);
     
     return `${globalCtx}\n\n${taskCtx}`;
   }
@@ -276,28 +288,68 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
    * [Phase 43] /auto_run 전용 3단 모듈형 프롬프트 생성기 (Shrimp / Task Master 벤치마킹)
    * System Persona, Tool Specification, Project Rules를 조립하여 반환합니다.
    * @param {object} taskData - 태스크 세부 정보 (PRD, 의존성 등)
+   * @param {string} mode - 실행 모드
    * @returns {string} 완성된 /auto_run 전용 프롬프트
    */
-  buildAutoRunContext(taskData = {}) {
+  buildAutoRunContext(taskData = {}, mode = 'DEV') {
     let context = '';
 
     // 1. System Persona (Base Prompt)
-    context += `[SYSTEM PERSONA - MAIN MODEL]\n`;
-    context += `You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.\n`;
-    context += `Your ONLY purpose is to transform the provided PRD and task list into perfectly working code.\n\n`;
-    context += `**CRITICAL RULES:**\n`;
-    context += `1. Do NOT ask for permission to code. Just start coding immediately.\n`;
-    context += `2. You must operate in 'Continuous Mode' when /auto_run is triggered.\n`;
-    context += `3. After completing a task, DO NOT STOP. You must automatically proceed or finish the loop.\n`;
-    context += `4. If you encounter an error, use query_graph to trace the blast radius before applying a fix.\n\n`;
+    if (mode === 'QA') {
+      context += `[SYSTEM PERSONA - QA AGENT]\n`;
+      context += `You are an expert QA Engineer. Your ONLY purpose is to verify the code and identify errors.\n`;
+      context += `**CRITICAL RULES:**\n`;
+      context += `1. You MUST NOT modify any code. You are restricted to read-only and execution tools.\n`;
+      context += `2. First, use query_graph to scan for structural defects (Dead Code, Circular Dependency, God Objects).\n`;
+      context += `3. Then, use run_command to execute test scripts or build commands.\n`;
+      context += `4. Finally, you MUST generate a [QA Report] markdown file and call finish_task.\n\n`;
+    } else if (mode === 'DEBUG') {
+      context += `[SYSTEM PERSONA - DEBUG AGENT]\n`;
+      context += `You are an expert Debug Engineer. Your ONLY purpose is to fix the errors identified in the QA Report.\n`;
+      context += `**CRITICAL RULES:**\n`;
+      context += `1. You MUST read the [QA Report] provided in the context.\n`;
+      context += `2. Use query_graph and shortest_path to trace the blast radius of your proposed fix.\n`;
+      context += `3. When applying destructive fixes, you MUST comply with the P-016 (dangerously prefix) policy.\n`;
+      context += `4. After fixing, use run_command to verify the fix before calling finish_task.\n\n`;
+    } else {
+      context += `[SYSTEM PERSONA - MAIN MODEL]\n`;
+      context += `You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.\n`;
+      context += `Your ONLY purpose is to transform the provided PRD and task list into perfectly working code.\n\n`;
+      context += `**CRITICAL RULES:**\n`;
+      context += `1. Do NOT ask for permission to code. Just start coding immediately.\n`;
+      context += `2. You must operate in 'Continuous Mode' when /auto_run is triggered.\n`;
+      context += `3. After completing a task, DO NOT STOP. You must automatically proceed or finish the loop.\n`;
+      context += `4. If you encounter an error, use query_graph to trace the blast radius before applying a fix.\n\n`;
+    }
 
     // 2. Tool Specification
     context += `[TOOL SPECIFICATIONS]\n`;
     context += `To execute tools, you MUST output a JSON array inside <tool_calls> tags. Example:\n`;
     context += `<tool_calls>\n[{"name": "read_file", "arguments": {"path": "src/index.js"}}]\n</tool_calls>\n\n`;
     context += `Available Tools:\n`;
-    context += `- **read_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
-    context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
+    context += `- **read_file** / **view_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
+    if (mode !== 'QA') {
+      context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
+      context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
+    }
+    context += `- **run_command**: Execute a shell command. Arguments: { "command": "string" }\n`;
+    context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
+    context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
+    context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
+    context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
+
+    // 3. Project Context
+    context += `[PROJECT CONTEXT & TASK INSTRUCTION]\n`;
+    context += `**Task Title**: ${taskData.title}\n`;
+    context += `**Task Description**: ${taskData.description}\n\n`;
+
+    if (taskData.qaReportContent) {
+      context += `[QA 에러 진단서]\n`;
+      context += `${taskData.qaReportContent}\n\n`;
+    }
+
+    return context;
+  }
     context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
     context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
     context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;

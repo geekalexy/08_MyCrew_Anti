@@ -43,16 +43,55 @@ function resolveAndGuard(userPath, safeRoot) {
 }
 
 export async function executeTool(name, args, options = {}) {
-    const { safeRoot = path.resolve(process.cwd(), '../../') } = options;
+    const { safeRoot = path.resolve(process.cwd(), '../../'), mode = 'DEV' } = options;
+
+    // [P1-001 보정] QA 모드일 때 파일 수정 도구 원천 차단
+    if (mode === 'QA' && ['write_file', 'multi_replace'].includes(name)) {
+        return { output: 'REJECTED: QA 에이전트는 코드를 수정할 수 없습니다.', action: 'REJECTED', reason: 'QA는 파일 수정 불가' };
+    }
 
     let output = `[Tool ${name} executed]\n`;
 
     try {
-        if (name === 'read_file') {
+        if (name === 'read_file' || name === 'view_file') {
             const absPath = resolveAndGuard(args.path, safeRoot);
             const content = fs.readFileSync(absPath, 'utf-8');
             output += `Success.\n${content}`;
         } 
+        else if (name === 'run_command') {
+            // [P1-002 보정] QA 모드에서 파일 쓰기 패턴 차단 화이트리스트
+            if (mode === 'QA') {
+                const cmdPattern = args.command || '';
+                if (/[><]|tee|mv|cp|rm|sed\s+-i/.test(cmdPattern)) {
+                    return { output: 'REJECTED: QA 모드에서는 파일 시스템을 변경하는 명령어를 사용할 수 없습니다.', action: 'REJECTED' };
+                }
+            }
+            try {
+                let stdout = '';
+                if (Array.isArray(args.command)) {
+                    stdout = execFileSync(args.command[0], args.command.slice(1), { encoding: 'utf-8', cwd: safeRoot });
+                } else {
+                    const { execSync } = await import('child_process');
+                    stdout = execSync(args.command, { encoding: 'utf-8', cwd: safeRoot });
+                }
+                output += `Success.\n${stdout}`;
+            } catch (err) {
+                output += `Command failed: ${err.message}\n${err.stdout || ''}\n${err.stderr || ''}`;
+            }
+        }
+        else if (name === 'grep_search') {
+            try {
+                const { execFileSync } = await import('child_process');
+                const stdout = execFileSync('rg', ['-n', args.query, args.path || '.'], { encoding: 'utf-8', cwd: safeRoot });
+                output += `Success.\n${stdout}`;
+            } catch (err) {
+                if (err.status === 1) {
+                    output += `No matches found.`;
+                } else {
+                    output += `Search failed: ${err.message}`;
+                }
+            }
+        }
         else if (name === 'write_file') {
             const absPath = resolveAndGuard(args.path, safeRoot);
             fs.mkdirSync(path.dirname(absPath), { recursive: true });

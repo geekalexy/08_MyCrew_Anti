@@ -29,7 +29,9 @@
 - [ ] **카드 상태 전이 (Lifecycle)**:
   - 시작 시: `todo` → `IN_PROGRESS`
   - 실행 중 에러(Max Steps 등) 발생 시: `IN_PROGRESS` → `FAILED`
-  - 작업 완료 시: `IN_PROGRESS` → `COMPLETED` (또는 리뷰 필요 시 `REVIEW`)
+  - 작업 완료 시 판정:
+    - **`COMPLETED` (UI상 `Done` 컬럼)**: 코드 작성을 마치고 자가 검증까지 통과하여, 다른 에이전트의 검토 없이 최종 완료된 상태.
+    - **`REVIEW` (UI상 `Review` 컬럼)**: 코딩은 끝났으나, 보안 검토나 QA 시나리오 테스트를 위해 `dev_advisor`나 `dev_qa` 에이전트 등 다음 담당자에게 바통(Baton)을 넘겨야 하는 대기 상태.
 - [ ] 단일 태스크 완료 후, 다음 태스크로 재귀적(Chain-of-thought)으로 넘어가는 흐름(Workflow) 제어 로직 추가.
 
 ### Step 3. 강제 종료 및 탈출 기제 (Escape Hatch) 구현

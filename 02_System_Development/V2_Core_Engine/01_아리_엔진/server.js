@@ -7,7 +7,7 @@ import http from 'http';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import TelegramBot from 'node-telegram-bot-api';
-import { execFile, spawn } from 'child_process';
+import { execFile, spawn, exec } from 'child_process';
 import { promisify } from 'util';
 
 const execFilePromise = promisify(execFile);
@@ -134,6 +134,30 @@ const HEARTBEAT_TIMEOUT_MS = 15000; // Opus 권고: 5초 × 3회 = 15초 임계�
 
 // Phase 11: Task별 실행 중인 프로세스 컨트롤러 맵 (Kill용)
 const activeProcesses = new Map();
+
+// ============================================================================
+// [Phase 39-4] Graphify Background Update Wrapper
+// ============================================================================
+function triggerGraphifyUpdate(projectId) {
+  if (!projectId) return;
+  dbManager.getProjectById(projectId).then(project => {
+    if (!project) return;
+    const pDirName = `${project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${project.id.slice(-5)}`;
+    // __dirname is not available in ES Modules, using process.cwd() fallback or specific path resolution
+    const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+    
+    console.log(`[Graphify] 백그라운드 AST 업데이트 시작: ${pDirName}`);
+    // Non-blocking spawn/exec (try-catch safety)
+    exec('graphify update .', { cwd: pRoot }, (error, stdout, stderr) => {
+      if (error) {
+        console.warn(`[Graphify] 백그라운드 업데이트 실패 (경고만 표시): ${error.message}`);
+        // CLI가 없어도 메인 서버 스레드 파쇄 방지 (안전한 래퍼)
+        return;
+      }
+      console.log(`[Graphify] 백그라운드 업데이트 완료.`);
+    });
+  }).catch(e => console.error('[Graphify] 프로젝트 경로 추출 실패:', e));
+}
 
 let globalAgentMap = {};
 export let rawAgents = [];
@@ -540,6 +564,8 @@ async function forceRedispatchTask(taskId, agentId, additionalContext = '', cont
         } else {
           if (status === 'COMPLETED') {
              broadcastLog('success', `> [${agentId}] Task #${taskId} 완료 (바톤 터치 성공)`, agentId, taskId);
+             // [Phase 39-4] 백그라운드 Graphify AST 동기화 실행
+             triggerGraphifyUpdate(fullTask.project_id);
           } else {
              broadcastLog('success', `> [${agentId}] Task #${taskId} 재착수 완료 — 승인 대기 중`, agentId, taskId);
           }

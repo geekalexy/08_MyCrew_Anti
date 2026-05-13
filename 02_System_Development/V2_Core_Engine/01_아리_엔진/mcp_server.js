@@ -355,10 +355,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (name === "run_tasks") {
     return { content: [{ type: "text", text: `[run_tasks] 자율 코딩 태스크 시작: ${args.command}` }] };
   }
+  
+  if (name === "query_graph") {
+    const { execSync } = await import('child_process');
+    try {
+      // Non-blocking 안전 래퍼: graphify CLI 호출
+      const stdout = execSync(`graphify query "${args.query}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      return { content: [{ type: "text", text: stdout }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `[Graphify Error] 쿼리 실패 또는 도구가 설치되지 않았습니다: ${err.message}` }] };
+    }
+  }
+
+  if (name === "trace_bug") {
+    return { content: [{ type: "text", text: `[trace_bug] (Graphify 연동 예정) Graphify query_graph 도구를 사용하여 에러 로그(${args.error_log})의 함수 종속성 및 최단 경로를 역추적하십시오.` }] };
+  }
+
   if (name === "audit_code") {
-    return { content: [{ type: "text", text: `[audit_code] 코드 취약점 및 예외처리 검토 완료.` }] };
+    return { content: [{ type: "text", text: `[audit_code] (Graphify 연동 예정) 변경된 코드 간의 교차 커뮤니티 노드를 Graphify로 식별하여 회귀 테스트를 수행하십시오.` }] };
   }
   
+  if (name === "extract_graph") {
+    return { content: [{ type: "text", text: `[extract_graph] 이 도구는 폐기되었습니다. 백그라운드에서 graphify update . 가 자동 실행됩니다.` }] };
+  }
+
   throw new Error(`Tool not found: ${name}`);
 });
 

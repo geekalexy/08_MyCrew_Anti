@@ -3608,7 +3608,7 @@ app.post('/api/tasks/:id/run', async (req, res) => {
       forceModel = MODEL.ANTI_GEMINI_PRO_HIGH;
     } else if (mode === 'QA') {
       routeResult = { mode: 'QA', intent: 'auto_test', extractedPayload: intent || '/auto_test' };
-      forceModel = MODEL.OPUS;
+      forceModel = MODEL.SONNET; // [Phase 39-4] QA 모드 모델을 Sonnet 4.6으로 통일
     } else if (mode === 'DEBUG') {
       routeResult = { mode: 'DEBUG', intent: 'auto_debug', extractedPayload: intent || '/auto_debug' };
       forceModel = MODEL.SONNET;
@@ -3636,6 +3636,12 @@ app.post('/api/tasks/:id/run', async (req, res) => {
     io.emit('task:moved', { taskId: sid, toColumn: 'in_progress' });
     
     // 4. Executor 실행 (강제 트리거)
+    // [Phase 39-3] ARCHITECT 모드(또는 PLAN_MASTER)로 판별된 경우, 일반 백엔드 에이전트를 태우지 않고 프론트엔드로 트리거 발송
+    if (routeResult.mode === 'ARCHITECT' || routeResult.mode === 'PLAN_MASTER' || routeResult.intent === 'plan_master') {
+      io.emit('plan-master:trigger', { taskId: sid, projectId: task.project_id });
+      return res.json({ status: 'ok', message: 'Plan Master 트리거 완료 (프론트엔드 모달 오픈 대기)', route: routeResult });
+    }
+
     forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode, forceModel);
 
     res.json({ status: 'ok', message: 'Zero-Command 트리거 성공', route: routeResult });

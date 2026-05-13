@@ -22,10 +22,9 @@
   - `ANTI_OPUS_THINK: 'anti-claude-opus-4.6-thinking'`
 - **결과**: **[일치]** 기획서에서 명명한 추상적 모델 이름들이 백엔드 시스템 상수에 규칙적으로 잘 맵핑되어 있습니다.
 
-### 🔴 2) 모드와 모델 할당의 미스매치 (Backend ↔ PRD)
-- **기획 의도**: 리뷰/QA 모드는 백그라운드에서 프로젝트 전체를 스캔하는 무거운 작업이므로, 비용과 쿼터 제한이 없는 `Gemini 3.1 Pro (Low)` 또는 `Gemini 2.5 Pro`를 배정하도록 설계되었습니다.
-- **실제 코드 (`server.js`의 `/api/tasks/:id/run`)**: `QA` 모드 실행 시 `MODEL.OPUS` (가장 비싼 토큰)가 강제 할당되도록 구현되어 있습니다.
-- **결과**: **[불일치]** 기획 의도(Quota Defender)에 정면으로 위배됩니다. 백그라운드 인프라 작업에 한정된 Opus 쿼터를 낭비하게 되므로, `server.js`의 QA 모델 할당 로직 수정이 시급합니다.
+### 🔴 2) 모드와 모델 할당의 미스매치 및 일관성 통일 (Backend ↔ PRD ↔ 타 문서)
+- **발견 사항**: 기존 `server.js`의 `/api/tasks/:id/run`에서는 `QA` 모드에 `MODEL.OPUS`를 할당하고 있었고, Phase 39 초기 기획서는 `Gemini Pro`를 명시했으나, 다른 설계 문서들 및 페르소나 기획에서는 QA/리뷰 담당(`dev_advisor` 등)으로 **Claude Sonnet 4.6**을 사용하도록 일관되게 기획되어 있었습니다.
+- **조치 결과**: **[Sonnet 4.6으로 통일 완료]** 깊이 있는 버그 탐지 성능 향상과 기존 설계서 간의 일관성을 맞추기 위해, `server.js`의 강제 할당 모델을 `MODEL.SONNET`으로 수정하고 기획서 내용도 Sonnet 4.6으로 일원화 업데이트를 완료했습니다.
 
 ### 🟠 3) 스킬(Tools)과 UI 연동 일관성
 - **기획 의도**: `mcp_server.js`에 정의된 `run_tasks`, `trace_bug`, `extract_graph`, `audit_code` 스킬들을 모드별로 동적 로드(Selective Loading) 함.
@@ -51,8 +50,8 @@
 
 ### 📡 3) Monitoring / 인프라 Agent (백그라운드)
 - **Graphify 활용 방안 (`extract_graph` 스킬 대체)**:
-  - 기존처럼 에이전트가 코드를 읽고 JSON을 만드는 `extract_graph` 방식을 **폐기**합니다. (환각 발생 및 비효율).
-  - 대신 시스템이 작업 완료(Task Done) 이벤트를 수신하면, 백그라운드에서 `graphify update .` CLI 명령어를 자동 실행하는 파이프라인으로 전환합니다. 
+  - 대신 시스템이 작업 완료(Task Done) 이벤트를 수신하면, 백그라운드에서 `graphify update .` CLI 명령어를 자동 실행하는 파이프라인으로 전환합니다.
+  - **⚠️ 추가 확인 사항 (실행 가능성 검증)**: 현재 샌드박스 백엔드 환경에 `graphify` 패키지가 글로벌 CLI 형태로 설치되어 있는지 검증이 필요합니다. 환경적 이유로 CLI 호출이 실패하더라도 메인 서버가 죽지 않도록 **Non-blocking Spawn 또는 Try-Catch 기반의 안전한 래퍼(Wrapper)**를 추가 구현해야 합니다.
   - 에이전트는 업데이트된 `GRAPH_REPORT.md`의 통계 정보(God Nodes 등)만 모니터링하며 시스템 노후화(결합도 증가)를 경고하는 역할로 축소/효율화합니다.
 
 ---

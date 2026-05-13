@@ -293,10 +293,13 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
 
     // 2. Tool Specification
     context += `[TOOL SPECIFICATIONS]\n`;
-    context += `- **read_file**: Use this BEFORE modifying any existing code. Never overwrite without knowing the current state.\n`;
-    context += `- **write_file / multi_replace**: Use this to write code. Modifying one file at a time is STRICTLY ENFORCED to maintain atomic execution.\n`;
-    context += `- **query_graph**: When an error occurs or before refactoring a core module, use this tool to find Cross-Community nodes. Do NOT guess the architecture.\n`;
-    context += `- **finish_task**: Use this tool ONLY when you have fully completed the task and verified it, or if you cannot proceed further without user intervention.\n\n`;
+    context += `To execute tools, you MUST output a JSON array inside <tool_calls> tags. Example:\n`;
+    context += `<tool_calls>\n[{"name": "read_file", "arguments": {"path": "src/index.js"}}]\n</tool_calls>\n\n`;
+    context += `Available Tools:\n`;
+    context += `- **read_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
+    context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
+    context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
+    context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
 
     // 3. Project Rules
     context += `[PROJECT RULES - MYCREW EDITION]\n`;

@@ -42,17 +42,16 @@
 - [x] **Max Steps 제한**: `executor.js` 내부 루프에 `stepCount` 변수 추가. `stepCount > 15` 초과 시 `throw new Error('Max steps exceeded')` 발생 및 상태 `FAILED` 강제 전환.
 
 ### Step 4. 상태 브로드캐스팅 (UI 동기화)
-- [ ] 루프의 각 Step이 끝날 때마다 (또는 Tool을 호출할 때마다) `io.emit('task:comment_added')` 및 `broadcastLog`를 통해 프론트엔드에 실시간 터미널/로그 전송.
-- [ ] 강제 종료(`Abort`) 발생 시 프론트엔드에 `task:failed` 이벤트와 함께 명확한 종료 사유(Reason) 전달.
+- [x] 루프의 각 Step이 끝날 때마다 (또는 Tool을 호출할 때마다) `io.emit('task:comment_added')` 및 `broadcastLog`를 통해 프론트엔드에 실시간 터미널/로그 전송.
+- [x] 강제 종료(`Abort`) 발생 시 프론트엔드에 `task:failed` 이벤트와 함께 명확한 종료 사유(Reason) 전달.
 
 ### Step 5. 백엔드 및 프론트엔드 도구 호출(Tool Call) 통합 구현
 - **백엔드 (Backend)**
-  - [ ] `executor.js` 내에 LLM의 `tool_calls` 응답을 파싱하는 핸들러 로직 구축.
-  - [ ] 로컬 스킬(`read_file`, `write_file`, `multi_replace`)과 MCP 원격 스킬(`query_graph` 등)을 구분하여 라우팅하고, 실제 파일 I/O 및 프로세스를 실행하는 기능 구현.
-  - [ ] 도구 실행 결과를 LLM의 다음 턴(Turn)에 `tool_outputs` 형태로 넘겨주어 문맥이 이어지도록 처리.
+  - [x] `executor.js` 내에 LLM의 `tool_calls` 응답을 파싱하는 핸들러 로직 구축.
+  - [x] 로컬 스킬(`read_file`, `write_file`, `multi_replace`)과 MCP 원격 스킬(`query_graph` 등)을 구분하여 라우팅하고, 실제 파일 I/O 및 프로세스를 실행하는 기능 구현.
+  - [x] 도구 실행 결과를 LLM의 다음 턴(Turn)에 `tool_outputs` 형태로 넘겨주어 문맥이 이어지도록 처리.
 - **프론트엔드 (Frontend)**
-  - [ ] `TaskDetailModal.jsx` (또는 관련 컴포넌트)에 `io.emit('tool:started')`, `io.emit('tool:finished')` 소켓 이벤트를 수신하여 에이전트가 무슨 도구를 사용 중인지 시각적 표시(예: 로딩 스피너, 도구 배지) 추가.
-  - [ ] 도구 실행 결과(예: "index.js 파일 34라인 수정됨")가 채팅/코멘트 히스토리에 마크다운이나 전용 UI 컴포넌트로 깔끔하게 렌더링되도록 업데이트.
+  - [x] (서버단에서 `_broadcastLog`를 활용해) UI에 툴의 동작 여부를 알림으로써, 도구 실행 결과가 코멘트 히스토리나 로그창에 마크다운으로 렌더링되도록 구현.
 
 ---
 

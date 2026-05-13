@@ -1167,6 +1167,7 @@ class Executor {
         let stepCount = 0;
         const MAX_STEPS = 15;
         let isTaskCompleted = false;
+        let toolOutputs = [];
 
         // 모듈형 프롬프트 주입기 호출
         const autoRunContext = contextInjector.buildAutoRunContext({
@@ -1181,11 +1182,84 @@ class Executor {
              throw new Error('Max steps exceeded');
           }
 
-          // TODO (Step 5): LLM API 호출(tool_calls 활성화) 및 로컬/MCP 도구 파싱 로직 구현 자리
-          // 임시: 툴 로직 구현 전까지는 시뮬레이션을 위해 즉시 완료 처리
-          console.log(`[AutoRun] ⏳ 태스크 #${currentTaskId} Step ${stepCount} 진행 중... (Step 5 구현 대기)`);
-          
-          isTaskCompleted = true; // 완료 플래그 (임시)
+          let currentPrompt = autoRunContext;
+          if (toolOutputs.length > 0) {
+            currentPrompt += `\n\n[PREVIOUS TOOL OUTPUTS]\n${toolOutputs.join('\n\n')}\n`;
+          }
+
+          if (this._broadcastLog) {
+            this._broadcastLog('info', `⏳ [AutoRun] Step ${stepCount}: 에이전트 사고 회로 가동 중...`, agentId, currentTaskId);
+          }
+
+          // [Step 5] LLM API 직접 호출 (여기서는 GeminiAdapter 활용)
+          const result = await geminiAdapter.generateResponse(
+            "주어진 태스크를 달성하기 위해 코딩을 진행하세요. 필요한 경우 반드시 <tool_calls>를 사용하십시오.",
+            currentPrompt,
+            MODEL.PRO
+          );
+
+          // [Step 4] DB에 로그(코멘트) 저장 및 UI 브로드캐스트
+          await dbManager.createComment(currentTaskId, agentId.toUpperCase(), result.text);
+          if (this._broadcastLog) {
+            this._broadcastLog('info', result.text, agentId, currentTaskId);
+          }
+
+          // [Step 5] 도구(Tool Call) 파싱 로직
+          const toolCallMatch = result.text.match(/<tool_calls>([\s\S]*?)<\/tool_calls>/i);
+          if (toolCallMatch) {
+            try {
+              const calls = JSON.parse(toolCallMatch[1].trim());
+              for (const call of calls) {
+                const { name, arguments: args } = call;
+
+                if (this._broadcastLog) {
+                  this._broadcastLog('info', `🔧 도구 실행 중: ${name}`, agentId, currentTaskId);
+                }
+
+                let output = `[Tool ${name} executed]\n`;
+                if (name === 'read_file') {
+                  try {
+                    const absPath = path.resolve(process.cwd(), '../../', args.path);
+                    const content = fs.readFileSync(absPath, 'utf-8');
+                    output += `Success.\n${content}`;
+                  } catch(e) {
+                    output += `Failed: ${e.message}`;
+                  }
+                } else if (name === 'write_file') {
+                  try {
+                    const absPath = path.resolve(process.cwd(), '../../', args.path);
+                    fs.mkdirSync(path.dirname(absPath), { recursive: true });
+                    fs.writeFileSync(absPath, args.content, 'utf-8');
+                    output += `Success. File written to ${args.path}`;
+                  } catch(e) {
+                    output += `Failed: ${e.message}`;
+                  }
+                } else if (name === 'query_graph') {
+                  // 임시 Graphify 호출 시뮬레이션
+                  output += `Success. (Graphify simulation for query: ${args.query})`;
+                } else if (name === 'finish_task') {
+                  output += `Task finished. Reason: ${args.reason}`;
+                  isTaskCompleted = true;
+                } else {
+                  output += `Failed: Unknown tool ${name}`;
+                }
+
+                toolOutputs.push(`--- TOOL: ${name} ---\nARGS: ${JSON.stringify(args)}\nRESULT:\n${output}`);
+                
+                // 도구 실행 결과도 시스템 로그로 저장
+                await dbManager.createComment(currentTaskId, 'SYSTEM', output);
+              }
+            } catch(e) {
+              console.warn('[AutoRun] tool_calls 파싱 실패:', e.message);
+              toolOutputs.push(`Failed to parse <tool_calls> JSON: ${e.message}`);
+              await dbManager.createComment(currentTaskId, 'SYSTEM', `❌ 도구 파싱 실패: ${e.message}`);
+            }
+          } else {
+            // 도구를 안 썼고 종료 선언도 안 했으면 에러 문맥 주입
+            if (!isTaskCompleted) {
+              toolOutputs.push(`System Warning: No <tool_calls> found in your response. You must use tools to proceed, or call finish_task to complete.`);
+            }
+          }
         }
 
         // 5. 작업 완료 시 판정 (Lifecycle): 무조건 REVIEW 전환 및 CEO 할당

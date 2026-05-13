@@ -8,6 +8,7 @@ import modelSelector from './modelSelector.js';
 import dbManager from '../database.js';
 import systemShieldSkill from './skills/systemShieldSkill.js';
 import contextInjector from './tools/contextInjector.js';
+import { executeTool } from './tools/toolExecutor.js';
 import contextChainService from './services/contextChainService.js';
 import scrubber from './tools/scrubbing.js';
 import { MODEL } from './modelRegistry.js';
@@ -1205,6 +1206,7 @@ class Executor {
           }
 
           // [Step 5] 도구(Tool Call) 파싱 로직
+          let isBlocked = false;
           const toolCallMatch = result.text.match(/<tool_calls>([\s\S]*?)<\/tool_calls>/i);
           if (toolCallMatch) {
             try {
@@ -1216,38 +1218,38 @@ class Executor {
                   this._broadcastLog('info', `🔧 도구 실행 중: ${name}`, agentId, currentTaskId);
                 }
 
-                let output = `[Tool ${name} executed]\n`;
-                if (name === 'read_file') {
-                  try {
-                    const absPath = path.resolve(process.cwd(), '../../', args.path);
-                    const content = fs.readFileSync(absPath, 'utf-8');
-                    output += `Success.\n${content}`;
-                  } catch(e) {
-                    output += `Failed: ${e.message}`;
-                  }
-                } else if (name === 'write_file') {
-                  try {
-                    const absPath = path.resolve(process.cwd(), '../../', args.path);
-                    fs.mkdirSync(path.dirname(absPath), { recursive: true });
-                    fs.writeFileSync(absPath, args.content, 'utf-8');
-                    output += `Success. File written to ${args.path}`;
-                  } catch(e) {
-                    output += `Failed: ${e.message}`;
-                  }
-                } else if (name === 'query_graph') {
-                  // 임시 Graphify 호출 시뮬레이션
-                  output += `Success. (Graphify simulation for query: ${args.query})`;
-                } else if (name === 'finish_task') {
-                  output += `Task finished. Reason: ${args.reason}`;
+                // 단일화된 toolExecutor 사용 (WARN-001, BUG-002 방어 포함)
+                const resultObj = await executeTool(name, args);
+                let output = resultObj.output;
+
+                if (resultObj.action === 'FINISH') {
                   isTaskCompleted = true;
-                } else {
-                  output += `Failed: Unknown tool ${name}`;
+                } else if (resultObj.action === 'PAUSE') {
+                  // BUG-001: ask_user 호출 시 BLOCKED 전환
+                  isTaskCompleted = true; 
+                  isBlocked = true;
+                  await dbManager.updateTaskStatus(currentTaskId, 'BLOCKED');
+                  if (this._broadcastLog) {
+                    this._broadcastLog('warn', `⏸️ 사용자 응답 대기 (BLOCKED): ${resultObj.reason}`, agentId, currentTaskId);
+                  }
+                }
+
+                // WARN-002: 대형 출력 방어 (3000자 제한)
+                if (output.length > 3000) {
+                  output = output.substring(0, 3000) + '\n... (Output truncated due to size limit)';
                 }
 
                 toolOutputs.push(`--- TOOL: ${name} ---\nARGS: ${JSON.stringify(args)}\nRESULT:\n${output}`);
                 
+                // WARN-002: 최근 3개의 도구 출력 이력만 유지
+                if (toolOutputs.length > 3) {
+                  toolOutputs.shift();
+                }
+                
                 // 도구 실행 결과도 시스템 로그로 저장
                 await dbManager.createComment(currentTaskId, 'SYSTEM', output);
+
+                if (isBlocked) break; // BLOCKED 상태면 남은 도구 실행 중단
               }
             } catch(e) {
               console.warn('[AutoRun] tool_calls 파싱 실패:', e.message);
@@ -1262,8 +1264,9 @@ class Executor {
           }
         }
 
-        // 5. 작업 완료 시 판정 (Lifecycle): 무조건 REVIEW 전환 및 CEO 할당
-        if (!abortController.signal.aborted && isTaskCompleted) {
+        // 5. 작업 완료 시 판정 (Lifecycle): 무조건 REVIEW 전환 및 CEO 할당 (단, BLOCKED 상태가 아닐 때만)
+        // BUG-001 수정: isBlocked 확인
+        if (!abortController.signal.aborted && isTaskCompleted && !isBlocked) {
           await dbManager.updateTaskStatus(currentTaskId, 'REVIEW');
           await dbManager.updateTaskAssignee(currentTaskId, 'ceo');
           console.log(`[AutoRun] ✅ 태스크 #${currentTaskId} 완료 → REVIEW 전환 및 CEO 할당`);
@@ -1298,6 +1301,11 @@ class Executor {
       this.activeAutoRuns.get(runId).abort();
       this.activeAutoRuns.delete(runId);
       console.log(`[AutoRun] 🛑 강제 종료 시그널 전송됨 (RunID: ${runId})`);
+      
+      // WARN-003: UI 브로드캐스트 누락 픽스
+      if (this._broadcastLog) {
+        this._broadcastLog('error', `🛑 사용자에 의해 AutoRun 프로세스가 강제 종료되었습니다.`, 'SYSTEM', null);
+      }
       return true;
     }
     return false;

@@ -1,15 +1,15 @@
-# Phase 39-1: Plan Master 개발구현계획서 (Task List)
+# Phase 39-2: Plan Master 개발구현계획서 (Task List)
 
-**작성일**: 2026-05-11  
+**작성일**: 2026-05-13  
 **작성자**: Luca  
 **상태**: 🔧 패치 완료 — 통합 테스트 대기  
 **기준 문서**: [Phase39-1_Plan_Master_관련_기획서](Phase39-1_Plan_Master_관련_기획서.md)  
-**디버깅 리포트**: [Phase39-1_Plan_Master_디버깅리포트_v1](Phase39-1_Plan_Master_디버깅리포트_v1.md)
+**아키텍처 감사 리포트**: [plan_master_architecture_audit.md](../../../../../.gemini/antigravity/brain/3270c5ac-7e9c-4bd6-83ea-22a58e4cb5e3/artifacts/plan_master_architecture_audit.md)
 
 ---
 
 ## 1. 개요
-본 문서는 `Phase39-1_Plan_Master_관련_기획서.md`를 바탕으로, 'AI 기획자(Plan Master)'의 요구사항 분석, 버전 분리, 사용자 협상, 그리고 Sequential Thinking UX를 실제 코드로 구현하기 위한 상세 개발 체크리스트입니다.
+본 문서는 `Phase39-1_Plan_Master_관련_기획서.md`를 바탕으로 구축된 Plan Master 파이프라인의 구조적 한계(단발성 Mocking)를 극복하고, 진정한 Sequential Thinking MCP 및 실시간 UI 스트리밍(Phase 39-2)을 구현하기 위한 상세 개발 체크리스트입니다.
 
 ---
 
@@ -67,6 +67,22 @@
   - "이대로 확정" 버튼 클릭 시 `POST /plan-master/confirm { action: 'confirm' }` 호출 추가.
   - DB `plan_master_status: LOCKED` + `v1.0_MVP_PRD.locked` 파일 생성 정상화.
 
+### 📌 2.6 백엔드: Native Tool Calling 및 Agentic Loop 적용 (Phase 39-2 신규)
+- [x] **`antigravityAdapter.js` MCP 도구 연동**:
+  - `generateResponse`에 `tools` 파라미터를 추가하여 IDE Bridge `requestJson` 내에 Native Tool Calling 스키마가 주입되도록 수정.
+  - `mcp_server.js`의 `ALL_TOOLS`를 `export` 처리하여 연동 확보.
+- [x] **`server.js` 파이프라인 루프 리팩토링 (`/analyze`)**:
+  - 단일 샷 JSON 파싱 구조를 `while (nextThoughtNeeded)` 기반의 다중 사고(Agentic) 루프로 재작성.
+  - 매 단계의 사고 과정(`accumulatedThoughts`)을 다음 프롬프트 컨텍스트에 누적 주입.
+- [x] **`server.js` SRP 분리 (`/generate-roadmaps`)**:
+  - 단일 책임 원칙(SRP) 위반을 해소하기 위해, 기존의 통합 프롬프트를 `make_roadmaps` 도구 호출과 `confirm_mvp` 도구 호출로 분할.
+  - 두 단계 모두 독립된 `while` 루프를 적용하여 순차적 사고 흐름 강화.
+
+### 📌 2.7 프론트엔드: "사고 진행 중..." 실시간 UX 스트리밍 (Phase 39-2 신규)
+- [x] **Socket.IO 이벤트 연동 (`PlanMasterModal.jsx`)**:
+  - 서버에서 전송되는 `plan-master:thinking`, `plan-master:thought_update` 이벤트를 `useSocket`으로 구독.
+  - `thinkingLogs` 배열 상태를 관리하여 사고 과정이 1단계, 2단계 순으로 화면에 적층 렌더링되도록 구현.
+
 ---
 
 ## 3. 테스트 시나리오
@@ -83,6 +99,10 @@
 - [ ] **[T-04] confirm LOCKED 상태**: "이대로 확정" 후 DB `plan_master_status = LOCKED` 확인 + 원래 태스크 REVIEW 이동 확인.
 - [ ] **[T-05] 피드백 재기획 루프**: revise 요청 → 스코프 재분석 → 새 로드맵 제안 → 반복 (MAX 5회).
 - [ ] **[T-06] 멀티 프로젝트 격리**: 다른 프로젝트의 bulk_created 이벤트가 현재 프로젝트 칸반에 混入되지 않는지.
+
+### 🆕 Phase 39-2 추가 테스트 시나리오
+- [ ] **[T-07] 다단계 사고 스트리밍 확인**: 분석 및 로드맵 도출 시 UI(PlanMasterModal)에서 "[Step 1]... [Step 2]..." 형식으로 실시간 사고 과정이 스트리밍되는지 확인.
+- [ ] **[T-08] 도구 분할 작동 확인**: 로드맵 생성 시 `make_roadmaps` 루프와 `confirm_mvp` 루프가 연속적으로 실행되어 최종 브리핑 메시지가 도출되는지 확인.
 
 ---
 

@@ -49,10 +49,11 @@
 *   **배정 모델**: **Claude Sonnet 4.6 (Thinking)**
     *   **선정 사유**: 코드 리뷰 및 QA는 정밀한 논리와 버그 탐지 능력이 필수적입니다. 이전 문서들과의 일관성 및 `dev_advisor` 페르소나와의 매핑을 고려하여, 깊이 있는 디버깅 성능을 발휘하는 Sonnet 4.6 모델로 통일 배정합니다.
 *   **할당되는 MCP 스킬 (도구)**:
-    1.  `extract_graph`: 코드가 완성될 때마다 메타데이터와 함수 관계를 추출해 `Graph.json`을 업데이트합니다.
-    2.  `audit_code`: PRD 대비 누락된 예외 처리나 보안 취약점을 검토합니다.
+    1.  `query_graph`: Graphify 지식망에 쿼리를 날려 변경된 코드 간의 교차 커뮤니티(Cross-Community) 노드를 식별, 부작용(Blast Radius)을 추적합니다.
+    2.  `audit_code`: query_graph로 추출한 영향 반경 데이터를 토대로 PRD 대비 누락된 예외 처리나 보안 취약점을 검토합니다.
+    *   *(참고)* 기존의 `extract_graph` 스킬은 토큰 낭비 방지를 위해 **폐기**되었습니다. 대신, `server.js` 백엔드에서 태스크 완료 시 `child_process.exec` 기반의 Non-blocking 래퍼를 통해 `graphify update .`를 백그라운드에서 자동 실행합니다.
 *   **💡 벤치마킹 MCP 차용 포인트**:
-    *   **Claude Task Master**: 역할에 따라 Main Model(Claude)과 Research Model(Perplexity)을 완벽히 분리하여 API를 쏘는 '다중 모델 라우팅' 사상을 차용하여, 백그라운드 리뷰 작업을 비용이 싼 Gemini에게 100% 위임합니다.
+    *   **Claude Task Master**: 역할에 따라 Main Model과 Research Model을 완벽히 분리하여 API를 쏘는 '다중 모델 라우팅' 사상을 차용하여, 리뷰 작업과 디버깅에는 논리 추론이 가장 뛰어난 Sonnet 모델에게 100% 위임합니다.
 
 ---
 

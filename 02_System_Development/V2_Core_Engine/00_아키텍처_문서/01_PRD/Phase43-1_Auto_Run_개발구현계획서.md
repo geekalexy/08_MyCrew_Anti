@@ -23,10 +23,14 @@
 - [ ] **Tool Specification 주입**: `read_file`, `write_file`, `query_graph` 등의 용도 및 방어 로직 텍스트 추가.
 - [ ] **Project Rules 주입**: Tailwind 금지, Vanilla CSS 사용 등 MyCrew 커스텀 룰셋 주입.
 
-### Step 2. 연속 실행 루프 (Continuous Mode) 및 스케줄러 로직 구현
-- [ ] `executor.js`의 메인 실행 함수 내에 `Continuous Mode`를 위한 `while (true)` 또는 재귀 형태의 무한 루프 뼈대 구축.
-- [ ] 루프 1회차 완료 시 다음 지시사항을 LLM에게 재귀적으로 넘겨주는(Chain-of-thought) 로직 추가.
-- [ ] 한 번에 하나의 태스크만 `IN_PROGRESS`로 처리하도록 의존성 기반 필터링(DB Query) 로직 강화.
+### Step 2. 연속 실행 루프 (Continuous Mode) 및 카드 스케줄러 구현
+- [ ] `executor.js` 메인 실행 함수 내에 `Continuous Mode`를 위한 무한 루프(`while (true)`) 뼈대 구축.
+- [ ] **카드(태스크) 획득 로직 (Scheduler)**: `dbManager.js`를 통해 현재 프로젝트의 `todo` 또는 `PENDING` 상태인 카드 목록을 조회하고 최우선순위(의존성이 없는) 카드를 하나 선택.
+- [ ] **카드 상태 전이 (Lifecycle)**:
+  - 시작 시: `todo` → `IN_PROGRESS`
+  - 실행 중 에러(Max Steps 등) 발생 시: `IN_PROGRESS` → `FAILED`
+  - 작업 완료 시: `IN_PROGRESS` → `COMPLETED` (또는 리뷰 필요 시 `REVIEW`)
+- [ ] 단일 태스크 완료 후, 다음 태스크로 재귀적(Chain-of-thought)으로 넘어가는 흐름(Workflow) 제어 로직 추가.
 
 ### Step 3. 강제 종료 및 탈출 기제 (Escape Hatch) 구현
 - [ ] **에이전트 주도 탈출**: `mcp_server.js` 또는 로컬 툴 스키마에 `finish_task`, `ask_user` 도구 명세 추가. 해당 툴 호출 시 루프(while문) 즉각 `break`.

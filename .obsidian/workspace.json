@@ -13,56 +13,15 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "02_System_Development/01_아리_엔진/docs/ARI_BRAIN.md",
+                "file": "04_Users/01_Company/01_Projects/마케팅_84752/socian-wiki-main/rows/socian_alimtalk_crm_plan.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ARI_BRAIN"
-            }
-          },
-          {
-            "id": "a3a1e312f28b07b4",
-            "type": "leaf",
-            "state": {
-              "type": "image",
-              "state": {
-                "file": "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png"
-              },
-              "icon": "lucide-image",
-              "title": "스크린샷 2026-05-10 오전 10.57.09"
-            }
-          },
-          {
-            "id": "009cdc7d6e0f3302",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "07_MyCrew_Wiki/raw/그래피파이 명령어 보기.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "그래피파이 명령어 보기"
-            }
-          },
-          {
-            "id": "13cb3ffdc0b69854",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "07_MyCrew_Wiki/raw/G-Stack 스킬.md",
-                "mode": "source",
-                "source": false
-              },
-              "icon": "lucide-file",
-              "title": "G-Stack 스킬"
+              "title": "socian_alimtalk_crm_plan"
             }
           }
-        ],
-        "currentTab": 3
+        ]
       }
     ],
     "direction": "vertical"
@@ -119,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 383.50271224975586
+    "width": 200
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -222,44 +181,44 @@
       "bases:새 베이스 생성하기": false
     }
   },
-  "active": "73276ca47e98c954",
+  "active": "9f3e127f9bdc6424",
   "lastOpenFiles": [
-    "05_My_history/Sonnet/ESSAY_Alex_2026-05-14_Sonnet.md",
-    "05_My_history/Luca/ESSAY_Alex_2026-05-14_Sonnet.md",
-    "05_My_history/Luca/ESSAY_Alex_2026-05-14_Luca.md",
-    "02_System_Development/_SESSION_LOGS/SESSION_LOG_Phase43_QA_Phase44_Design_2026-05-14.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/48_Phase44_2_AutoQA_GStack_Sonnet_ReEvaluation.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_3_Phase44_GStack_최종승인_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_2_Phase44_2_AutoQA_GStack_SupremeReview_Sonnet.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/47_Phase44_2_AutoQA_GStack_SupremeReview_Sonnet.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_3_Phase44_GStack_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/44_2_Phase44_GStack_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_G_Stack_Supreme_Review_Target.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_Auto_Test_QA_Pipeline_PRD_v1.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_45_자율검증_및_디버깅_파이프라인_PRD_v1.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_45_자율검증_및_디버깅_개발구현계획서_v1.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-3_Auto_QA_개발구현계획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-2_Auto_QA_Pipeline_GStack_통합_PRD.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-1_G-Stack_Architecture_내재화_기획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-3_Auto_QA_Pipeline_GStack_통합_PRD.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-2_G-Stack_Architecture_내재화_기획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase46_G-Stack_Architecture_내재화_기획서.md",
-    "07_MyCrew_Wiki/raw/G-Stack 스킬.md",
-    "07_MyCrew_Wiki/raw/그래피파이 명령어 보기.md",
-    "02_System_Development/V2_Core_Engine/01_아리_엔진/migrations/011_autorun_persistence.sql",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44-1_Auto_Test_개발구현계획서.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase44_Auto_Test_QA_Pipeline_PRD.md",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/99_Graph_Data",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/90_Decisions",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/70_External_Integrations",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/60_Roles_Permissions",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/50_Business_Rules",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/40_Flows",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/30_Requirements",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/20_Domain",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/10_Product",
-    "02_System_Development/04_Users/01_Company/01_Projects/광고주센터_개발_86418/Project_WIKI/raw/meetings/2026-05-13_Task1777811330668120_회의록.md",
-    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/43_3_Phase43_AutoRun_재승인_Prime.md",
+    "02_System_Development/ESSAY_20260514_Sonnet_관찰기록.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/graphify-out/cache/ast/0306e0e700008ff7f54c6526b8055ce526b20b3f8848ae29448b557afa275570.json",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/graphify-out/cache/ast/2a42040f57f62f6becae3400216ba563ba03b626e8b0f20aed9ce9a5295d54b1.json",
+    "02_System_Development/SESSION_LOG_20260514_Sonnet_Phase44-3_QA.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/미니앱_개발_20096/Project_WIKI/raw/meetings/2026-05-14_Task1777811330668125_회의록.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/미니앱_개발_20096/Project_WIKI/raw/meetings",
+    "02_System_Development/04_Users/01_Company/01_Projects/미니앱_개발_20096/Project_WIKI/raw",
+    "02_System_Development/04_Users/01_Company/01_Projects/미니앱_개발_20096/Project_WIKI",
+    "02_System_Development/04_Users/01_Company/01_Projects/미니앱_개발_20096",
+    "02_System_Development/04_Users/01_Company/01_Projects",
+    "02_System_Development/04_Users/01_Company",
+    "02_System_Development/04_Users",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/49_Phase44_3_AutoQA_Code_SupremeReview_Prime.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/sync_folders2.js",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/03_Skills/repetitive_tasks.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/03_Skills/heavy_analysis.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/02_Team/team_roster.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/01_Memory/user_memory.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/01_Memory/project_memory.md",
+    "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/PROJECT.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/Project_WIKI/00_Index/PROJECT_WIKI.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/graphify-out/GRAPH_REPORT.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/03_Skills/telegram_miniapp_spec.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/03_Skills/strict_isolation_arch.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/03_Skills/interactive_timeline_ux.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/team_roster.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_ux_ux_designer_persona.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_senior_senior_dev_persona.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_qa_qa_engineer_persona.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_fullstack_fullstack_dev_persona.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_advisor_advisor_persona.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/01_Memory/user_memory.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/01_Memory/project_memory.md",
+    "04_Users/01_Company/01_Projects/미니앱_개발_20096/PROJECT.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/01_PRD/Phase45_MyCrew_Full_System_AutoQA_PRD.md",
+    "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/48_Phase44-3_QA_Report_Sonnet_20260514.md",
     "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778052368882.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778050952157.png",

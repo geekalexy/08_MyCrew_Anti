@@ -4,7 +4,7 @@ import path from 'path';
 // [B-03 Fix] rootPath 검증 — 시작 시 경로 존재 여부 확인
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
   ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-  : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects'); // fallback: 엔진 기준 상위로 올라가 워크스페이스 루트 04_Users/01_Company/01_Projects 참조
+  : path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects'); // fallback: 엔진 기준 상위로 올라가 워크스페이스 루트 04_Users/01_Company/01_Projects 참조
 
 class ProjectScaffolder {
   constructor() {

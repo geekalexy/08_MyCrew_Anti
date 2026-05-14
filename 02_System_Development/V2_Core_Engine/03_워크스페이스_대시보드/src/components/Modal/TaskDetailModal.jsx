@@ -315,6 +315,8 @@ export default function TaskDetailModal() {
   const [isStarting, setIsStarting] = useState(false); // [Sprint4+] 실행 시작 로딩
   // [Phase 43] Auto Run 상태 추적
   const [autoRunStatus, setAutoRunStatus] = useState(null); // null | { taskTitle, step, maxSteps }
+  // [Phase 44-3] QA 파이프라인 로딩 상태 (버튼 중복 클릭 방지)
+  const [qaLoading, setQaLoading] = useState(false);
   const [commentColumn, setCommentColumn] = useState('');
   const [commentAssignee, setCommentAssignee] = useState('');
   const [commentPriority, setCommentPriority] = useState('medium');
@@ -631,8 +633,24 @@ export default function TaskDetailModal() {
       }
 
       // 🛑 종료 메시지 감지
-      if (msg.includes('🛑') || msg.includes('✅') && msg.includes('REVIEW') || msg.includes('🏁')) {
+      // [Phase 44-3] auto_run 정상 완료(REVIEW 전환) 시 DEV_DONE 후속 전환
+      const isNormalComplete = msg.includes('✅') && msg.includes('REVIEW');
+      const isAborted = msg.includes('🛑');
+      const isFinalDone = msg.includes('🏁');
+      if (isNormalComplete || isAborted || isFinalDone) {
         setAutoRunStatus(null);
+        // DEV_DONE: 정상 완료 시에만 QA 게이트웨이로 진입 유도
+        if (isNormalComplete) {
+          const currentTask = useKanbanStore.getState().tasks[String(activeDetailTaskId)];
+          if (currentTask && !currentTask.last_autorun_status) {
+            fetch(`${SERVER_URL}/api/tasks/${activeDetailTaskId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ last_autorun_status: 'DEV_DONE' }),
+            }).then(() => patchTask(String(activeDetailTaskId), { last_autorun_status: 'DEV_DONE' }))
+              .catch(console.error);
+          }
+        }
       }
     };
 
@@ -649,6 +667,20 @@ export default function TaskDetailModal() {
       socket.off('autorun:stopped', onAutoRunStopped);
     };
   }, [socket, activeDetailTaskId, task?.project_id, task?.title]);
+
+  // [Phase 44-3] QA 파이프라인 상태 실시간 수신 — last_autorun_status 즉시 반영
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+    const onQaStatusUpdate = ({ taskId, last_autorun_status, artifact_url }) => {
+      if (String(taskId) !== String(activeDetailTaskId)) return;
+      const patch = { last_autorun_status };
+      if (artifact_url !== undefined) patch.artifact_url = artifact_url;
+      patchTask(taskId, patch);
+      setQaLoading(false);
+    };
+    socket.on('task:qa_status_update', onQaStatusUpdate);
+    return () => socket.off('task:qa_status_update', onQaStatusUpdate);
+  }, [socket, activeDetailTaskId, patchTask]);
 
   const handleClose = useCallback(() => {
     // 아카이빙 완료 후 닫힉 시 카드를 스토어에서 제거
@@ -1000,10 +1032,7 @@ export default function TaskDetailModal() {
   const statusInfo = STATUS_LABEL[task.status] || STATUS_LABEL['PENDING'];
   const isReview = task.column === 'review';
 
-  // [Phase 37 Bugfix] 태스크 본문이나 댓글에 웹 프론트엔드(HTML/CSS/JS 등) 코드 블록이 있는 경우에만 프리뷰 버튼 노출
-  const uiCodeRegex = /```(html|css|js|jsx|ts|tsx|javascript|typescript)(?:\s|$)/i;
-  const hasCodeBlock = (typeof task.content === 'string' && uiCodeRegex.test(task.content)) || 
-                       (Array.isArray(comments) && comments.some(c => typeof c.content === 'string' && uiCodeRegex.test(c.content)));
+
 
   return (
     <div
@@ -1054,8 +1083,8 @@ export default function TaskDetailModal() {
           </div>
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexShrink: 0 }}>
 
-            {/* 👀 Live Preview 버튼 — OUTPUT/index.html 존재 및 코드 블록 포함 여부에 따라 노출 (또는 플랜모드 카드일 때 Graphify 지원) */}
-            {((previewUrl && hasPreviewData && hasCodeBlock) || task.status === 'BACKLOG') && (
+            {/* 👀 Live Preview 버튼 — OUTPUT/index.html 존재 여부에 따라 노출 (또는 플랜모드 카드일 때 Graphify 지원) */}
+            {((previewUrl && hasPreviewData) || task.status === 'BACKLOG') && (
               <button
                 id="btn-live-preview"
                 onClick={() => {
@@ -1647,7 +1676,86 @@ export default function TaskDetailModal() {
               </span>
             </div>
           )}
-          {task?.mode === 'DEV' && (
+          {/* [Phase 44-3] QA 파이프라인 배너 — last_autorun_status 기반 8-state 시스템 */}
+          {task?.last_autorun_status && (() => {
+            // [1-1 잔여] 배너 우선순위 resolver: FAILED > *_RUNNING > PIPELINE_DONE
+            // task.status가 ARCHIVED인 데 PIPELINE_DONE이면 배너 숨김 (이미 완료)
+            const rawQas = task.last_autorun_status;
+            const taskStatus = (task.status || '').toUpperCase();
+            const PRIORITY = { FAILED: 5, QA_RUNNING: 4, DBG_RUNNING: 4, QA_FAILED: 3, DBG_DONE: 2, DEV_DONE: 2, QA_DONE: 2, PIPELINE_DONE: 1, COMPLETED: 0 };
+            // PIPELINE_DONE + ARCHIVED = 숨김 (이미 애드후 완료)
+            if (rawQas === 'PIPELINE_DONE' && taskStatus === 'ARCHIVED') return null;
+            // 우선순위 기반 표시 상태 결정 (현재 단일 필드에서 읽으므로 기본적으로 rawQas 사용,
+            // 향후 복수 필드 증실 시 resolver 확장 지점)
+            const qas = (PRIORITY[rawQas] !== undefined) ? rawQas : null;
+            if (!qas) return null;
+            const isRunning = qas === 'QA_RUNNING' || qas === 'DBG_RUNNING';
+            const btnBase = { borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: qaLoading || isRunning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, opacity: qaLoading || isRunning ? 0.5 : 1, border: 'none' };
+            const BANNER_MAP = {
+              DEV_DONE:     { bg: 'rgba(100,135,242,0.12)', border: 'rgba(100,135,242,0.35)', color: '#b4c5ff', icon: 'check_circle',  text: '✅ 개발 완료 — QA 파이프라인을 시작할 수 있습니다.' },
+              QA_RUNNING:   { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  color: '#fbbf24', icon: 'hourglass_top', text: '⏳ QA 진행 중...' },
+              QA_DONE:      { bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  color: '#4ade80', icon: 'verified',      text: '✅ QA 통과 — 아카이브하거나 계속 진행하세요.' },
+              QA_FAILED:    { bg: 'rgba(255,82,82,0.12)',   border: 'rgba(255,82,82,0.35)',   color: '#ff5449', icon: 'cancel',        text: '❌ QA 실패 — 디버깅을 시작하거나 리포트를 확인하세요.' },
+              DBG_RUNNING:  { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  color: '#fbbf24', icon: 'hourglass_top', text: '⏳ 디버깅 진행 중...' },
+              DBG_DONE:     { bg: 'rgba(100,135,242,0.12)', border: 'rgba(100,135,242,0.35)', color: '#b4c5ff', icon: 'build_circle',  text: '✅ 디버깅 완료 — QA를 재시도하세요.' },
+              PIPELINE_DONE:{ bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  color: '#4ade80', icon: 'celebration',   text: '🎉 전 파이프라인 완료 — 수동으로 아카이브하세요.' },
+              FAILED:       { bg: 'rgba(255,82,82,0.12)',   border: 'rgba(255,82,82,0.35)',   color: '#ff5449', icon: 'warning',       text: '🚨 비정상 종료 — 리포트 확인 후 재시도하세요.' },
+              COMPLETED:    { bg: 'rgba(148,163,184,0.1)',  border: 'rgba(148,163,184,0.2)',  color: '#94a3b8', icon: 'check_circle',  text: `✅ Auto Run 완료 — Step ${task.last_autorun_step}/${task.last_autorun_max_steps}` },
+            };
+            const cfg = BANNER_MAP[qas];
+            if (!cfg) return null;
+            const callQA    = () => { setQaLoading(true); fetch(`${SERVER_URL}/api/tasks/${task.id}/auto_QA`,    { method: 'POST' }).catch(() => setQaLoading(false)); };
+            const callDebug = () => { setQaLoading(true); fetch(`${SERVER_URL}/api/tasks/${task.id}/auto_debug`, { method: 'POST' }).catch(() => setQaLoading(false)); };
+            const callArchive = () => {
+              setQaLoading(true);
+              fetch(`${SERVER_URL}/api/tasks/${task.id}/archive`, { method: 'POST' })
+                .then(() => { patchTask(task.id, { status: 'ARCHIVED', column: 'archived' }); setIsArchived(true); showToast('🗃️ 아카이브 완료'); })
+                .catch(() => showToast('❌ 아카이브 실패'))
+                .finally(() => setQaLoading(false));
+            };
+            // [W-004] openArtifact 존재 여부 사전 확인 (Prime Review 반영)
+            const openReport = () => {
+              if (!task.artifact_url) {
+                showToast('리포트가 아직 생성되지 않았습니다.');
+                return;
+              }
+              if (typeof openArtifact !== 'function') {
+                // uiStore에 openArtifact가 없는 환경 → 폴백: 새 탭에서 직접 열기
+                window.open(task.artifact_url, '_blank');
+                return;
+              }
+              openArtifact(task.artifact_url);
+            };
+            return (
+              <div id="qa-pipeline-banner" style={{ marginBottom: '16px', padding: '10px 14px', background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px', transition: 'all 0.3s' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: '1.2rem', color: cfg.color, flexShrink: 0, animation: isRunning ? 'thinking-glow-pulse 1.5s ease-in-out infinite' : 'none' }}>{cfg.icon}</span>
+                <span style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600, color: cfg.color }}>{cfg.text}</span>
+                {!isRunning && (
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    {qas === 'DEV_DONE' && (<button id="qa-start-btn" onClick={callQA} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(100,135,242,0.2)', color: '#b4c5ff' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>science</span>🧪 /auto_QA 시작</button>)}
+                    {qas === 'QA_DONE' && (<button id="qa-archive-btn" onClick={callArchive} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>archive</span>🗃️ 아카이브</button>)}
+                    {qas === 'QA_FAILED' && (<>
+                      <button id="qa-report-btn" onClick={openReport} style={{ ...btnBase, background: 'rgba(148,163,184,0.15)', color: '#94a3b8' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>description</span>📄 리포트</button>
+                      <button id="debug-start-btn" onClick={callDebug} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(255,82,82,0.15)', color: '#ff5449' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>bug_report</span>🔧 /auto_debug</button>
+                      <button id="qa-retry-btn" onClick={callQA} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(100,135,242,0.15)', color: '#b4c5ff' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>refresh</span>🔄 재시도</button>
+                    </>)}
+                    {qas === 'DBG_DONE' && (<>
+                      <button id="qa-rerun-btn" onClick={callQA} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(100,135,242,0.15)', color: '#b4c5ff' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>science</span>🧪 QA 재시도</button>
+                      <button id="dbg-archive-btn" onClick={callArchive} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(74,222,128,0.1)', color: '#4ade80' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>archive</span>🗃️ 아카이브</button>
+                    </>)}
+                    {qas === 'PIPELINE_DONE' && (<button id="pipeline-archive-btn" onClick={callArchive} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(74,222,128,0.15)', color: '#4ade80' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>archive</span>🗃️ 아카이브</button>)}
+                    {(qas === 'FAILED' || qas === 'COMPLETED') && (<>
+                      {qas === 'FAILED' && (<button id="failed-report-btn" onClick={openReport} style={{ ...btnBase, background: 'rgba(148,163,184,0.15)', color: '#94a3b8' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>description</span>📄 리포트</button>)}
+                      <button id="failed-retry-btn" onClick={callQA} disabled={qaLoading} style={{ ...btnBase, background: 'rgba(100,135,242,0.15)', color: '#b4c5ff' }}><span className="material-symbols-outlined" style={{ fontSize: '0.9rem' }}>refresh</span>🔄 재시도</button>
+                    </>)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 기존 모드 레이블 배너 — last_autorun_status 없을 때만 표시 */}
+          {!task?.last_autorun_status && task?.mode === 'DEV' && (
             autoRunStatus ? (
               // [Phase 43] Auto Run 가동 중 → 동적 상태 배너
               <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.15)', border: '1px solid rgba(46,204,113,0.3)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1707,13 +1815,13 @@ export default function TaskDetailModal() {
               </div>
             )
           )}
-          {task?.mode === 'QA' && (
+          {!task?.last_autorun_status && task?.mode === 'QA' && (
             <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>fact_check</span>
               [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
             </div>
           )}
-          {task?.mode === 'DEBUG' && (
+          {!task?.last_autorun_status && task?.mode === 'DEBUG' && (
             <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>bug_report</span>
               [ /auto_debug : 로그 추적 및 에러 자율 수정 ]

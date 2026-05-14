@@ -3,7 +3,7 @@ import path from 'path';
 import geminiAdapter from '../adapters/geminiAdapter.js';
 
 // 프로젝트 최상위 루트 (엔진의 두 단계 위)
-const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH || path.join(process.cwd(), '../../04_Users/01_Company/01_Projects');
+const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH || path.join(process.cwd(), '../../../04_Users/01_Company/01_Projects');
 const MAX_MEMORY_LINES = 200;
 
 class MemoryWatchdog {

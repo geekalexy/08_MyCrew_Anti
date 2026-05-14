@@ -23,7 +23,7 @@ class WikiEngine {
     if (!projectRow) return null;
     const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
     // Fix: Use __dirname to reliably locate the 04_Users folder. 5 times '..' reaches 08_MyCrew_Anti.
-    return path.resolve(__dirname, '../../../../../04_Users/01_Company/01_Projects', projectDirName);
+    return path.resolve(__dirname, '../../../../../../04_Users/01_Company/01_Projects', projectDirName);
   }
 
   async ensureOntologyDirectories(wikiRoot) {

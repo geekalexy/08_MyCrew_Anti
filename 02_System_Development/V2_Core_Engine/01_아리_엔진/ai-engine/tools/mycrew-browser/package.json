@@ -1,0 +1,12 @@
+{
+  "name": "mycrew-browser",
+  "version": "1.0.0",
+  "module": "daemon.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "dependencies": {
+    "playwright": "^1.43.0"
+  }
+}

@@ -138,6 +138,12 @@ try {
   await runMigrations();
   _initDynamicSeeds();
   _cleanupOrphanSkills();
+
+  // [GAP-002] 스타트업 훅: 비정상 종료된 QA/디버깅 파이프라인 복구
+  db.run(`UPDATE Task SET last_autorun_status = 'FAILED' WHERE last_autorun_status IN ('QA_RUNNING', 'DBG_RUNNING')`, function(err) {
+      if (err) console.error('[DB] 스타트업 훅(QA 복구) 실패:', err.message);
+      else if (this.changes > 0) console.log(`[DB] 스타트업 훅: 비정상 종료된 QA/디버깅 루프 ${this.changes}건을 FAILED로 복구 완료`);
+  });
 } catch (e) {
   console.error('[DB] 마이그레이션 실패로 시스템 구동을 중단합니다:', e);
   process.exit(1);
@@ -764,6 +770,21 @@ class DatabaseManager {
         function (err) {
           if (err) reject(err);
           else resolve(this.changes);
+        }
+      );
+    });
+  }
+
+  // ─── [Phase 44-3] Task 스냅샷 생성 (QA 진입 등 불변성 보장용) ───────────────────────────
+  createTaskSnapshot(taskId) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO task_snapshots (task_id, content, linked_files)
+         SELECT id, content, '' FROM Task WHERE id = ?`,
+        [taskId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
         }
       );
     });

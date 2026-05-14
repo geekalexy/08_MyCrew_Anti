@@ -597,7 +597,7 @@ class Executor {
             if (pRow) {
               const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
               // [Fix D-002] Use __dirname and correct depth (5) to guarantee folder hit.
-              const pRoot = path.resolve(__dirname, '../../../../../04_Users/01_Company/01_Projects', pDirName);
+              const pRoot = path.resolve(__dirname, '../../../../../../04_Users/01_Company/01_Projects', pDirName);
               const wikiPath = path.resolve(pRoot, 'Project_WIKI/00_Index/PROJECT_WIKI.md');
               if (fs.existsSync(wikiPath)) {
                 const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
@@ -727,7 +727,7 @@ class Executor {
           // [Fix] 실제 생성된 물리적 프로젝트 폴더명 계산 로직 추가
           const projectRow = await dbManager.getProjectById(taskInfo.project_id).catch(()=>null);
           const projectDirName = projectRow ? `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}` : taskInfo.project_id;
-          const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+          const projectRoot = path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects', projectDirName);
           const ioLogs = [];
           for (const op of parsed.file_operations) {
             if (op.action === 'write' && op.path) {
@@ -956,7 +956,7 @@ class Executor {
             const pRow = await dbManager.getProjectById(tInfo.project_id);
             if (pRow) {
               const pDirName = `${pRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${pRow.id.slice(-5)}`;
-              const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+              const pRoot = path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects', pDirName);
               const wikiPath = path.resolve(pRoot, '.mycrew/wiki/PROJECT_WIKI.md');
               if (fs.existsSync(wikiPath)) {
                 const wikiContent = fs.readFileSync(wikiPath, 'utf-8');
@@ -1079,7 +1079,7 @@ class Executor {
       if (taskInfoForIO && taskInfoForIO.project_id) {
         const projectRow = await dbManager.getProjectById(taskInfoForIO.project_id).catch(()=>null);
         const projectDirName = projectRow ? `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}` : taskInfoForIO.project_id;
-        const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+        const projectRoot = path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects', projectDirName);
         const ioLogs = [];
         for (const op of parsed.file_operations) {
           if (op.action === 'write' && op.path) {

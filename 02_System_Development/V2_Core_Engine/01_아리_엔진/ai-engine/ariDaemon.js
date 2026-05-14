@@ -906,7 +906,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역(플랫폼 메타) 접근을 허용합니다. (메타 에이전트 dev_lead 등 전용)
       // 향후 일반 유저 에이전트의 전역 접근을 원천 차단하기 위한 플래그 추가를 권고합니다.
       const workspaceRoot = projectId
-        ? path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName)
+        ? path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects', projectDirName)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(dirPath) ? dirPath : path.resolve(workspaceRoot, dirPath);
 
@@ -939,7 +939,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [Risk #2 명시] projectId가 없는 경우 전역 접근 허용 (메타 에이전트 전용)
       // 향후 보안 강화를 위해 유저 에이전트 접근 차단 플래그 추가 권고.
       const workspaceRoot = projectId
-        ? path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName)
+        ? path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects', projectDirName)
         : path.resolve(process.cwd(), '../../');
       const targetPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceRoot, filePath);
 

@@ -42,12 +42,84 @@ function resolveAndGuard(userPath, safeRoot) {
     return absPath;
 }
 
+// --- [Phase 44-3] 데몬 라이프사이클 관리 ---
+import { spawn } from 'child_process';
+import crypto from 'crypto';
+
+const DAEMON_STATE_FILE = path.resolve(process.cwd(), '.agents/browser_daemon.json');
+let daemonProcess = null;
+
+async function ensureDaemon() {
+    let state = {};
+    if (fs.existsSync(DAEMON_STATE_FILE)) {
+        try { state = JSON.parse(fs.readFileSync(DAEMON_STATE_FILE, 'utf-8')); } catch(e){}
+    }
+
+    if (daemonProcess && !daemonProcess.killed) {
+        return state.uuid;
+    }
+
+    // 콜드 스타트 시 잔존 좀비 프로세스 정리
+    if (state.pid) {
+        try { process.kill(state.pid, 'SIGKILL'); } catch(e) {}
+    }
+
+    const uuid = crypto.randomUUID();
+    const daemonScript = path.resolve(process.cwd(), 'ai-engine/tools/mycrew-browser/daemon.ts');
+    
+    // 데몬 부팅
+    daemonProcess = spawn('bun', ['run', daemonScript], {
+        env: { ...process.env, DAEMON_UUID: uuid },
+        cwd: path.resolve(process.cwd(), 'ai-engine/tools/mycrew-browser'),
+        stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    state = { pid: daemonProcess.pid, uuid, startedAt: Date.now() };
+    if (!fs.existsSync(path.dirname(DAEMON_STATE_FILE))) {
+        fs.mkdirSync(path.dirname(DAEMON_STATE_FILE), { recursive: true });
+    }
+    fs.writeFileSync(DAEMON_STATE_FILE, JSON.stringify(state));
+
+    // [GAP-003] 데몬 준비 완료 대기 (최대 1.5초)
+    return new Promise((resolve, reject) => {
+        let isReady = false;
+        const onData = (data) => {
+            const str = data.toString();
+            if (str.includes('"status":"ready"')) {
+                isReady = true;
+                daemonProcess.stdout.off('data', onData);
+                resolve(uuid);
+            }
+        };
+        daemonProcess.stdout.on('data', onData);
+
+        setTimeout(() => {
+            if(!isReady) {
+                daemonProcess.kill();
+                daemonProcess = null;
+                reject(new Error("데몬 부팅 타임아웃 (1.5초 초과)"));
+            }
+        }, 1500);
+    });
+}
+
+
 export async function executeTool(name, args, options = {}) {
     const { safeRoot = path.resolve(process.cwd(), '../../'), mode = 'DEV' } = options;
 
-    // [P1-001 보정] QA 모드일 때 파일 수정 도구 원천 차단
+    // [P1-001 보정] QA 모드일 때 파일 수정 도구 원천 차단 (Step 4: artifacts 작성은 허용)
     if (mode === 'QA' && ['write_file', 'multi_replace'].includes(name)) {
-        return { output: 'REJECTED: QA 에이전트는 코드를 수정할 수 없습니다.', action: 'REJECTED', reason: 'QA는 파일 수정 불가' };
+        if (name === 'write_file' && args.path) {
+            const absPath = resolveAndGuard(args.path, safeRoot);
+            const artifactsDir = path.resolve(safeRoot, 'artifacts');
+            if (absPath.startsWith(artifactsDir)) {
+                // 통과
+            } else {
+                return { output: 'REJECTED: QA 에이전트는 코드를 수정할 수 없습니다. (artifacts/ 리포트 작성만 허용)', action: 'REJECTED', reason: 'QA는 파일 수정 불가' };
+            }
+        } else {
+            return { output: 'REJECTED: QA 에이전트는 코드를 수정할 수 없습니다. (artifacts/ 리포트 작성만 허용)', action: 'REJECTED', reason: 'QA는 파일 수정 불가' };
+        }
     }
 
     let output = `[Tool ${name} executed]\n`;
@@ -59,11 +131,13 @@ export async function executeTool(name, args, options = {}) {
             output += `Success.\n${content}`;
         } 
         else if (name === 'run_command') {
-            // [P1-002 보정] QA 모드에서 파일 쓰기 패턴 차단 화이트리스트
+            // [GAP-004 & NEW-002] 확정 Allowlist 배열 정의 (QA 모드)
             if (mode === 'QA') {
-                const cmdPattern = args.command || '';
-                if (/[><]|tee|mv|cp|rm|sed\s+-i/.test(cmdPattern)) {
-                    return { output: 'REJECTED: QA 모드에서는 파일 시스템을 변경하는 명령어를 사용할 수 없습니다.', action: 'REJECTED' };
+                const cmdString = Array.isArray(args.command) ? args.command.join(' ') : (args.command || '');
+                const allowList = ['node --check', 'npx playwright test', 'bun run', 'graphify query', 'grep'];
+                const isAllowed = allowList.some(allowedCmd => cmdString.startsWith(allowedCmd));
+                if (!isAllowed) {
+                    return { output: 'REJECTED: QA 모드에서는 허용된 명령어(Allowlist)만 실행할 수 있습니다.', action: 'REJECTED' };
                 }
             }
             try {
@@ -132,6 +206,35 @@ export async function executeTool(name, args, options = {}) {
         else if (name === 'ask_user') {
             output += `Task paused to ask user. Question: ${args.question}`;
             return { output, action: 'PAUSE', reason: args.question };
+        }
+        else if (name === 'browser_action') {
+            const uuid = await ensureDaemon();
+            if (!daemonProcess) throw new Error("Daemon not running");
+            daemonProcess.stdin.write(JSON.stringify({ uuid, command: args.command }) + '\n');
+            
+            output += await new Promise((resolve, reject) => {
+                let buffer = '';
+                const onData = (data) => {
+                    buffer += data.toString();
+                    const parts = buffer.split('\n');
+                    buffer = parts.pop(); // keep incomplete chunk
+                    for (const line of parts) {
+                        if (line.trim()) {
+                            try {
+                                const parsed = JSON.parse(line);
+                                daemonProcess.stdout.off('data', onData);
+                                resolve(`Success.\n${line}`);
+                                return;
+                            } catch(e) {}
+                        }
+                    }
+                };
+                daemonProcess.stdout.on('data', onData);
+                setTimeout(() => {
+                    daemonProcess.stdout.off('data', onData);
+                    reject(new Error("Browser action timeout (10s)"));
+                }, 10000);
+            });
         }
         else {
             output += `Failed: Unknown tool ${name}`;

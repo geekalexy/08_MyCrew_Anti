@@ -38,6 +38,8 @@ import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.
 import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
 import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
 import wikiEngine from './ai-engine/services/wikiEngine.js';
+import { runQALoop } from './ai-engine/loops/qaLoop.js';
+import { runDebugLoop } from './ai-engine/loops/debugLoop.js';
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4007;
@@ -88,7 +90,8 @@ app.use('/preview/:projectId', async (req, res, next) => {
     // [TODO: 물리적 디스크 파티셔닝] 
     // 향후 확장을 위해 '01_Company' 대신 동적으로 \`04_Users/\${projectRow.company_id}/01_Projects\` 로 라우팅
     const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
-    const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+    const rootPath = process.env.PROJECTS_ROOT_PATH || path.resolve(process.cwd(), '../../../../04_Users/01_Company/01_Projects');
+    const projectRoot = path.resolve(rootPath, projectDirName);
     
     // 아웃풋(OUTPUT)만 서빙하면 인풋(INPUT) 경로(이미지 등)를 불러올 수 없는 문제 해결
     // 프로젝트 루트 전체를 서빙하되, 프론트엔드 Iframe은 /preview/ID/OUTPUT/index.html 로 접근하도록 설계
@@ -144,7 +147,8 @@ function triggerGraphifyUpdate(projectId) {
     if (!project) return;
     const pDirName = `${project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${project.id.slice(-5)}`;
     // __dirname is not available in ES Modules, using process.cwd() fallback or specific path resolution
-    const pRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', pDirName);
+    const rootPath = process.env.PROJECTS_ROOT_PATH || path.resolve(process.cwd(), '../../../../04_Users/01_Company/01_Projects');
+    const pRoot = path.resolve(rootPath, pDirName);
     
     console.log(`[Graphify] 백그라운드 AST 업데이트 시작: ${pDirName}`);
     // Non-blocking spawn/exec (try-catch safety)
@@ -1863,6 +1867,101 @@ app.post('/api/projects/:id/autorun/stop', async (req, res) => {
   }
 });
 
+/**
+ * [Phase 44-3] POST /api/tasks/:id/auto_QA — 자율 QA 파이프라인 트리거
+ */
+app.post('/api/tasks/:id/auto_QA', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const task = await dbManager.getTaskById(id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    
+    // [W-002] 중복 실행 방지 가드
+    if (task.last_autorun_status === 'QA_RUNNING' || task.last_autorun_status === 'DBG_RUNNING') {
+      return res.status(400).json({ error: 'Pipeline is already running.' });
+    }
+    
+    // [Phase 44-3] DEV 완료 시점 스냅샷 생성 (불변성 보장)
+    await dbManager.createTaskSnapshot(id);
+    
+    const runId = `qa_${id}_${Date.now()}`;
+    const controller = new AbortController();
+    executor.activeAutoRuns.set(runId, controller);
+    
+    runQALoop(task, controller.signal, io).then(() => {
+      executor.activeAutoRuns.delete(runId);
+      io.emit('task:updated', { taskId: id });
+    }).catch(err => {
+      console.error('[QA Loop Error]', err);
+      executor.activeAutoRuns.delete(runId);
+    });
+    
+    res.json({ ok: true, message: 'QA Pipeline Started', runId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * [Phase 44-3] POST /api/tasks/:id/auto_debug — 자율 디버깅 파이프라인 트리거
+ */
+app.post('/api/tasks/:id/auto_debug', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const task = await dbManager.getTaskById(id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    
+    // [W-002] 중복 실행 방지 가드
+    if (task.last_autorun_status === 'QA_RUNNING' || task.last_autorun_status === 'DBG_RUNNING') {
+      return res.status(400).json({ error: 'Pipeline is already running.' });
+    }
+    
+    // [NEW-WARN-002 패치] QA 리포트 아티팩트를 읽어 task 객체에 주입 (ContextInjector 연동용)
+    if (task.artifact_url) {
+      try {
+        const fullPath = path.resolve(process.cwd(), task.artifact_url);
+        if (fs.existsSync(fullPath)) {
+          task.qaReportContent = fs.readFileSync(fullPath, 'utf-8');
+          console.log(`[Auto Debug] QA 리포트 읽기 성공 (${task.artifact_url})`);
+        }
+      } catch (e) {
+        console.warn(`[Auto Debug] QA 리포트 읽기 실패 (${task.artifact_url}):`, e.message);
+      }
+    }
+
+    const runId = `debug_${id}_${Date.now()}`;
+    const controller = new AbortController();
+    executor.activeAutoRuns.set(runId, controller);
+    
+    runDebugLoop(task, controller.signal, io).then(() => {
+      executor.activeAutoRuns.delete(runId);
+      io.emit('task:updated', { taskId: id });
+    }).catch(err => {
+      console.error('[Debug Loop Error]', err);
+      executor.activeAutoRuns.delete(runId);
+    });
+    
+    res.json({ ok: true, message: 'Debug Pipeline Started', runId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * [Phase 44-3] POST /api/tasks/:id/archive — 수동 아카이브 처리
+ */
+app.post('/api/tasks/:id/archive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbManager.updateTaskStatus(id, 'ARCHIVED');
+    io.emit('task:updated', { taskId: id, status: 'ARCHIVED' });
+    io.emit('task:moved', { taskId: id, toColumn: 'archived' }); // UI 새로고침용
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // ─── [Week 3: Memory 흡수] FTS5 전문 검색 API ──────────────────────────────
 app.get('/api/search', async (req, res) => {
@@ -2007,7 +2106,19 @@ app.post('/api/projects', async (req, res) => {
   try {
     const { id, name, objective, isolation_scope } = req.body;
     if (!id || !name) return res.status(400).json({ error: 'id and name are required' });
+    
     await dbManager.createProject(id, name, objective, isolation_scope);
+
+    // [Bug Fix] 기본 프로젝트 생성 시에도 물리 폴더(AOM 등) 스캐폴딩 보장
+    try {
+      const projectScaffolder = (await import('./ai-engine/services/projectScaffolder.js')).default;
+      await projectScaffolder.scaffoldProjectWorkspace(id, name, objective || '', [], null);
+      console.log(`[API] 일반 프로젝트 생성 폴더 스캐폴딩 완료 (${name})`);
+    } catch (scaffoldErr) {
+      console.error(`[API] 프로젝트 폴더 스캐폴딩 실패:`, scaffoldErr);
+      // 스캐폴딩 실패해도 DB에는 이미 들어갔으므로 일단 진행 (필요시 폴백 로직 추가)
+    }
+
     res.json({ status: 'ok', id });
   } catch (err) {
     console.error('[API] POST /api/projects 에러:', err);
@@ -2077,7 +2188,30 @@ app.put('/api/projects/:id', async (req, res) => {
  */
 app.delete('/api/projects/:id', async (req, res) => {
   try {
-    await dbManager.deleteProject(req.params.id);
+    const projectId = req.params.id;
+    const project = await dbManager.getProjectById(projectId);
+
+    await dbManager.deleteProject(projectId);
+
+    // [Bug Fix] 물리 폴더 연동 삭제 (실제 폴더를 .trash 로 이동)
+    if (project) {
+        const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
+        const shortId = projectId.slice(-5);
+        const projectDirName = `${safeName}_${shortId}`;
+        const rootPath = process.env.PROJECTS_ROOT_PATH || path.resolve(process.cwd(), '../../../../04_Users/01_Company/01_Projects');
+        const projectPath = path.resolve(rootPath, projectDirName);
+        
+        if (fs.existsSync(projectPath)) {
+            const trashRoot = path.resolve(rootPath, '.trash');
+            if (!fs.existsSync(trashRoot)) {
+                fs.mkdirSync(trashRoot, { recursive: true });
+            }
+            const trashPath = path.join(trashRoot, `${projectDirName}_${Date.now()}`);
+            fs.renameSync(projectPath, trashPath);
+            console.log(`[API] 프로젝트 폴더 삭제됨 (Trash로 이동): ${projectPath} -> ${trashPath}`);
+        }
+    }
+
     res.json({ status: 'ok' });
   } catch (err) {
     console.error('[API] DELETE /api/projects/:id 에러:', err);
@@ -2096,7 +2230,7 @@ app.get('/api/projects/:id/project_md', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
+      : path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -2132,7 +2266,7 @@ app.get('/api/projects/:id/project_md/versions', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
+      : path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -2180,7 +2314,7 @@ app.put('/api/projects/:id/project_md', async (req, res) => {
 
     const PROJECTS_ROOT = process.env.PROJECTS_ROOT_PATH
       ? path.resolve(process.env.PROJECTS_ROOT_PATH)
-      : path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects');
+      : path.resolve(process.cwd(), '../../../04_Users/01_Company/01_Projects');
 
     const safeName = project.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_');
     const shortId = project.id.slice(-5);
@@ -2462,7 +2596,8 @@ app.post('/api/tasks/:id/attachments', async (req, res) => {
         const projectRow = await dbManager.getProjectById(task.project_id);
         if (projectRow) {
           const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
-          const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+          const rootPath = process.env.PROJECTS_ROOT_PATH || path.resolve(process.cwd(), '../../../../04_Users/01_Company/01_Projects');
+          const projectRoot = path.resolve(rootPath, projectDirName);
           const rawDir = path.resolve(projectRoot, '.mycrew/wiki/raw');
           
           if (!fs.existsSync(rawDir)) {
@@ -2609,7 +2744,8 @@ async function appendMeetingLog(projectId, taskId, author, content) {
     if (!projectRow) return;
     
     const projectDirName = `${projectRow.name.replace(/[^a-zA-Z0-9가-힣]/g, '_').replace(/_+/g, '_')}_${projectRow.id.slice(-5)}`;
-    const projectRoot = path.resolve(process.cwd(), '../../04_Users/01_Company/01_Projects', projectDirName);
+    const rootPath = process.env.PROJECTS_ROOT_PATH || path.resolve(process.cwd(), '../../../../04_Users/01_Company/01_Projects');
+    const projectRoot = path.resolve(rootPath, projectDirName);
     const meetingsDir = path.resolve(projectRoot, 'Project_WIKI/raw/meetings');
     
     await fs.promises.mkdir(meetingsDir, { recursive: true });

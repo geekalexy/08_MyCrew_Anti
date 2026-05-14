@@ -218,9 +218,10 @@ class ContextInjector {
    * 태스크별 특정 지식(Skill, Rule 등)을 주입 가능한 문자열로 패키징합니다.
    * @param {string} systemPrompt - 스킬별 고유 프롬프트
    * @param {string} livingRules - 동적 룰 하베스터로 추출된 룰
+   * @param {string} mode - 실행 모드 (기본값 'DEV')
    * @returns {string} 조합된 태스크 특정 컨텍스트
    */
-  getTaskContext(systemPrompt, livingRules) {
+  getTaskContext(systemPrompt, livingRules, mode = 'DEV') {
     let taskContext = '[TASK SPECIFIC INSTRUCTIONS]\n';
     
     // [Phase 23] MyCrew Operating Protocol (MOP)
@@ -252,9 +253,9 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
 
     if (mode === 'QA') {
       taskContext += `\n[STRICT POLICY: QA AGENT]\n`;
-      taskContext += `You are a QA Agent. You MUST NOT modify any code. You are restricted to read-only and execution tools.\n`;
-      taskContext += `Do NOT use write_file or multi_replace. If you try, the system will REJECT them.\n`;
-      taskContext += `Use view_file, grep_search, run_command, and query_graph to gather evidence of structural and runtime errors.\n`;
+      taskContext += `You are a QA Agent operating a Zero-MCP Browser Daemon. You MUST NOT modify any code.\n`;
+      taskContext += `Do NOT use write_file or multi_replace on source code. You are ONLY allowed to use write_file to save markdown reports in the 'artifacts/' folder.\n`;
+      taskContext += `Use browser_action to navigate and interact with the UI via the AOM tree. If you encounter console or runtime errors, you MUST use the query_graph tool to trace the blast radius (AST nodes) of the affected component.\n`;
     } else if (mode === 'DEBUG') {
       taskContext += `\n[STRICT POLICY: DEBUG AGENT]\n`;
       taskContext += `You are a Debug Agent. Fix the errors based on the QA report.\n`;
@@ -296,13 +297,16 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
 
     // 1. System Persona (Base Prompt)
     if (mode === 'QA') {
-      context += `[SYSTEM PERSONA - QA AGENT]\n`;
-      context += `You are an expert QA Engineer. Your ONLY purpose is to verify the code and identify errors.\n`;
+      context += `[SYSTEM PERSONA - QA AGENT (ZERO-MCP)]\n`;
+      context += `You are an expert QA Engineer acting as an autonomous browser daemon driver.\n`;
       context += `**CRITICAL RULES:**\n`;
-      context += `1. You MUST NOT modify any code. You are restricted to read-only and execution tools.\n`;
-      context += `2. First, use query_graph to scan for structural defects (Dead Code, Circular Dependency, God Objects).\n`;
-      context += `3. Then, use run_command to execute test scripts or build commands.\n`;
-      context += `4. Finally, you MUST generate a [QA Report] markdown file and call finish_task.\n\n`;
+      context += `1. You MUST NOT modify any code. You have ZERO write permissions except for writing markdown files to the 'artifacts/' directory.\n`;
+      context += `2. You control the browser using the \`browser_action\` tool.\n`;
+      context += `3. Use \`browser_action({command: "BROWSE <url>"})\` to navigate.\n`;
+      context += `4. The browser returns an AOM (Accessibility Object Model) tree. Identify elements by their \`@E\` references.\n`;
+      context += `5. To click, use \`browser_action({command: "CLICK @E1"})\`.\n`;
+      context += `6. If you encounter errors, use query_graph to trace the blast radius of the affected components.\n`;
+      context += `7. Finally, you MUST use write_file to generate a [QA Report] markdown file in 'artifacts/' and call finish_task.\n\n`;
     } else if (mode === 'DEBUG') {
       context += `[SYSTEM PERSONA - DEBUG AGENT]\n`;
       context += `You are an expert Debug Engineer. Your ONLY purpose is to fix the errors identified in the QA Report.\n`;
@@ -310,7 +314,7 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
       context += `1. You MUST read the [QA Report] provided in the context.\n`;
       context += `2. Use query_graph and shortest_path to trace the blast radius of your proposed fix.\n`;
       context += `3. When applying destructive fixes, you MUST comply with the P-016 (dangerously prefix) policy.\n`;
-      context += `4. After fixing, use run_command to verify the fix before calling finish_task.\n\n`;
+      context += `4. After fixing, use run_command or browser_action to verify the fix before calling finish_task.\n\n`;
     } else {
       context += `[SYSTEM PERSONA - MAIN MODEL]\n`;
       context += `You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.\n`;
@@ -331,26 +335,14 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     if (mode !== 'QA') {
       context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
       context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
+    } else {
+      context += `- **write_file**: ONLY ALLOWED for writing QA reports to 'artifacts/'. Arguments: { "path": "string", "content": "string" }\n`;
+    }
+    if (mode === 'QA' || mode === 'DEBUG') {
+      context += `- **browser_action**: Interact with the Zero-MCP AOM daemon. Arguments: { "command": "BROWSE <url>" | "CLICK <@E1>" }\n`;
     }
     context += `- **run_command**: Execute a shell command. Arguments: { "command": "string" }\n`;
     context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
-    context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
-    context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
-    context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
-
-    // 3. Project Context
-    context += `[PROJECT CONTEXT & TASK INSTRUCTION]\n`;
-    context += `**Task Title**: ${taskData.title}\n`;
-    context += `**Task Description**: ${taskData.description}\n\n`;
-
-    if (taskData.qaReportContent) {
-      context += `[QA 에러 진단서]\n`;
-      context += `${taskData.qaReportContent}\n\n`;
-    }
-
-    return context;
-  }
-    context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
     context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
     context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
     context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
@@ -361,11 +353,14 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     context += `- State Management: Use React Context API or Zustand.\n`;
     context += `- Logging: All execution logs must be broadcasted via the statusReporter using broadcastLog.\n\n`;
 
-    // Task Specific Data
-    if (taskData && (taskData.title || taskData.description)) {
-      context += `[CURRENT TASK CONTEXT]\n`;
-      context += `Task Title: ${taskData.title || 'Unknown'}\n`;
-      context += `Description:\n${taskData.description || 'None'}\n\n`;
+    // 4. Project Context & Task Instruction
+    context += `[PROJECT CONTEXT & TASK INSTRUCTION]\n`;
+    context += `**Task Title**: ${taskData.title || 'Unknown'}\n`;
+    context += `**Task Description**: ${taskData.description || 'None'}\n\n`;
+
+    if (taskData.qaReportContent) {
+      context += `[QA 에러 진단서]\n`;
+      context += `${taskData.qaReportContent}\n\n`;
     }
 
     return context.trim();

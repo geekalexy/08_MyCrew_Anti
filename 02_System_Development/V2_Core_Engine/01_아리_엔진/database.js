@@ -403,7 +403,7 @@ class DatabaseManager {
         // 4. Tasks Insert
         const stmtTask = db.prepare(`
           INSERT INTO Task (title, content, status, project_id, requester, assigned_agent, model, execution_mode, project_task_num) 
-          VALUES (?, ?, 'PENDING', ?, 'CEO', ?, ?, 'ari',
+          VALUES (?, ?, 'TODO', ?, 'CEO', ?, ?, ?,
             (SELECT COALESCE(MAX(project_task_num), 0) + 1 FROM Task WHERE project_id = ? AND deleted_at IS NULL)
           )
         `);
@@ -412,7 +412,8 @@ class DatabaseManager {
           const taskAssignee = task.assignee?.toLowerCase() || 'ari';
           // [TASK-MODEL-FIX] 담당 에이전트 모델 동적 배정 (ROLE_DEFAULT_MODELS 참조)
           const taskModel = ROLE_DEFAULT_MODELS[taskAssignee] || MODEL.ANTI_GEMINI_PRO_HIGH;
-          stmtTask.run([task.title, taskContent, id, taskAssignee, taskModel, id], function(err) {
+          const taskMode = task.mode || 'ari';
+          stmtTask.run([task.title, taskContent, id, taskAssignee, taskModel, taskMode, id], function(err) {
             if (err) return rollback(err);
           });
         }

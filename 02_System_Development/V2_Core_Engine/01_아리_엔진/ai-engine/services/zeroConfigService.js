@@ -124,8 +124,8 @@ class ZeroConfigService {
 - 리서치·초안·단순 반복·라우팅·조율 → Gemini Flash
 `;
 
-    // ─── [Phase 35 v2] 1-Stage 원샷 파이프라인 (Gemini 3.1 Pro High) ────────
-    // 변경 이유: 2-Stage Opus+Gemini(~114초) → 1-Stage 원샷(~35초), 품질 차이 미미
+    // ─── [Phase 35 v3] 초고속 1-Stage 원샷 파이프라인 (Gemini 3 Flash) ────────
+    // 변경 이유: 100초 타임아웃 버그 방지를 위해 Pro High → Flash로 격하 및 태스크 생성 롤 제외
     const singleStagePrompt = `당신은 최고 수준의 AI 팀 빌더입니다.
 사용자가 제공한 프로젝트 정보를 바탕으로, 깊이 있는 분석과 함께 최적의 팀 구성, 커스텀 스킬, 초기 태스크, 업무 프로세스를 설계하고
 즉시 아래 [출력 형식]의 순수 JSON으로 반환하세요.
@@ -141,16 +141,7 @@ class ZeroConfigService {
    - 🔴 마케팅 프로젝트 → assigned_crew 첫 번째에 'mkt_advisor' 반드시 포함 (Opus 배정 필수). 이후 프로젝트 성격에 따라 mkt_lead, mkt_planner, mkt_designer, mkt_analyst 등을 조합하여 4~5명으로 구성.
    - 아래 [역할별 배정 모델] 기준을 반드시 따라 다양한 모델 조합 구성.
 2. 커스텀 스킬: 이 프로젝트에 특화된 스킬 3~5개를 설계하고 YAML Frontmatter 포함 마크다운으로 작성.
-3. 초기 태스크 (CRITICAL — 아래 규칙 엄수):
-   - initial_tasks는 반드시 1개만 생성한다. PRD, 아키텍처, UX 태스크를 미리 만들지 말 것.
-   - 단 1개의 태스크: "[기획] 핵심 요구사항 도출"
-   - 이 태스크의 목적: CEO와 대화하여 원하는 핵심 요구사항을 확정받는 것.
-   - 담당자: 개발 프로젝트는 dev_senior, 마케팅 프로젝트는 mkt_lead 또는 mkt_planner 등 실무 기획 담당자 1명.
-   - 🚫 어드바이저(dev_advisor, mkt_advisor)는 절대 초기 실무 태스크에 배정하지 않는다. 어드바이저는 최종 산출물 리뷰 및 전략 검수 전담이다.
-   - 태스크 content에 프로젝트 목적 기반 후보 3~5개를 포함하여 CEO에게 선택지를 제시할 것.
-   - ⚠️ 이유: 요구사항이 확정되지 않은 상태에서 PRD나 기획서를 생성하면 잘못된 방향을 유도함.
-   - 후속 태스크는 이 카드 완료 후 팀이 자율 생성한다.
-4. 업무 프로세스: R&R, /run 명령 스프린트 자율 완주 흐름 명시.
+3. 업무 프로세스: R&R, /run 명령 스프린트 자율 완주 흐름 명시.
 
 [⚠️ CRITICAL: 허용된 에이전트 ID (STRICT 정책)]
 - 개발/IT: dev_senior, dev_fullstack, dev_ux, dev_qa, dev_advisor
@@ -178,28 +169,21 @@ ${MODEL_GUIDE}
       "role_description": "이 프로젝트에서의 구체적 역할 (1~2문장)",
       "persona_md": "# Persona: 에이전트ID\\n\\n... (임무 및 행동 지침)"
     }
-  ],
-  "initial_tasks": [
-    {
-      "title": "[기획] 핵심 요구사항 도출",
-      "content": "CEO님과 대화를 통해 이 프로젝트에서 실제로 원하시는 핵심 요구사항을 확정합니다.\\n\\n**[후보 제안 — 프로젝트 목적 기반]**\\n아래는 '${name}' 프로젝트 목적을 분석하여 제안드리는 후보입니다. 원하시는 것을 선택하거나 직접 말씀해주세요:\\n\\n① (프로젝트에 맞는 핵심 기능/목표 후보 1)\\n② (프로젝트에 맞는 핵심 기능/목표 후보 2)\\n③ (프로젝트에 맞는 핵심 기능/목표 후보 3)\\n④ (선택적 기능/목표 후보 4)\\n⑤ (선택적 기능/목표 후보 5)\\n\\n**[다음 단계]**\\n요구사항이 확정되면 이에 맞는 세부 기획 태스크를 생성하여 진행합니다.",
-      "assignee": "dev_senior 또는 mkt_lead"
-    }
   ]
 }
 `;
 
     let planData;
     try {
-      // 1-Stage: Gemini 3.1 Pro High 원샷 (기획 + JSON 통합)
-      broadcast(`[1/5] Gemini 3.1 Pro가 프로젝트를 분석하고 팀을 구성 중입니다...`);
-      console.log('[Zero-Config] 1-Stage 가동 (Gemini 3.1 Pro High — 원샷 팀빌딩)...');
+      // 1-Stage: Gemini 3 Flash 원샷 (기획 + JSON 통합)
+      broadcast(`[1/5] Gemini 3 Flash가 프로젝트를 분석하고 팀을 구성 중입니다...`);
+      console.log('[Zero-Config] 1-Stage 가동 (Gemini 3 Flash — 원샷 팀빌딩)...');
 
       const response = await antigravityAdapter.generateResponse(
         '프로젝트를 분석하고 최적의 팀 구성과 JSON 스캐폴드를 생성해주세요.',
         singleStagePrompt,
         'team_builder_gemini',
-        MODEL.ANTI_GEMINI_PRO_HIGH,
+        MODEL.ANTI_GEMINI_FLASH,
         TEAM_BUILDER_TIMEOUT_MS  // 2분 타임아웃
       );
 
@@ -219,7 +203,7 @@ ${MODEL_GUIDE}
         const fallbackRes = await geminiAdapter.generateResponse(
           singleStagePrompt,
           '당신은 AI 팀 빌더입니다. 반드시 순수 JSON만 반환하세요.',
-          MODEL.PRO  // gemini-2.5-pro 직접 API 호출
+          MODEL.FLASH  // gemini-2.5-flash 직접 API 호출
         );
         const rawText = fallbackRes.text || fallbackRes.result || '';
         const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -232,7 +216,7 @@ ${MODEL_GUIDE}
     }
 
     // 스키마 검증
-    if (!planData || !planData.assigned_crew || !planData.initial_tasks) {
+    if (!planData || !planData.assigned_crew) {
       throw new Error('기획된 데이터 형식이 올바르지 않습니다.');
     }
 
@@ -245,10 +229,6 @@ ${MODEL_GUIDE}
         return { ...c, agent_id: 'dev_fullstack' };
       }
       return { ...c, agent_id: rawId };
-    });
-    planData.initial_tasks = planData.initial_tasks.map(t => {
-      const rawId = (t.assignee || '').toLowerCase();
-      return { ...t, assignee: ALLOWED_IDS.has(rawId) ? rawId : 'assistant' };
     });
 
     // ─── [ADVISOR-FIX] 개발 프로젝트 dev_advisor 강제 포함 ──────────────
@@ -298,27 +278,9 @@ ${MODEL_GUIDE}
       }
     }
 
-    // ─── [TASK-GATE] initial_tasks 강제 교체 (V3 자율 릴레이) ─────────────────
-    // 기존 V2의 하드코딩된 4개 카드 또는 조건부 2개 카드 형식을 전면 폐기하고,
-    // [킥오프] 단일 카드 1장만 생성하여 V3 자율 릴레이가 알아서 후속 카드를 파생하도록 수정합니다.
-    {
-      const firstExecutorId =
-        planData.assigned_crew.find(c => c.agent_id === 'dev_senior')?.agent_id
-        || planData.assigned_crew.find(c => c.agent_id === 'mkt_lead')?.agent_id
-        || planData.assigned_crew.find(c => c.agent_id === 'mkt_planner')?.agent_id
-        || planData.assigned_crew.find(c => c.agent_id === 'dev_fullstack')?.agent_id
-        || planData.assigned_crew.find(c => c.agent_id !== 'dev_advisor' && c.agent_id !== 'mkt_advisor' && c.agent_id !== 'assistant')?.agent_id
-        || planData.assigned_crew[0]?.agent_id
-        || 'assistant';
-
-      console.log(`[Zero-Config][TASK-GATE] V3 자율 릴레이 전환 — 단일 킥오프 카드 1개 생성 (담당: ${firstExecutorId})`);
-
-      planData.initial_tasks = [{
-        title: '[기획] 프로젝트 킥오프 및 V3 자율 릴레이 시작',
-        content: `새로운 프로젝트가 생성되었습니다.\n\n**[프로젝트 초기 목표]**\n${objective}\n\n**[V3 자율 릴레이 지시사항]**\n목표를 분석하고 다음 단계를 판단하세요. PRD 작성이 필요하다면 수행하고, 다음 담당자(예: UX 디자이너 또는 풀스택 엔지니어)에게 넘길 새로운 태스크를 생성하여 바통을 터치하십시오.`,
-        assignee: firstExecutorId,
-      }];
-    }
+    // ─── [TASK-GATE] (제거됨) ────────────────────────────────────────────────
+    // V3 자율 릴레이 강제 킥오프 카드 생성을 제거하고, LLM이 의도한 "CEO와의 요구사항 조율 카드"가 그대로 유지되도록 합니다.
+    // 이를 통해 사용자가 생각하고 검토할 시간을 확보합니다.
 
     // ─── [C-02] required_skills 미생성 시 기본 스킬 보장 ───────────────
     if (!planData.required_skills || planData.required_skills.length === 0) {
@@ -343,6 +305,16 @@ ${MODEL_GUIDE}
     if (!planData.project_charter_md) {
       planData.project_charter_md = `# PROJECT: ${name}\n\n## 🎯 프로젝트 개요\n${objective}\n\n## 🛑 대원칙 및 톤앤매너\n- (팀과 합의 후 추가 예정)\n`;
     }
+
+    // ─── [PLAN MASTER FIX] 프로젝트 생성 시 무조건 단일 기획 카드 1개만 생성 (Plan Mode) ────────
+    planData.initial_tasks = [
+      {
+        title: '[기획] v1.0 MVP 로드맵',
+        content: '채팅창에 초기 아이디어를 한 줄 남겨주시면, Plan Master가 PRD 문서를 도출합니다.',
+        assignee: isDevProject ? 'dev_senior' : 'mkt_lead',
+        mode: 'ARCHITECT'
+      }
+    ];
 
     // Stage 4: DB 트랜잭션
     broadcast(`[4/5] 팀 구성을 데이터베이스에 등록 중입니다...`);

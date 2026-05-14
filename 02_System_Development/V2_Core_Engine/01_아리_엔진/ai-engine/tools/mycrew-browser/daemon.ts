@@ -21,9 +21,28 @@ async function extractAOM(page: Page) {
         
         // Dual-Track 검증 (isVisible / boundingBox) 시뮬레이션 및 요소 추출
         if (node.role && node.name) {
-            const eid = `@E${idCounter++}`;
-            elementMap.set(eid, node);
-            result.push({ id: eid, role: node.role, name: node.name });
+            let isValid = false;
+            let bounds = null;
+            try {
+                // 정확히 1개 매칭되는 경우만 필터링하거나 first()를 씀
+                const locator = page!.getByRole(node.role, { name: node.name, exact: true }).first();
+                const isVisible = await locator.isVisible({ timeout: 50 }).catch(() => false);
+                if (isVisible) {
+                    const box = await locator.boundingBox({ timeout: 50 }).catch(() => null);
+                    if (box && box.width > 0 && box.height > 0) {
+                        isValid = true;
+                        bounds = box;
+                    }
+                }
+            } catch(e) {
+                // Ignore
+            }
+
+            if (isValid) {
+                const eid = `@E${idCounter++}`;
+                elementMap.set(eid, node);
+                result.push({ id: eid, role: node.role, name: node.name, box: bounds });
+            }
         }
         
         if (node.children) {

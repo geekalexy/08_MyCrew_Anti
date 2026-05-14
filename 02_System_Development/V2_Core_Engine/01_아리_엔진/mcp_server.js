@@ -137,19 +137,17 @@ export const ALL_TOOLS = [
   // ── [Phase 39-1] Plan Master 전용 기획 도구 (Sequential Thinking 적용) ──
   {
     name: "analyze_scope",
-    description: "사용자의 초기 요구사항을 심층 분석하여 구체성이 부족한 경우 객관식 옵션을 제시하거나, 충분한 경우 Must-have와 Nice-to-have 스코프를 JSON으로 반환합니다.",
+    description: "CEO와의 인터뷰 및 요구사항 타임라인 대화를 바탕으로, 최종적으로 확정된 핵심(Must-have) 기능과 부가(Nice-to-have) 기능을 분석 및 분류합니다. 팝업 개입 없이 오직 데이터 분류만 수행합니다.",
     inputSchema: {
       type: "object",
       properties: {
         thought: { type: "string", description: "현재 단계의 분석 내용 및 근거 (Sequential Thinking)" },
         thoughtNumber: { type: "integer", description: "현재 사고 단계 번호" },
         nextThoughtNeeded: { type: "boolean", description: "추가적인 사고가 필요한지 여부" },
-        needs_clarification: { type: "boolean", description: "요구사항이 너무 포괄적이어서 사용자에게 구체화 옵션을 물어봐야 하는지 여부" },
-        options: { type: "array", items: { type: "string" }, description: "needs_clarification이 true일 때 사용자에게 제시할 객관식 옵션 2~3개" },
-        must_have: { type: "array", items: { type: "string" }, description: "필수 스코프 기능 목록 (충분히 구체적일 때만)" },
-        nice_to_have: { type: "array", items: { type: "string" }, description: "확장 기능 스코프 목록 (충분히 구체적일 때만)" }
+        must_have: { type: "array", items: { type: "string" }, description: "필수 스코프 기능 목록" },
+        nice_to_have: { type: "array", items: { type: "string" }, description: "확장 기능 스코프 목록" }
       },
-      required: ["thought", "thoughtNumber", "nextThoughtNeeded", "needs_clarification"]
+      required: ["thought", "thoughtNumber", "nextThoughtNeeded"]
     }
   },
   {
@@ -264,23 +262,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Phase 39: 스킬 MOCK 실행 (실제 내부 로직은 파이프라인에서 구현)
   // ── [Phase 39-1] Plan Master 도구 실행 (LLM이 전달한 JSON 수신) ──
   if (name === "analyze_scope") {
-    // [Task 2.1] Sequential Thinking 강제 파싱 + must_have/nice_to_have 구조 반환
+    // [Phase 39-5] 팝업용 변수 제거. 순수 백그라운드 스코프 데이터 파싱
     const result = {
+      status: 'scope_analyzed',
       thought: args.thought || '',
       thoughtNumber: args.thoughtNumber || 1,
       nextThoughtNeeded: args.nextThoughtNeeded || false,
     };
 
-    if (args.needs_clarification) {
-      result.status = 'needs_clarification';
-      // [P-Injection 방어] 옵션 문자열 정제
-      result.options = (args.options || []).map(sanitizeScope);
-    } else {
-      result.status = 'scope_analyzed';
-      // [P-Injection 방어] 스코프 항목 정제
-      result.must_have = (args.must_have || []).map(sanitizeScope);
-      result.nice_to_have = (args.nice_to_have || []).map(sanitizeScope);
-    }
+    // [P-Injection 방어] 스코프 항목 정제
+    result.must_have = (args.must_have || []).map(sanitizeScope);
+    result.nice_to_have = (args.nice_to_have || []).map(sanitizeScope);
 
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }

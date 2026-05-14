@@ -52,7 +52,8 @@
 | **이미지 생성** | `generate_image` | AI 기반 이미지/UI 목업 생성 |
 | **Planning 모드** | 내장 | 구현 계획 수립 → Artifact 작성 → 사용자 승인 요청 → 실행 워크플로우 |
 | **아티팩트 관리** | `write_to_file` (artifact) | 분석 보고서·계획서·태스크 트래커 등 구조화 문서 생성 |
-| **Skill Creator** 🆕 | `skill-library/` | 새 스킬 설계·기존 스킬 개선·성능 평가. `SKILL.md` YAML 프론트매터 기준 트리거 정확도·출력 품질·사용자 만족도 3지표로 측정. MyCrew 3-Layer(Engine/Domain/Infra) 분류에 따라 에이전트에게 스킬 주입 |
+| **Skill Creator** 🆕 | `skill-library/` | 새 스킬 설계·기존 스킬 개선·성능 평가. `SKILL.md` YAML 프론트매터 기준 트리거 정확도·출력 품질·사용자 만족도 3지표로 측정 |
+| **G-Stack 오리지널** 🆕 | `gstack-main/` | `/plan-ceo`, `/review` 등의 커맨드 시 Garry Tan의 오리지널 `SKILL.md` 프롬프트를 동적 로드하여 수행 |
 
 ### 🏢 L2 · DOMAIN (외부 MCP 연동)
 
@@ -231,5 +232,5 @@
 
 ---
 
-*마지막 업데이트: 2026-04-24 by 소넷 (Claude Sonnet 4.6 / Antigravity)*
-*변경 이력: 소넷 팀원 항목 추가, 루카·소넷 에이전트 명확 분리, 커버리지 표 업데이트*
+*마지막 업데이트: 2026-05-15 by 루카 (Gemini / Antigravity)*
+*변경 이력: G-Stack 오리지널 13종 스킬(L1 ENGINE) 동적 로드 라우팅 추가*

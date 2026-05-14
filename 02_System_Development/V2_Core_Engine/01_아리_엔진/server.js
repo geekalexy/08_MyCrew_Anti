@@ -2220,6 +2220,53 @@ app.delete('/api/projects/:id', async (req, res) => {
 });
 
 /**
+ * [Phase 45] POST /api/projects/:id/run_full_qa — MyCrew 전체 기능 자율 QA (Living QA)
+ */
+app.post('/api/projects/:id/run_full_qa', async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+    const scope = req.body.scope || 'full';
+    
+    const project = await dbManager.getProjectById(projectId);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    const specPath = path.resolve(process.cwd(), 'docs/qa_spec.yaml');
+    let qaSpec = '';
+    try {
+      qaSpec = fs.readFileSync(specPath, 'utf-8');
+    } catch(e) {
+      return res.status(500).json({ error: `QA Spec 파일을 읽을 수 없습니다: ${specPath}` });
+    }
+    
+    const title = `[AUTO QA] MyCrew 전체 기능 검증 (scope: ${scope})`;
+    const content = `[QA_SCOPE:${scope}]\n\n${qaSpec}`;
+    const taskId = await dbManager.createTask(
+      title, content,
+      'system', MODEL.ANTI_GEMINI_PRO_HIGH, 'dev_qa_auto', 'QA', projectId
+    );
+    
+    const task = await dbManager.getTaskById(taskId);
+    await dbManager.createTaskSnapshot(taskId);
+    
+    const runId = `qa_${taskId}_${Date.now()}`;
+    const controller = new AbortController();
+    executor.activeAutoRuns.set(runId, controller);
+    
+    runQALoop(task, controller.signal, io).then(() => {
+      executor.activeAutoRuns.delete(runId);
+      io.emit('task:updated', { taskId });
+    }).catch(err => {
+      console.error('[QA Loop Error]', err);
+      executor.activeAutoRuns.delete(runId);
+    });
+    
+    res.json({ ok: true, taskId, runId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * [Phase 36] GET /api/projects/:id/project_md — PROJECT.md 읽기
  */
 app.get('/api/projects/:id/project_md', async (req, res) => {
@@ -2655,81 +2702,11 @@ app.get('/api/tasks/:id/comments/:idx', async (req, res) => {
  * 에이전트는 title, content, assignee 세 가지만 보냄. 서버가 나머지를 강제 주입.
  */
 app.post('/api/tasks/:id/sprint/next', async (req, res) => {
-  try {
-    const parentId = req.params.id;
-    const { title, content, assignee } = req.body;
-    
-    if (!title || !content || !assignee) {
-      return res.status(400).json({ error: 'title, content, assignee는 필수입니다.' });
-    }
-
-    const parentTask = await dbManager.getTaskById(parentId);
-    if (!parentTask) return res.status(404).json({ error: '부모 카드를 찾을 수 없습니다.' });
-
-    // 유효성 검증 및 자기 참조 방지
-    const ALLOWED_IDS = ['dev_senior', 'dev_fullstack', 'dev_advisor', 'dev_qa', 'dev_ux', 'dev_pm', 'mkt_lead', 'mkt_planner', 'mkt_designer', 'mkt_video', 'mkt_analyst', 'mkt_advisor'];
-    let finalAssignee = assignee;
-    
-    // 자기 참조 차단 룰: CTO가 코딩 리뷰 요청 시 자기 자신에게 할당 불가
-    if (parentTask.assigned_agent === 'dev_senior' && finalAssignee === 'dev_senior') {
-      finalAssignee = 'dev_advisor'; // 강제 폴백
-      console.log(`[Sprint Validation] CTO 자기 참조 감지. 할당자를 ${finalAssignee}로 강제 변경합니다.`);
-    } else if (!ALLOWED_IDS.includes(finalAssignee)) {
-      finalAssignee = 'dev_advisor';
-      console.log(`[Sprint Validation] 유효하지 않은 할당자(${assignee}). 할당자를 ${finalAssignee}로 강제 변경합니다.`);
-    }
-
-    const contextInjectedContent = content + `\n\n> 🔗 **이전 릴레이 산출물 참조:** #${parentTask.project_task_num || parentId}`;
-
-    let parentChain = [];
-    try {
-      parentChain = typeof parentTask.context_chain === 'string' ? JSON.parse(parentTask.context_chain) : (parentTask.context_chain || []);
-    } catch(e) {}
-    const newChain = [...parentChain, parentTask.project_task_num || parentTask.id];
-
-    // 새 카드 생성. sprintNo, projectId는 서버가 부모로부터 무조건 상속
-    const newTaskId = await dbManager.createTask(
-      title,
-      contextInjectedContent,
-      parentTask.assigned_agent, // requester는 부모 카드의 작업자
-      null, // model
-      finalAssignee,
-      'QUICK_CHAT',
-      parentTask.project_id,
-      null, // pipelineStep (이제 사용 안 함)
-      0,
-      parentTask.sprint_no, // sprintNo 상속
-      newChain // 11. 컨텍스트 체인 상속
-    );
-
-    // 방금 생성된 태스크 전체 조회 (project_task_num 등)
-    const newTaskObj = await dbManager.getTaskById(newTaskId);
-    
-    // 즉시 IN_PROGRESS 전환 (릴레이 바통 터치)
-    await dbManager.updateTaskStatus(newTaskId, 'IN_PROGRESS');
-    
-    io.emit('task:created', { 
-      projectId: parentTask.project_id, 
-      taskId: String(newTaskId), 
-      title: newTaskObj.title,
-      content: newTaskObj.content,
-      agentId: newTaskObj.assigned_agent,
-      project_task_num: newTaskObj.project_task_num,
-      status: 'IN_PROGRESS', 
-      column: 'in_progress' 
-    });
-    io.emit('task:moved', { taskId: String(newTaskId), toColumn: 'in_progress' });
-    
-    broadcastLog('info', `> [${finalAssignee}] 바통 터치: ${title}`, 'system', newTaskId, 'DASHBOARD', parentTask.project_id);
-
-    // 새로 생성된 카드를 담당자에게 dispatch (이벤트 드리븐)
-    setImmediate(() => forceRedispatchTask(newTaskId, finalAssignee, '', 'START'));
-
-    res.json({ status: 'ok', id: newTaskId, assignee: finalAssignee });
-  } catch (err) {
-    console.error('[API] /api/tasks/:id/sprint/next 에러:', err);
-    res.status(500).json({ error: err.message });
-  }
+  // ─── [V3 RELAY MODULARIZED] ───────────────────────────────────────────────
+  // Phase 36-A 자율 릴레이(create_next_sprint_task) 로직은
+  // 추후 /goal 자율주행 도입을 위해 ai-engine/loops/relayV3Module.js 로 분리하여 보존 중입니다.
+  // 현재는 사용되지 않으므로 404를 반환합니다.
+  return res.status(404).json({ error: '이 기능은 /goal 자율주행 모듈로 이관되어 현재 비활성화 상태입니다.' });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

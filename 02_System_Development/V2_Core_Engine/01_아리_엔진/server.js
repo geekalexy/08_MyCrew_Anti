@@ -22,6 +22,7 @@ import antigravityAdapter from './ai-engine/adapters/antigravityAdapter.js';
 import geminiAdapter from './ai-engine/adapters/geminiAdapter.js';
 import contextInjector from './ai-engine/tools/contextInjector.js';
 import ruleHarvester from './ai-engine/tools/ruleHarvester.js';
+import { sanitizeInput } from './promptInjectionGuard.js';
 
 import modelSelector from './ai-engine/modelSelector.js';
 import { launchOmoTask } from './ai-engine/omoLauncher.js';
@@ -385,7 +386,11 @@ async function buildLinkedContext(taskContent, projectId) {
   try { currentProject = await dbManager.getProjectById(projectId); } catch (e) {}
 
   const sections = [];
-  for (const [fullTag, cardNumStr, type, idxStr] of tags) {
+  let totalLength = 0;
+  // 최신 태그(본문 하단)부터 우선 채우기 위한 역순 처리 (LRU)
+  const reversedTags = [...tags].reverse();
+
+  for (const [fullTag, cardNumStr, type, idxStr] of reversedTags) {
     const cardNum = parseInt(cardNumStr, 10);
     const idx = parseInt(idxStr, 10);
     let refTask = null;
@@ -403,11 +408,12 @@ async function buildLinkedContext(taskContent, projectId) {
     } catch (e) { continue; }
     if (!refTask) continue;
 
+    let sectionText = '';
     if (type === 'C') {
       let comment = null;
       try { comment = await dbManager.getTaskCommentByIndex(refTask.id, idx); } catch(e) {}
       if (!comment) continue;
-      sections.push(`<!-- [CARD LINK: ${fullTag}] -->\n## 📎 참조: ${refTask.title || `카드 #${cardNum}`} (#${cardNum}) / 코멘트 ${idx}번\n작성: ${comment.author} | ${comment.created_at}\n\n${(comment.content || '').slice(0, 3000)}\n---`);
+      sectionText = `<!-- [CARD LINK: ${fullTag}] -->\n## 📎 참조: ${refTask.title || `카드 #${cardNum}`} (#${cardNum}) / 코멘트 ${idx}번\n작성: ${comment.author} | ${comment.created_at}\n\n${(comment.content || '').slice(0, 3000)}\n---`;
     } else if (type === 'F') {
       let attachment = null;
       try { attachment = await dbManager.getTaskAttachmentByIndex(refTask.id, idx); } catch(e) {}
@@ -429,7 +435,19 @@ async function buildLinkedContext(taskContent, projectId) {
           fileContent = raw.slice(0, 5000);
         }
       } catch (e) { fileContent = `[파일 오류: ${e.message}]`; }
-      sections.push(`<!-- [FILE LINK: ${fullTag}] -->\n## 📄 참조 파일: ${attachment.file_label} (#${cardNum} / F${idx})\n\n${fileContent}\n---`);
+      sectionText = `<!-- [FILE LINK: ${fullTag}] -->\n## 📄 참조 파일: ${attachment.file_label} (#${cardNum} / F${idx})\n\n${fileContent}\n---`;
+    }
+
+    if (sectionText) {
+      if (totalLength + sectionText.length > 8000) {
+        const remaining = 8000 - totalLength;
+        if (remaining > 100) {
+          sections.push(sectionText.slice(0, remaining) + '\n...[TRUNCATED]');
+        }
+        break; // 8000자 초과 시 더 이상 컨텍스트를 추가하지 않음
+      }
+      sections.push(sectionText);
+      totalLength += sectionText.length;
     }
   }
   if (sections.length === 0) return '';
@@ -477,15 +495,27 @@ async function forceRedispatchTask(taskId, agentId, additionalContext = '', cont
     let linkedCtx = '';
     try { linkedCtx = await buildLinkedContext(fullTask.content, fullTask.project_id); } catch(e) {}
 
-    // 추가 컨텍스트 주입
-    let enrichedContent = linkedCtx ? linkedCtx + '\n' + fullTask.content : fullTask.content;
+    // [GAP-A3] 코멘트(additionalContext)에도 동일하게 buildLinkedContext 적용
+    let chainedComment = additionalContext;
     if (additionalContext) {
+      try {
+        const commentLinks = await buildLinkedContext(additionalContext, fullTask.project_id);
+        chainedComment = commentLinks ? commentLinks + '\n' + additionalContext : additionalContext;
+      } catch (e) {}
+    }
+
+    // [GAP-S1] Prompt Injection 방어 모듈 연동 (안전한 컨텍스트 주입)
+    let safeContent = sanitizeInput(fullTask.content);
+    let safeComment = sanitizeInput(chainedComment);
+
+    let enrichedContent = linkedCtx ? linkedCtx + '\n' + safeContent : safeContent;
+    if (safeComment) {
       if (contextType === 'REWORK') {
-        enrichedContent += `\n\n---\n[대표님 피드백 및 재작업 지시사항]\n${additionalContext}\n\n위 피드백을 철저히 반영하여 기존 결과물을 수정/보완하고 최종 결과물을 다시 제출하라.`;
+        enrichedContent += `\n\n---\n[대표님 피드백 및 재작업 지시사항]\n${safeComment}\n\n위 피드백을 철저히 반영하여 기존 결과물을 수정/보완하고 최종 결과물을 다시 제출하라.`;
       } else if (contextType === 'PINGPONG') {
-        enrichedContent += `\n\n---\n[핑퐁 인계 지시 — 이전 담당자 완료]\n${additionalContext}\n\n위 인계 지시에 따라 이 카드의 후속 작업을 즉시 수행하고 결과물을 제출하라.`;
+        enrichedContent += `\n\n---\n[핑퐁 인계 지시 — 이전 담당자 완료]\n${safeComment}\n\n위 인계 지시에 따라 이 카드의 후속 작업을 즉시 수행하고 결과물을 제출하라.`;
       } else {
-        enrichedContent += `\n\n---\n[이전 착수 보고]\n${additionalContext}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`;
+        enrichedContent += `\n\n---\n[이전 착수 보고]\n${safeComment}\n\n위 착수 보고 이후 실제 작업을 지금 바로 수행하고 최종 결과물을 제출하라.`;
       }
     }
 
@@ -4781,8 +4811,8 @@ if (process.env.NO_SERVER !== 'true') {
     }
   });
 
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 MyCrew Bridge Server v2.0 running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, '127.0.0.1', () => {
+    console.log(`🚀 MyCrew Bridge Server v2.0 running on http://127.0.0.1:${PORT}`);
   console.log(`🔌 Socket.io ready | CORS: ${FRONTEND_ORIGIN}`);
   console.log(`📡 Linked to Local SQLite Database & AI Engine`);
   // [W1 Fix] 부팅 시점을 기준으로 인터벌 카운트 시작 → 재시작 직후 즉시 발송 방지

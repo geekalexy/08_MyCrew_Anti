@@ -199,6 +199,14 @@ export async function executeTool(name, args, options = {}) {
                 throw new Error(`[Graphify Error] 쿼리 실패 또는 도구가 설치되지 않았습니다: ${err.message}`);
             }
         } 
+        else if (name === 'save_execution_plan') {
+            // [Phase 43-4] Task Master의 원자적 실행 계획 저장용 도구
+            if (!args.plan_json) {
+                throw new Error("plan_json is required for save_execution_plan.");
+            }
+            output += `Execution plan saved successfully. Task Master has completed its objective.`;
+            return { output, action: 'SAVE_PLAN', planJson: args.plan_json };
+        }
         else if (name === 'finish_task') {
             output += `Task marked as finished. Reason: ${args.reason}`;
             return { output, action: 'FINISH', reason: args.reason };

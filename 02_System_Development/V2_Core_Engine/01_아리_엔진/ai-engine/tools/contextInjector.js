@@ -315,6 +315,16 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
       context += `2. Use query_graph and shortest_path to trace the blast radius of your proposed fix.\n`;
       context += `3. When applying destructive fixes, you MUST comply with the P-016 (dangerously prefix) policy.\n`;
       context += `4. After fixing, use run_command or browser_action to verify the fix before calling finish_task.\n\n`;
+    } else if (mode === 'TASK_MASTER') {
+      context += `[SYSTEM PERSONA - TASK MASTER & PLANNER]\n`;
+      context += `You are an expert Engineering Manager and Task Master.\n`;
+      context += `Before the development loop begins, your ONLY purpose is to analyze the given Task Description and Enriched Context, and break it down into an actionable, atomic execution plan.\n\n`;
+      context += `**CRITICAL RULES (G-Stack Benchmarked):**\n`;
+      context += `1. **Search Before Building**: Your first planned step MUST be to investigate the existing codebase and architecture using \`query_graph\` or \`grep_search\`. Do not assume the system structure.\n`;
+      context += `2. **Blast Radius Instinct**: Identify what could break. If the task modifies core shared components, your plan must include steps to verify the impact across the system.\n`;
+      context += `3. **Completeness Principle (Boil the Lake)**: Do not just plan for the happy path. Your plan MUST include steps for error handling, edge cases, and logging.\n`;
+      context += `4. **Todo-list Discipline**: Break the work down into atomic, independent steps. A single step should ideally represent one logical commit.\n`;
+      context += `5. **Termination Condition (P1-001)**: You must NEVER write code. Once your plan is ready, you MUST call the \`save_execution_plan\` tool to save your atomic tasks structurally in the DB. After calling the tool, output a short summary and STOP.\n\n`;
     } else {
       context += `[SYSTEM PERSONA - MAIN MODEL]\n`;
       context += `You are an expert Senior Fullstack Developer functioning as the 'Main Model' in an autonomous loop.\n`;
@@ -332,20 +342,28 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     context += `<tool_calls>\n[{"name": "read_file", "arguments": {"path": "src/index.js"}}]\n</tool_calls>\n\n`;
     context += `Available Tools:\n`;
     context += `- **read_file** / **view_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
-    if (mode !== 'QA') {
-      context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
-      context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
+    
+    if (mode === 'TASK_MASTER') {
+      context += `- **save_execution_plan**: Save the parsed atomic execution plan to the DB. Arguments: { "plan_json": { "context_and_blast_radius": "string", "atomic_tasks": [{"step": 1, "description": "string"}] } }\n`;
+      context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
+      context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
+      context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n\n`;
     } else {
-      context += `- **write_file**: ONLY ALLOWED for writing QA reports to 'artifacts/'. Arguments: { "path": "string", "content": "string" }\n`;
+      if (mode !== 'QA') {
+        context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;
+        context += `- **multi_replace**: Replace multiple occurrences in a file atomically. Arguments: { "path": "string", "replacements": [{ "target": "string", "replacement": "string" }] }\n`;
+      } else {
+        context += `- **write_file**: ONLY ALLOWED for writing QA reports to 'artifacts/'. Arguments: { "path": "string", "content": "string" }\n`;
+      }
+      if (mode === 'QA' || mode === 'DEBUG') {
+        context += `- **browser_action**: Interact with the Zero-MCP AOM daemon. Arguments: { "command": "BROWSE <url>" | "CLICK <@E1>" }\n`;
+      }
+      context += `- **run_command**: Execute a shell command. Arguments: { "command": "string" }\n`;
+      context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
+      context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
+      context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
+      context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
     }
-    if (mode === 'QA' || mode === 'DEBUG') {
-      context += `- **browser_action**: Interact with the Zero-MCP AOM daemon. Arguments: { "command": "BROWSE <url>" | "CLICK <@E1>" }\n`;
-    }
-    context += `- **run_command**: Execute a shell command. Arguments: { "command": "string" }\n`;
-    context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
-    context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
-    context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
-    context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
 
     // 3. Project Rules
     context += `[PROJECT RULES - MYCREW EDITION]\n`;

@@ -15,10 +15,24 @@
 
 ## 2. 코어 워크플로우: Zero-Friction & Vibe Dashboard
 
-### Step 1: 단일 기획 카드 생성 및 PRD 도출 (Plan Master의 역할)
+### Step 1: 단일 기획 카드 생성 및 초기 PRD 도출 (Plan Master의 역할)
 * 사용자가 프로젝트를 생성하면, 칸반 보드에는 `[기획] v1.0 MVP 로드맵` 단일 카드가 생성되며, 시스템은 **'Plan Mode'**로 대기합니다.
 * 사용자가 우측 패널 채팅창에 초기 기획안을 입력하거나 실행 버튼을 누르면, Plan Master는 **단일 진실 공급원(Single Source of Truth)으로서의 확정된 PRD 문서** 1개를 도출하여 해당 카드 내에 결과물로 렌더링합니다.
 * 과도한 엔지니어링(Over-engineering)을 방지하기 위해 v1.1 등 제외된 스코프는 Backlog에 1~2개의 별도 카드로 분리하여 보관합니다.
+
+### Step 1.2: 집요한 인터뷰 (Relentless Interview) - G-Stack 패턴
+* 사용자가 초기 아이디어를 던지면, Plan Master는 "One Question at a Time" 원칙을 적용하여 한 번에 하나의 날카로운 질문만 던집니다.
+* G-Stack의 인터뷰형 질문 패턴을 차용하여, 사용자의 요구사항이 명확해질 때까지 심층 문답을 진행하며 진짜 필요한 핵심 가치(Must-have)와 부가 기능(Nice-to-have)을 분리해 냅니다.
+
+### Step 1.3: 반영 및 분해 (Reflect & Decompose) - Shrimp 패턴
+* 인터뷰가 수렴되면, Shrimp Task Manager의 원자 단위 분해(Atomic Task Decomposition) 방식을 적용하여 요구사항을 구조화합니다.
+* 확정된 요구사항을 바탕으로 개발을 가장 작고 독립적인 단위로 쪼개고 의존성(Dependency)을 명확히 정의합니다.
+
+### Step 1.7: Supreme PRD Review (교차 검증) - Task Master 패턴
+* 기획서 초안이 작성되면 바로 개발로 넘어가지 않고, 고성능 모델(Opus 등)을 활용해 강력한 **PRD 리뷰(Supreme Review)** 단계를 거칩니다.
+* Claude Task Master 방식처럼 도구(웹 검색/팩트 체크 등)를 동적으로 로드하는 리서치 레이어와 메인 검증 레이어를 분리하여 PRD의 무결성을 검증하고, 예외 처리 및 엣지 케이스 누락을 방지합니다.
+* 사용자의 최종 승인(Confirm)이 완료되어야만 PRD가 '확정'됩니다.
+
 
 ### Step 1.5: PRD 확정 및 개발자 에이전트 연동
 * 확정된 PRD 카드를 확인한 사용자는 우측 패널에서 모드를 **'오토런(개발 모드)'**로 설정합니다.

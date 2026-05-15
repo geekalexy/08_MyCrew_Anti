@@ -1452,7 +1452,7 @@ app.post('/api/bugdog-alert', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`
 ==================================================
 🤖 [Ari Daemon v2] 지능형 비서 부팅 완료!

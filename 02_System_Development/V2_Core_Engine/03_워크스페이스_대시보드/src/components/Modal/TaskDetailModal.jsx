@@ -1682,16 +1682,18 @@ export default function TaskDetailModal() {
             // task.status가 ARCHIVED인 데 PIPELINE_DONE이면 배너 숨김 (이미 완료)
             const rawQas = task.last_autorun_status;
             const taskStatus = (task.status || '').toUpperCase();
-            const PRIORITY = { FAILED: 5, QA_RUNNING: 4, DBG_RUNNING: 4, QA_FAILED: 3, DBG_DONE: 2, DEV_DONE: 2, QA_DONE: 2, PIPELINE_DONE: 1, COMPLETED: 0 };
+            const PRIORITY = { FAILED: 5, QA_RUNNING: 4, DBG_RUNNING: 4, BLOCKED: 4, QA_FAILED: 3, DBG_DONE: 2, DEV_DONE: 2, QA_DONE: 2, PLAN_COMPLETE: 2, PIPELINE_DONE: 1, COMPLETED: 0, PLANNING: 0 };
             // PIPELINE_DONE + ARCHIVED = 숨김 (이미 애드후 완료)
             if (rawQas === 'PIPELINE_DONE' && taskStatus === 'ARCHIVED') return null;
             // 우선순위 기반 표시 상태 결정 (현재 단일 필드에서 읽으므로 기본적으로 rawQas 사용,
             // 향후 복수 필드 증실 시 resolver 확장 지점)
             const qas = (PRIORITY[rawQas] !== undefined) ? rawQas : null;
             if (!qas) return null;
-            const isRunning = qas === 'QA_RUNNING' || qas === 'DBG_RUNNING';
+            const isRunning = qas === 'QA_RUNNING' || qas === 'DBG_RUNNING' || qas === 'PLANNING';
             const btnBase = { borderRadius: '6px', padding: '4px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: qaLoading || isRunning ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, opacity: qaLoading || isRunning ? 0.5 : 1, border: 'none' };
             const BANNER_MAP = {
+              PLANNING:     { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  color: '#fbbf24', icon: 'auto_awesome',  text: '⏳ Task Master가 원자적 계획을 수립 중입니다...' },
+              PLAN_COMPLETE:{ bg: 'rgba(100,135,242,0.12)', border: 'rgba(100,135,242,0.35)', color: '#b4c5ff', icon: 'format_list_bulleted', text: '✅ 계획 수립 완료 — Developer 루프로 진입합니다.' },
               DEV_DONE:     { bg: 'rgba(100,135,242,0.12)', border: 'rgba(100,135,242,0.35)', color: '#b4c5ff', icon: 'check_circle',  text: '✅ 개발 완료 — QA 파이프라인을 시작할 수 있습니다.' },
               QA_RUNNING:   { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  color: '#fbbf24', icon: 'hourglass_top', text: '⏳ QA 진행 중...' },
               QA_DONE:      { bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  color: '#4ade80', icon: 'verified',      text: '✅ QA 통과 — 아카이브하거나 계속 진행하세요.' },
@@ -1700,6 +1702,7 @@ export default function TaskDetailModal() {
               DBG_DONE:     { bg: 'rgba(100,135,242,0.12)', border: 'rgba(100,135,242,0.35)', color: '#b4c5ff', icon: 'build_circle',  text: '✅ 디버깅 완료 — QA를 재시도하세요.' },
               PIPELINE_DONE:{ bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.35)',  color: '#4ade80', icon: 'celebration',   text: '🎉 전 파이프라인 완료 — 수동으로 아카이브하세요.' },
               FAILED:       { bg: 'rgba(255,82,82,0.12)',   border: 'rgba(255,82,82,0.35)',   color: '#ff5449', icon: 'warning',       text: '🚨 비정상 종료 — 리포트 확인 후 재시도하세요.' },
+              BLOCKED:      { bg: 'rgba(255,82,82,0.12)',   border: 'rgba(255,82,82,0.35)',   color: '#ff5449', icon: 'block',         text: '🛑 Task Master 차단됨 — 파싱 실패 또는 확인 필요.' },
               COMPLETED:    { bg: 'rgba(148,163,184,0.1)',  border: 'rgba(148,163,184,0.2)',  color: '#94a3b8', icon: 'check_circle',  text: `✅ Auto Run 완료 — Step ${task.last_autorun_step}/${task.last_autorun_max_steps}` },
             };
             const cfg = BANNER_MAP[qas];

@@ -1235,6 +1235,15 @@ class Executor {
                   if (this._broadcastLog) {
                     this._broadcastLog('warn', `⏸️ 사용자 응답 대기 (BLOCKED): ${resultObj.reason}`, agentId, currentTaskId);
                   }
+                } else if (resultObj.action === 'SAVE_PLAN') {
+                  // Phase 43-4: DB에 실행 계획 저장 후 PLAN_COMPLETE 전환
+                  await dbManager.saveExecutionPlan(currentTaskId, null, resultObj.planJson);
+                  await dbManager.updateTaskStatus(currentTaskId, 'PLAN_COMPLETE');
+                  await dbManager.updateAutoRunStatus(currentTaskId, 'PLAN_COMPLETE', lastStepCount, MAX_STEPS);
+                  isTaskCompleted = true;
+                  if (this._broadcastLog) {
+                    this._broadcastLog('info', `✅ Task Master 계획 저장 완료 (PLAN_COMPLETE)`, agentId, currentTaskId);
+                  }
                 }
 
                 // WARN-002: 대형 출력 방어 (3000자 제한)

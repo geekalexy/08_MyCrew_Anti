@@ -791,6 +791,40 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 43-4] Task Master 실행 계획 저장 (GAP-A1 보완) ───────────────────────────
+  saveExecutionPlan(taskId, projectId, planJson) {
+    return new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO execution_plans (task_id, project_id, plan_json) VALUES (?, ?, ?)`,
+        [taskId, projectId, JSON.stringify(planJson)],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+  }
+
+  getExecutionPlanByTaskId(taskId) {
+    return new Promise((resolve, reject) => {
+      db.get(
+        `SELECT id, plan_json, created_at FROM execution_plans WHERE task_id = ? ORDER BY id DESC LIMIT 1`,
+        [taskId],
+        (err, row) => {
+          if (err) reject(err);
+          else {
+            if (!row) return resolve(null);
+            try {
+              resolve(JSON.parse(row.plan_json));
+            } catch (e) {
+              resolve(row.plan_json);
+            }
+          }
+        }
+      );
+    });
+  }
+
   // ─── Task Sprint 번호 업데이트 ───────────────────────────
   updateTaskSprintNo(id, sprintNo) {
     return new Promise((resolve, reject) => {
@@ -1127,10 +1161,13 @@ class DatabaseManager {
     // 폴백 기본값 (DB 설정 없거나 파싱 실패 시)
     const DEFAULT_COLUMNS = [
       { status: 'PENDING',     label: 'To Do',      column: 'todo',        aliases: ['TODO', 'todo', 'PENDING', '대기', '할일'] },
+      { status: 'PLANNING',    label: 'Planning',   column: 'planning',    aliases: ['계획수립중', '플래닝'] },
+      { status: 'PLAN_COMPLETE', label: 'Plan Complete', column: 'plan_complete', aliases: ['계획완료'] },
       { status: 'IN_PROGRESS', label: 'In Progress', column: 'in_progress', aliases: ['in_progress', '진행중', '진행'] },
       { status: 'REVIEW',      label: 'Review',      column: 'review',      aliases: ['검토', '검토대기', '리뷰'] },
       { status: 'COMPLETED',   label: 'Done',        column: 'done',        aliases: ['DONE', 'done', '완료', '완성'] },
       { status: 'FAILED',      label: 'Failed',      column: 'failed',      aliases: ['실패', '오류'] },
+      { status: 'BLOCKED',     label: 'Blocked',     column: 'blocked',     aliases: ['블록됨', '막힘'] },
       { status: 'ARCHIVED',    label: 'Archived',    column: 'archive',     aliases: ['archive', 'ARCHIVED', '아카이브', '보관'] },
     ];
 

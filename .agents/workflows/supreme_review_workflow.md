@@ -1,63 +1,174 @@
 ---
-description: Luca의 코드를 Claude Opus 등 고성능 모델에게 교차 검증(Peer Review)받기 위한 워크플로우
+description: Luca 또는 Sonnet의 코드/기획서를 고성능 모델(Opus, Sonnet Thinking 등)에게 교차 검증(Supreme Review)받기 위한 워크플로우
 ---
 
-# Prime Advisor (Opus) 전용 리뷰 워크플로우
+# 🛡️ Supreme Review 워크플로우 (강제 이행 버전)
 
-이 워크플로우는 비용(과금) 발생 없이 Antigravity 환경의 모델 변경(수동)을 활용하여 내부 코드의 무결성과 보안 취약점을 레드팀(Red Teaming) 관점에서 검증받는 공식 절차입니다.
+> ## 🚨 이 워크플로우는 선택이 아닙니다
+>
+> **리뷰어(Prime/Sonnet/Luca)는 아래 단계를 순서대로 모두 완료해야 합니다.**  
+> **단계를 건너뛰는 것은 P-020(무단 작업 금지) 위반과 동일하게 간주됩니다.**  
+> 기획서만 읽고 리뷰를 완료했다고 선언하는 것은 **불완전 리뷰**이며 즉시 재수행해야 합니다.
 
-## 0. 📋 [필수] Prime 컨텍스트 로딩 — 정책 동기화
+---
 
-> ⚠️ Prime(Opus)은 온디맨드로 호출되므로 정책 업데이트를 자동으로 받지 못합니다.
-> 리뷰 시작 전 반드시 아래 파일을 읽어 정책 싱크를 맞추십시오.
+## ✅ STEP 0 — 컨텍스트 로딩 (스킵 불가)
 
-**필수 읽기 (순서대로)**:
-1. `01_Company_Operations/04_HR_온보딩/POLICY_INDEX.md` — 전체 정책 인덱스 (last_updated 확인)
-2. `01_Company_Operations/04_HR_온보딩/strategic_memory.md` — 모델 식별자·아키텍처 원칙
+리뷰 첫 문장을 쓰기 전에 아래 파일을 **실제로 읽어야(view_file 호출)** 합니다.  
+"이미 알고 있다"는 이유로 생략하는 것은 금지입니다.
 
-**리뷰 대상이 에이전트 ID / 팀빌딩 관련이면 추가 참조**:
-- `02_System_Development/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md`
+**반드시 읽을 파일 (순서대로):**
 
-## 0.5 📊 [필수] Graphify 기반 영향도 분석 (CEO 지시, 2026-05-13)
+| # | 파일 | 목적 |
+|---|------|------|
+| 1 | `01_Company_Operations/04_HR_온보딩/POLICY_INDEX.md` | last_updated 확인, STRICT 정책 동기화 |
+| 2 | `01_Company_Operations/04_HR_온보딩/strategic_memory.md` | 모델 식별자, 아키텍처 원칙 |
 
-> 🔴 **리뷰 시 반드시 Graphify 그래프를 활용해야 합니다.** grep/파일 읽기만으로 리뷰를 완료하는 것은 불충분합니다.
+**리뷰 대상이 에이전트 ID/팀빌딩 관련이면 추가 필독:**
+- `02_System_Development/V2_Core_Engine/01_아리_엔진/ai-engine/AGENT_ID_SPEC.md`
 
-**리뷰 착수 전 필수 수행**:
-1. `graphify-out/GRAPH_REPORT.md` 읽기 — God Nodes, Community 구조 파악
-2. `graphify-out/graph.json`에서 변경 대상 파일의 **파급 반경(Blast Radius)** 추출 — import하는/import되는 파일 목록
-3. 변경 대상이 God Node(상위 10개)에 해당하면 **추가 주의 판정** 부여
-4. 의존성 경로(`imports_from`, `calls`, `contains`)를 통해 변경 전파 경로 분석
+---
 
-## 0.7 🔬 [필수] 멀티 렌즈 분석 (CEO 지시, 2026-05-14)
+## ✅ STEP 1 — 실제 코드 파일 읽기 (스킵 불가)
 
-> 🔴 **보안/인프라 관점만으로는 불충분합니다.** Phase 44-2 리뷰에서 Prime은 2건만 발견했으나, Sonnet은 8건의 추가 결함(상태 모순, UX 흐름 단절, 권한 우회)을 발견했습니다. 이 교훈을 반영하여 아래 **6개 렌즈**를 반드시 적용하십시오.
+> 🔴 **기획서(PRD)만 읽고 리뷰하는 것은 불완전 리뷰입니다.**  
+> 기획서가 참조하는 **실제 소스 코드 파일을 반드시 view_file 또는 grep_search로 직접 확인**해야 합니다.
 
-**모든 리뷰에서 반드시 검증할 6개 관점**:
+**수행 방법:**
+1. 리뷰 대상 기획서/문서에서 언급된 파일명을 모두 추출한다.
+2. 각 파일을 `view_file` 도구로 실제 읽는다.
+3. 기획서의 설명과 실제 코드 간의 괴리가 없는지 대조한다.
+
+**예시 — Phase43-4 PRD 리뷰 시 필독 파일:**
+```
+ai-engine/tools/contextInjector.js   → buildAutoRunContext() 실제 구현 확인
+ai-engine/executor.js                → Task Master 루프 핸들러 존재 여부 확인  
+ai-engine/tools/scrubbing.js         → sanitize() 함수 실제 동작 확인
+ai-engine/services/contextChainService.js → 체이닝 로직 확인
+```
+
+**이 단계를 건너뛰었다면 리뷰를 멈추고 처음부터 다시 시작하십시오.**
+
+---
+
+## ✅ STEP 2 — Graphify 기반 Blast Radius 분석 (스킵 불가)
+
+> 🔴 grep/파일 읽기만으로 리뷰를 완료하는 것은 불충분합니다.  
+> Graphify MCP 도구를 **반드시 호출**해야 합니다.
+
+**수행해야 할 Graphify 도구 호출 (최소 3개):**
+
+| 호출 도구 | 목적 |
+|-----------|------|
+| `mcp_graphify_god_nodes(top_n=10)` | God Node 목록 확인 — 변경 대상 포함 여부 판단 |
+| `mcp_graphify_get_neighbors(label=변경대상파일)` | 직접 의존 파일 목록 추출 |
+| `mcp_graphify_query_graph(question=리뷰핵심키워드)` | 영향 받는 Community 전파 경로 분석 |
+
+**God Node 해당 시 → 보고서에 "🔴 GOD NODE 경보" 섹션 추가 필수**
+
+---
+
+## ✅ STEP 3 — 6개 렌즈 분석 (모두 적용, 스킵 불가)
+
+> 🔴 "해당 없음"으로 처리하려면 그 이유를 한 문장 이상 명시해야 합니다.  
+> 이유 없이 렌즈를 생략하는 것은 불완전 리뷰입니다.
+
+**반드시 적용할 6개 관점:**
 
 | # | 렌즈 | 핵심 질문 | 예시 결함 |
 |---|------|----------|----------|
-| 1 | **🔒 보안 (Security)** | 입력 검증, 권한 탈출, 인젝션 벡터가 있는가? | Shell Injection, Path Traversal, Prompt Injection |
+| 1 | **🔒 보안 (Security)** | 입력 검증, 권한 탈출, 인젝션 벡터가 있는가? | Shell Injection, Prompt Injection |
 | 2 | **🏗️ 아키텍처 (Architecture)** | God Node 비대화, 순환 참조, 모듈 경계 위반이 있는가? | Executor 1500줄, 크로스 모듈 변경 |
-| 3 | **🔄 상태 정합성 (State Consistency)** | 상태 전이에 모순이 있는가? 충돌 시 우선순위가 정의되었는가? | ARCHIVED인데 배너 노출, 좀비 RUNNING 카드 |
+| 3 | **🔄 상태 정합성 (State Consistency)** | 상태 전이에 모순이 있는가? 충돌 우선순위가 정의되었는가? | 좀비 RUNNING 카드, 상태 충돌 |
 | 4 | **👤 UX/사용자 흐름 (User Experience)** | 사용자가 실제로 이 기능을 쓸 때 혼란이 생기지 않는가? | Fork 후 어떤 카드를 봐야 하는지 모호 |
-| 5 | **⚙️ 런타임 안정성 (Runtime Stability)** | 크래시, 타임아웃, 좀비 프로세스, 재시작 시나리오가 커버되는가? | 데몬 재시작 중 명령 충돌, PID 미스매치 |
-| 6 | **📜 정책 준수 (Policy Compliance)** | P-002(ID 형식), P-006(모델 식별자), P-016(dangerously) 등 위반이 있는가? | qa_engineer(P-002 위반), 에이전트 본명 기입 |
+| 5 | **⚙️ 런타임 안정성 (Runtime Stability)** | 크래시, 타임아웃, 좀비 프로세스, 재시작 커버가 되는가? | 데몬 재시작 중 명령 충돌 |
+| 6 | **📜 정책 준수 (Policy Compliance)** | P-002(ID 형식), P-006(모델 식별자), P-016(dangerously) 위반이 있는가? | 하드코딩 모델 식별자 |
+
+**각 렌즈마다 최소 1건 이상의 결함 또는 "이상 없음 + 근거" 를 명시해야 합니다.**
 
 ---
 
-## 1. 📝 리뷰 타겟(Target) 자동 생성
-**대상(Target)**: Luca(Gemini) 또는 Sonnet이 작성한 모든 핵심 코어 아키텍처 및 보안 비즈니스 로직.
-작업(코딩)을 마친 후, **절대 스스로 검증을 끝내지 않고** 아래 양식에 맞추어 `[Opus_Review_Target.md]` 파일을 생성합니다.
-- 변경된 소스코드 원본 포함.
-- 작업자(Luca/Sonnet)가 스스로 고민되는 Edge Case 및 공격 취약점 포인트 포함.
+## ✅ STEP 4 — 자가 점검 게이트 (보고서 제출 전 필수)
 
-## 2. 🔄 (User) 모델 체인지 (Manual)
-대표님은 작성된 `[Opus_Review_Target.md]` 아티팩트를 확인한 후, 안티그래비티 모델 선택 메뉴에서 모델을 **[Claude Sonnet 4.6 (Thinking)]** 또는 **[Claude Opus 4.6 (Thinking)]**로 변경합니다.
+리뷰 보고서를 저장하기 **직전**, 아래 체크리스트를 내부 사고(Thought)에서 점검하십시오.  
+하나라도 No이면 해당 단계로 돌아가 보완한 후 저장합니다.
 
-## 3. 🛡️ (User → Opus) 비판적 리뷰 명령
-대표님은 변경된 모델에게 다음 프롬프트를 전송합니다.
-> "현재 생성된 `[Opus_Review_Target.md]` 문서를 읽고, Prime Advisor로서 이 설계의 보안적 결함, 아키텍처 한계, 그리고 더 나은 Best Practice 대안을 비판적으로 도출해 줘."
+```
+[ ] STEP 0: POLICY_INDEX.md와 strategic_memory.md를 실제로 view_file 했는가?
+[ ] STEP 1: 기획서가 언급한 소스 코드 파일을 최소 1개 이상 직접 읽었는가?
+[ ] STEP 2: Graphify MCP 도구를 최소 3회 호출했는가?
+[ ] STEP 3: 6개 렌즈 모두 섹션이 존재하는가? (해당 없음도 근거 명시)
+[ ] 보고서 헤더에 리뷰어 이름, 리뷰 대상, 리뷰 일시, 이전 리뷰 파일명이 있는가?
+[ ] 결함 요약 매트릭스(표)가 포함되어 있는가?
+```
 
-## 4. 🛠️ (Luca) 피드백 수용 및 코드 수정
-Opus의 비판(아티팩트 등)이 도출되면, 대표님은 다시 모델을 **[Gemini] (Luca)**로 복구합니다.
-Luca는 Opus의 의견을 수용하여 최종 코드를 Refactoring 하고, `SUPREME_REVIEW_YYMMDD.md` 형태로 지식 뱅크에 백업합니다.
+---
+
+## ✅ STEP 5 — 보고서 저장 (규칙 엄수)
+
+**저장 경로 (절대 변경 금지):**
+```
+02_System_Development/V2_Core_Engine/00_아키텍처_문서/06_리뷰_아카이브/
+```
+
+**파일명 형식 (절대 임의 변경 금지):**
+```
+[일련번호]_[리뷰대상_키워드]_SupremeReview_[리뷰어이름]_[YYYY-MM-DD].md
+```
+
+| 리뷰어 | 이름 토큰 | 파일명 예시 |
+|--------|-----------|------------|
+| Luca (Gemini) | `Luca` | `53_Phase43-4_SupremeReview_Luca_2026-05-16.md` |
+| 소넷 (Claude Sonnet) | `Sonnet` | `53_Phase43-4_SupremeReview_Sonnet_2026-05-16.md` |
+| 프라임 (Claude Opus) | `Prime` | `53_Phase43-4_SupremeReview_Prime_2026-05-16.md` |
+
+**일련번호**: `06_리뷰_아카이브/` 내 마지막 파일 번호 + 1  
+→ 저장 전 반드시 `ls 06_리뷰_아카이브/` 로 마지막 번호를 확인할 것
+
+**보고서 헤더 필수 항목 (없으면 저장 금지):**
+```markdown
+**리뷰어**: [이름 (모델명)]
+**리뷰 대상**: `[파일명]`
+**리뷰 일시**: YYYY-MM-DD
+**이전 리뷰**: `[이전 파일명]` (없으면 "최초 리뷰"로 명시)
+```
+
+---
+
+## ✅ STEP 6 — 저장 완료 보고 (대표님께 반드시)
+
+저장 후 대화창에 다음 형식으로 보고합니다:
+
+```
+📁 리뷰 완료 저장:
+경로: 02_System_Development/.../06_리뷰_아카이브/[파일명]
+결함: CRITICAL [N]건 / HIGH [N]건 / MEDIUM [N]건 / LOW [N]건
+구현 착수 전 필수 해결: [N]건
+```
+
+---
+
+## 📋 워크플로우 전체 흐름 요약
+
+```
+STEP 0: 정책 파일 읽기 (view_file 필수)
+   ↓
+STEP 1: 관련 소스 코드 직접 읽기 (view_file 필수)
+   ↓
+STEP 2: Graphify 도구 최소 3회 호출
+   ↓
+STEP 3: 6개 렌즈 모두 분석
+   ↓
+STEP 4: 자가 점검 체크리스트 통과
+   ↓
+STEP 5: 06_리뷰_아카이브/ 에 저장 (파일명 형식 엄수)
+   ↓
+STEP 6: 대표님께 결과 보고
+```
+
+---
+
+> **[반복 위반 발생 시]**  
+> 소넷 또는 프라임이 이 워크플로우를 연속 2회 이상 불완전 이행한 경우,  
+> 대표님은 해당 모델에게 "supreme_review_workflow.md를 다시 읽고 STEP 0부터 재수행하라"고 명령하십시오.  
+> 에이전트는 변명 없이 즉시 재수행해야 합니다.

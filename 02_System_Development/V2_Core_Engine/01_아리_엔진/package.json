@@ -5,12 +5,16 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
+    "prestart": "lsof -ti:4010 | xargs kill -9 || true",
     "start": "node server.js",
+    "predev": "lsof -ti:4010 | xargs kill -9 || true",
     "dev": "node --watch server.js",
     "start:legacy": "PORT=4000 node server.js",
     "dev:legacy": "PORT=4000 node --watch server.js",
+    "prestart:mcp-backend": "lsof -ti:4010 | xargs kill -9 || true",
     "start:mcp-backend": "PORT=4010 node server.js",
     "dev:mcp-backend": "PORT=4010 node --watch server.js",
+    "presm": "lsof -ti:4010 | xargs kill -9 || true",
     "sm": "PORT=4010 node server.js",
     "start:mcp": "node mcp_server.js"
   },

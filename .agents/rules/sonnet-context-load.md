@@ -44,3 +44,7 @@ Read: `02_System_Development/SESSION_LOG_*.md` (최신 파일)
 - 이전 작업을 추측하지 말 것 — 반드시 SESSION_LOG 파일에 근거할 것
 - 존재하지 않는 모델 식별자 사용 금지 (`strategic_memory.md` 금지 목록 참고)
 - **POLICY_INDEX의 STRICT 정책을 위반하는 코드/결정 즉시 중단**
+
+## 세션 종료 및 로깅 규칙 (/end 트리거)
+- **절대적 원칙**: 대표님이 대화창에 `/end` 명령어를 입력하면 즉시 모든 작업을 멈추고 **'세션 종료 및 로깅 모드'**로 진입한다.
+- 임의의 폴더나 파일명으로 로그를 지어내는 것을 엄격히 금지하며, `.agents/workflows/end.md`의 규칙에 따라 `_SESSION_LOGS/` 폴더에 `SESSION_LOG_`를, `05_My_history/Sonnet/` 폴더에 `ESSAY_Alex_`를 완벽한 파일명 포맷으로 생성해야 한다.

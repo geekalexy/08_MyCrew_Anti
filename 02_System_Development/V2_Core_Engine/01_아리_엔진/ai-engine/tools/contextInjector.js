@@ -315,6 +315,19 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
       context += `2. Use query_graph and shortest_path to trace the blast radius of your proposed fix.\n`;
       context += `3. When applying destructive fixes, you MUST comply with the P-016 (dangerously prefix) policy.\n`;
       context += `4. After fixing, use run_command or browser_action to verify the fix before calling finish_task.\n\n`;
+    } else if (mode === 'PLAN_MASTER') {
+      // [Phase 45-PRE3] PLAN_MASTER 분기 신설 — 기존 TASK_MASTER와 명확히 분리
+      context += `[SYSTEM PERSONA - PLAN MASTER (MVP ARCHITECT)]\n`;
+      context += `You are an expert Product Manager and MVP Strategist operating the MyCrew Plan Master pipeline.\n`;
+      context += `**CRITICAL RULES:**\n`;
+      context += `1. **NO CODE**: You MUST NOT write any code. Your sole purpose is to define scope and generate a roadmap.\n`;
+      context += `2. **Three-Phase Loop**: You MUST follow this exact sequence:\n`;
+      context += `   Phase 1 → Call \`analyze_scope\` to classify must-have vs nice-to-have requirements.\n`;
+      context += `   Phase 2 → Call \`make_roadmaps\` to convert the scope into atomic kanban tasks and future backlog.\n`;
+      context += `   Phase 3 → Call \`confirm_mvp\` to generate the final briefing message for CEO approval.\n`;
+      context += `3. **Dry-Run Only**: The \`confirm_mvp\` tool returns a PREVIEW only. Actual card creation requires explicit CEO approval. Do NOT create cards directly.\n`;
+      context += `4. **Idempotency**: If \`confirm_mvp\` is called more than once, the system will reject duplicates. Call it EXACTLY once per session.\n`;
+      context += `5. **Stop Condition**: After calling \`confirm_mvp\`, output a summary and STOP. Do not loop further.\n\n`;
     } else if (mode === 'TASK_MASTER') {
       context += `[SYSTEM PERSONA - TASK MASTER & PLANNER]\n`;
       context += `You are an expert Engineering Manager and Task Master.\n`;
@@ -343,11 +356,25 @@ You are an agent operating inside the MyCrew Kanban System. You have the ability
     context += `Available Tools:\n`;
     context += `- **read_file** / **view_file**: Use this BEFORE modifying any existing code. Arguments: { "path": "string" }\n`;
     
-    if (mode === 'TASK_MASTER') {
-      context += `- **save_execution_plan**: Save the parsed atomic execution plan to the DB. Arguments: { "plan_json": { "context_and_blast_radius": "string", "atomic_tasks": [{"step": 1, "description": "string"}] } }\n`;
+    if (mode === 'PLAN_MASTER') {
+      // [Phase 45-PRE3] PLAN_MASTER 전용 허용 Tool 목록 — 코드 수정 도구 완전 차단
+      context += `- **analyze_scope**: Classify requirements into must-have and nice-to-have. Arguments: { "must_have": ["..."], "nice_to_have": ["..."], "thought": "string", "thoughtNumber": number, "nextThoughtNeeded": boolean }\n`;
+      context += `- **make_roadmaps**: Convert scope into kanban MVP tasks and future backlog. Arguments: { "mvp_tasks": ["..."], "future_scope": ["..."], "thought": "string", "thoughtNumber": number, "nextThoughtNeeded": boolean }\n`;
+      context += `- **confirm_mvp**: Generate the final briefing message for CEO approval (DRY-RUN preview only). Arguments: { "message_to_user": "string", "thought": "string", "thoughtNumber": number, "nextThoughtNeeded": boolean }\n`;
+      context += `- **add_comment**: Add a progress comment to a task card. Arguments: { "task_id": "string|number", "content": "string" }\n`;
+      context += `- **ask_user**: Pause the loop and request clarification from CEO. Arguments: { "question": "string" }\n`;
+      context += `- **finish_task**: Use ONLY after confirm_mvp is called. Arguments: { "reason": "string" }\n\n`;
+      context += `❌ STRICTLY FORBIDDEN: write_file, multi_replace, run_command, create_category_tasks\n\n`;
+    } else if (mode === 'TASK_MASTER') {
+      context += `- **create_category_tasks**: Save the categorized task breakdown and create multiple child cards. Arguments: { "tasksGroupedByCategory": [{"category": "backend", "title": "...", "description": "...", "depends_on": "..."}] }\n`;
+      context += `- **get_next_task**: Get the next pending child task to process. Arguments: { "parent_task_id": "string|number" }\n`;
+      context += `- **update_card_status**: Update the status of a specific task card. Arguments: { "task_id": "string|number", "status": "DONE|BLOCKED|IN_PROGRESS|REVIEW" }\n`;
+      context += `- **read_comments**: Read comments from a task card. Arguments: { "task_id": "string|number" }\n`;
+      context += `- **add_comment**: Add a comment to a task card. Arguments: { "task_id": "string|number", "content": "string" }\n`;
       context += `- **grep_search**: Search for a string in files. Arguments: { "query": "string", "path": "string (optional)" }\n`;
       context += `- **query_graph**: Use this to find Cross-Community nodes. Arguments: { "query": "string" }\n`;
-      context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n\n`;
+      context += `- **ask_user**: If you cannot proceed without user input, call this to pause the loop and request clarification. Arguments: { "question": "string" }\n`;
+      context += `- **finish_task**: Use this ONLY when you have fully completed the task. Arguments: { "reason": "string" }\n\n`;
     } else {
       if (mode !== 'QA') {
         context += `- **write_file**: Modifying one file at a time is STRICTLY ENFORCED. Arguments: { "path": "string", "content": "string" }\n`;

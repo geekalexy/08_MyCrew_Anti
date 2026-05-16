@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import contextInjector from './tools/contextInjector.js';
-import { MODEL } from './modelRegistry.js';
+import { MODEL, ARI_GEMINI_MODELS } from './modelRegistry.js';
 
 // ─── ARI_BRAIN.md 로드 (아리의 핵심 두뇌) ────────────────────────────────────
 const ARI_BRAIN_PATH = path.resolve(
@@ -712,7 +712,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // [Phase 25] 할당 이벤트 발생 (서버의 Dispatcher 트리거)
       try {
-        fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/dispatch`, {
+        fetch(`http://localhost:${process.env.PORT || 4010}/api/tasks/dispatch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ agentId: assigneeId })
@@ -721,7 +721,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // [버그 패치] 실시간 UI 갱신을 위한 socket.io 브로드캐스트 트리거
       try {
-        fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/notify-created`, {
+        fetch(`http://localhost:${process.env.PORT || 4010}/api/tasks/notify-created`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -766,7 +766,7 @@ async function executeTool(toolName, args, projectId = null) {
       // [아카이빙] COMPLETED 또는 ARCHIVED로 변경되는 경우 /archive API 호출
       if (column === 'done' || column === 'archive') {
         try {
-          const archiveResp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}/archive`, {
+          const archiveResp = await fetch(`http://localhost:${process.env.PORT || 4010}/api/tasks/${taskId}/archive`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ archivedBy: 'ARI(위임)' }),
@@ -785,7 +785,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // 일반 수정 (done 아닌 경우)
       try {
-        const resp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4010}/api/tasks/${taskId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatePayload)
@@ -811,7 +811,7 @@ async function executeTool(toolName, args, projectId = null) {
       const { taskId: inputTaskId, reason } = args;
       const taskId = await resolveTaskId(inputTaskId);
       try {
-        const resp = await fetch(`http://localhost:${process.env.PORT || 4007}/api/tasks/${taskId}`, {
+        const resp = await fetch(`http://localhost:${process.env.PORT || 4010}/api/tasks/${taskId}`, {
           method: 'DELETE'
         });
         if (!resp.ok) {
@@ -1022,7 +1022,7 @@ async function executeTool(toolName, args, projectId = null) {
       await dbManager.toggleAgentSkill(agentId, skillId, isActive);
 
       // REST API로도 변경 사실을 알리기 (프론트 실시간 동기화를 위해)
-      fetch(`http://localhost:${process.env.PORT || 4007}/api/agents/${agentId}/skills`, {
+      fetch(`http://localhost:${process.env.PORT || 4010}/api/agents/${agentId}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ skillId, active: isActive })
@@ -1072,7 +1072,7 @@ async function executeTool(toolName, args, projectId = null) {
 
       // ── [Phase 37] OUTPUT 파일 저장 시 Live Preview 자동 새로고침 알림 ──
       if (projectId && filePath.toUpperCase().includes('OUTPUT')) {
-        fetch(`http://localhost:${process.env.PORT || 4007}/api/preview/notify`, {
+        fetch(`http://localhost:${process.env.PORT || 4010}/api/preview/notify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId, filePath }),
@@ -1190,12 +1190,11 @@ app.post('/v1beta/models/:model::action', async (req, res) => {
 
 // ─── 메인 대화 엔드포인트 ─────────────────────────────────────────────────
 app.post('/api/compute', async (req, res) => {
-  const { content, author, oauthToken, preferredModel, projectId } = req.body;
-  if (!content) return res.status(400).send('Content missing');
+  const { content, author, oauthToken, preferredModel, projectId, images } = req.body;
+  if (!content && (!images || images.length === 0)) return res.status(400).send('Content or images missing');
 
   // preferredModel 검증 — 아리 엔진은 Gemini API 전용이므로 Gemini 계열만 허용
-  const ARI_ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'];
-  const activeModel = ARI_ALLOWED_MODELS.includes(preferredModel)
+  const activeModel = ARI_GEMINI_MODELS.includes(preferredModel)
     ? preferredModel
     : MODEL.PRO; // 기본값: gemini-2.5-pro (2026-04-28 Flash → Pro 격상)
   console.log(`[AriDaemon] 🎯 사용 모델: ${activeModel}${preferredModel && preferredModel !== activeModel ? ` (요청: ${preferredModel} → 미허용, Pro 폴백)` : ''}`);
@@ -1219,6 +1218,7 @@ app.post('/api/compute', async (req, res) => {
   }
 
   console.log(`[AriDaemon] 💭 대표님(${author}) 메시지: ${content}`);
+  if (images && images.length > 0) console.log(`[AriDaemon] 🖼️ 첨부 이미지 수: ${images.length}`);
   console.log(`[AriDaemon] 🧠 현재 컨텍스트: ${conversationHistory.length} 턴`);
 
   try {
@@ -1227,6 +1227,11 @@ app.post('/api/compute', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
+
+    req.on('close', () => {
+      console.log('[AriDaemon] 클라이언트 연결 종료 (SSE Abort)');
+      res.end();
+    });
 
     // [Phase 26] 장착된 스킬 기반 시스템 프롬프트 + 동적 Tools 조립
     const [systemInstruction, activeTools] = await Promise.all([
@@ -1254,7 +1259,22 @@ app.post('/api/compute', async (req, res) => {
       }
     }
 
-    const contents = [...conversationHistory, { role: 'user', parts: [{ text: content }] }];
+    const userParts = [{ text: content || '(이미지 전송)' }];
+    if (images && images.length > 0) {
+      images.forEach((imgBase64) => {
+        const match = imgBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (match) {
+          userParts.push({
+            inlineData: {
+              mimeType: match[1],
+              data: match[2]
+            }
+          });
+        }
+      });
+    }
+
+    const contents = [...conversationHistory, { role: 'user', parts: userParts }];
 
     // ── Gemini API 호출 (Function Calling 지원) ─────────────────
     let response;
@@ -1285,7 +1305,30 @@ app.post('/api/compute', async (req, res) => {
 
       for (const part of toolCallParts) {
         const { name, args } = part.functionCall;
+        
+        // 도구 표시명 매핑
+        const toolDisplayNames = {
+          run_command: '터미널 명령어 실행',
+          getTaskDetails: '작업 내역 조회',
+          createKanbanTask: '작업 카드 생성',
+          updateKanbanTask: '작업 카드 수정',
+          deleteKanbanTask: '작업 카드 삭제',
+          getCrewStatus: '팀원 상태 조회',
+          googleSearch: '구글 검색',
+          naverSearch: '네이버 검색'
+        };
+        const displayName = toolDisplayNames[name] || name;
+
+        // tool:start 이벤트 발송
+        res.write(`event: tool:start\ndata: ${JSON.stringify({ toolName: name, displayName })}\n\n`);
+        const startTime = Date.now();
+
         const result = await executeTool(name, args, projectId);
+
+        // tool:end 이벤트 발송
+        const durationMs = Date.now() - startTime;
+        res.write(`event: tool:end\ndata: ${JSON.stringify({ toolName: name, durationMs })}\n\n`);
+
         toolResults.push({
           functionResponse: {
             name,
@@ -1347,19 +1390,21 @@ app.post('/api/compute', async (req, res) => {
     }
 
     // ── 대화 히스토리 업데이트 ────────────────────────────────────────────
-    if (finalText.trim()) {
-      conversationHistory.push({ role: 'user', parts: [{ text: content }] });
-      conversationHistory.push({ role: 'model', parts: [{ text: finalText }] });
-    }
+    res.on('finish', () => {
+      if (finalText.trim()) {
+        conversationHistory.push({ role: 'user', parts: [{ text: content }] });
+        conversationHistory.push({ role: 'model', parts: [{ text: finalText }] });
+      }
 
-    // 최근 30턴 보존 (60개 parts)
-    if (conversationHistory.length > 60) {
-      conversationHistory = conversationHistory.slice(-60);
-    }
+      // 최근 30턴 보존 (60개 parts)
+      if (conversationHistory.length > 60) {
+        conversationHistory = conversationHistory.slice(-60);
+      }
+      console.log(`[AriDaemon] ✅ 응답 완료 (${finalText.length}자, 히스토리: ${conversationHistory.length}턴)`);
+    });
 
     res.write('event: done\ndata: {}\n\n');
     res.end();
-    console.log(`[AriDaemon] ✅ 응답 완료 (${finalText.length}자, 히스토리: ${conversationHistory.length}턴)`);
 
   } catch (error) {
     if (error.status === 429) {

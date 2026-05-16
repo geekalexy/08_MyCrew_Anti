@@ -7,6 +7,14 @@ export const useChatStore = create(
   persist(
     (set) => ({
       chats: [],
+      isStreaming: false,
+      streamingText: '',
+
+      setStreamingState: (isStreaming, streamingText = '') =>
+        set({ isStreaming, streamingText }),
+
+      appendStreamingText: (text) =>
+        set((s) => ({ streamingText: s.streamingText + text })),
 
       appendChat: (chat) =>
         set((s) => {

@@ -352,7 +352,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { execSync } = await import('child_process');
     try {
       // Non-blocking 안전 래퍼: graphify CLI 호출
-      const stdout = execSync(`graphify query "${args.query}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      const graphifyBin = '/Users/alex/.local/bin/graphify';
+      const stdout = execSync(`${graphifyBin} query "${args.query}"`, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
       return { content: [{ type: "text", text: stdout }] };
     } catch (err) {
       return { content: [{ type: "text", text: `[Graphify Error] 쿼리 실패 또는 도구가 설치되지 않았습니다: ${err.message}` }] };

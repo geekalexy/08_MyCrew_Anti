@@ -776,6 +776,21 @@ class DatabaseManager {
     });
   }
 
+  // ─── [Phase 45-A] 좀비 복구용: 특정 last_autorun_status 카드 전체 조회 ─────
+  getTasksByAutoRunStatus(status) {
+    return new Promise((resolve, reject) => {
+      db.all(
+        `SELECT id, title, project_id FROM Task 
+         WHERE last_autorun_status = ? AND deleted_at IS NULL`,
+        [status],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows || []);
+        }
+      );
+    });
+  }
+
   // ─── [Phase 44-3] Task 스냅샷 생성 (QA 진입 등 불변성 보장용) ───────────────────────────
   createTaskSnapshot(taskId) {
     return new Promise((resolve, reject) => {
@@ -1916,4 +1931,5 @@ class DatabaseManager {
   }
 }
 
+export const rawDb = db;
 export default new DatabaseManager();

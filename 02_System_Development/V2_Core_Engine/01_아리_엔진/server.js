@@ -39,8 +39,9 @@ import videoLabRouter, { setIoForVideoLabRouter } from './routes/videoLabRouter.
 import { detectBugdogTrigger, executeBugdogPipeline } from './ai-engine/bugdogPipeline.js';
 import memoryWatchdog from './ai-engine/workers/memoryWatchdog.js';
 import wikiEngine from './ai-engine/services/wikiEngine.js';
-import { runQALoop } from './ai-engine/loops/qaLoop.js';
-import { runDebugLoop } from './ai-engine/loops/debugLoop.js';
+import { runQALoop, recoverZombieQATasks } from './ai-engine/loops/qaLoop.js';
+import { runDebugLoop, recoverZombieDebugTasks } from './ai-engine/loops/debugLoop.js';
+import { runPlanMasterLoop } from './ai-engine/loops/planMasterLoop.js';
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 4007;
@@ -3531,82 +3532,17 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
  */
 app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
   const { id: projectId } = req.params;
-  const { requirements, deadline } = req.body;
+  const { requirements, deadline, taskId } = req.body;
   try {
     const safeReq = requirements || '';
     broadcastLog('info', `[Plan Master] 스코프 분석 시작 (요구사항: ${safeReq.substring(0, 30)}...)`, 'system', null, 'DASHBOARD', projectId);
     
-    let thoughtNumber = 1;
-    let nextThoughtNeeded = true;
-    let parsedResult = null;
-    let accumulatedThoughts = [];
+    // [Phase 45-B] God Route 비동기 위임 (202 Accepted 즉시 반환)
+    runPlanMasterLoop(projectId, taskId, safeReq, deadline, io).catch(err => {
+      console.error('[Plan Master Loop Error]', err);
+    });
 
-    while (nextThoughtNeeded && thoughtNumber <= 5) {
-      io.emit('plan-master:thinking', { projectId, thoughtNumber, status: '사고 진행 중...' });
-      broadcastLog('info', `[Plan Master] 스코프 심층 분석 중... (Step ${thoughtNumber})`, 'system', null, 'DASHBOARD', projectId);
-
-      const systemPrompt = `당신은 최상위 Product Manager인 Plan Master입니다.
-사용자의 요구사항: "${requirements}"
-개발 완료 희망일: "${deadline}"
-
-현재까지의 사고 과정:
-${accumulatedThoughts.join('\\n')}
-
-당신은 Sequential Thinking을 통해 문제를 다각도로 분석해야 합니다.
-반드시 아래 스키마에 맞는 순수 JSON 객체 하나만 반환하십시오. 마크다운 블록 없이 순수 JSON만 반환해야 합니다.
-{
-  "thought": "현재 단계의 분석 내용 및 근거",
-  "thoughtNumber": ${thoughtNumber},
-  "nextThoughtNeeded": true/false,
-  "needs_clarification": true/false,
-  "options": ["옵션A", "옵션B"], // needs_clarification이 true일 때만
-  "must_have": ["필수1"], // 결론이 났을 때만 (nextThoughtNeeded가 false일 때)
-  "nice_to_have": ["확장1"] // 결론이 났을 때만
-}`;
-
-      const promptContext = thoughtNumber === 1 
-        ? "초기 요구사항을 분석하여 첫 번째 사고를 진행하십시오." 
-        : `위 사고 과정을 이어받아 ${thoughtNumber}번째 사고를 진행하십시오. 스코프가 확정되었다면 nextThoughtNeeded를 false로 설정하세요.`;
-
-      const result = await antigravityAdapter.generateResponse(
-        promptContext, 
-        systemPrompt, 
-        'sonnet', 
-        'anti-claude-sonnet-4.6-thinking', 
-        2 * 60 * 1000,
-        [{ name: 'analyze_scope' }] // MCP Tool 시그니처 전달 (어댑터 호환용)
-      );
-
-      try {
-        parsedResult = JSON.parse(result.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
-        if (parsedResult.thought) {
-          accumulatedThoughts.push(`[Step ${thoughtNumber}] ${parsedResult.thought}`);
-        }
-        
-        nextThoughtNeeded = parsedResult.nextThoughtNeeded === true;
-        
-        // 프론트에 실시간 상태 브로드캐스트
-        io.emit('plan-master:thought_update', {
-            projectId,
-            taskId: req.body.taskId, // 클라이언트에서 전달받을 수 있음
-            thoughtNumber,
-            thought: parsedResult.thought,
-            nextThoughtNeeded
-        });
-
-        thoughtNumber++;
-      } catch(e) {
-        console.warn('[Plan Master] JSON 파싱 실패, Fallback 적용 및 루프 중단', e.message);
-        parsedResult = {
-          thought: "JSON 파싱 오류로 인한 긴급 폴백",
-          needs_clarification: true,
-          options: ["요구사항을 조금 더 상세히 적어주세요.", "기능을 단계별로 나누어 설명해주세요."]
-        };
-        break;
-      }
-    }
-
-    res.json({ status: parsedResult.needs_clarification ? 'needs_clarification' : 'success', ...parsedResult });
+    res.status(202).json({ status: 'accepted', message: 'Plan Master 분석 파이프라인이 시작되었습니다.' });
   } catch (err) {
     console.error('[API /api/projects/:id/plan-master/analyze] Error:', err.message);
     res.status(500).json({ error: err.message });
@@ -4874,6 +4810,10 @@ if (process.env.NO_SERVER !== 'true') {
 
   setTimeout(async () => {
     try {
+      // [Phase 45-B] 좀비 루프 복구 후크 실행 (QA, DEBUG)
+      await recoverZombieQATasks();
+      await recoverZombieDebugTasks();
+
       const staleTasks = await dbManager.getStaleTasks(0); // 기동 시점 기준 즉시 전체
       const inProgressTasks = staleTasks.filter(t => 
         (t.status === 'in_progress' || t.status === 'IN_PROGRESS') && t.execution_mode !== 'omo'

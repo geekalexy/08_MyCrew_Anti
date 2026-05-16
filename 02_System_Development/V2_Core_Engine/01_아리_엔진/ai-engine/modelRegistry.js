@@ -96,3 +96,10 @@ export const FLASH_FALLBACK_CHAIN = Object.freeze([
   'gemini-2.5-flash',
   'gemini-2.5-flash-lite',
 ]);
+
+/** ARI 엔진이 직접 호출 가능한 Gemini 모델 목록 (SSE 및 직접 호출용) */
+export const ARI_GEMINI_MODELS = Object.freeze([
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+]);

@@ -36,11 +36,20 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
         // You can update a separate status state if needed, or rely on thought_update
       }
     };
+    const handleComplete = (data) => {
+      if (String(data.projectId) === String(projectId)) {
+        setRoadmap(data.roadmap);
+        setStep(2);
+        setLoading(false);
+      }
+    };
     socket.on('plan-master:thought_update', handleThoughtUpdate);
     socket.on('plan-master:thinking', handleThinking);
+    socket.on('plan-master:complete', handleComplete);
     return () => {
       socket.off('plan-master:thought_update', handleThoughtUpdate);
       socket.off('plan-master:thinking', handleThinking);
+      socket.off('plan-master:complete', handleComplete);
     };
   }, [socket, projectId]);
 
@@ -68,48 +77,46 @@ export default function PlanMasterModal({ onClose, projectId, taskId, onSubmit }
       const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/plan-master/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requirements: req, deadline })
+        body: JSON.stringify({ requirements: req, deadline, taskId })
       });
       const data = await res.json();
       
       if (data.status === 'needs_clarification') {
         setOptions(data.options);
+        setLoading(false);
       } else {
-        await generateRoadmaps(data);
+        // 202 Accepted. Loading is set to false in handleComplete via SSE event
+        console.log('[Plan Master] Loop started in background.');
       }
     } catch (err) {
       console.error(err);
       alert('분석 중 오류가 발생했습니다: ' + err.message);
-    } finally {
       setLoading(false);
     }
   };
 
-  const generateRoadmaps = async (analyzeData) => {
+  const generateRoadmaps = async (currentRoadmap) => {
     setLoading(true);
+    setThinkingLogs([]); // Reset logs
     try {
-      const payload = { ...analyzeData };
-      if (feedback.trim()) payload.feedback = feedback;
-
-      const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/plan-master/generate-roadmaps`, {
+      const newReq = feedback.trim() ? req + '\n\n[추가 피드백]: ' + feedback : req;
+      
+      const res = await fetch(`${SERVER_URL}/api/projects/${projectId}/plan-master/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ requirements: newReq, deadline, taskId })
       });
       const data = await res.json();
       if (res.ok) {
-        setRoadmap(data);
-        setStep(2);
+        setStep(1); // Go back to step 1 to show thinking
         setFeedback('');
-        // [USER 피드백] 완료되면 리뷰컬럼(REVIEW) 이동
-        await updateTaskStatus('REVIEW');
+        console.log('[Plan Master] Feedback loop started.');
       } else {
-        throw new Error(data.error || '로드맵 생성 실패');
+        throw new Error(data.error || '로드맵 재생성 실패');
       }
     } catch (err) {
       console.error(err);
       alert('로드맵 생성 중 오류가 발생했습니다: ' + err.message);
-    } finally {
       setLoading(false);
     }
   };

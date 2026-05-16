@@ -11,6 +11,7 @@ import { renderTaggedText, renderChainRefText } from '../../utils/TagRenderer';
 import { useContextChain, extractChainRefs } from '../../hooks/useContextChain';
 import ContextChainPanel from './ContextChainPanel';
 import PlanMasterModal from './PlanMasterModal';
+import CategoryPreviewModal from './CategoryPreviewModal'; // [Phase 43-6] Task Master Dry-Run 프리뷰
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
 const WORKFLOW_STEPS = [
@@ -369,6 +370,11 @@ export default function TaskDetailModal() {
   // [Plan Master Fix] ARCHITECT 모드 실행 시 PlanMasterModal 제어
   const [showPlanMasterModal, setShowPlanMasterModal] = useState(false);
 
+  // [Phase 43-6] Task Master Branching 상태
+  const [showCategoryPreview, setShowCategoryPreview] = useState(false);
+  const [categoryPreviewCards, setCategoryPreviewCards] = useState([]);
+  const [childTasks, setChildTasks] = useState([]); // 생성된 대분류 자식 카드 목록
+
   // ── [Phase 37] Live Split Preview ────────────────────────────────────────
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);      // 좌측 패널 % 비율
@@ -585,7 +591,53 @@ export default function TaskDetailModal() {
     return () => socket.off('plan-master:trigger', onPlanMasterTrigger);
   }, [socket, activeDetailTaskId]);
 
-  // [Sprint4+] 이벤트 드리븐: task:updated 수신 → IN_PROGRESS 시 Activity 자동 기록
+  // [Phase 43-6] Branching 소켓 이벤트 구독 — 상태 표시 전용
+  useEffect(() => {
+    if (!socket || !activeDetailTaskId) return;
+
+    // 자식 카드 신규 생성
+    const onCategoryCardCreated = ({ parentTaskId, childTasks: newChildren }) => {
+      if (String(parentTaskId) !== String(activeDetailTaskId)) return;
+      setChildTasks(newChildren || []);
+    };
+
+    // 개별 자식 카드 상태 변경
+    const onChildStatusUpdated = ({ parentTaskId, taskId, status }) => {
+      if (String(parentTaskId) !== String(activeDetailTaskId)) return;
+      setChildTasks((prev) =>
+        prev.map((c) => String(c.id) === String(taskId) ? { ...c, status } : c)
+      );
+    };
+
+    // 전체 BRANCHING 완료
+    const onBranchingCompleted = ({ parentTaskId }) => {
+      if (String(parentTaskId) !== String(activeDetailTaskId)) return;
+      showToast('✅ Task Master 분기 실행 완료! 모든 카드가 처리되었습니다.');
+      patchTask(String(activeDetailTaskId), { status: 'REVIEW' });
+    };
+
+    // BLOCKED 발생
+    const onBranchingBlocked = ({ parentTaskId, blockedTaskId, reason }) => {
+      if (String(parentTaskId) !== String(activeDetailTaskId)) return;
+      showToast(`⚠️ 카드 #${blockedTaskId} BLOCKED: ${reason || '수동 확인 필요'}`);
+      setChildTasks((prev) =>
+        prev.map((c) => String(c.id) === String(blockedTaskId) ? { ...c, status: 'BLOCKED' } : c)
+      );
+    };
+
+    socket.on('task:category_card_created', onCategoryCardCreated);
+    socket.on('task:child_status_updated', onChildStatusUpdated);
+    socket.on('task:branching_completed', onBranchingCompleted);
+    socket.on('task:branching_blocked', onBranchingBlocked);
+    return () => {
+      socket.off('task:category_card_created', onCategoryCardCreated);
+      socket.off('task:child_status_updated', onChildStatusUpdated);
+      socket.off('task:branching_completed', onBranchingCompleted);
+      socket.off('task:branching_blocked', onBranchingBlocked);
+    };
+  }, [socket, activeDetailTaskId, showToast, patchTask]);
+
+
   useEffect(() => {
     if (!socket || !activeDetailTaskId) return;
     const onTaskUpdated = ({ taskId, status, column }) => {
@@ -1818,12 +1870,61 @@ export default function TaskDetailModal() {
               </div>
             )
           )}
+          {/* [Phase 43-6] Task Master 분기 실행 버튼 — DEV 모드 카드에 추가 노출 */}
+          {task?.mode === 'DEV' && !task?.last_autorun_status && (
+            <div style={{ marginBottom: '16px' }}>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ mode: 'BRANCHING' }),
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Task Master 분석 실패');
+                    if (data.status === 'preview' && data.previewCards?.length > 0) {
+                      setCategoryPreviewCards(data.previewCards);
+                      setShowCategoryPreview(true);
+                    } else {
+                      showToast('⚠️ Task Master가 분기 가능한 카테고리를 찾지 못했습니다.');
+                    }
+                  } catch (err) {
+                    showToast(`❌ ${err.message}`);
+                  }
+                }}
+                style={{
+                  width: '100%', padding: '10px 16px',
+                  background: 'linear-gradient(135deg, rgba(100,135,242,0.12), rgba(74,222,128,0.08))',
+                  border: '1px solid rgba(180,197,255,0.25)',
+                  borderRadius: '10px', color: '#b4c5ff',
+                  fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  fontFamily: 'Inter, sans-serif',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(100,135,242,0.2), rgba(74,222,128,0.14))';
+                  e.currentTarget.style.borderColor = 'rgba(180,197,255,0.45)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(100,135,242,0.12), rgba(74,222,128,0.08))';
+                  e.currentTarget.style.borderColor = 'rgba(180,197,255,0.25)';
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>account_tree</span>
+                Task Master 분기 실행 (Dry-Run 프리뷰)
+              </button>
+            </div>
+          )}
+
           {!task?.last_autorun_status && task?.mode === 'QA' && (
             <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(241, 196, 15, 0.1)', color: '#f1c40f', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>fact_check</span>
               [ /auto_test : 시나리오 기반 자율 테스트 및 검증 ]
             </div>
           )}
+
           {!task?.last_autorun_status && task?.mode === 'DEBUG' && (
             <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(231, 76, 60, 0.1)', color: '#e74c3c', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>bug_report</span>
@@ -2904,6 +3005,86 @@ export default function TaskDetailModal() {
             showToast(`✅ Plan Master 기획 완료! ${roadmap?.mvp_tasks?.length || 0}개 MVP 카드가 백로그에 생성되었습니다.`);
           }}
         />
+      )}
+
+      {/* [Phase 43-6] Task Master Dry-Run 프리뷰 모달 */}
+      {showCategoryPreview && task && (
+        <CategoryPreviewModal
+          taskId={task.id}
+          previewCards={categoryPreviewCards}
+          onClose={() => setShowCategoryPreview(false)}
+          onConfirmed={(childTaskIds) => {
+            setShowCategoryPreview(false);
+            showToast(`🚀 Task Master 분기 시작! ${childTaskIds.length}장의 카드가 생성되었습니다.`);
+          }}
+        />
+      )}
+
+      {/* [Phase 43-6] 자식 카드 미니 칸반 뷰 — 분기 실행 중일 때 표시 */}
+      {childTasks.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: '5rem', right: '1.5rem',
+          width: '280px', zIndex: 1500,
+          background: 'linear-gradient(145deg, #1a1f2e, #141825)',
+          border: '1px solid rgba(180,197,255,0.18)',
+          borderRadius: '14px',
+          boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
+          overflow: 'hidden',
+          fontFamily: 'Inter, sans-serif',
+        }}>
+          <div style={{
+            padding: '0.65rem 0.9rem',
+            background: 'linear-gradient(135deg, rgba(100,135,242,0.1), rgba(74,222,128,0.05))',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+          }}>
+            <span className="material-symbols-outlined" style={{ fontSize: '0.9rem', color: '#b4c5ff' }}>account_tree</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#b4c5ff', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              분기 진행 중
+            </span>
+            <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+              {childTasks.filter(c => c.status === 'DONE').length}/{childTasks.length} 완료
+            </span>
+          </div>
+          <div style={{ padding: '0.5rem 0.6rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            {childTasks.map((child) => {
+              const statusMap = {
+                DONE:        { icon: 'check_circle',    color: '#4ade80', label: '완료' },
+                IN_PROGRESS: { icon: 'pending',         color: '#b4c5ff', label: '진행 중' },
+                BLOCKED:     { icon: 'block',           color: '#f87171', label: 'BLOCKED' },
+                TODO:        { icon: 'radio_button_unchecked', color: '#64748b', label: '대기' },
+              };
+              const s = statusMap[child.status] || statusMap.TODO;
+              return (
+                <div key={child.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '0.45rem',
+                  padding: '0.4rem 0.5rem', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: `1px solid rgba(255,255,255,${child.status === 'IN_PROGRESS' ? '0.1' : '0.04'})`,
+                  transition: 'all 0.3s',
+                  animation: child.status === 'IN_PROGRESS' ? 'thinking-glow-pulse 2s ease-in-out infinite' : 'none',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.85rem', color: s.color, flexShrink: 0 }}>
+                    {s.icon}
+                  </span>
+                  <span style={{
+                    fontSize: '0.73rem', color: child.status === 'IN_PROGRESS' ? '#e2e8f0' : '#94a3b8',
+                    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    fontWeight: child.status === 'IN_PROGRESS' ? 600 : 400,
+                  }}>
+                    {child.title || child.category}
+                  </span>
+                  <span style={{
+                    fontSize: '0.62rem', color: s.color, flexShrink: 0,
+                    fontFamily: 'Space Grotesk, sans-serif', fontWeight: 600,
+                  }}>
+                    {s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );

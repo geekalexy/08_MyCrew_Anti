@@ -42,7 +42,8 @@ class WikiEngine {
       // [Phase 42-4] 로컬 graphify 바이너리로 프로젝트별 개별 그래프만 업데이트
       // [CEO 정책] global add 전면 폐기 — B타입 포함 모든 프로젝트 간 그래프 병합 금지
       // 각 프로젝트는 독립적인 graphify-out/graph.json만 유지합니다.
-      await execFileAsync('graphify', ['update', projectRoot]);
+      const graphifyBin = '/Users/alex/.local/bin/graphify';
+      await execFileAsync(graphifyBin, ['update', projectRoot]);
 
       return true;
     } catch (e) {

@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execFileSync } from 'child_process';
+import dbManager from '../../database.js';
+import promptInjectionGuard from '../../promptInjectionGuard.js';
+import categoryTaskService from '../../services/CategoryTaskService.js';
 
 /**
  * 중앙화된 도구 실행기 (Phase 43.5)
@@ -190,7 +193,8 @@ export async function executeTool(name, args, options = {}) {
             try {
                 // P1-001: execSync → execFileSync 전환 (Shell Injection 원천 차단)
                 // 인자를 배열로 분리하여 셸 해석을 우회
-                const stdout = execFileSync('graphify', ['query', args.query], {
+                const graphifyBin = '/Users/alex/.local/bin/graphify';
+                const stdout = execFileSync(graphifyBin, ['query', args.query], {
                     encoding: 'utf-8',
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
@@ -211,6 +215,52 @@ export async function executeTool(name, args, options = {}) {
             output += `Task marked as finished. Reason: ${args.reason}`;
             return { output, action: 'FINISH', reason: args.reason };
         } 
+        else if (name === 'create_category_tasks') {
+            if (!options.currentTaskId) throw new Error("currentTaskId is required to create category tasks.");
+            const safeTasks = (args.tasksGroupedByCategory || []).map(t => ({
+                ...t,
+                title: promptInjectionGuard.sanitizeInput(t.title || ''),
+                description: promptInjectionGuard.sanitizeInput(t.description || ''),
+                depends_on: t.depends_on
+            }));
+            const childIds = await categoryTaskService.createCategoryTasks(options.currentTaskId, safeTasks);
+            output += `Successfully created ${childIds.length} category tasks. IDs: ${childIds.join(', ')}`;
+            return { output, action: 'CREATE_TASKS', childIds };
+        }
+        else if (name === 'get_next_task') {
+            const parentId = args.parent_task_id || options.currentTaskId;
+            if (!parentId) throw new Error("parent_task_id is required.");
+            // DB에서 부모의 자식 중 PENDING/TODO 중 하나를 가져옴
+            const childTasks = await dbManager.getAllTasks(options.projectId || 'proj_default');
+            const nextTask = childTasks.find(t => t.parent_task_id == parentId && (t.status === 'TODO' || t.status === 'PENDING'));
+            if (!nextTask) {
+                output += `No pending child tasks found for parent ${parentId}.`;
+            } else {
+                const safeContent = promptInjectionGuard.sanitizeInput(nextTask.content || '');
+                output += `Next Task: ID=${nextTask.id}, Category=${nextTask.category}, Title=${nextTask.title}\nContent:\n${safeContent}`;
+            }
+        }
+        else if (name === 'update_card_status') {
+            const validStatuses = ['DONE', 'BLOCKED', 'IN_PROGRESS', 'REVIEW', 'TODO'];
+            const status = (args.status || '').toUpperCase();
+            if (!validStatuses.includes(status)) throw new Error(`Invalid status: ${status}. Must be one of ${validStatuses.join(', ')}`);
+            await dbManager.updateTaskStatus(args.task_id, status);
+            output += `Successfully updated task ${args.task_id} status to ${status}.`;
+            return { output, action: 'UPDATE_STATUS', taskId: args.task_id, status };
+        }
+        else if (name === 'read_comments') {
+            const comments = await dbManager.getTaskComments(args.task_id);
+            if (!comments || comments.length === 0) {
+                output += `No comments found for task ${args.task_id}.`;
+            } else {
+                const formatted = comments.map(c => `[${c.author}]: ${promptInjectionGuard.sanitizeInput(c.content)}`).join('\n\n');
+                output += `Comments for task ${args.task_id}:\n${formatted}`;
+            }
+        }
+        else if (name === 'add_comment') {
+            await dbManager.addTaskComment(args.task_id, options.agentId || 'Task Master', args.content);
+            output += `Successfully added comment to task ${args.task_id}.`;
+        }
         else if (name === 'ask_user') {
             output += `Task paused to ask user. Question: ${args.question}`;
             return { output, action: 'PAUSE', reason: args.question };
@@ -243,6 +293,12 @@ export async function executeTool(name, args, options = {}) {
                     reject(new Error("Browser action timeout (10s)"));
                 }, 10000);
             });
+        }
+        else if (name === 'analyze_scope' || name === 'make_roadmaps' || name === 'confirm_mvp') {
+            output += `Plan Master tool ${name} executed successfully.`;
+            if (name === 'confirm_mvp') {
+                return { output, action: 'PAUSE', message_to_user: args.message_to_user };
+            }
         }
         else {
             output += `Failed: Unknown tool ${name}`;

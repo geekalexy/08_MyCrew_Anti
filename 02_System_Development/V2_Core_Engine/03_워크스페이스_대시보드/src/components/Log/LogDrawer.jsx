@@ -6,6 +6,7 @@ import { useKanbanStore } from '../../store/kanbanStore';
 import { useAgentStore } from '../../store/agentStore';
 import { useSocket } from '../../hooks/useSocket';
 import { useProjectStore } from '../../store/projectStore';
+import { useStreaming } from '../../hooks/useStreaming';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
@@ -72,9 +73,10 @@ export default function LogDrawer() {
   const [timelineComments, setTimelineComments] = useState([]); // [Fix Bug2] Timeline DB 댓글
   const [attachedImages, setAttachedImages] = useState([]); // [ImageAttach] 첨부 이미지 [{dataUrl, name}]
 
-  // ── Phase 22: Ari 스트리밍 상태 ──────────────────────────────────────────
-  const [streamingText, setStreamingText] = useState('');   // 누적 청크
-  const [isStreaming, setIsStreaming]     = useState(false); // 타이핑 중 여부
+  // ── Phase 46: SSE 스트리밍 상태 관리 ────────────────────────────────────
+  const streamingText = useChatStore((s) => s.streamingText);
+  const isStreaming = useChatStore((s) => s.isStreaming);
+  const { startStream, dangerouslyAbortStream } = useStreaming();
 
   // ── @멘션 자동완성 ────────────────────────────────────────────────────────
   const [crewList, setCrewList] = useState([]);
@@ -389,55 +391,14 @@ export default function LogDrawer() {
 
   // ── Kill 핸들러 ─────────────────────────────────────────────
   const handleKill = useCallback(() => {
+    dangerouslyAbortStream(); // 진행 중인 스트리밍 중단
     if (!focusedTask) return;
     fetch(`${SERVER_URL}/api/tasks/${focusedTask.id}/kill`, { method: 'POST' })
       .then(() => setBtnMode('send'))
       .catch(console.error);
-  }, [focusedTask]);
+  }, [focusedTask, dangerouslyAbortStream]);
 
-  // ── Phase 22: Ari Socket 스트리밍 이벤트 구독 ──────────────────────────
-  useEffect(() => {
-    const ariSocket = getAriSocket();
-
-    const onChunk = ({ text }) => {
-      setStreamingText(prev => prev + text);
-    };
-
-    const onDone = ({ fullText, error } = {}) => {
-      setIsStreaming(false);
-      setStreamingText('');
-      setBtnMode('send');
-      
-      if (fullText) {
-        useChatStore.getState().appendChat({
-          level: 'info',
-          message: fullText,
-          agentId: 'ari',
-          timestamp: new Date().toISOString(),
-          projectId: useProjectStore.getState().selectedProjectId,
-        });
-      } else if (error) {
-        useChatStore.getState().appendChat({
-          level: 'error',
-          message: error,
-          agentId: 'system',
-          timestamp: new Date().toISOString(),
-          projectId: useProjectStore.getState().selectedProjectId,
-        });
-      }
-    };
-
-
-
-
-    ariSocket.on('ari:stream_chunk', onChunk);
-    ariSocket.on('ari:stream_done', onDone);
-
-    return () => {
-      ariSocket.off('ari:stream_chunk', onChunk);
-      ariSocket.off('ari:stream_done', onDone);
-    };
-  }, []);
+  // ── Phase 46: SSE 스트리밍 이벤트는 useStreaming 훅에서 관리됨 ──────────
 
   const handleSend = useCallback(() => {
     const hasText = inputText.trim().length > 0;
@@ -543,19 +504,15 @@ export default function LogDrawer() {
           return;
         }
 
-        // Ari Socket으로 메시지 발송 → 스트리밍 응답 수신
-        setIsStreaming(true);
-        setStreamingText('');
-        // agentMeta['ari'].model → 수동 선택된 모델을 preferredModel로 전달
+        // SSE 스트리밍 통신 시작 (Phase 46-B)
         const preferredModel = agentMeta?.['ari']?.model || 'gemini-2.5-flash';
-        ariSocket.emit('ari:message', {
+        startStream(`${SERVER_URL}/api/compute`, {
           content: trimmedText || '(이미지 전송)',
-          channel: 'dashboard',
           author: 'CEO',
-          images: imageDataUrls,
           preferredModel,
           projectId: selectedProjectId,
-        });
+          images: imageDataUrls,
+        }, selectedProjectId);
 
         // 입력창 즉시 초기화 및 포커스 유지
         setInputText('');
@@ -565,7 +522,7 @@ export default function LogDrawer() {
           textareaRef.current.style.height = 'auto';
           setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
         }
-        isSendingRef.current = false; // 락 해제 (소켓 emit 완료)
+        isSendingRef.current = false; // 락 해제
         return;
       } else if (activeLogTab === 'time') {
         // [Phase 14] Timeline 탭: #번호 소환 및 전환 기능

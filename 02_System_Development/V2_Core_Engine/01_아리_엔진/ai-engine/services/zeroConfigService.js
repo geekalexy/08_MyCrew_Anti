@@ -179,15 +179,13 @@ ${MODEL_GUIDE}
       broadcast(`[1/5] Gemini 3 Flash가 프로젝트를 분석하고 팀을 구성 중입니다...`);
       console.log('[Zero-Config] 1-Stage 가동 (Gemini 3 Flash — 원샷 팀빌딩)...');
 
-      const response = await antigravityAdapter.generateResponse(
-        '프로젝트를 분석하고 최적의 팀 구성과 JSON 스캐폴드를 생성해주세요.',
+      const response = await geminiAdapter.generateResponse(
         singleStagePrompt,
-        'team_builder_gemini',
-        MODEL.ANTI_GEMINI_FLASH,
-        TEAM_BUILDER_TIMEOUT_MS  // 2분 타임아웃
+        '당신은 최고 수준의 AI 팀 빌더입니다. 반드시 순수 JSON만 반환하세요.',
+        MODEL.FLASH // gemini-2.5-flash 직접 API 호출 (브릿지 대기 지연 제거)
       );
 
-      const rawText = response.text || response.result;
+      const rawText = response.text || response.result || '';
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('JSON 파싱 실패 (1-Stage 응답에 JSON 블록 없음)');
 
@@ -195,7 +193,7 @@ ${MODEL_GUIDE}
       broadcast(`[2/5] 팀 구성 완료. 정책 검증 중입니다...`);
 
     } catch (err) {
-      console.warn(`[Zero-Config] 브릿지 1-Stage 실패 (${err.message}). Gemini API 직접 Fallback 가동...`);
+      console.warn(`[Zero-Config] 1-Stage 팀빌딩 실패 (${err.message}). Fallback 재시도 가동...`);
 
       // 🚀 Fallback: Gemini API 직접 호출 (브릿지 무관 — 항상 성공 보장)
       broadcast(`[1/5] 브릿지 연결 실패. Gemini API로 직접 팀 구성 중입니다...`);
@@ -234,6 +232,7 @@ ${MODEL_GUIDE}
     // ─── [ADVISOR-FIX] 개발 프로젝트 dev_advisor 강제 포함 ──────────────
     const isDevProject = (isolation_scope?.type === 'strict_isolation')
       || planData.assigned_crew.some(c => (c.agent_id || '').startsWith('dev_'));
+    const isMktProject = planData.assigned_crew.some(c => (c.agent_id || '').startsWith('mkt_'));
     const hasAdvisor = planData.assigned_crew.some(c => c.agent_id === 'dev_advisor');
 
     if (isDevProject && !hasAdvisor) {
@@ -307,10 +306,11 @@ ${MODEL_GUIDE}
     }
 
     // ─── [PLAN MASTER FIX] 프로젝트 생성 시 무조건 단일 기획 카드 1개만 생성 (Plan Mode) ────────
+    // 사용자의 상세 요구사항(부가기능 포함)이 첫 카드의 요구사항(prompt)으로 통합됩니다.
     planData.initial_tasks = [
       {
         title: '[기획] v1.0 MVP 로드맵',
-        content: '채팅창에 초기 아이디어를 한 줄 남겨주시면, Plan Master가 PRD 문서를 도출합니다.',
+        content: `아래 사용자가 입력한 [프로젝트 유형] 및 [기능 목록]을 바탕으로,\n이 프로젝트의 첫 번째 PRD(기획서)와 MVP 로드맵을 작성해 주세요.\n\n**[초기 요구사항 원문]**\n${objective}`,
         assignee: isDevProject ? 'dev_senior' : 'mkt_lead',
         mode: 'ARCHITECT'
       }

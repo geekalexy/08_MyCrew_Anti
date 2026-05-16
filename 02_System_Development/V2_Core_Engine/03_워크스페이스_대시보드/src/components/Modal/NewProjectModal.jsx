@@ -207,9 +207,8 @@ export default function NewProjectModal({ isOpen, onClose, initialValues = null 
           </div>
           <button
             onClick={onClose}
-            disabled={isSubmitting}
             aria-label="닫기"
-            style={{ background: 'none', border: 'none', cursor: isSubmitting ? 'not-allowed' : 'pointer', color: 'var(--text-muted)', display: 'flex', opacity: isSubmitting ? 0.3 : 1 }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', opacity: 1 }}
           >
             <span className="material-symbols-outlined" style={{ fontSize: '1.4rem' }}>close</span>
           </button>
@@ -441,7 +440,9 @@ export default function NewProjectModal({ isOpen, onClose, initialValues = null 
 
         {/* 푸터 */}
         <div style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', background: 'var(--bg-surface-2)', borderRadius: '0 0 12px 12px' }}>
-          <button type="button" onClick={onClose} disabled={isSubmitting} className="modal-btn modal-btn--ghost">취소</button>
+          <button type="button" onClick={onClose} className="modal-btn modal-btn--ghost">
+            {isSubmitting ? '백그라운드로 숨기기' : '취소'}
+          </button>
           <button
             type="submit"
             form="new-project-form"

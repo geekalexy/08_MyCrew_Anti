@@ -36,7 +36,14 @@ const CRITICAL_KEYWORDS = [
 
 function classifyRiskLevel(content) {
   const lower = content.toLowerCase();
-  return CRITICAL_KEYWORDS.some((kw) => lower.includes(kw)) ? 'CRITICAL' : 'SAFE';
+  return CRITICAL_KEYWORDS.some((kw) => {
+    // 영어 키워드는 단어 단위로 매칭 (예: 'rm'이 'crm'에 매칭되는 것 방지)
+    if (/^[a-z]+$/.test(kw)) {
+      return new RegExp(`\\b${kw}\\b`, 'i').test(lower);
+    }
+    // 한글 등은 단순 포함 여부
+    return lower.includes(kw);
+  }) ? 'CRITICAL' : 'SAFE';
 }
 
 db.serialize(() => {

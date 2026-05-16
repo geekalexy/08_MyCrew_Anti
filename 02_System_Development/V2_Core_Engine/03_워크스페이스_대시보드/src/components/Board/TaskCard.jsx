@@ -282,26 +282,7 @@ export default function TaskCard({ task, isDragging }) {
           </div>
         )}
 
-        {/* [S2-3] CRITICAL 위험 배지 — 점 대신 명확한 경고 텍스트 */}
-        {task.riskLevel === 'CRITICAL' && (
-          <span
-            title="위험 키워드 포함 — 실행 전 승인 필요"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '0.15rem',
-              fontSize: '0.6rem', fontWeight: 700,
-              fontFamily: 'Space Grotesk, sans-serif',
-              color: '#ffb4ab',
-              background: 'rgba(255,82,82,0.08)',
-              border: '1px solid rgba(255,82,82,0.2)',
-              borderRadius: '3px', padding: '0px 4px',
-              letterSpacing: '0.04em', marginLeft: 'auto',
-            }}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: '0.65rem' }}>warning</span>
-            CRITICAL
-          </span>
-        )}
-
+        {/* CRITICAL 배지는 TaskDetailModal로 이동됨 */}
       </div>
     </div>
   );

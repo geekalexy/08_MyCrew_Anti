@@ -268,9 +268,16 @@ export default function App() {
               <p className="board-header__subtitle" style={{ marginTop: '0.3rem' }}>
                 {(() => {
                   if (!selectedProject) return 'AI 에이전트가 실시간으로 작업을 처리하고 있습니다';
-                  const flow = selectedProject.workflow_raw
+                  let flow = selectedProject.workflow_raw
                     || (selectedProject.objective || '').split('[업무 흐름]')[1]?.trim()
                     || (selectedProject.objective || '').split('[업무 흐름]')[0].replace('[목적]', '').trim();
+                  if (flow) {
+                    flow = flow.replace(/\[프로젝트 유형\][\s\S]*?\[원하는 기능 목록\]\s*/, '');
+                    flow = flow.split('\n')[0].trim();
+                    if (flow.length > 120) {
+                      flow = flow.substring(0, 120) + '...';
+                    }
+                  }
                   return flow || '업무 흐름을 설정해 주세요';
                 })()} 
               </p>

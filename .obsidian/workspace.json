@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "04_Users/01_Company/01_Projects/마케팅_84752/socian-wiki-main/rows/socian_alimtalk_crm_plan.md",
+                "file": "04_Users/01_Company/01_Projects/CRM개발_79295/OUTPUT/crm_architecture_design.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "socian_alimtalk_crm_plan"
+              "title": "crm_architecture_design"
             }
           }
         ]
@@ -78,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 200
+    "width": 243.5
   },
   "right": {
     "id": "059d9fc041525dd8",
@@ -183,6 +183,13 @@
   },
   "active": "9f3e127f9bdc6424",
   "lastOpenFiles": [
+    "04_Users/01_Company/01_Projects/CRM개발_79295/OUTPUT/index.html",
+    "04_Users/01_Company/01_Projects/CRM개발_79295/Project_WIKI/raw/meetings/2026-05-16_Task1777811330668128_회의록.md",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/database.sqlite-journal",
+    "02_System_Development/V2_Core_Engine/01_아리_엔진/skill-library/00_team/proj-1778941779295_GROUND_RULES.md",
+    "04_Users/01_Company/01_Projects/CRM개발_79295/OUTPUT/crm_prd_updated.md",
+    "04_Users/01_Company/01_Projects/CRM개발_79295/OUTPUT/crm_architecture_design.md",
+    "04_Users/01_Company/01_Projects/마케팅_84752/socian-wiki-main/rows/socian_alimtalk_crm_plan.md",
     "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-14_Sonnet_Phase44-3_QA.md",
     "02_System_Development/_SESSION_LOGS/SESSION_LOG_2026-05-14_Luca_Phase44-3_QA_Fixes.md",
     "05_My_history/Sonnet/ESSAY_20260514_Sonnet_관찰기록.md",
@@ -200,7 +207,6 @@
     "02_System_Development/04_Users/01_Company",
     "02_System_Development/04_Users",
     "02_System_Development/V2_Core_Engine/00_아키텍처_문서/리뷰_아카이브/49_Phase44_3_AutoQA_Code_SupremeReview_Prime.md",
-    "02_System_Development/V2_Core_Engine/01_아리_엔진/sync_folders2.js",
     "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/03_Skills/repetitive_tasks.md",
     "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/03_Skills/heavy_analysis.md",
     "02_System_Development/04_Users/01_Company/01_Projects/마케팅_84752/02_Team/team_roster.md",
@@ -213,12 +219,6 @@
     "04_Users/01_Company/01_Projects/미니앱_개발_20096/03_Skills/strict_isolation_arch.md",
     "04_Users/01_Company/01_Projects/미니앱_개발_20096/03_Skills/interactive_timeline_ux.md",
     "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/team_roster.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_ux_ux_designer_persona.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_senior_senior_dev_persona.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_qa_qa_engineer_persona.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_fullstack_fullstack_dev_persona.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/02_Team/dev_advisor_advisor_persona.md",
-    "04_Users/01_Company/01_Projects/미니앱_개발_20096/01_Memory/user_memory.md",
     "07_MyCrew_Wiki/raw/스크린샷 2026-05-10 오전 10.57.09.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778052368882.png",
     "02_System_Development/01_아리_엔진/outputs/ig_poc_socian_official_1778050952157.png",

@@ -105,15 +105,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* 지식베이스 허브 (Knowledge Hub / Archive) - Phase 40 */}
-        <button
-          className={`sidebar__nav-item ${currentView === 'archive' ? 'sidebar__nav-item--active' : ''}`}
-          onClick={() => handleNavClick('archive')}
-        >
-          <span className="material-symbols-outlined sidebar__nav-icon" style={{ fontVariationSettings: currentView === 'archive' ? "'FILL' 1" : "'FILL' 0" }}>inventory_2</span>
-          Knowledge Hub
-          <span style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: 'rgba(180,197,255,0.15)', color: 'var(--brand)', fontFamily: 'Space Grotesk', letterSpacing: '0.04em', marginLeft: '2px' }}>NEW</span>
-        </button>
 
         {/* Image Lab */}
         <button

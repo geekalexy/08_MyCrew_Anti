@@ -10,7 +10,6 @@ import remarkGfm from 'remark-gfm';
 import { renderTaggedText, renderChainRefText } from '../../utils/TagRenderer';
 import { useContextChain, extractChainRefs } from '../../hooks/useContextChain';
 import ContextChainPanel from './ContextChainPanel';
-import PlanMasterModal from './PlanMasterModal';
 import CategoryPreviewModal from './CategoryPreviewModal'; // [Phase 43-6] Task Master Dry-Run 프리뷰
 
 // ── [CKS] 워크플로우 타임라인 컴포넌트 ─────────────────────────────────
@@ -336,22 +335,7 @@ export default function TaskDetailModal() {
     setTimeout(() => setToastMsg(''), duration);
   }, []);
 
-  const checkAutoFallback = () => {
-    if (!task?.content || task.content.trim().length < 5) {
-      if (['DEV', 'QA', 'DEBUG'].includes(task?.mode)) {
-        patchTask(task.id, { mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking)' });
-        fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode: 'ARCHITECT', model: 'Claude Opus 4.6 (Thinking)' })
-        }).catch(console.error);
-        
-        showToast('📋 상세 내용이 없어 기획 모드로 자동 전환되었습니다.');
-        return 'ARCHITECT';
-      }
-    }
-    return task?.mode || 'DEV';
-  };
+
   
   // [Phase 39] 통합 UI 모드/모델 상태
   const [isCommentExpanded, setIsCommentExpanded] = useState(false);
@@ -367,8 +351,6 @@ export default function TaskDetailModal() {
   const [isArchived, setIsArchived] = useState(false); // 아카이빙 완료 상태 (API 호출 후 모달 유지)
   const [isExpanded, setIsExpanded] = useState(false); // 노션 스타일 확장 뷰 토글
   const [copiedCommentIdx, setCopiedCommentIdx] = useState(null); // [Phase 36b] 복사 피드백 상태
-  // [Plan Master Fix] ARCHITECT 모드 실행 시 PlanMasterModal 제어
-  const [showPlanMasterModal, setShowPlanMasterModal] = useState(false);
 
   // [Phase 43-6] Task Master Branching 상태
   const [showCategoryPreview, setShowCategoryPreview] = useState(false);
@@ -460,7 +442,7 @@ export default function TaskDetailModal() {
     } else if (s === 'REVIEW') {
       return allModes.filter(m => ['NONE', 'QA', 'DEBUG'].includes(m.value));
     } else if (s === 'DONE' || s === 'COMPLETED' || s === 'FINALIZED' || s === 'ARCHIVED') {
-      return allModes.filter(m => ['NONE'].includes(m.value));
+      return allModes.filter(m => ['NONE', 'DEV', 'DEBUG'].includes(m.value));
     }
     return allModes;
   };
@@ -577,18 +559,6 @@ export default function TaskDetailModal() {
     };
     socket.on('task:comment_added', handler);
     return () => socket.off('task:comment_added', handler);
-  }, [socket, activeDetailTaskId]);
-
-  // [Phase 39-3] Plan Master 트리거 수신 (Zero-Command UX)
-  useEffect(() => {
-    if (!socket || !activeDetailTaskId) return;
-    const onPlanMasterTrigger = ({ taskId }) => {
-      if (String(taskId) === String(activeDetailTaskId)) {
-        setShowPlanMasterModal(true);
-      }
-    };
-    socket.on('plan-master:trigger', onPlanMasterTrigger);
-    return () => socket.off('plan-master:trigger', onPlanMasterTrigger);
   }, [socket, activeDetailTaskId]);
 
   // [Phase 43-6] Branching 소켓 이벤트 구독 — 상태 표시 전용
@@ -906,7 +876,7 @@ export default function TaskDetailModal() {
     if (!commentText.trim() || !task) return;
 
     const trimmedText = commentText.trim();
-    const finalMode = checkAutoFallback();
+    const finalMode = task.mode || 'NONE';
 
     let finalColumn = commentColumn === 'NO_CHANGE' ? task.column : commentColumn;
     const finalPriority = commentPriority === 'NO_CHANGE' ? task.priority : commentPriority;
@@ -1016,16 +986,9 @@ export default function TaskDetailModal() {
       alert('담당자를 먼저 지정해주세요.');
       return;
     }
-    const finalMode = checkAutoFallback();
+    const finalMode = task.mode || 'NONE';
 
-    // [Bug 3 Fix] ARCHITECT 모드: Plan Master 전용 기획 파이프라인 실행
-    // → PlanMasterModal 오픈 (1차 Sonnet 분석 → 2차 Opus 로드맵 생성 → 백로그 카드 자동 생성)
-    if (finalMode === 'ARCHITECT') {
-      setShowPlanMasterModal(true);
-      return;
-    }
-
-    // 그 외 모드: /api/tasks/:id/run 엔드포인트로 모드 기반 실행 (Zero-Command Router)
+    // /api/tasks/:id/run 엔드포인트로 모드 기반 실행 (Zero-Command Router)
     setIsStarting(true);
     fetch(`${SERVER_URL}/api/tasks/${task.id}/run`, {
       method: 'POST',
@@ -1122,6 +1085,25 @@ export default function TaskDetailModal() {
                 fontSize: '0.76rem', fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700,
                 letterSpacing: '0.08em', color: 'var(--text-muted)' 
               }}>Task #{task.project_task_num != null ? task.project_task_num : String(task.id).slice(-6)}</span>
+              
+              {task.riskLevel === 'CRITICAL' && (
+                <span
+                  title="위험 키워드 포함 — 특별 관심 대상"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                    fontSize: '0.65rem', fontWeight: 700,
+                    fontFamily: 'Space Grotesk, sans-serif',
+                    color: '#4dabf7', // 블루 계열
+                    background: 'rgba(77, 171, 247, 0.1)',
+                    border: '1px solid rgba(77, 171, 247, 0.2)',
+                    borderRadius: '4px', padding: '1px 6px',
+                    letterSpacing: '0.04em',
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '0.7rem' }}>info</span>
+                  CRITICAL
+                </span>
+              )}
              </div>
             {isEditing ? (
               <input 
@@ -1511,7 +1493,12 @@ export default function TaskDetailModal() {
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap', padding: '0.6rem 0.8rem', background: 'var(--bg-surface-2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flex: 1, minWidth: '130px' }}>
-              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>모드 (Mode)</label>
+              <label 
+                style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, cursor: 'help' }}
+                title="카드 상태에 따라 선택 가능한 모드가 제한됩니다. (완료된 카드에서도 후속 작업을 위해 개발/디버그 모드 선택 가능)"
+              >
+                모드 (Mode) ⓘ
+              </label>
               <select
                 value={task.mode || 'NONE'}
                 onChange={(e) => {
@@ -1864,9 +1851,21 @@ export default function TaskDetailModal() {
               </div>
             ) : (
               // 정적 레이블
-              <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>rocket_launch</span>
-                [ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]
+              <div style={{ marginBottom: '16px', padding: '8px 14px', background: 'rgba(46, 204, 113, 0.1)', color: '#2ecc71', borderRadius: '6px', fontSize: '0.88rem', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>rocket_launch</span>
+                  <span>[ /auto_run : 태스크 기반 자율 연속 파이프라인 실행 ]</span>
+                </div>
+                <button
+                  onClick={handleStartTask}
+                  disabled={isStarting}
+                  style={{
+                    background: 'rgba(46, 204, 113, 0.15)', border: '1px solid rgba(46, 204, 113, 0.4)', color: '#2ecc71', borderRadius: '4px', padding: '4px 12px', fontSize: '0.8rem', fontWeight: 700, cursor: isStarting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: isStarting ? 0.6 : 1
+                  }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>{isStarting ? 'hourglass_empty' : 'play_arrow'}</span>
+                  {isStarting ? '실행중...' : '실행'}
+                </button>
               </div>
             )
           )}
@@ -2649,7 +2648,7 @@ export default function TaskDetailModal() {
                   disabled={
                     isArchived ||
                     commentColumn === 'archive' ||
-                    (!commentText.trim() && Object.keys(task).length > 0 && commentColumn === task.column && commentAssignee === task.assignee && commentPriority === task.priority)
+                    !commentText.trim()
                   }
                   style={{
                     background: 'var(--brand-dim, #2668ff)', color: '#ffffff', border: 'none', borderRadius: '8px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 700, fontFamily: 'Space Grotesk, sans-serif', transition: 'all 0.18s ease', letterSpacing: '0.02em', boxShadow: '0 2px 8px rgba(38,104,255,0.35)',
@@ -2985,26 +2984,6 @@ export default function TaskDetailModal() {
           <span className="material-symbols-outlined" style={{ color: 'var(--brand)', fontSize: '1.2rem' }}>info</span>
           {toastMsg}
         </div>
-      )}
-
-      {/* [Bug 3 Fix] ARCHITECT 모드 실행 시 Plan Master 기획 파이프라인 전용 모달 */}
-      {showPlanMasterModal && task && (
-        <PlanMasterModal
-          projectId={task.projectId || task.project_id}
-          taskId={task.id}
-          onClose={() => setShowPlanMasterModal(false)}
-          onSubmit={(roadmap) => {
-            // 기획 완료 → 현재 태스크를 REVIEW로 이동 (CEO 검토 요청)
-            setShowPlanMasterModal(false);
-            patchTask(task.id, { column: 'review', status: 'REVIEW' });
-            fetch(`${SERVER_URL}/api/tasks/${task.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ column: 'review' }),
-            }).catch(console.error);
-            showToast(`✅ Plan Master 기획 완료! ${roadmap?.mvp_tasks?.length || 0}개 MVP 카드가 백로그에 생성되었습니다.`);
-          }}
-        />
       )}
 
       {/* [Phase 43-6] Task Master Dry-Run 프리뷰 모달 */}

@@ -146,6 +146,14 @@ export function useStreaming() {
       } else {
         console.error('[SSE] 스트림 에러:', err);
         setStreamingState(false);
+        // [Fix] Fetch 에러나 HTTP 500 에러 발생 시 UI에 에러 버블 표시
+        appendChat({
+          level: 'error',
+          message: `스트림 연결에 실패했습니다: ${err.message}`,
+          agentId: 'system',
+          timestamp: new Date().toISOString(),
+          projectId,
+        });
       }
     } finally {
       clearToolTimeout();

@@ -207,6 +207,7 @@ export default function KanbanBoard() {
         {[
           { key: 'kanban', icon: 'view_kanban', label: '칸반 보드' },
           { key: 'graph',  icon: 'account_tree', label: '지식 그래프' },
+          { key: 'archive', icon: 'inventory_2', label: '아카이브' },
         ].map(tab => (
           <button
             key={tab.key}
@@ -322,13 +323,9 @@ export default function KanbanBoard() {
             </button>
           )}
           <div style={{ marginLeft: 'auto' }}>
-            <button
-              onClick={() => useUiStore.getState().setCurrentView('archive')}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.3rem 0.8rem', background: 'var(--surface-100)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: '1rem' }}>inventory_2</span>
-              아카이브 ({archivedTasks.length})
-            </button>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              완료된 업무는 아카이브 탭에서 확인하세요
+            </span>
           </div>
         </div>
       )}
@@ -365,6 +362,53 @@ export default function KanbanBoard() {
     </DndContext>
 
       </div>{/* 칸반 뷰 wrapper 닫기 */}
+
+      {/* [Phase B] 아카이브 뷰 */}
+      {mainTab === 'archive' && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '1rem' }}>
+          {archivedTasks.length === 0 ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '3rem', opacity: 0.3, marginBottom: '1rem' }}>inventory_2</span>
+              <p>아직 아카이브된 Task가 없습니다.</p>
+            </div>
+          ) : (
+            <div className="glass-panel" style={{ background: 'var(--bg-surface-1)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>#ID</th>
+                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>타이틀</th>
+                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>담당</th>
+                    <th style={{ padding: '0.75rem 1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>결과</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedTasks.map((task) => (
+                    <tr 
+                      key={task.id} 
+                      onClick={() => useUiStore.getState().setActiveDetailTaskId(task.id)}
+                      style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                      onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-50)'}
+                      onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.85rem' }}>#{task.id}</td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.9rem', fontWeight: 500 }}>{task.title || task.content}</td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span className={`exec-badge exec-badge--${task.executionMode || 'ari'}`}>
+                          {task.executionMode === 'omo' ? 'Dev Team' : 'Ari'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem' }}>
+                        <span className="status-badge" style={{ backgroundColor: '#F59E0B', color: '#fff', border: 'none', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>📦 ARCHIVED</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

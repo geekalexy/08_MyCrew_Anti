@@ -12,7 +12,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { scrubContent } from '../../utils/scrubContent'; // [S1-4]
 import { renderMarkdown } from '../../utils/markdownRenderer'; // [S1-4] 타임라인 마크다운
-import PlanMasterModal from '../Modal/PlanMasterModal';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:4010';
 
@@ -102,7 +101,6 @@ export default function LogDrawer() {
   const [mentionQuery, setMentionQuery]       = useState('');   // @뒤 타이핑 중인 키워드
   const [showMention, setShowMention]         = useState(false); // 드롭다운 표시 여부
 
-  const [showPlanMasterModal, setShowPlanMasterModal] = useState(false);
   const [mentionedAgent, setMentionedAgent]   = useState(null);  // 최종 선택된 에이전트
   const mentionRef = useRef(null);
 
@@ -413,13 +411,15 @@ export default function LogDrawer() {
     const trimmedText = inputText.trim();
     setShowMention(false); // 전송 시 멘션 드롭다운 닫기
 
-    if (trimmedText === '/plan-master') {
-      setShowPlanMasterModal(true);
-      setBtnMode('send'); isSendingRef.current = false; setInputText('');
-      return;
+    // [Fix] 즉시 텍스트 클리어 (Optimistic UI)
+    setInputText('');
+    setAttachedImages([]);
+    setMentionedAgent(null);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
     }
-
-
+    
     // ── [Phase 32] 버그독 커맨드 인터셉트 (타임라인 휘발 방지) ────────────
     if (trimmedText.startsWith('/bugdog기록')) {
       const projectId = selectedProjectId;
@@ -428,7 +428,7 @@ export default function LogDrawer() {
           level: 'error', message: '프로젝트를 먼저 선택해주세요.',
           agentId: 'system', timestamp: new Date().toISOString(),
         });
-        setBtnMode('send'); isSendingRef.current = false; setInputText('');
+        setBtnMode('send'); isSendingRef.current = false;
         return;
       }
       const ariSocket = getAriSocket();
@@ -438,8 +438,6 @@ export default function LogDrawer() {
         author: 'CEO',
         projectId,
       });
-      setInputText('');
-      if (textareaRef.current) textareaRef.current.style.height = 'auto';
       isSendingRef.current = false;
       return;
     }
@@ -458,6 +456,14 @@ export default function LogDrawer() {
       const resolvedAgent = mentionedAgent
         || (mentionInText ? mentionInText[1].toLowerCase() : null);
 
+      // [Phase 46] Optimistic Update: 타임라인 화면에 텍스트가 바로 나타나도록 선 반영
+      setTimelineComments(prev => [...prev, {
+        taskId: focusedTask.id,
+        author: 'CEO',
+        content: commentContent,
+        created_at: new Date().toISOString()
+      }]);
+
       fetchPromise = fetch(`${SERVER_URL}/api/tasks/${focusedTask.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -474,20 +480,18 @@ export default function LogDrawer() {
         // ── [Phase 22 Sprint 1] fetch → Socket 스트리밍 교체 ──────────────
         // HTTP REST /api/chat (블로킹, 10초 대기) 완전 폐기
 
-        // [ImageAttach] 이미지가 있는 경우에만 Optimistic append
-        // - 텍스트 전용: 서버 broadcastLog(log:append)가 버블 생성 → 클라이언트 추가 불필요
-        // - 이미지 포함: 서버는 broadcast 스킵(base64 데이터 없음) → 클라이언트가 직접 추가
-        if (imageDataUrls.length > 0) {
-          const imageMarkdown = imageDataUrls.map(u => `![image](${u})`).join('\n');
-          const fullMessage = [trimmedText, imageMarkdown].filter(Boolean).join('\n');
-          useChatStore.getState().appendChat({
-            level: 'info',
-            message: fullMessage,
-            agentId: 'CEO',
-            timestamp: new Date().toISOString(),
-            projectId: selectedProjectId,
-          });
-        }
+        // [Phase 46] SSE 스트리밍 통신으로 전환되며 서버 측의 log:append 브로드캐스트가 더 이상 CEO 입력 텍스트를 반환하지 않습니다.
+        // 따라서 클라이언트(UI) 단에서 이미지 유무와 관계없이 무조건 즉시(Optimistic) 채팅 버블을 생성해야 텍스트가 휘발되지 않습니다.
+        const imageMarkdown = imageDataUrls.length > 0 ? imageDataUrls.map(u => `![image](${u})`).join('\n') : '';
+        const fullMessage = [trimmedText, imageMarkdown].filter(Boolean).join('\n');
+        
+        useChatStore.getState().appendChat({
+          level: 'info',
+          message: fullMessage,
+          agentId: 'CEO',
+          timestamp: new Date().toISOString(),
+          projectId: selectedProjectId,
+        });
 
         const ariSocket = getAriSocket();
         
@@ -514,14 +518,6 @@ export default function LogDrawer() {
           images: imageDataUrls,
         }, selectedProjectId);
 
-        // 입력창 즉시 초기화 및 포커스 유지
-        setInputText('');
-        setAttachedImages([]);
-        setMentionedAgent(null); // 전송 후 멘션 초기화
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
-        }
         isSendingRef.current = false; // 락 해제
         return;
       } else if (activeLogTab === 'time') {
@@ -562,15 +558,6 @@ export default function LogDrawer() {
     fetchPromise = fetchPromise || Promise.resolve();
 
     fetchPromise
-      .then(() => {
-        setInputText('');
-        setAttachedImages([]);
-        setMentionedAgent(null);
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          setTimeout(() => { if (textareaRef.current) textareaRef.current.focus(); }, 0);
-        }
-      })
       .catch(console.error)
       .finally(() => {
         isSendingRef.current = false; // 락 해제
@@ -981,7 +968,8 @@ export default function LogDrawer() {
                       // [S2-2] 소켓 상태가 'active'이거나 column이 in_progress이면 표시
                       const agentKey = t.assignee.toLowerCase();
                       const socketActive = agentStates[agentKey]?.status === 'active';
-                      return t.column === 'in_progress' && socketActive;
+                      // [Phase 46] MCP 자율 루프 환경에서는 소켓 액티브 상태와 무관하게 IN_PROGRESS 칼럼이면 진행 중으로 간주
+                      return t.column === 'in_progress';
                     });
 
                     return activeTasks.map(t => {
@@ -1480,42 +1468,6 @@ export default function LogDrawer() {
           </div>
         </div>
       </aside>
-
-      {showPlanMasterModal && (
-        <PlanMasterModal 
-          projectId={selectedProjectId}
-          taskId={selectedTaskId}
-          onClose={() => setShowPlanMasterModal(false)}
-          onSubmit={async (data) => {
-            useTimelineStore.getState().appendTimeline({
-              level: 'info', message: '✅ 초기 스코프 확정. MVP 로드맵 및 지식그래프 생성을 시작합니다.',
-              agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
-            });
-            try {
-              const res = await fetch(`${SERVER_URL}/api/projects/${selectedProjectId}/plan-master/generate-roadmaps`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data) // must_have, nice_to_have, thought 등 포함
-              });
-              const roadmapData = await res.json();
-              
-              if (res.ok) {
-                useTimelineStore.getState().appendTimeline({
-                  level: 'info', message: `🚀 기획 종료 (컨펌 대기): ${roadmapData.message_to_user}`,
-                  agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
-                });
-              } else {
-                throw new Error(roadmapData.error || '로드맵 생성 실패');
-              }
-            } catch(e) {
-              useTimelineStore.getState().appendTimeline({
-                level: 'error', message: `❌ 로드맵 생성 중 오류: ${e.message}`,
-                agentId: 'system', timestamp: new Date().toISOString(), projectId: selectedProjectId,
-              });
-            }
-          }}
-        />
-      )}
     </>
   );
 }

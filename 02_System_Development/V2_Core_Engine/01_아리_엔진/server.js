@@ -3553,114 +3553,15 @@ app.post('/api/projects/:id/plan-master/analyze', async (req, res) => {
  * [Phase 39-1] POST /api/projects/:id/plan-master/generate-roadmaps — 로드맵 생성 및 칸반 카드/백로그 업데이트
  */
 app.post('/api/projects/:id/plan-master/generate-roadmaps', async (req, res) => {
-  const { id: projectId } = req.params;
-  const { must_have, nice_to_have, feedback } = req.body;
   try {
-    broadcastLog('info', `[Plan Master] MVP 로드맵 생성 중...`, 'system', null, 'DASHBOARD', projectId);
-    
-    let thoughtNumber = 1;
-    let nextThoughtNeeded = true;
-    let accumulatedThoughts = [];
-    let mvp_tasks = [];
-    let future_scope = [];
-
-    // 1. make_roadmaps 단계 루프
-    while (nextThoughtNeeded && thoughtNumber <= 5) {
-      io.emit('plan-master:thinking', { projectId, thoughtNumber, status: '로드맵 구성 중...' });
-      const systemPrompt1 = `당신은 최상위 Product Manager인 Plan Master입니다.
-이전 분석 단계에서 확정된 스코프는 다음과 같습니다:
-- 필수(Must-have): ${must_have ? must_have.join(', ') : '없음'}
-- 확장(Nice-to-have): ${nice_to_have ? nice_to_have.join(', ') : '없음'}
-사용자 피드백: ${feedback || '없음'}
-
-현재까지의 사고 과정:
-${accumulatedThoughts.join('\\n')}
-
-Sequential Thinking을 통해 기능을 태스크로 분할하십시오. 
-반드시 아래 스키마에 맞는 순수 JSON 객체만 반환하십시오.
-{
-  "thought": "로드맵을 구성하는 사고 과정...",
-  "thoughtNumber": ${thoughtNumber},
-  "nextThoughtNeeded": true/false,
-  "mvp_tasks": ["상품 목록 조회 개발", "장바구니 API 연동"], // 결론이 났을 때만
-  "future_scope": ["위시리스트", "상품 추천 AI"] // 결론이 났을 때만
-}`;
-      const prompt1 = thoughtNumber === 1 ? "로드맵 구성을 시작하십시오." : "추가 사고를 진행하십시오.";
-      const result1 = await antigravityAdapter.generateResponse(
-        prompt1, systemPrompt1, 'opus', 'anti-claude-opus-4.6-thinking', 3 * 60 * 1000, [{ name: 'make_roadmaps' }]
-      );
-      try {
-        const parsed1 = JSON.parse(result1.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
-        if (parsed1.thought) accumulatedThoughts.push(`[Step ${thoughtNumber}] ${parsed1.thought}`);
-        io.emit('plan-master:thought_update', { projectId, taskId: req.body.taskId, thoughtNumber, thought: parsed1.thought, nextThoughtNeeded: parsed1.nextThoughtNeeded });
-        
-        nextThoughtNeeded = parsed1.nextThoughtNeeded === true;
-        if (!nextThoughtNeeded) {
-            mvp_tasks = parsed1.mvp_tasks || [];
-            future_scope = parsed1.future_scope || [];
-        }
-        thoughtNumber++;
-      } catch (e) {
-        console.warn('[Plan Master] 로드맵 JSON 파싱 실패');
-        mvp_tasks = must_have || ["기본 기능 구현"];
-        future_scope = nice_to_have || [];
-        break;
-      }
-    }
-
-    // 2. confirm_mvp 단계 루프 (사용자 브리핑 메시지 작성)
-    let confirmThoughtNum = 1;
-    let confirmNext = true;
-    let message_to_user = "";
-
-    while (confirmNext && confirmThoughtNum <= 3) {
-      io.emit('plan-master:thinking', { projectId, thoughtNumber: confirmThoughtNum, status: '브리핑 작성 중...' });
-      const systemPrompt2 = `당신은 최상위 Product Manager입니다.
-도출된 태스크: MVP(${mvp_tasks.join(', ')}), Future(${future_scope.join(', ')})
-
-사용자에게 보고할 최종 브리핑 메시지를 작성하십시오. JSON 형식만 반환하세요.
-{
-  "thought": "보고 메시지 구성 의도...",
-  "thoughtNumber": ${confirmThoughtNum},
-  "nextThoughtNeeded": true/false,
-  "message_to_user": "최소 스펙인 결제 및 장바구니 기능으로 2주 내 런칭 가능한 MVP 로드맵을 설계했습니다. 진행할까요?"
-}`;
-      const prompt2 = confirmThoughtNum === 1 ? "최종 보고 메시지를 작성하십시오." : "메시지 작성을 계속하십시오.";
-      const result2 = await antigravityAdapter.generateResponse(
-        prompt2, systemPrompt2, 'opus', 'anti-claude-opus-4.6-thinking', 2 * 60 * 1000, [{ name: 'confirm_mvp' }]
-      );
-      try {
-        const parsed2 = JSON.parse(result2.text.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim());
-        if (parsed2.thought) accumulatedThoughts.push(`[Confirm Step ${confirmThoughtNum}] ${parsed2.thought}`);
-        io.emit('plan-master:thought_update', { projectId, taskId: req.body.taskId, thoughtNumber: confirmThoughtNum, thought: parsed2.thought, nextThoughtNeeded: parsed2.nextThoughtNeeded });
-        
-        confirmNext = parsed2.nextThoughtNeeded === true;
-        if (!confirmNext) {
-            message_to_user = parsed2.message_to_user || "MVP 로드맵 생성을 완료했습니다. 진행할까요?";
-        }
-        confirmThoughtNum++;
-      } catch (e) {
-        message_to_user = "MVP 로드맵 생성을 완료했습니다. 진행할까요?";
-        break;
-      }
-    }
-
-    const createdIds = [];
-    if (mvp_tasks.length > 0) {
-      for (const taskTitle of mvp_tasks) {
-        const tId = await dbManager.createTask(taskTitle, taskTitle, 'plan_master', null, 'dev_senior', 'BACKLOG', projectId);
-        if (tId) createdIds.push(String(tId));
-      }
-    }
-    if (future_scope.length > 0) {
-      for (const taskTitle of future_scope) {
-        const tId = await dbManager.createTask(`[확장 버전] ${taskTitle}`, taskTitle, 'plan_master', null, null, 'BACKLOG', projectId);
-        if (tId) createdIds.push(String(tId));
-      }
-    }
-    io.to(`project_${projectId}`).emit('task:bulk_created', { projectId, taskIds: createdIds, count: createdIds.length });
-
-    res.json({ status: 'success', mvp_tasks, future_scope, message_to_user });
+    // [Phase 45-B] God Route 제거: 모든 로직이 runPlanMasterLoop (analyze_scope -> make_roadmaps -> confirm_mvp) 로 비동기 위임됨.
+    // 프론트엔드 하위 호환성을 위해 더미 응답을 반환합니다. (Phase 45-C에서 제거 예정)
+    res.json({
+      status: 'success',
+      mvp_tasks: [],
+      future_scope: [],
+      message_to_user: "Plan Master가 비동기로 로드맵을 구성하고 있습니다."
+    });
   } catch (err) {
     console.error('[API /api/projects/:id/plan-master/generate-roadmaps] Error:', err.message);
     res.status(500).json({ error: err.message });

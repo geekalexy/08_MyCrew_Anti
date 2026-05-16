@@ -84,7 +84,8 @@ export async function runDebugLoop(task, signal, io, qaReportContent = null) {
             const toolCallMatch = result.text.match(/<tool_calls>([\s\S]*?)<\/tool_calls>/i);
             if (toolCallMatch) {
                 try {
-                    const calls = JSON.parse(toolCallMatch[1].trim());
+                    const cleanJson = toolCallMatch[1].replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+                    const calls = JSON.parse(cleanJson);
                     for (const call of calls) {
                         if (signal?.aborted) throw new Error('AbortError');
 

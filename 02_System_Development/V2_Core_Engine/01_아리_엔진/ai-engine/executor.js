@@ -1200,7 +1200,8 @@ class Executor {
             const toolCallMatch = result.text.match(/<tool_calls>([\s\S]*?)<\/tool_calls>/i);
             if (toolCallMatch) {
               try {
-                const calls = JSON.parse(toolCallMatch[1].trim());
+                const cleanJson = toolCallMatch[1].replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+              const calls = JSON.parse(cleanJson);
                 for (const call of calls) {
                   const { name, arguments: args } = call;
                   if (this._broadcastLog) this._broadcastLog('info', `🔧 도구 실행 중: ${name}`, 'Task Master', currentTaskId);
@@ -1284,7 +1285,8 @@ class Executor {
           const toolCallMatch = result.text.match(/<tool_calls>([\s\S]*?)<\/tool_calls>/i);
           if (toolCallMatch) {
             try {
-              const calls = JSON.parse(toolCallMatch[1].trim());
+              const cleanJson = toolCallMatch[1].replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+              const calls = JSON.parse(cleanJson);
               for (const call of calls) {
                 const { name, arguments: args } = call;
                 if (this._broadcastLog) this._broadcastLog('info', `🔧 도구 실행 중: ${name}`, agentId, currentTaskId);

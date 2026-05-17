@@ -4,7 +4,8 @@
 > 작성일: 2026-05-16  
 > CTO 리뷰: 루카 (Luca) — 2026-05-16  
 > 리뷰어: Prime (Claude Sonnet 4.6 Thinking) — 2026-05-16  
-> 상태: **점검 완료 / 설계 초안 / Prime 리뷰 반영**  
+> 업데이트: 소넷 (Sonnet) — 2026-05-17 (설계 철학 역전 재설계 반영)  
+> 상태: **점검 완료 / 설계 초안 / Prime 리뷰 반영 / ⚠️ 설계 철학 재설계 진행 중**  
 > 연관 Phase: Phase 43-4 (AutoRun), Phase 43-5 (Task 분기), Phase 46 (Full Auto QA)
 
 ---
@@ -124,6 +125,19 @@ Phase 43-5 기획서의 코멘트 핑퐁 루프 원칙을 plan_master와 auto_QA
 서버(server.js)는 최초 트리거만 발행하고, 이후 루프는 에이전트가 MCP Tool을 호출하며 진행한다.
 ```
 
+> [!IMPORTANT]
+> **[2026-05-17 설계 철학 추가 — 수동 모드 기본값 원칙]**
+>
+> 모든 AI 파이프라인(플랜마스터, 오토런, 오토QA)의 **기본값은 수동 모드**다.
+> - `task:create`, `task:move`, `task:comment` 등 칸반 이벤트는 DB 상태 변경만 수행한다.
+> - AI 에이전트 실행은 반드시 다음 명시적 트리거 중 하나로만 시작된다:
+>   - 슬래시 명령어: `/plan_master`, `/auto_run`, `/auto_qa`, `/auto_debug`
+>   - UI 모드 토글: `pipelineMode = 'run'` 저장
+>   - 수동 실행 버튼: `isManualTrigger = true` 플래그
+> - 이를 위반하는 `forceRedispatchTask` 직접 호출은 반드시 `pipelineMode === 'run'` 가드를 통과해야 한다.
+>
+> **근거**: 예외(Exception)로 차단하는 현재 구조는 새 진입점마다 가드 누락 버그가 반복됨 (Phase45_버그_디버그_리포트.md Design #1 참조).
+
 ### 4-2. plan_master — MCP 기반 재설계
 
 #### 목표 흐름
@@ -207,6 +221,29 @@ AI가 MCP Tool 호출:
 - [ ] `task:qa_status_update` — DB 상태 변경만으로 충분하면 소켓 제거 가능 여부 검토
 - [ ] 의존 컴포넌트 단계적 제거 (App.jsx → KanbanBoard.jsx → TaskDetailModal 순서)
 
+### Phase 45-D: 오토런 기본값 설계 역전 — 장기 재설계 ⚠️ 최우선 착수
+
+> **배경**: 2026-05-17 대표님 지시. "기본은 수동 모드, 명시적 트리거 시에만 AI 파이프라인 작동"이 올바른 철학임을 확인. 현재 설계는 이것이 역전되어 있음 (Phase45_버그_디버그_리포트.md Design #1).
+
+**목표**: 모든 AI 실행 진입점을 `pipelineMode` 단일 게이트로 일원화하여 예외 처리 구조를 완전히 제거.
+
+#### Phase 45-D-1: `forceRedispatchTask` pipelineMode 게이트 추가
+- [ ] `forceRedispatchTask` 함수 상단에 `pipelineMode !== 'run' && !isManualTrigger` 가드 삽입
+- [ ] `isManualTrigger` 파라미터 추가 (`contextType` 다음)
+- [ ] 기존 `forceRedispatchTask` 직접 호출 위치 전수 조사 (현재 약 20곳)
+- [ ] 슬래시 명령어 경로(`/auto_run`, `ari:message`)에만 `isManualTrigger: true` 전달
+
+#### Phase 45-D-2: `task:move` 핸들러 디커플링
+- [ ] `task:move` → `in_progress` 드래그 시: `pipelineMode === 'run'`일 때만 `forceRedispatchTask` 호출
+- [ ] `pipelineMode !== 'run'`: 드래그 = 상태 변경(DB)만, AI 실행 없음
+- [ ] `task:create` 핸들러: 봇 할당 시 `dispatchNextTaskForAgent` 호출 제거 (pipelineMode 가드로 대체)
+
+#### Phase 45-D-3: 설계 완료 검증
+- [ ] CEO 카드 생성 → To-Do 유지 확인 (CEO 예외 코드 불필요해짐)
+- [ ] 오토런 OFF 상태에서 카드 드래그 → AI 미실행 확인
+- [ ] `/auto_run` 명령 → 정상 실행 확인
+- [ ] `pipelineMode = 'run'` 토글 → 정상 실행 확인
+
 ---
 
 ## 6. 정책 준수 체크 (Phase 45 적용 기준)
@@ -242,10 +279,15 @@ AI가 MCP Tool 호출:
 1. `qaLoop.js`/`debugLoop.js`의 미사용 `import { executeTool }` 제거 후 실제 라우팅 설계
 2. `graphify update .` 실행 — `qaLoop`, `debugLoop`, `CategoryTaskService`가 그래프에 미등록
 
-**구현 순서**:
-1. 선결 사항 해소 후 `/code` 모드 전환 → Phase 45-A 구현 착수
-2. Phase 45-A 완료 후 Phase 43-5 Task 분기 보강 기획서와 통합하여 Phase 45-B 진행
-3. 전체 완료 후 Supreme Review → Phase 46 (Full Auto QA) 착수
+**구현 순서 (2026-05-17 업데이트)**:
+1. **[최우선] Phase 45-D 장기 재설계** 착수 — 오토런 기본값 설계 역전 해소
+   - 45-D-1 `forceRedispatchTask` 게이트 → 45-D-2 `task:move` 디커플링 → 45-D-3 검증
+2. Phase 45-D 완료 후 선결 사항 해소 → Phase 45-A (qaLoop/debugLoop) 구현
+3. Phase 45-A 완료 후 Phase 45-B (plan_master God Route 제거)
+4. 전체 완료 후 Supreme Review → Phase 46 (Full Auto QA) 착수
+
+> [!NOTE]
+> Phase 45-D를 먼저 진행하는 이유: 현재 설계 역전 상태에서 45-A/B를 구현하면, 새 루프 진입점이 추가될 때마다 동일 버그가 재발하는 구조가 고착된다. 기반 설계를 먼저 바로잡아야 이후 구현이 안전하다.
 
 ---
 

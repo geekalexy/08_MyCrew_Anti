@@ -192,6 +192,13 @@ export default function LogDrawer() {
     }
   }, [isStreaming]);
 
+  // [Bug #1 Fix] btnMode 이중 잠금 추가 수정: 스트리밍 종료 시 sending 상태면 send로 롤백
+  useEffect(() => {
+    if (!isStreaming && btnMode === 'sending') {
+      setBtnMode('send');
+    }
+  }, [isStreaming, btnMode]);
+
   // 팀 상세 페이지, 프로필 페이지에서는 Chatting 탭을 디폴트로 활성화
   useEffect(() => {
     if (currentView === 'organization' || currentView === 'agent-detail') {
@@ -289,7 +296,19 @@ export default function LogDrawer() {
           : `✅ ${author?.toUpperCase()} 작업 완료 — 카드에서 결과물 확인`;  // 에이전트: 요약
 
         setTimelineComments(prev => {
-          const exists = prev.some(c => c.content === displayContent && c.author === author);
+          const optimisticIndex = prev.findIndex(c => c._optimistic && c.author === author && String(c.taskId) === String(taskId));
+          if (optimisticIndex !== -1) {
+            const newComments = [...prev];
+            newComments[optimisticIndex] = {
+              taskId, author,
+              content: displayContent,
+              thought_process: (isSystem || isCeo) ? null : thought_process,
+              created_at: createdAt || new Date().toISOString()
+            };
+            return newComments;
+          }
+
+          const exists = prev.some(c => c.content === displayContent && c.author === author && String(c.taskId) === String(taskId));
           if (exists) return prev;
           return [...prev, {
             taskId, author,
@@ -366,7 +385,7 @@ export default function LogDrawer() {
       // 비이미지 파일은 텍스트로
       setInputText(prev => prev + files.map(f => `[첨부: ${f.name}]`).join(' '));
     }
-  }, []);
+  }, [setInputText]);
 
   // ── [ImageAttach] 클립보드 블래시 붙여넣기 ────────────────────────────────
   const handlePaste = useCallback(async (e) => {
@@ -461,7 +480,8 @@ export default function LogDrawer() {
         taskId: focusedTask.id,
         author: 'CEO',
         content: commentContent,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        _optimistic: true
       }]);
 
       fetchPromise = fetch(`${SERVER_URL}/api/tasks/${focusedTask.id}/comments`, {
@@ -510,7 +530,8 @@ export default function LogDrawer() {
 
         // SSE 스트리밍 통신 시작 (Phase 46-B)
         const preferredModel = agentMeta?.['ari']?.model || 'gemini-2.5-flash';
-        startStream(`${SERVER_URL}/api/compute`, {
+        const ARI_DAEMON_URL = import.meta.env.VITE_ARI_DAEMON_URL || 'http://localhost:5050';
+        startStream(`${ARI_DAEMON_URL}/api/compute`, {
           content: trimmedText || '(이미지 전송)',
           author: 'CEO',
           preferredModel,
@@ -565,7 +586,7 @@ export default function LogDrawer() {
         const hasMention = trimmedText.match(/^@([a-zA-Z가-힣]+)/);
         setBtnMode(activeLogTab === 'time' ? (focusedTask || hasMention ? 'send' : 'idle') : 'send');
       });
-  }, [inputText, attachedImages, focusedTask, btnMode, activeLogTab, mentionedAgent]);
+  }, [inputText, attachedImages, focusedTask, btnMode, activeLogTab, mentionedAgent, selectedProjectId, startStream]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend(); }

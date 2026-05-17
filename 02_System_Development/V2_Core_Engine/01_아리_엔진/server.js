@@ -214,9 +214,14 @@ setInterval(() => {
 }, 5000);
 
 // ─── [Phase 25] Event-Driven Task Dispatcher (이벤트 기반 Pull 모델) ───
-async function dispatchNextTaskForAgent(agentId, projectId = null) {
-  if (!dbManager || !agentId || agentId === '미할당' || agentId === 'system') return;
+async function dispatchNextTaskForAgent(agentId, projectId = null, isManualTrigger = false) {
+  if (!dbManager || !agentId || agentId === '미할당' || agentId === 'system' || agentId.toUpperCase() === 'CEO' || agentId === '대표님' || agentId === 'extension_user') return;
   try {
+    const pipelineMode = projectId ? await dbManager.getProjectPipelineMode(projectId).catch(() => 'none') : 'none';
+    if (pipelineMode !== 'run' && !isManualTrigger) {
+      return; // 오토런 모드 OFF + 수동 트리거 아님 -> AI 자동 착수 중단
+    }
+
     const tasks = await dbManager.getAllTasksLight(projectId);
     
     // 1. 해당 에이전트가 현재 진행 중인 작업이 있는지 확인 (Busy 체크)
@@ -477,19 +482,35 @@ async function handleReviewRequest(taskRow, fromAgentId, reviewRequest) {
     await dbManager.updateTaskStatus(taskRow.id, 'IN_PROGRESS');
     io.emit('task:moved', { taskId: String(taskRow.id), toColumn: 'in_progress' });
     // 3. 새 에이전트 디스패치
-    setTimeout(() => forceRedispatchTask(taskRow.id, assignee, message || '', 'PINGPONG'), 800);
+    // PINGPONG은 파이프라인 내부 연속 작업 — isManualTrigger:true로 pipelineMode 게이트 통과
+    setTimeout(() => forceRedispatchTask(taskRow.id, assignee, message || '', 'PINGPONG', null, true), 800);
   } catch (e) {
     console.error('[ReviewRequest] 처리 오류:', e.message);
   }
 }
 
-async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM', forceModel = null) {
+// [Phase 45-D] isManualTrigger: 슬래시 명령어/UI 버튼/PINGPONG 등 명시적 트리거 여부
+// 기본값 false → pipelineMode !== 'run'이면 AI 실행 없음 (수동 모드 기본값 원칙)
+async function forceRedispatchTask(taskId, agentId, additionalContext = '', contextType = 'INTERIM', forceModel = null, isManualTrigger = false) {
   if (!dbManager || !executor) return;
+  if (!agentId || agentId === '미할당' || agentId === 'system' || agentId.toUpperCase() === 'CEO' || agentId === '대표님' || agentId === 'extension_user') return;
   try {
     const fullTask = await dbManager.getTaskById(taskId);
     if (!fullTask) {
       console.warn(`[ForceRedispatch] Task #${taskId} 없음 — 재착수 취소`);
       return;
+    }
+
+    // [Phase 45-D-1] 수동 모드 기본값 원칙 게이트
+    // isManualTrigger가 아니면 pipelineMode === 'run'일 때만 실행
+    if (!isManualTrigger) {
+      const mode = fullTask.project_id
+        ? await dbManager.getProjectPipelineMode(fullTask.project_id).catch(() => 'none')
+        : 'none';
+      if (mode !== 'run') {
+        console.log(`[ForceRedispatch] Task #${taskId} — 오토런 OFF 상태. AI 실행 중단 (pipelineMode=${mode})`);
+        return;
+      }
     }
 
     // [Phase 36b] 카드링크 컨텍스트 자동 주입
@@ -766,6 +787,9 @@ io.on('connection', (socket) => {
   socket.on('extension:chat', async ({ text, model, history = [], browserContext = {} }) => {
     console.log(`[Extension] Received chat: ${text} | Model: ${model} | URL: ${browserContext.url || 'N/A'}`);
     
+    // [Finding #3] 서버 사이드 히스토리 길이 제한 방어 로직 추가
+    const safeHistory = (history || []).slice(-6);
+    
     // ── [Sprint 7 — Step 4] Slash Command 전처리기 ─────────────────────
     // LLM 호출 없이 즉시 시스템 기능으로 연결하여 비용 절감 및 즉시 응답
     if (text.startsWith('/task ')) {
@@ -790,7 +814,7 @@ io.on('connection', (socket) => {
           text: `✅ **새 카드 생성 완료!**\n- 카드 번호: #${taskId}\n- 내용: ${taskContent}\n- 상태: 대기(PENDING)\n\n대시보드 칸반 보드에서 확인하실 수 있습니다.` 
         });
         // 히스토리에도 기록
-        const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: `[/task] 카드 #${taskId} 생성 완료` }];
+        const newHistory = [...safeHistory, { role: 'user', content: text }, { role: 'assistant', content: `[/task] 카드 #${taskId} 생성 완료` }];
         try { await dbManager.saveExtensionSession('default_session', newHistory); } catch (e) { /* silent */ }
       } catch (error) {
         console.error('[Extension] /task 실패:', error);
@@ -852,9 +876,9 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
     
     // [Sprint 5] 과거 대화 히스토리를 User Prompt에 체이닝
     let historyBlock = '';
-    if (history && history.length > 0) {
+    if (safeHistory && safeHistory.length > 0) {
       historyBlock = '<conversation_history>\n';
-      history.forEach(msg => {
+      safeHistory.forEach(msg => {
         historyBlock += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n\n`;
       });
       historyBlock += '</conversation_history>\n\n현재 사용자의 새로운 요청:\n';
@@ -868,7 +892,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
         result = await antigravityAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, 'extension', model, 60000);
       } else {
         // 내장 Gemini 어댑터 직접 호출
-        result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, model || MODEL.FLASH);
+        result = await geminiAdapter.generateResponse(finalUserPrompt, finalSystemPrompt, MODEL.FLASH);
       }
       
       // ── [Sprint 7 — Step 1] System Action Backend Interceptor ──────────
@@ -916,7 +940,7 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
       socket.emit('extension:reply', { text: responseText });
       
       // [Sprint 5] DB에 새로운 히스토리 체인 저장
-      const newHistory = [...history, { role: 'user', content: text }, { role: 'assistant', content: responseText }];
+      const newHistory = [...safeHistory, { role: 'user', content: text }, { role: 'assistant', content: responseText }];
       try {
         await dbManager.saveExtensionSession('default_session', newHistory);
       } catch (e) {
@@ -1018,8 +1042,15 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
             broadcastLog('warn', `새로운 긴급 업무 지시(드래그)로 인해 기존 작업 #${at.id}을(를) 잠시 대기(To-Do) 상태로 내립니다.`, 'system', at.id);
           }
 
-          // 드래그된 작업 즉시 착수
-          forceRedispatchTask(task.id, agentId, '', 'START');
+          // [Phase 45-D-2] 드래그 in_progress: pipelineMode === 'run'일 때만 AI 착수
+          // 오토런 OFF 시 드래그 = 상태 변경(DB)만, AI 실행 없음
+          const dragMode = await dbManager.getProjectPipelineMode(task.project_id).catch(() => 'none');
+          if (dragMode === 'run') {
+            // dragMode 확인 완료 — isManualTrigger:true로 내부 중복 DB 조회 방지
+            forceRedispatchTask(task.id, agentId, '', 'START', null, true);
+          } else {
+            broadcastLog('info', `> [${agentId}] 카드 이동 완료 (오토런 OFF — AI 자동 착수 없음)`, 'system', task.id);
+          }
         }
       }
       
@@ -1062,7 +1093,9 @@ ${browserContext.domSnapshot ? `\`\`\`text\n${browserContext.domSnapshot}\n\`\`\
       
       // 새로 할당된 에이전트가 있으면 Dispatcher 트리거
       if (assignee && assignee !== '미할당') {
-        setTimeout(() => dispatchNextTaskForAgent(assignee, targetProjectId), 500); // DB 갱신 대기 후 트리거
+        // [Phase 45-D-2] task:create: dispatchNextTaskForAgent는 이미 pipelineMode 가드 보유
+        // 오토런 OFF 시 → 가드에서 자동 차단됨. 별도 예외처리 불필요
+        setTimeout(() => dispatchNextTaskForAgent(assignee, targetProjectId), 500);
       }
     } catch (err) {
       console.error('[Socket] task:create 오류:', err.message);
@@ -1265,7 +1298,8 @@ async function checkV3RelayWatchdog(completedTask, projectId) {
         });
         broadcastLog('info', `> [dev_advisor] 긴급 복구 카드가 생성되어 파이프라인을 재가동합니다.`, 'system', rescueTaskId, 'DASHBOARD', projectId);
         
-        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START'));
+        // 워치독 복구 기동 — pipelineMode='run' 환경에서만 진입하므로 isManualTrigger:true
+        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START', null, true));
         startPipelineWatchdog(projectId); // 워치독 타이머 재시작 보장
       }
     } catch (e) {
@@ -1308,7 +1342,8 @@ function startPipelineWatchdog(projectId) {
             broadcastLog('info', `> [Watchdog L1] PENDING 상태 단절 카드 감지 → Task #${stuckTask.project_task_num || stuckTask.id} 자동 재개`, 'system', stuckTask.id, 'DASHBOARD', projectId);
             await dbManager.updateTaskStatus(stuckTask.id, 'IN_PROGRESS');
             io.emit('task:moved', { taskId: String(stuckTask.id), toColumn: 'in_progress' });
-            setImmediate(() => forceRedispatchTask(stuckTask.id, stuckTask.assigned_agent, '', 'START'));
+            // 워치독 stuck 탐지 복구 — pipelineMode='run'에서만 진입하므로 isManualTrigger:true
+            setImmediate(() => forceRedispatchTask(stuckTask.id, stuckTask.assigned_agent, '', 'START', null, true));
           }
         } catch (recoverErr) {
           console.error('[V3 Watchdog L1] 재개 시도 오류:', recoverErr.message);
@@ -1333,7 +1368,8 @@ function startPipelineWatchdog(projectId) {
           status: 'IN_PROGRESS', 
           column: 'in_progress' 
         });
-        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START'));
+        // 워치독 L2 장기 단절 복구 — pipelineMode='run'에서만 진입하므로 isManualTrigger:true
+        setImmediate(() => forceRedispatchTask(rescueTaskId, 'dev_advisor', '', 'START', null, true));
       } else {
         // Level 3: CEO 호출
         stopPipelineWatchdog(projectId);
@@ -1798,7 +1834,8 @@ async function startPipelineInternal(projectId, mode, targetTaskId = null) {
   io.emit('task:moved', { taskId: String(firstTask.id), toColumn: 'in_progress' });
   io.emit('task:updated', { taskId: String(firstTask.id), status: 'IN_PROGRESS', column: 'in_progress', sprint_no: sprintNo });
   broadcastLog('info', `> [${firstTask.assigned_agent}] Sprint #${sprintNo} 시작: ${firstTask.title}`, 'system', firstTask.id, 'DASHBOARD', projectId);
-  setImmediate(() => forceRedispatchTask(firstTask.id, firstTask.assigned_agent, '', 'START'));
+  // sprint:start 명령 실행 — 수동 트리거 (isManualTrigger:true)
+  setImmediate(() => forceRedispatchTask(firstTask.id, firstTask.assigned_agent, '', 'START', null, true));
 
   startPipelineWatchdog(projectId);
 
@@ -3310,7 +3347,8 @@ app.patch('/api/tasks/:id', async (req, res) => {
           // 담당자가 CEO인 경우 AI 실행을 하지 않고 상태만 IN_PROGRESS로 업데이트
           if (agentId.toLowerCase() !== 'ceo') {
             // FilePollingAdapter 대신 엔진에서 직접 실행
-            forceRedispatchTask(taskId, agentId, '', 'START');
+            // ari:message 라우팅 결과 → 수동 트리거 (isManualTrigger:true)
+            forceRedispatchTask(taskId, agentId, '', 'START', null, true);
           }
         }
       }
@@ -3518,7 +3556,8 @@ app.patch('/api/tasks/:id/rework', async (req, res) => {
     await dbManager.incrementCksIrc(sid).catch(e => console.error('[DB] IRC 증가 실패:', e));
 
     // [버그 수정] 재작업 지시 시 에이전트가 실제로 작업을 다시 수행하도록 강제 트리거
-    forceRedispatchTask(sid, task.assigned_agent, reason, 'REWORK');
+    // 재작업 지시 → 대표님 수동 트리거 (isManualTrigger:true)
+    forceRedispatchTask(sid, task.assigned_agent, reason, 'REWORK', null, true);
 
     
     res.json({ status: 'ok', message: '재작업 지시 완료. In Progress로 이동했습니다.' });
@@ -3704,7 +3743,8 @@ app.post('/api/tasks/:id/run', async (req, res) => {
       return res.json({ status: 'ok', message: 'Plan Master 트리거 완료 (프론트엔드 모달 오픈 대기)', route: routeResult });
     }
 
-    forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode, forceModel);
+    // 슬래시 명령어(/auto_run 등) 라우팅 → 수동 트리거 (isManualTrigger:true)
+    forceRedispatchTask(sid, agentToTrigger, routeResult.extractedPayload, routeResult.mode, forceModel, true);
 
     res.json({ status: 'ok', message: 'Zero-Command 트리거 성공', route: routeResult });
   } catch (err) {

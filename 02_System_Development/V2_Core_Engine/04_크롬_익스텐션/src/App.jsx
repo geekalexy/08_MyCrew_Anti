@@ -180,7 +180,7 @@ function App() {
     }
 
     // 2. 히스토리 구성 (system 메시지 제외)
-    const chatHistory = messages.filter(m => m.role !== 'system');
+    const chatHistory = messages.filter(m => m.role !== 'system').slice(-6);
     
     // 3. UI 업데이트 및 전송
     setMessages(prev => [...prev, { role: 'user', content: input }]);

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useChatStore } from '../store/chatStore';
 
 // 타임아웃 매핑 테이블 (단위: 밀리초)
@@ -17,7 +17,10 @@ const TOOL_TIMEOUTS = {
 export function useStreaming() {
   const abortControllerRef = useRef(null);
   const timeoutRef = useRef(null);
-  const { setStreamingState, appendStreamingText, appendChat } = useChatStore();
+  // [Fix] Zustand persist hydration 충돌 방지: 전체 구독 대신 개별 selector 사용
+  const setStreamingState = useChatStore((s) => s.setStreamingState);
+  const appendStreamingText = useChatStore((s) => s.appendStreamingText);
+  const appendChat = useChatStore((s) => s.appendChat);
 
   const clearToolTimeout = () => {
     if (timeoutRef.current) {
@@ -94,6 +97,13 @@ export function useStreaming() {
               
               timeoutRef.current = setTimeout(() => {
                 console.warn(`[SSE] ⚠️ 도구 실행 타임아웃: ${data.toolName}`);
+                appendChat({
+                  level: 'warn',
+                  message: `⏱️ 도구 실행이 지연되고 있습니다 (${data.displayName || data.toolName}). 잠시만 더 기다려주세요...`,
+                  agentId: 'system',
+                  timestamp: new Date().toISOString(),
+                  projectId,
+                });
               }, timeoutMs);
 
             } else if (currentEvent === 'tool:end') {
@@ -160,6 +170,13 @@ export function useStreaming() {
       abortControllerRef.current = null;
     }
   }, [dangerouslyAbortStream, setStreamingState, appendStreamingText, appendChat]);
+
+  // [P-017] 컴포넌트 언마운트 시 자동 스트림 중단
+  useEffect(() => {
+    return () => {
+      dangerouslyAbortStream();
+    };
+  }, [dangerouslyAbortStream]);
 
   return {
     startStream,

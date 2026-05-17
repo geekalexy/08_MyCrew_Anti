@@ -11,7 +11,30 @@ async function startBrowser() {
 }
 
 async function extractAOM(page: Page) {
-    const snapshot = await page.accessibility.snapshot();
+    const client = await page.context().newCDPSession(page);
+    const { nodes } = await client.send('Accessibility.getFullAXTree');
+    const nodeMap = new Map();
+    for (const n of nodes) {
+        nodeMap.set(n.nodeId, {
+            role: n.role?.value,
+            name: n.name?.value,
+            children: [],
+            childIds: n.childIds || []
+        });
+    }
+    let snapshot = null;
+    if (nodes.length > 0) {
+        for (const n of nodes) {
+            const mapped = nodeMap.get(n.nodeId);
+            for (const cid of mapped.childIds) {
+                const child = nodeMap.get(cid);
+                if (child) {
+                    mapped.children.push(child);
+                }
+            }
+        }
+        snapshot = nodeMap.get(nodes[0].nodeId);
+    }
     let idCounter = 1;
     elementMap.clear();
 
